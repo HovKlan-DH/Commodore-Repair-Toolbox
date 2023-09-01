@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Commodore-Retro-Toolbox")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+28b51e93acf4418bea14284bbddd4c0605555d05")]
 [assembly: System.Reflection.AssemblyProductAttribute("Commodore-Retro-Toolbox")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Commodore-Retro-Toolbox")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

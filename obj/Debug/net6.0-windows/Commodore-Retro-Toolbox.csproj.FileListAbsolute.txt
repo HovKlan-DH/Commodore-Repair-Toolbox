@@ -4,6 +4,7 @@ D:\Data\Development\Visual Studio\Commodore-Retro-Toolbox\bin\Debug\net6.0-windo
 D:\Data\Development\Visual Studio\Commodore-Retro-Toolbox\bin\Debug\net6.0-windows\Commodore-Retro-Toolbox.dll
 D:\Data\Development\Visual Studio\Commodore-Retro-Toolbox\bin\Debug\net6.0-windows\Commodore-Retro-Toolbox.pdb
 D:\Data\Development\Visual Studio\Commodore-Retro-Toolbox\obj\Debug\net6.0-windows\Commodore_Retro_Toolbox.Form1.resources
+D:\Data\Development\Visual Studio\Commodore-Retro-Toolbox\obj\Debug\net6.0-windows\Commodore_Retro_Toolbox.Properties.Resources.resources
 D:\Data\Development\Visual Studio\Commodore-Retro-Toolbox\obj\Debug\net6.0-windows\Commodore-Retro-Toolbox.csproj.GenerateResource.cache
 D:\Data\Development\Visual Studio\Commodore-Retro-Toolbox\obj\Debug\net6.0-windows\Commodore-Retro-Toolbox.GeneratedMSBuildEditorConfig.editorconfig
 D:\Data\Development\Visual Studio\Commodore-Retro-Toolbox\obj\Debug\net6.0-windows\Commodore-Retro-Toolbox.AssemblyInfoInputs.cache
