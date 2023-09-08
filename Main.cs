@@ -24,17 +24,22 @@ namespace Commodore_Retro_Toolbox
         {
             InitializeComponent();
 
+//            tabPage1.Margin = new Padding(0);
+//            tabPage1.Padding = new Padding(0);
+
             panelMain = new CustomPanel
             {
                 Size = new Size(500, 350),
                 Location = new Point(0, 0),
                 AutoScroll = true,
                 Dock = DockStyle.Fill,
+//                Margin = new Padding(0),
+//                Padding = new Padding(0),
             };
             tabPage1.Controls.Add(panelMain);
 
 
-            //image = Image.FromFile("Application.StartupPath + "\\Data\\Schematics.gif");
+            //image = Image.FromFile(Application.StartupPath + "\\Data\\Schematics.gif");
             image = Image.FromFile(Application.StartupPath + "\\Data\\Image.jpg");
             panelImage = new Panel
             {
@@ -42,6 +47,8 @@ namespace Commodore_Retro_Toolbox
                 BackgroundImage = image,
                 BackgroundImageLayout = ImageLayout.Zoom,
                 Dock = DockStyle.None,
+//                Margin = new Padding(0),
+//                Padding = new Padding(0),
             };
             panelMain.Controls.Add(panelImage);
 
@@ -49,7 +56,8 @@ namespace Commodore_Retro_Toolbox
             panelImage.MouseDown += PanelImage_MouseDown;
             panelImage.MouseUp += PanelImage_MouseUp;
             panelImage.MouseMove += PanelImage_MouseMove;
-            
+            this.Shown += new EventHandler(this.Main_Shown);
+
 
             // Enable double buffering for the panels (smoother drawing updates)
             panelMain.DoubleBuffered(true);
@@ -57,7 +65,10 @@ namespace Commodore_Retro_Toolbox
 
         }
 
-
+        private void Main_Shown(object sender, EventArgs e)
+        {
+            panelMain.AutoScrollPosition = new Point(750, 400);
+        }
 
         private void PanelMain_MouseWheel(object sender, MouseEventArgs e)
         {
