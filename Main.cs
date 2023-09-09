@@ -8,30 +8,40 @@ namespace Commodore_Retro_Toolbox
     public partial class Main : Form
     {
 
-        private Image image;
-        private float zoomFactor = 1.0f;
-        private Point lastMousePosition;
-        private TransparentPanel panelOverlay1;
+        // UI elements
         private CustomPanel panelMain;
         private Panel panelImage;
         private PictureBox overlayPictureBox1;
-        private Bitmap bmp1;
+        private Bitmap overlayBitmap1; 
+        
+        // Main variables
+        private Image image;
+        private float zoomFactor = 1.0f;
+        private Point lastMousePosition;
         private Size originalOverlaySize;
         private Point originalOverlayLocation;
+        private bool isResizedByMouseWheel = false;
+
+
+        // ###########################################################################################
+        // Main()
+        // -----------------
+        // This is where it all starts :-)
+        // ###########################################################################################
 
         public Main()
         {
             InitializeComponent();
 
-            // Initialize main panel with custom settings
+            // Initialize main panel, make it part of the "tabMain" and fill the entire size
             panelMain = new CustomPanel
             {
-                Size = new Size(500, 350),
+                Size = new Size(10, 10),
                 Location = new Point(0, 0),
                 AutoScroll = true,
                 Dock = DockStyle.Fill,
             };
-            tabPage1.Controls.Add(panelMain);
+            tabMain.Controls.Add(panelMain);
 
             // Load an image and initialize image panel
             image = Image.FromFile(Application.StartupPath + "\\Data\\Schematics.gif");
@@ -57,14 +67,15 @@ namespace Commodore_Retro_Toolbox
 
             
            
-
+            /*
             // Create and set a bitmap for the overlay PictureBox
-            bmp1 = new Bitmap(overlayPictureBox1.Width, overlayPictureBox1.Height);
-            using (Graphics g = Graphics.FromImage(bmp1))
+            overlayBitmap1 = new Bitmap(overlayPictureBox1.Width, overlayPictureBox1.Height);
+            using (Graphics g = Graphics.FromImage(overlayBitmap1))
             {
                 g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
             }
-            overlayPictureBox1.Image = bmp1;
+            overlayPictureBox1.Image = overlayBitmap1;
+            */
 
             // Attach event handlers for mouse events and form shown
             panelMain.CustomMouseWheel += new MouseEventHandler(PanelMain_MouseWheel);
@@ -72,6 +83,7 @@ namespace Commodore_Retro_Toolbox
             panelImage.MouseUp += PanelImage_MouseUp;
             panelImage.MouseMove += PanelImage_MouseMove;
             this.Shown += new EventHandler(this.Main_Shown);
+            panelMain.Resize += new EventHandler(this.PanelMain_Resize);
 
             overlayPictureBox1.MouseDown += PanelImage_MouseDown;
             overlayPictureBox1.MouseUp += PanelImage_MouseUp;
@@ -82,14 +94,39 @@ namespace Commodore_Retro_Toolbox
             panelImage.DoubleBuffered(true);
         }
 
+
+        // ###########################################################################################
+        // Main_Shown()
+        // -----------------
+        // What to do AFTER the Main() form has been shown?
+        // ###########################################################################################
+
+        private void Main_Shown(object sender, EventArgs e)
+        {
+            FitImageToPanel();
+            
+            //panelMain.AutoScrollPosition = new Point(750, 400);FitImageToPanel();
+        }
+        
+        
+        // ###########################################################################################
+        // FitImageToPanel()
+        // -----------------
+        // Resize image to fit main panel display (show 100% of the image)
+        // ###########################################################################################
+
         private void FitImageToPanel()
         {
+            // Set the zoom factor
             float xZoomFactor = (float)panelMain.Width / image.Width;
             float yZoomFactor = (float)panelMain.Height / image.Height;
             zoomFactor = Math.Min(xZoomFactor, yZoomFactor);
 
+            // Update the image size to the zoom factor
             panelImage.Size = new Size((int)(image.Width * zoomFactor), (int)(image.Height * zoomFactor));
 
+            // HEST
+            // Update the overlays
             if (overlayPictureBox1 != null)
             {
                 int newWidth = (int)(originalOverlaySize.Width * zoomFactor);
@@ -97,6 +134,7 @@ namespace Commodore_Retro_Toolbox
                 overlayPictureBox1.Size = new Size(newWidth, newHeight);
                 overlayPictureBox1.Location = new Point((int)(originalOverlayLocation.X * zoomFactor), (int)(originalOverlayLocation.Y * zoomFactor));
 
+                // Dispose the overlay transparent bitmap and create a new one (bitmaps cannot be resized)
                 if (overlayPictureBox1.Image != null)
                 {
                     overlayPictureBox1.Image.Dispose();
@@ -110,18 +148,19 @@ namespace Commodore_Retro_Toolbox
             }
         }
 
-        private void Main_Shown(object sender, EventArgs e)
+
+        private void PanelMain_Resize(object sender, EventArgs e)
         {
-            //            panelMain.AutoScrollPosition = new Point(750, 400);FitImageToPanel();
-            FitImageToPanel();
+            if (!isResizedByMouseWheel)
+            {
+                FitImageToPanel();
+            }
+
+            isResizedByMouseWheel = false;
         }
 
         private void PanelMain_MouseWheel(object sender, MouseEventArgs e)
         {
-//            panelMain.SuspendLayout();
-//            panelImage.SuspendLayout();
-//            overlayPictureBox1.SuspendLayout();
-
             Debug.WriteLine("MouseWheel event");
             float oldZoomFactor = zoomFactor;
 
@@ -151,6 +190,8 @@ namespace Commodore_Retro_Toolbox
 
             if (hasZoomChanged)
             {
+                isResizedByMouseWheel = true;
+
                 // Calculate the new size of the imagePanel.
                 Size newSize = new Size((int)(image.Width * zoomFactor), (int)(image.Height * zoomFactor));
 
@@ -198,9 +239,6 @@ namespace Commodore_Retro_Toolbox
 
                 Debug.WriteLine("After: panelMain.Width=" + panelMain.Width + ", panelImage.Width=" + panelImage.Width + ", image.Width=" + image.Width + ", panelMain.AutoScrollPosition.X=" + panelMain.AutoScrollPosition.X);
 
-//                panelMain.ResumeLayout();
-//                panelImage.ResumeLayout();
-//                overlayPictureBox1.ResumeLayout();
             }
         }
 
