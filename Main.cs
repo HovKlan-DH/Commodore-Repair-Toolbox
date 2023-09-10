@@ -46,6 +46,8 @@ namespace Commodore_Retro_Toolbox
 
         private void InitializeTabMain()
         {
+
+
             // Initialize main panel, make it part of the "tabMain" and fill the entire size
             panelMain = new CustomPanel
             {
@@ -57,7 +59,7 @@ namespace Commodore_Retro_Toolbox
             panel1.Controls.Add(panelMain);
 
             // Load an image and initialize image panel
-            image = Image.FromFile(Application.StartupPath + "\\Data\\Schematics.gif");
+            image = Image.FromFile(Application.StartupPath + "\\Data\\Commodore 64 Breadbin\\250425\\Schematics 1of2.gif");
             panelImage = new Panel
             {
                 Size = image.Size,
@@ -148,7 +150,6 @@ namespace Commodore_Retro_Toolbox
                     e.Graphics.DrawRectangle(pen, halfPenWidth, halfPenWidth, listBox1.Width - penWidth, listBox1.Height - penWidth);
                 }
             });
-
             panelImageList.Controls.Add(listBox1);
 
             Label listLabel1 = new Label
@@ -258,13 +259,46 @@ namespace Commodore_Retro_Toolbox
             };
             listBox5.Controls.Add(listLabel5);
             */
+
+            // ---
+
+            double ratio = (double)(100 - (double)(((double)(listBox1.Image.Width - listBox1.Width) * 100) / listBox1.Image.Width)) / 100;
+            int newLocationX = (int)Math.Round(1226 * ratio,8);
+            int newLocationY = (int)Math.Round(1672 * ratio,8);
+            int newSizeWidth = (int)Math.Round(listBox1.Size.Width * ratio, 8);
+            int newSizeHeight = (int)Math.Round(listBox1.Size.Height * ratio, 8);
+            int newHeight = (int)(listBox1.Height);
+
+            // Initialize overlay PictureBox and store its original dimensions
+            PictureBox overlayPictureBox100 = new PictureBox
+            {
+                Name = "U3",
+                Size = new Size(6, 4),
+                Location = new Point(45, 62),
+                BackColor = Color.Transparent,
+            };
+            listBox1.Controls.Add(overlayPictureBox100);
+
+
+            // Create a new bitmap with the new dimensions
+            Bitmap newBmp = new Bitmap(overlayPictureBox100.Width, overlayPictureBox100.Height);
+
+            // Perform drawing operations here, if any
+            using (Graphics g = Graphics.FromImage(newBmp))
+            {
+                g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
+            }
+
+            // Set the new bitmap
+            overlayPictureBox100.Image = newBmp;
+
         }
 
 
         // ###########################################################################################
         // Main_Shown()
         // ------------
-        // What to do AFTER the Main() form has been shown?
+        // What to do AFTER the Main() form has been shown (this is not the tab named "Main")?
         // ###########################################################################################
 
         private void Main_Shown(object sender, EventArgs e)
@@ -444,15 +478,15 @@ namespace Commodore_Retro_Toolbox
             Control control = sender as Control;
             if (control != null)
             {
-                label7.Text = control.Name;
+//                label7.Text = control.Name;
             }
-            label7.Visible = true;
+//            label7.Visible = true;
         }
 
         private void Overlay_MouseLeave(object sender, EventArgs e)
         {
             this.Cursor = Cursors.Default;
-            label7.Visible = false;
+//            label7.Visible = false;
         }
 
 
