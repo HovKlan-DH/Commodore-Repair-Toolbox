@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.7.34024.191
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Commodore-Retro-Toolbox", "Commodore-Retro-Toolbox.csproj", "{329269BE-8F20-469D-ACEF-40A4F304ADAC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Commodore-Repair-Toolbox", "Commodore-Repair-Toolbox.csproj", "{329269BE-8F20-469D-ACEF-40A4F304ADAC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
