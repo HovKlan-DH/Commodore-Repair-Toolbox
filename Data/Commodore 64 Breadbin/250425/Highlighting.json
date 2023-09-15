@@ -1,56 +1,56 @@
 {
   "Print, Top": [
     {
-      "Tab_HighlightColor": "Yellow",
-      "Tab_HighlightOpacity": "75%",
-      "List_HighlightColor": "Yellow",
-      "List_HighlightOpacity": "100%",
-      "Board_Label": [{
+      "highlight-tab-color": "Yellow",
+      "highlight-tab-opacity": "75%",
+      "highlight-list-color": "Yellow",
+      "highlight-list-opacity": "100%",
+      "component": [{
           "U1": [
               {
-              "x_start": 240,
-              "y_start": 100,
-              "x_end": 240,
-              "y_end": 100
+              "x": 240,
+              "y": 100,
+              "width": 240,
+              "height": 100
               }
           ],
           "U2": [
               {
-              "x_start": 110,
-              "y_start": 210,
-              "x_end": 140,
-              "y_end": 215
+              "x": 110,
+              "y": 210,
+              "width": 140,
+              "height": 215
               }
           ]
       }]
     }
   ],
   "Schematics 1 of 2": [{
-      "Tab_HighlightColor": "Yellow",
-      "Tab_HighlightOpacity": "60%",
-      "List_HighlightColor": "Red",
-      "List_HighlightOpacity": "80%",
-      "Board_Label": [{
+      "highlight-tab-color": "Green",
+      "highlight-tab-opacity": "60%",
+      "highlight-list-color": "Blue",
+      "highlight-list-opacity": "90%",
+      "component": [{
           "U1": [
               {
-              "x_start": 240,
-              "y_start": 100,
-              "x_end": 240,
-              "y_end": 100
+              "x": 240,
+              "y": 100,
+              "width": 240,
+              "height": 100
               },
               {
-              "x_start": 110,
-              "y_start": 210,
-              "x_end": 140,
-              "y_end": 215
+              "x": 110,
+              "y": 210,
+              "width": 140,
+              "height": 215
               }
           ],
           "U2": [
               {
-              "x_start": 110,
-              "y_start": 210,
-              "x_end": 140,
-              "y_end": 215
+              "x": 110,
+              "y": 210,
+              "width": 140,
+              "height": 215
               }
           ]
       }]
