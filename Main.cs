@@ -20,7 +20,7 @@ namespace Commodore_Repair_Toolbox
         // UI elements
         private CustomPanel panelMain;
         private Panel panelImage;
-        private PictureBox overlayTab1;
+//        private PictureBox overlayTab1;
 
         /*
         private Dictionary<string, Dictionary<string, Dictionary<string, object>>> data =
@@ -162,13 +162,26 @@ namespace Commodore_Repair_Toolbox
         private string highlightTabColor = "";
         private string nameTechnical = "";
 
-        List<PictureBox> overlayComponents = new List<PictureBox>();
-        Dictionary<string, Size> overlayComponentsOriginalSizes = new Dictionary<string, Size>();
-        Dictionary<string, Point> overlayComponentsOriginalLocations = new Dictionary<string, Point>();
+        // Overlay array in "Main" tab
+        List<PictureBox> overlayComponentsList = new List<PictureBox>(); 
+        List<PictureBox> overlayComponentsTab = new List<PictureBox>();
+        Dictionary<string, Size> overlayComponentsTabOriginalSizes = new Dictionary<string, Size>();
+        Dictionary<string, Point> overlayComponentsTabOriginalLocations = new Dictionary<string, Point>();
 
         public Main()
         {
             InitializeComponent();
+
+            // Load the active image
+            image = Image.FromFile(Application.StartupPath + "\\Data\\Commodore 64 Breadbin\\250425\\Schematics 1of2.gif");
+
+            // Create the array that will be used for all overlays
+            CreateOverlayArrays("tab");
+            CreateOverlayArrays("list");
+
+            // Initialize the two parts in the "Main" tab, the zoomable area and the image list
+            InitializeTabMain();
+            InitializeList();
 
             /*
              
@@ -281,9 +294,6 @@ namespace Commodore_Repair_Toolbox
 
             */
 
-            image = Image.FromFile(Application.StartupPath + "\\Data\\Commodore 64 Breadbin\\250425\\Schematics 1of2.gif");
-            InitializeTabMain();
-            InitializeList();
         }
 
         /*
@@ -373,20 +383,28 @@ namespace Commodore_Repair_Toolbox
             };
             panelMain.Controls.Add(panelImage);
 
-            for (int i = 1; i <= 3; i++)
+            // Create all overlays defined in the array
+            foreach (PictureBox overlayTab in overlayComponentsTab)
             {
-                PictureBox overlayTab = new PictureBox
-                {
-                    Name = $"U{i}",
-                    Size = new Size(250, 410),
-                    Location = new Point(1226+(i * 270), 1672+(i * 270)),
-                    BackColor = Color.Transparent,
-                };
+
+//                PictureBox overlayTab = new PictureBox
+//                {
+//                    Name = $"U{i}",
+//                    Size = new Size(250, 410),
+//                    Location = new Point(1226+(i * 270), 1672+(i * 270)),
+//                    BackColor = Color.Transparent,
+//                };
                 panelImage.Controls.Add(overlayTab);
 
-                overlayComponents.Add(overlayTab);
-                overlayComponentsOriginalSizes[overlayTab.Name] = overlayTab.Size;
-                overlayComponentsOriginalLocations[overlayTab.Name] = overlayTab.Location;
+                overlayTab.MouseDown += PanelImage_MouseDown;
+                overlayTab.MouseUp += PanelImage_MouseUp;
+                overlayTab.MouseMove += PanelImage_MouseMove;
+                overlayTab.MouseEnter += new EventHandler(this.Overlay_MouseEnter);
+                overlayTab.MouseLeave += new EventHandler(this.Overlay_MouseLeave);
+
+//                overlayComponents.Add(overlayTab);
+//                overlayComponentsOriginalSizes[overlayTab.Name] = overlayTab.Size;
+//                overlayComponentsOriginalLocations[overlayTab.Name] = overlayTab.Location;
             }
 
             /*
@@ -424,6 +442,10 @@ namespace Commodore_Repair_Toolbox
             panelImage.DoubleBuffered(true);
         }
 
+        private void panelMain_MouseEnter(object sender, EventArgs e)
+        {
+            panelMain.Focus();
+        }
 
         // ###########################################################################################
         // InitializeTabMain()
@@ -483,14 +505,20 @@ namespace Commodore_Repair_Toolbox
             };
             panelList2.Controls.Add(labelList1);
 
-            overlayList1 = new PictureBox
+            //            overlayList1 = new PictureBox
+            //            {
+            //                Name = "U3",
+            //                Size = new Size(250, 410),
+            //                Location = new Point(1226, 1672),
+            //                BackColor = Color.Transparent,
+            //            };
+            //            panelList2.Controls.Add(overlayList1);
+
+            // Create all overlays defined in the array
+            foreach (PictureBox overlayList in overlayComponentsList)
             {
-                Name = "U3",
-                Size = new Size(250, 410),
-                Location = new Point(1226, 1672),
-                BackColor = Color.Transparent,
-            };
-            panelList2.Controls.Add(overlayList1);
+                panelList2.Controls.Add(overlayList);
+            }
 
             // Set the zoom factor for the size of the panel
             float xZoomFactor = (float)panelList1.Width / image.Width;
@@ -500,34 +528,67 @@ namespace Commodore_Repair_Toolbox
             // Update the image size to the zoom factor
             panelList2.Size = new Size((int)(image.Width * zoomFactor), (int)(image.Height * zoomFactor));
 
-            // Update the overlay
-            if (overlayList1 != null)
-            {
-                int newWidth = (int)(overlayList1.Width * zoomFactor);
-                int newHeight = (int)(overlayList1.Height * zoomFactor);
-                overlayList1.Size = new Size(newWidth, newHeight);
-                overlayList1.Location = new Point((int)(overlayList1.Location.X * zoomFactor), (int)(overlayList1.Location.Y * zoomFactor));
+            ///*
+            // Highlight the overlay
+            foreach (PictureBox overlayList in overlayComponentsList)
+            {            
+                int newWidth = (int)(overlayList.Width * zoomFactor);
+                int newHeight = (int)(overlayList.Height * zoomFactor);
+                overlayList.Size = new Size(newWidth, newHeight);
+                overlayList.Location = new Point((int)(overlayList.Location.X * zoomFactor), (int)(overlayList.Location.Y * zoomFactor));
 
                 // Dispose the overlay transparent bitmap and create a new one (bitmaps cannot be resized)
-                if (overlayList1.Image != null)
+                if (overlayList.Image != null)
                 {
-                    overlayList1.Image.Dispose();
+                    overlayList.Image.Dispose();
                 }
                 Bitmap newBmp = new Bitmap(newWidth, newHeight);
                 using (Graphics g = Graphics.FromImage(newBmp))
                 {
                     g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
                 }
-                overlayList1.Image = newBmp;
+                overlayList.Image = newBmp;
             }
+            //*/
         }
 
 
-        // ###########################################################################################
-        // Main_Shown()
-        // ------------
-        // What to do AFTER the Main() form has been shown (this is not the tab named "Main")?
-        // ###########################################################################################
+        private void CreateOverlayArrays (string scope)
+        {
+            List<int> x = new List<int> { 1226, 2654, 833 };
+            List<int> y = new List<int> { 1672, 1672, 589 };
+            List<int> width = new List<int> { 250, 159, 100 };
+            List<int> height = new List<int> { 410, 385, 91 };
+
+            for (int i = 0; i <= 2; i++)
+            {
+
+                // Define the PictureBox
+                PictureBox overlay = new PictureBox
+                {
+                    Name = $"U{i}",
+                    Location = new Point(x[i], y[i]),
+                    Size = new Size(width[i], height[i]),
+                    BackColor = Color.Transparent,
+                };
+
+                // Add the PictureBox to the "Main" image
+                if (scope == "tab")
+                {
+                    overlayComponentsTab.Add(overlay);
+                    overlayComponentsTabOriginalSizes[overlay.Name] = overlay.Size;
+                    overlayComponentsTabOriginalLocations[overlay.Name] = overlay.Location;
+                }
+
+                // Add the PictureBox to the "List" image (?????????????)
+                if (scope == "list")
+                {
+                    overlayComponentsList.Add(overlay);
+                }
+                    
+            }
+        }
+
 
         private void Main_Shown(object sender, EventArgs e)
         {
@@ -553,23 +614,20 @@ namespace Commodore_Repair_Toolbox
             // Update the image size to the zoom factor
             panelImage.Size = new Size((int)(image.Width * zoomFactor), (int)(image.Height * zoomFactor));
 
-            UpdateTabOverlay();
+            HighlightTabOverlay();
         }
 
-        private void UpdateTabOverlay()
+        private void HighlightTabOverlay()
         {
 
-//            List<PictureBox> overlayComponents = new List<PictureBox>();
-//            Dictionary<string, Size> overlayComponentsOriginalSizes = new Dictionary<string, Size>();
-//            Dictionary<string, Point> overlayComponentsOriginalLocations = new Dictionary<string, Point>();
-            foreach (PictureBox overlayComponent in overlayComponents)
+            // Highlight all overlays from the array
+            foreach (PictureBox overlayComponent in overlayComponentsTab)
             {
 
-                // Update the overlay
                 if (overlayComponent != null)
                 {
-                    Size originalSize = overlayComponentsOriginalSizes[overlayComponent.Name];
-                    Point originalLocation = overlayComponentsOriginalLocations[overlayComponent.Name];
+                    Size originalSize = overlayComponentsTabOriginalSizes[overlayComponent.Name];
+                    Point originalLocation = overlayComponentsTabOriginalLocations[overlayComponent.Name];
                     int newWidth = (int)(originalSize.Width * zoomFactor);
                     int newHeight = (int)(originalSize.Height * zoomFactor);
                     overlayComponent.Size = new Size(newWidth, newHeight);
@@ -675,7 +733,7 @@ namespace Commodore_Repair_Toolbox
                 // Update the scroll position of the containerPanel.
                 panelMain.AutoScrollPosition = new Point(newScrollPosition.X - e.X, newScrollPosition.Y - e.Y);
 
-                UpdateTabOverlay();
+                HighlightTabOverlay();
 
                 Debug.WriteLine("After: panelMain.Width=" + panelMain.Width + ", panelImage.Width=" + panelImage.Width + ", image.Width=" + image.Width + ", panelMain.AutoScrollPosition.X=" + panelMain.AutoScrollPosition.X);
 
@@ -718,15 +776,15 @@ namespace Commodore_Repair_Toolbox
             Control control = sender as Control;
             if (control != null)
             {
-                //                label7.Text = control.Name;
+                label3.Text = control.Name;
             }
-            //            label7.Visible = true;
+            label3.Visible = true;
         }
 
         private void Overlay_MouseLeave(object sender, EventArgs e)
         {
             this.Cursor = Cursors.Default;
-            //            label7.Visible = false;
+            label3.Visible = false;
         }
 
 
