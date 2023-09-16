@@ -11,135 +11,57 @@ using System.Data;
 using System.IO;
 using ExcelDataReader;
 using System.Data;
+using OfficeOpenXml;
+using System.Xml.Linq;
 
 namespace Commodore_Repair_Toolbox
 {
+    public class Hardware
+    {
+        public string Name { get; set; }
+        public string Folder { get; set; }
+        public List<Board> Boards { get; set; }
+    }
+
+    public class Board
+    {
+        public string Name { get; set; }
+        public string Folder { get; set; }
+        public List<File> Files { get; set; }
+        public List<Component> Components { get; set; }
+    }
+
+    public class File
+    {
+        public string Name { get; set; }
+        public string FileName { get; set; }
+        public string HighlightColorTab { get; set; }
+        public string HighlightColorList { get; set; }
+        public string HighlightOpacityTab { get; set; }
+        public string HighlightOpacityList { get; set; }
+        public List<Component> Components { get; set; }
+    }
+
+    public class Component
+    {
+        public string NameLabel { get; set; }
+        public string NameTechnical { get; set; }
+        public string NameFriendly { get; set; }
+        public List<Overlay> Overlays { get; set; }
+    }
+
+    public class Overlay
+    {
+        public Rectangle Bounds { get; set; }
+    }
+
+        
     public partial class Main : Form
     {
 
         // UI elements
         private CustomPanel panelMain;
         private Panel panelImage;
-//        private PictureBox overlayTab1;
-
-        /*
-        private Dictionary<string, Dictionary<string, Dictionary<string, object>>> data =
-            new Dictionary<string, Dictionary<string, Dictionary<string, object>>>
-            {
-                {
-                    "Commodore 64 (Breadbin)",
-                    new Dictionary<string, Dictionary<string, object>>
-                    {
-                        {
-                            "250425",
-                            new Dictionary<string, object>
-                            {
-                                {
-                                    "image",
-                                    new Dictionary<string, object>
-                                    {
-                                        {
-                                            "Schematics 1 of 2",
-                                            new Dictionary<string, object>
-                                            {
-                                                { "file", @"\Data\Commodore 64 Breadbin\250425\Schematics 1of2.gif" },
-                                                { "component-highlight-tab-color", "Yellow" },
-                                                { "component-highlight-tab-opacity", "80%" },
-                                                { "component-highlight-list-color", "Red" },
-                                                { "component-highlight-list-opacity", "100%" },
-                                                {
-                                                    "component",
-                                                    new Dictionary<string, object>
-                                                    {
-                                                        {
-                                                            "U1",
-                                                            new Dictionary<string, object>
-                                                            {
-                                                                {
-                                                                    "location",
-                                                                    new List<Dictionary<string, int>>
-                                                                    {
-                                                                        new Dictionary<string, int> { { "x", 1280 }, { "y", 1655 }, { "width", 110 }, { "height", 55 } },
-                                                                        new Dictionary<string, int> { { "x", 1000 }, { "y", 750 }, { "width", 85 }, { "height", 100 } }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                            }
-                                        },
-                                        { "Schematics 2 of 2", new Dictionary<string, object> { { "file", @"\Data\Commodore 64 Breadbin\250425\Schematics 2of2.gif" } } },
-                                        { "Layout", new Dictionary<string, object> { { "file", @"\Data\Commodore 64 Breadbin\250425\Board layout 250425.png" } } },
-                                        { "Top", new Dictionary<string, object> { { "file", @"\Data\Commodore 64 Breadbin\250425\Print top.JPG" } } }
-                                    }
-                                },
-                                {
-                                    "component",
-                                    new Dictionary<string, object>
-                                    {
-                                        {
-                                            "U1",
-                                            new Dictionary<string, object>
-                                            {
-                                                { "file", @"\Data\Commodore 64 Breadbin\250425\U3_pinout.gif" },
-                                                { "technical", "6526" },
-                                                { "friendly", "CIA 1" },
-                                                { "type", "IC" },
-                                                { "oneliner", "I/O chip with Serial and Parallel port" },
-                                                { "description", "Blaa...." },
-                                                {
-                                                    "datasheet",
-                                                    new Dictionary<string, string>
-                                                    {
-                                                        { "6526 datasheet 1", @"\Data\Commodore 64 Breadbin\250425\U3_sheet1.pdf" },
-                                                        { "6526 datasheet 2", "https://whatever.com" }
-                                                    }
-                                                },
-                                                {
-                                                    "link",
-                                                    new Dictionary<string, string>
-                                                    {
-                                                        { "A good reference", "https://yea.haga./dh" },
-                                                        { "Beginners guide", "https://whatever.com" }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                {
-                    "Commodore 64 model C",
-                    new Dictionary<string, Dictionary<string, object>>
-                    {
-                        {
-                            "321212",
-                            new Dictionary<string, object>
-                            {
-                                {
-                                    "image",
-                                    new Dictionary<string, object>
-                                    {
-                                        // Copy the same structure as in the previous model here...
-                                    }
-                                },
-                                {
-                                    "component",
-                                    new Dictionary<string, object>
-                                    {
-                                        // Copy the same structure as in the previous model here...
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            };
-        */
 
         // Main variables
         private Image image;
@@ -148,13 +70,6 @@ namespace Commodore_Repair_Toolbox
         private Size overlayTab1_originalSize;
         private Point overlayTab1_originalLocation;
         private bool isResizedByMouseWheel = false;
-
-
-        // ###########################################################################################
-        // Main()
-        // -----------------
-        // This is where it all starts :-)
-        // ###########################################################################################
 
         private string hardwareSelected = "Commodore 64 (Breadbin)";
         private string boardSelected = "250425";
@@ -168,9 +83,251 @@ namespace Commodore_Repair_Toolbox
         Dictionary<string, Size> overlayComponentsTabOriginalSizes = new Dictionary<string, Size>();
         Dictionary<string, Point> overlayComponentsTabOriginalLocations = new Dictionary<string, Point>();
 
+        List<Hardware> classHardware = new List<Hardware>();
+        
+        
+
+
+        // ---------------------------------------------------------------------------------
+
+
         public Main()
         {
             InitializeComponent();
+
+
+
+
+
+
+            // I am using this as "Polyform Noncommercial license"
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
+            // Get all hardware from the Excel data file
+            using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\Data.xlsx")))
+            {
+                // Assuming data is in the first worksheet
+                var worksheet = package.Workbook.Worksheets[0];
+
+                // Find the row that starts with the "searchHeader"
+                string searchHeader = "\"Hardware\" name in drop-down";
+                int row = 1;
+                while (row <= worksheet.Dimension.End.Row)
+                {
+                    if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
+                    {
+                        break; // found the starting row
+                    }
+                    row++;
+                }
+
+                // Skip the header row
+                row++;
+
+                // Now, start reading data from the identified row
+                while (worksheet.Cells[row, 1].Value != null)
+                {
+                    string name = worksheet.Cells[row, 1].Value.ToString();
+                    string folder = worksheet.Cells[row, 2].Value.ToString();
+                    Hardware hardware = new Hardware
+                    {
+                        Name = name,
+                        Folder = folder,
+                    };
+                    classHardware.Add(hardware);
+                    row++;
+                }
+            }
+
+            // Read all boards in to the class
+            List<Board> classBoard = new List<Board>();
+            foreach (Hardware hardware in classHardware)
+            {
+                using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\Data.xlsx")))
+                {
+                    var worksheet = package.Workbook.Worksheets[0];
+
+                    // Find the row that starts with the "searchHeader"
+                    string searchHeader = "\"Board\" name in drop-down";
+                    int row = 1;
+                    while (row <= worksheet.Dimension.End.Row)
+                    {
+                        if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
+                        {
+                            break; // found the starting row
+                        }
+                        row++;
+                    }
+
+                    // Skip the header row
+                    row++;
+
+                    // Now, start reading data from the identified row
+                    while (worksheet.Cells[row, 1].Value != null)
+                    {
+                        string name = worksheet.Cells[row, 1].Value.ToString();
+                        string folder = worksheet.Cells[row, 2].Value.ToString();
+                        Board boarda = new Board
+                        {
+                            Name = name,
+                            Folder = folder,
+                        };
+                        classBoard.Add(boarda);
+                        
+                        // Associate the board with the hardware
+                        // Create the "Boards" property if it is NULL and then add the board
+                        if (hardware.Boards == null)
+                        {
+                            hardware.Boards = new List<Board>();
+                        }
+                        hardware.Boards.Add(boarda);
+                        row++;
+                    }
+                }
+            }
+
+            // Read all files in to the class
+            List<File> classFile = new List<File>();
+            foreach (Hardware hardware in classHardware)
+            {
+                foreach (Board board in hardware.Boards)
+                {
+                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\Data.xlsx")))
+                    {
+                        var worksheet = package.Workbook.Worksheets[0];
+
+                        // Find the row that starts with the "searchHeader"
+                        string searchHeader = "LIST IMAGES";
+                        int row = 1;
+                        while (row <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
+                            {
+                                break; // found the starting row
+                            }
+                            row++;
+                        }
+
+                        // Skip the header row
+                        row++;
+                        row++;
+
+                        // Now, start reading data from the identified row
+                        while (worksheet.Cells[row, 1].Value != null)
+                        {
+                            string name = worksheet.Cells[row, 1].Value.ToString();
+                            string file = worksheet.Cells[row, 2].Value.ToString();
+                            File filea = new File
+                            {
+                                Name = name,
+                                FileName = file,
+                            };
+                            classFile.Add(filea);
+
+                            // Associate the board with the hardware
+                            // Create the "Boards" property if it is NULL and then add the board
+                            if (board.Files == null)
+                            {
+                                board.Files = new List<File>();
+                            }
+                            board.Files.Add(filea);
+                            row++;
+                        }
+                    }
+                }
+            }
+
+            // Read all components in to the class
+            List<Component> classComponent = new List<Component>();
+            foreach (Hardware hardware in classHardware)
+            {
+                foreach (Board board in hardware.Boards)
+                {
+                    bool populateComponents = true; // only populate the components once to the "board" component list
+                    foreach (File file in board.Files)
+                    {
+
+                        using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\Data.xlsx")))
+                        {
+                            var worksheet = package.Workbook.Worksheets[0];
+
+                            // Find the row that starts with the "searchHeader"
+                            string searchHeader = "COMPONENTS";
+                            int row = 1;
+                            while (row <= worksheet.Dimension.End.Row)
+                            {
+                                if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
+                                {
+                                    break; // found the starting row
+                                }
+                                row++;
+                            }
+
+                            // Skip the header row
+                            row++;
+                            row++;
+
+                            // Now, start reading data from the identified row
+                            while (worksheet.Cells[row, 1].Value != null)
+                            {
+                                string name = worksheet.Cells[row, 1].Value.ToString();
+                                Component component = new Component
+                                {
+                                    NameLabel = name,
+                                };
+                                classComponent.Add(component);
+
+                                // Associate the board with the hardware
+                                // Create the "Boards" property if it is NULL and then add the board
+                                if(populateComponents)
+                                {
+                                    if (board.Components == null)
+                                    {
+                                        board.Components = new List<Component>();
+                                    }
+                                    board.Components.Add(component);
+                                }
+                                if (file.Components == null)
+                                {
+                                    file.Components = new List<Component>();
+                                }
+                                file.Components.Add(component);
+                                row++;
+                            }
+                        }
+                        populateComponents = false;
+                    }
+                }
+            }
+
+            // Now you have a list of hardware, each containing a list of associated boards
+            foreach (Hardware hardware in classHardware)
+            {
+                Debug.WriteLine("Hardware Name = " + hardware.Name + ", Folder = " + hardware.Folder);
+                foreach (Board board in hardware.Boards)
+                {
+                    Debug.WriteLine("  Board Name = " + board.Name + ", Folder = " + board.Folder);
+                    foreach (File file in board.Files)
+                    {
+                        Debug.WriteLine("    File Name = " + file.Name + ", FileName = " + file.FileName);
+                        foreach (Component component in file.Components)
+                        {
+                            Debug.WriteLine("      Component Name = " + component.NameLabel);
+                        }
+                    }
+                    Debug.WriteLine("  Board Name = " + board.Name + ", Folder = " + board.Folder); 
+                    foreach (Component component in board.Components)
+                    {
+                        Debug.WriteLine("    Component Name = " + component.NameLabel);
+                    }
+                }
+            }
+
+
+
+
+
+
 
             // Load the active image
             image = Image.FromFile(Application.StartupPath + "\\Data\\Commodore 64 Breadbin\\250425\\Schematics 1of2.gif");
@@ -296,6 +453,10 @@ namespace Commodore_Repair_Toolbox
 
         }
 
+
+        // ---------------------------------------------------------------------------------
+
+
         /*
          
         public static DataTable ReadExcel(string path)
@@ -355,11 +516,9 @@ namespace Commodore_Repair_Toolbox
 
         */
 
-        // ###########################################################################################
-        // InitializeTabMain()
-        // -------------------
-        // Setup the tab named "Main"
-        // ###########################################################################################
+
+        // ---------------------------------------------------------------------------------
+
 
         private void InitializeTabMain()
         {
@@ -383,43 +542,22 @@ namespace Commodore_Repair_Toolbox
             };
             panelMain.Controls.Add(panelImage);
 
+            // Enable double buffering for smoother updates
+            panelMain.DoubleBuffered(true);
+            panelImage.DoubleBuffered(true);
+
             // Create all overlays defined in the array
             foreach (PictureBox overlayTab in overlayComponentsTab)
             {
-
-//                PictureBox overlayTab = new PictureBox
-//                {
-//                    Name = $"U{i}",
-//                    Size = new Size(250, 410),
-//                    Location = new Point(1226+(i * 270), 1672+(i * 270)),
-//                    BackColor = Color.Transparent,
-//                };
                 panelImage.Controls.Add(overlayTab);
+                overlayTab.DoubleBuffered(true);
 
                 overlayTab.MouseDown += PanelImage_MouseDown;
                 overlayTab.MouseUp += PanelImage_MouseUp;
                 overlayTab.MouseMove += PanelImage_MouseMove;
                 overlayTab.MouseEnter += new EventHandler(this.Overlay_MouseEnter);
                 overlayTab.MouseLeave += new EventHandler(this.Overlay_MouseLeave);
-
-//                overlayComponents.Add(overlayTab);
-//                overlayComponentsOriginalSizes[overlayTab.Name] = overlayTab.Size;
-//                overlayComponentsOriginalLocations[overlayTab.Name] = overlayTab.Location;
             }
-
-            /*
-            // Initialize overlay PictureBox and store its original dimensions
-            overlayTab1 = new PictureBox
-            {
-                Name = "U3",
-                Size = new Size(250, 410),
-                Location = new Point(1226, 1672),
-                BackColor = Color.Transparent,
-            };
-            panelImage.Controls.Add(overlayTab1);
-            overlayTab1_originalSize = overlayTab1.Size;
-            overlayTab1_originalLocation = overlayTab1.Location;
-            */
 
             ResizeTabImage();
 
@@ -428,30 +566,13 @@ namespace Commodore_Repair_Toolbox
             panelImage.MouseDown += PanelImage_MouseDown;
             panelImage.MouseUp += PanelImage_MouseUp;
             panelImage.MouseMove += PanelImage_MouseMove;
-            //            this.Shown += new EventHandler(this.Main_Shown);
             panelMain.Resize += new EventHandler(this.PanelMain_Resize);
 
-//            overlayTab1.MouseDown += PanelImage_MouseDown;
-//            overlayTab1.MouseUp += PanelImage_MouseUp;
-//            overlayTab1.MouseMove += PanelImage_MouseMove;
-//            overlayTab1.MouseEnter += new EventHandler(this.Overlay_MouseEnter);
-//            overlayTab1.MouseLeave += new EventHandler(this.Overlay_MouseLeave);
-
-            // Enable double buffering for smoother updates
-            panelMain.DoubleBuffered(true);
-            panelImage.DoubleBuffered(true);
         }
 
-        private void panelMain_MouseEnter(object sender, EventArgs e)
-        {
-            panelMain.Focus();
-        }
 
-        // ###########################################################################################
-        // InitializeTabMain()
-        // ------------
-        // Setup the tab named "Main"
-        // ###########################################################################################
+        // ---------------------------------------------------------------------------------
+
 
         private void InitializeList()
         {
@@ -505,19 +626,15 @@ namespace Commodore_Repair_Toolbox
             };
             panelList2.Controls.Add(labelList1);
 
-            //            overlayList1 = new PictureBox
-            //            {
-            //                Name = "U3",
-            //                Size = new Size(250, 410),
-            //                Location = new Point(1226, 1672),
-            //                BackColor = Color.Transparent,
-            //            };
-            //            panelList2.Controls.Add(overlayList1);
+            panelList1.DoubleBuffered(true);
+            panelList2.DoubleBuffered(true);
+            labelList1.DoubleBuffered(true);
 
             // Create all overlays defined in the array
             foreach (PictureBox overlayList in overlayComponentsList)
             {
                 panelList2.Controls.Add(overlayList);
+                overlayList.DoubleBuffered(true);
             }
 
             // Set the zoom factor for the size of the panel
@@ -525,32 +642,75 @@ namespace Commodore_Repair_Toolbox
             float yZoomFactor = (float)panelList1.Height / image.Height;
             float zoomFactor = Math.Min(xZoomFactor, yZoomFactor);
 
-            // Update the image size to the zoom factor
+            // Update the image based on the zoom factor
             panelList2.Size = new Size((int)(image.Width * zoomFactor), (int)(image.Height * zoomFactor));
 
-            ///*
-            // Highlight the overlay
-            foreach (PictureBox overlayList in overlayComponentsList)
-            {            
-                int newWidth = (int)(overlayList.Width * zoomFactor);
-                int newHeight = (int)(overlayList.Height * zoomFactor);
-                overlayList.Size = new Size(newWidth, newHeight);
-                overlayList.Location = new Point((int)(overlayList.Location.X * zoomFactor), (int)(overlayList.Location.Y * zoomFactor));
-
-                // Dispose the overlay transparent bitmap and create a new one (bitmaps cannot be resized)
-                if (overlayList.Image != null)
-                {
-                    overlayList.Image.Dispose();
-                }
-                Bitmap newBmp = new Bitmap(newWidth, newHeight);
-                using (Graphics g = Graphics.FromImage(newBmp))
-                {
-                    g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
-                }
-                overlayList.Image = newBmp;
-            }
-            //*/
+            HighlightOverlays("list", zoomFactor);
         }
+
+
+        // ---------------------------------------------------------------------------------
+
+
+        private void HighlightOverlays (string scope, float zoomFactor)
+        {
+
+            if (scope == "tab")
+            {
+                foreach (PictureBox overlay in overlayComponentsTab)
+                {
+                    Size originalSize = overlayComponentsTabOriginalSizes[overlay.Name];
+                    Point originalLocation = overlayComponentsTabOriginalLocations[overlay.Name];
+                    int newWidth = (int)(originalSize.Width * zoomFactor);
+                    int newHeight = (int)(originalSize.Height * zoomFactor);
+                    overlay.Size = new Size(newWidth, newHeight);
+                    overlay.Location = new Point((int)(originalLocation.X * zoomFactor), (int)(originalLocation.Y * zoomFactor));
+
+                    // Dispose the overlay transparent bitmap and create a new one (bitmaps cannot be resized)
+                    if (overlay.Image != null)
+                    {
+                        overlay.Image.Dispose();
+                    }
+                    Bitmap newBmp = new Bitmap(newWidth, newHeight);
+                    using (Graphics g = Graphics.FromImage(newBmp))
+                    {
+                        g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
+                    }
+                    overlay.Image = newBmp;
+                    overlay.DoubleBuffered(true);
+                }
+            }
+            
+            
+            if (scope == "list")
+            {
+                foreach (PictureBox overlayList in overlayComponentsList)
+                {
+                    int newWidth = (int)(overlayList.Width * zoomFactor);
+                    int newHeight = (int)(overlayList.Height * zoomFactor);
+                    overlayList.Size = new Size(newWidth, newHeight);
+                    overlayList.Location = new Point((int)(overlayList.Location.X * zoomFactor), (int)(overlayList.Location.Y * zoomFactor));
+
+                    // Dispose the overlay transparent bitmap and create a new one (bitmaps cannot be resized)
+                    if (overlayList.Image != null)
+                    {
+                        overlayList.Image.Dispose();
+                    }
+                    Bitmap newBmp = new Bitmap(newWidth, newHeight);
+                    using (Graphics g = Graphics.FromImage(newBmp))
+                    {
+                        g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
+                    }
+                    overlayList.Image = newBmp;
+                    overlayList.DoubleBuffered(true);
+                }
+            }
+
+            
+        }
+
+
+        // ---------------------------------------------------------------------------------
 
 
         private void CreateOverlayArrays (string scope)
@@ -590,19 +750,19 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+        // ---------------------------------------------------------------------------------
+
+
+        /*
         private void Main_Shown(object sender, EventArgs e)
         {
-            //FitTabImageToPanel();
-
             //panelMain.AutoScrollPosition = new Point(750, 400);FitImageToPanel();
         }
+        */
 
 
-        // ###########################################################################################
-        // FitImageToPanel()
-        // -----------------
-        // Resize image to fit main panel display (show 100% of the image)
-        // ###########################################################################################
+        // ---------------------------------------------------------------------------------
+
 
         private void ResizeTabImage()
         {
@@ -614,62 +774,12 @@ namespace Commodore_Repair_Toolbox
             // Update the image size to the zoom factor
             panelImage.Size = new Size((int)(image.Width * zoomFactor), (int)(image.Height * zoomFactor));
 
-            HighlightTabOverlay();
+            HighlightOverlays("tab",zoomFactor);
         }
 
-        private void HighlightTabOverlay()
-        {
 
-            // Highlight all overlays from the array
-            foreach (PictureBox overlayComponent in overlayComponentsTab)
-            {
+        // ---------------------------------------------------------------------------------
 
-                if (overlayComponent != null)
-                {
-                    Size originalSize = overlayComponentsTabOriginalSizes[overlayComponent.Name];
-                    Point originalLocation = overlayComponentsTabOriginalLocations[overlayComponent.Name];
-                    int newWidth = (int)(originalSize.Width * zoomFactor);
-                    int newHeight = (int)(originalSize.Height * zoomFactor);
-                    overlayComponent.Size = new Size(newWidth, newHeight);
-                    overlayComponent.Location = new Point((int)(originalLocation.X * zoomFactor), (int)(originalLocation.Y * zoomFactor));
-
-                    // Dispose the overlay transparent bitmap and create a new one (bitmaps cannot be resized)
-                    if (overlayComponent.Image != null)
-                    {
-                        overlayComponent.Image.Dispose();
-                    }
-                    Bitmap newBmp = new Bitmap(newWidth, newHeight);
-                    using (Graphics g = Graphics.FromImage(newBmp))
-                    {
-                        g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
-                    }
-                    overlayComponent.Image = newBmp;
-                }
-            }
-
-            /*
-            // Update the overlay
-            if (overlayTab1 != null)
-            {
-                int newWidth = (int)(overlayTab1_originalSize.Width * zoomFactor);
-                int newHeight = (int)(overlayTab1_originalSize.Height * zoomFactor);
-                overlayTab1.Size = new Size(newWidth, newHeight);
-                overlayTab1.Location = new Point((int)(overlayTab1_originalLocation.X * zoomFactor), (int)(overlayTab1_originalLocation.Y * zoomFactor));
-
-                // Dispose the overlay transparent bitmap and create a new one (bitmaps cannot be resized)
-                if (overlayTab1.Image != null)
-                {
-                    overlayTab1.Image.Dispose();
-                }
-                Bitmap newBmp = new Bitmap(newWidth, newHeight);
-                using (Graphics g = Graphics.FromImage(newBmp))
-                {
-                    g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
-                }
-                overlayTab1.Image = newBmp;
-            }
-            */
-        }
 
         private void PanelMain_Resize(object sender, EventArgs e)
         {
@@ -680,6 +790,10 @@ namespace Commodore_Repair_Toolbox
 
             isResizedByMouseWheel = false;
         }
+
+
+        // ---------------------------------------------------------------------------------
+
 
         private void PanelMain_MouseWheel(object sender, MouseEventArgs e)
         {
@@ -733,12 +847,17 @@ namespace Commodore_Repair_Toolbox
                 // Update the scroll position of the containerPanel.
                 panelMain.AutoScrollPosition = new Point(newScrollPosition.X - e.X, newScrollPosition.Y - e.Y);
 
-                HighlightTabOverlay();
+                //HighlightTabOverlay();
+                HighlightOverlays("tab", zoomFactor);
 
                 Debug.WriteLine("After: panelMain.Width=" + panelMain.Width + ", panelImage.Width=" + panelImage.Width + ", image.Width=" + image.Width + ", panelMain.AutoScrollPosition.X=" + panelMain.AutoScrollPosition.X);
 
             }
         }
+
+
+        // ---------------------------------------------------------------------------------
+
 
         private void PanelImage_MouseDown(object sender, MouseEventArgs e)
         {
@@ -748,6 +867,10 @@ namespace Commodore_Repair_Toolbox
                 lastMousePosition = e.Location;
             }
         }
+
+
+        // ---------------------------------------------------------------------------------
+
 
         private void PanelImage_MouseMove(object sender, MouseEventArgs e)
         {
@@ -761,6 +884,10 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
+
+        // ---------------------------------------------------------------------------------
+
+
         private void PanelImage_MouseUp(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Right)
@@ -769,6 +896,10 @@ namespace Commodore_Repair_Toolbox
                 lastMousePosition = Point.Empty;
             }
         }
+
+
+        // ---------------------------------------------------------------------------------
+
 
         private void Overlay_MouseEnter(object sender, EventArgs e)
         {
@@ -781,14 +912,18 @@ namespace Commodore_Repair_Toolbox
             label3.Visible = true;
         }
 
+
+        // ---------------------------------------------------------------------------------
+
+
         private void Overlay_MouseLeave(object sender, EventArgs e)
         {
             this.Cursor = Cursors.Default;
             label3.Visible = false;
         }
 
-
     }
+
 
     public class CustomPanel : Panel
     {
