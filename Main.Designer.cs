@@ -28,11 +28,11 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Main));
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabMain = new System.Windows.Forms.TabPage();
             this.panel2 = new System.Windows.Forms.Panel();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.label3 = new System.Windows.Forms.Label();
             this.tabTrivia = new System.Windows.Forms.TabPage();
             this.tabTroubleshooting = new System.Windows.Forms.TabPage();
             this.tabLinks = new System.Windows.Forms.TabPage();
@@ -47,7 +47,6 @@
             this.button1 = new System.Windows.Forms.Button();
             this.label7 = new System.Windows.Forms.Label();
             this.label5 = new System.Windows.Forms.Label();
-            this.label3 = new System.Windows.Forms.Label();
             this.tabControl1.SuspendLayout();
             this.tabMain.SuspendLayout();
             this.panel1.SuspendLayout();
@@ -101,6 +100,17 @@
             this.panel1.Name = "panel1";
             this.panel1.Size = new System.Drawing.Size(644, 638);
             this.panel1.TabIndex = 5;
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.BackColor = System.Drawing.Color.Bisque;
+            this.label3.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.label3.Location = new System.Drawing.Point(315, 574);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(46, 18);
+            this.label3.TabIndex = 0;
+            this.label3.Text = "label3";
             // 
             // tabTrivia
             // 
@@ -193,37 +203,16 @@
             // 
             // listBox1
             // 
+            this.listBox1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left)));
             this.listBox1.FormattingEnabled = true;
             this.listBox1.ItemHeight = 16;
-            this.listBox1.Items.AddRange(new object[] {
-            "U2",
-            "U3",
-            "U7",
-            "U8",
-            "U9",
-            "U27",
-            "R95",
-            "R96",
-            "R97",
-            "R100",
-            "R102",
-            "RP1",
-            "RP2",
-            "C7",
-            "C153",
-            "C177",
-            "C178",
-            "C179",
-            "CN2",
-            "CN3",
-            "CN4",
-            "FS2",
-            "FS3"});
             this.listBox1.Location = new System.Drawing.Point(12, 162);
             this.listBox1.Name = "listBox1";
             this.listBox1.SelectionMode = System.Windows.Forms.SelectionMode.MultiSimple;
             this.listBox1.Size = new System.Drawing.Size(208, 500);
             this.listBox1.TabIndex = 7;
+            this.listBox1.SelectedIndexChanged += new System.EventHandler(this.listBox1_SelectedIndexChanged);
             // 
             // label2
             // 
@@ -236,6 +225,7 @@
             // 
             // button1
             // 
+            this.button1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.button1.Location = new System.Drawing.Point(12, 668);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(208, 23);
@@ -264,17 +254,6 @@
             this.label5.Size = new System.Drawing.Size(106, 18);
             this.label5.TabIndex = 0;
             this.label5.Text = "Schematic 1 of 2";
-            // 
-            // label3
-            // 
-            this.label3.AutoSize = true;
-            this.label3.BackColor = System.Drawing.Color.Bisque;
-            this.label3.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.label3.Location = new System.Drawing.Point(315, 574);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(46, 18);
-            this.label3.TabIndex = 0;
-            this.label3.Text = "label3";
             // 
             // Main
             // 

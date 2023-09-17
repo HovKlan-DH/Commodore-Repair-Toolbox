@@ -1,44 +1,30 @@
 {
-  "Schematics 1 of 2": [{
+  "Layout": [{
       "highlight-tab-color": "Green",
       "highlight-tab-opacity": "60%",
       "highlight-list-color": "Blue",
       "highlight-list-opacity": "90%",
       "component": [{
-          "U3": [
+          "U1": [
               {
-              "x": 1245,
-              "y": 1700,
-              "width": 210,
-              "height": 350
-              }
-          ],
-          "U8": [
-              {
-              "x": 852,
-              "y": 596,
-              "width": 79,
-              "height": 66,
-              }
-          ],
-          "U27": [
-              {
-              "x": 555,
-              "y": 1924,
-              "width": 129,
-              "height": 87,
+              "x": 240,
+              "y": 100,
+              "width": 240,
+              "height": 100
               },
               {
-              "x": 2555,
-              "y": 2030,
-              "width": 119,
-              "height": 80
-              },
+              "x": 110,
+              "y": 210,
+              "width": 140,
+              "height": 215
+              }
+          ],
+          "U2": [
               {
-              "x": 565,
-              "y": 2392,
-              "width": 125,
-              "height": 96
+              "x": 110,
+              "y": 210,
+              "width": 140,
+              "height": 215
               }
           ]
       }]
