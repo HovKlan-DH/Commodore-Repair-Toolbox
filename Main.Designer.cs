@@ -32,6 +32,7 @@
             this.tabMain = new System.Windows.Forms.TabPage();
             this.panel2 = new System.Windows.Forms.Panel();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.label4 = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
             this.tabTrivia = new System.Windows.Forms.TabPage();
             this.tabTroubleshooting = new System.Windows.Forms.TabPage();
@@ -47,9 +48,10 @@
             this.button1 = new System.Windows.Forms.Button();
             this.label7 = new System.Windows.Forms.Label();
             this.label5 = new System.Windows.Forms.Label();
-            this.label4 = new System.Windows.Forms.Label();
+            this.panel3 = new System.Windows.Forms.Panel();
             this.tabControl1.SuspendLayout();
             this.tabMain.SuspendLayout();
+            this.panel2.SuspendLayout();
             this.panel1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -86,6 +88,7 @@
             // 
             this.panel2.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.panel2.Controls.Add(this.panel3);
             this.panel2.Location = new System.Drawing.Point(656, 6);
             this.panel2.Name = "panel2";
             this.panel2.Size = new System.Drawing.Size(265, 638);
@@ -102,6 +105,17 @@
             this.panel1.Name = "panel1";
             this.panel1.Size = new System.Drawing.Size(644, 638);
             this.panel1.TabIndex = 5;
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.label4.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label4.Location = new System.Drawing.Point(22, 21);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(129, 20);
+            this.label4.TabIndex = 1;
+            this.label4.Text = "Schematics 1 of 2";
             // 
             // label3
             // 
@@ -259,16 +273,15 @@
             this.label5.TabIndex = 0;
             this.label5.Text = "Schematic 1 of 2";
             // 
-            // label4
+            // panel3
             // 
-            this.label4.AutoSize = true;
-            this.label4.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.label4.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label4.Location = new System.Drawing.Point(22, 21);
-            this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(129, 20);
-            this.label4.TabIndex = 1;
-            this.label4.Text = "Schematics 1 of 2";
+            this.panel3.AutoScroll = true;
+            this.panel3.BackColor = System.Drawing.Color.Transparent;
+            this.panel3.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panel3.Location = new System.Drawing.Point(0, 0);
+            this.panel3.Name = "panel3";
+            this.panel3.Size = new System.Drawing.Size(265, 638);
+            this.panel3.TabIndex = 0;
             // 
             // Main
             // 
@@ -288,6 +301,7 @@
             this.Text = "Commodore Repair Toolbox";
             this.tabControl1.ResumeLayout(false);
             this.tabMain.ResumeLayout(false);
+            this.panel2.ResumeLayout(false);
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
             this.ResumeLayout(false);
@@ -317,5 +331,6 @@
         private System.Windows.Forms.Panel panel2;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Label label4;
+        private System.Windows.Forms.Panel panel3;
     }
 }
