@@ -30,8 +30,9 @@
         {
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabMain = new System.Windows.Forms.TabPage();
-            this.panel2 = new System.Windows.Forms.Panel();
-            this.panel1 = new System.Windows.Forms.Panel();
+            this.panelListMain = new System.Windows.Forms.Panel();
+            this.panelListAutoscroll = new System.Windows.Forms.Panel();
+            this.panelZoom = new System.Windows.Forms.Panel();
             this.label4 = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
             this.tabTrivia = new System.Windows.Forms.TabPage();
@@ -48,11 +49,10 @@
             this.button1 = new System.Windows.Forms.Button();
             this.label7 = new System.Windows.Forms.Label();
             this.label5 = new System.Windows.Forms.Label();
-            this.panel3 = new System.Windows.Forms.Panel();
             this.tabControl1.SuspendLayout();
             this.tabMain.SuspendLayout();
-            this.panel2.SuspendLayout();
-            this.panel1.SuspendLayout();
+            this.panelListMain.SuspendLayout();
+            this.panelZoom.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl1
@@ -74,8 +74,8 @@
             // 
             // tabMain
             // 
-            this.tabMain.Controls.Add(this.panel2);
-            this.tabMain.Controls.Add(this.panel1);
+            this.tabMain.Controls.Add(this.panelListMain);
+            this.tabMain.Controls.Add(this.panelZoom);
             this.tabMain.Location = new System.Drawing.Point(4, 25);
             this.tabMain.Name = "tabMain";
             this.tabMain.Padding = new System.Windows.Forms.Padding(3);
@@ -84,27 +84,37 @@
             this.tabMain.Text = "Main";
             this.tabMain.UseVisualStyleBackColor = true;
             // 
-            // panel2
+            // panelListMain
             // 
-            this.panel2.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            this.panelListMain.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.panel2.Controls.Add(this.panel3);
-            this.panel2.Location = new System.Drawing.Point(656, 6);
-            this.panel2.Name = "panel2";
-            this.panel2.Size = new System.Drawing.Size(265, 638);
-            this.panel2.TabIndex = 6;
+            this.panelListMain.Controls.Add(this.panelListAutoscroll);
+            this.panelListMain.Location = new System.Drawing.Point(656, 6);
+            this.panelListMain.Name = "panelListMain";
+            this.panelListMain.Size = new System.Drawing.Size(265, 638);
+            this.panelListMain.TabIndex = 6;
             // 
-            // panel1
+            // panelListAutoscroll
             // 
-            this.panel1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            this.panelListAutoscroll.AutoScroll = true;
+            this.panelListAutoscroll.BackColor = System.Drawing.Color.Transparent;
+            this.panelListAutoscroll.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panelListAutoscroll.Location = new System.Drawing.Point(0, 0);
+            this.panelListAutoscroll.Name = "panelListAutoscroll";
+            this.panelListAutoscroll.Size = new System.Drawing.Size(265, 638);
+            this.panelListAutoscroll.TabIndex = 0;
+            // 
+            // panelZoom
+            // 
+            this.panelZoom.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.panel1.Controls.Add(this.label4);
-            this.panel1.Controls.Add(this.label3);
-            this.panel1.Location = new System.Drawing.Point(6, 6);
-            this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(644, 638);
-            this.panel1.TabIndex = 5;
+            this.panelZoom.Controls.Add(this.label4);
+            this.panelZoom.Controls.Add(this.label3);
+            this.panelZoom.Location = new System.Drawing.Point(6, 6);
+            this.panelZoom.Name = "panelZoom";
+            this.panelZoom.Size = new System.Drawing.Size(644, 638);
+            this.panelZoom.TabIndex = 5;
             // 
             // label4
             // 
@@ -273,16 +283,6 @@
             this.label5.TabIndex = 0;
             this.label5.Text = "Schematic 1 of 2";
             // 
-            // panel3
-            // 
-            this.panel3.AutoScroll = true;
-            this.panel3.BackColor = System.Drawing.Color.Transparent;
-            this.panel3.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panel3.Location = new System.Drawing.Point(0, 0);
-            this.panel3.Name = "panel3";
-            this.panel3.Size = new System.Drawing.Size(265, 638);
-            this.panel3.TabIndex = 0;
-            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -301,9 +301,9 @@
             this.Text = "Commodore Repair Toolbox";
             this.tabControl1.ResumeLayout(false);
             this.tabMain.ResumeLayout(false);
-            this.panel2.ResumeLayout(false);
-            this.panel1.ResumeLayout(false);
-            this.panel1.PerformLayout();
+            this.panelListMain.ResumeLayout(false);
+            this.panelZoom.ResumeLayout(false);
+            this.panelZoom.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -327,10 +327,10 @@
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.Label label5;
-        private System.Windows.Forms.Panel panel1;
-        private System.Windows.Forms.Panel panel2;
+        private System.Windows.Forms.Panel panelZoom;
+        private System.Windows.Forms.Panel panelListMain;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Label label4;
-        private System.Windows.Forms.Panel panel3;
+        private System.Windows.Forms.Panel panelListAutoscroll;
     }
 }

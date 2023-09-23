@@ -94,6 +94,42 @@
           ]
       }]
     }
+  ],
+  "Print, Top": [
+    {
+      "highlight-tab-color": "Yellow",
+      "highlight-tab-opacity": "75%",
+      "highlight-list-color": "Yellow",
+      "highlight-list-opacity": "100%",
+      "component": [{
+          "U8": [
+              {
+              "x": 2091,
+              "y": 95,
+              "width": 625,
+              "height": 597
+              }
+          ]
+      }]
+    }
+  ],
+  "Print, Bottom": [
+    {
+      "highlight-tab-color": "Yellow",
+      "highlight-tab-opacity": "75%",
+      "highlight-list-color": "Yellow",
+      "highlight-list-opacity": "100%",
+      "component": [{
+          "U8": [
+              {
+              "x": 237,
+              "y": 167,
+              "width": 664,
+              "height": 653
+              }
+          ]
+      }]
+    }
   ]
 
 }
