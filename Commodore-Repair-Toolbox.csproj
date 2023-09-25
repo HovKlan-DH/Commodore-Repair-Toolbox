@@ -74,6 +74,12 @@
   <ItemGroup>
     <Compile Include="ControlExtensions.cs" />
     <Compile Include="DataStructure.cs" />
+    <Compile Include="FormComponent.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormComponent.Designer.cs">
+      <DependentUpon>FormComponent.cs</DependentUpon>
+    </Compile>
     <Compile Include="Main.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -82,6 +88,9 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <EmbeddedResource Include="FormComponent.resx">
+      <DependentUpon>FormComponent.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Main.resx">
       <DependentUpon>Main.cs</DependentUpon>
     </EmbeddedResource>

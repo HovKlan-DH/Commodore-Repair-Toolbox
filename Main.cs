@@ -20,6 +20,9 @@ namespace Commodore_Repair_Toolbox
         private CustomPanel panelMain;
         private Panel panelImage;
 
+        FormComponent formComponent;
+        //FormComponent formComponent = new FormComponent(string pictureBoxName);
+
         Dictionary<string, string> listBoxNameValueMapping = new Dictionary<string, string>();
 
         // List to hold the actual values of selected items
@@ -234,6 +237,7 @@ namespace Commodore_Repair_Toolbox
                 overlayTab.MouseMove += PanelImage_MouseMove;
                 overlayTab.MouseEnter += new EventHandler(this.Overlay_MouseEnter);
                 overlayTab.MouseLeave += new EventHandler(this.Overlay_MouseLeave);
+                overlayTab.MouseClick += new MouseEventHandler(this.PanelImageComponent_MouseClick);
             }
 
             ResizeTabImage();
@@ -276,12 +280,17 @@ namespace Commodore_Repair_Toolbox
                                     BackgroundImage = image2,
                                     BackgroundImageLayout = ImageLayout.Zoom,
                                     Dock = DockStyle.None,
+                                    Name = file.Name,
                                 };
                                 panelList2.DoubleBuffered(true);
                                 panelListAutoscroll.Controls.Add(panelList2);
 
+                                panelList2.MouseEnter += new EventHandler(this.PanelList2_MouseEnter);
+                                panelList2.MouseLeave += new EventHandler(this.PanelList2_MouseLeave);
+                                panelList2.MouseClick += new MouseEventHandler(this.PanelList2_MouseClick);
+
                                 // Add the Paint event handler to draw the border
-                                if(imageSelected == file.Name)
+                                if (imageSelected == file.Name)
                                 {
                                     panelList2.Paint += new PaintEventHandler((sender, e) =>
                                     {
@@ -413,6 +422,45 @@ namespace Commodore_Repair_Toolbox
                 if(scope == "tab")
                 {
 
+
+                    // Resize the overlays
+                    int index = 0;
+                    foreach (PictureBox overlay in overlayComponentsTab)
+                    {
+                        // Dispose the current overlay
+                        if (overlay.Image != null)
+                        {
+                            overlay.Image.Dispose();
+                        }
+
+                        Size originalSize = overlayComponentsTabOriginalSizes[index];
+                        Point originalLocation = overlayComponentsTabOriginalLocations[index];
+                        int newWidth = (int)(originalSize.Width * zoomFactor);
+                        int newHeight = (int)(originalSize.Height * zoomFactor);
+                        overlay.Size = new Size(newWidth, newHeight);
+                        overlay.Location = new Point((int)(originalLocation.X * zoomFactor), (int)(originalLocation.Y * zoomFactor));
+
+                        // Create a new bitmap
+                        Bitmap newBmp = new Bitmap(newWidth, newHeight);
+                        using (Graphics g = Graphics.FromImage(newBmp))
+                        {
+                            if (listBoxSelectedActualValues.Contains(overlay.Name))
+                            {
+                                g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
+                            } else
+                            {
+                                g.Clear(Color.FromArgb(0, Color.Transparent)); // 50% opacity
+                            }
+                                
+                        }
+                        overlay.Image = newBmp;
+                        overlay.DoubleBuffered(true);
+                        Debug.WriteLine("Attached PictureBox in ZOOM [" + imageSelected + "] with hash [" + overlay.GetHashCode() + "]");
+
+                        index++;
+                    }
+
+                    /*
                     foreach (var pb in overlayComponentsTab)
                     {
 
@@ -428,6 +476,7 @@ namespace Commodore_Repair_Toolbox
                             //pb.BackColor = Color.Blue;
                         }
                     }
+                    */
 
                 }
 
@@ -573,6 +622,10 @@ namespace Commodore_Repair_Toolbox
             //panelImage.Size = new Size((int)(panelImage.Width * zoomFactor), (int)(panelImage.Height * zoomFactor));
             //panelImage.Refresh();
 
+
+
+
+            /*
             // Resize the overlays
             int index = 0;
             foreach (PictureBox overlay in overlayComponentsTab)
@@ -602,6 +655,7 @@ namespace Commodore_Repair_Toolbox
 
                 index++;
             }
+            */
 
             // Highlight (relevant) overlays            
             HighlightOverlays("tab");
@@ -657,6 +711,72 @@ namespace Commodore_Repair_Toolbox
 
             if (hasZoomChanged)
             {
+
+
+                isResizedByMouseWheel = true;
+
+                // Calculate the new size of the imagePanel.
+                Size newSize = new Size((int)(image.Width * zoomFactor), (int)(image.Height * zoomFactor));
+
+                // Calculate the current mouse position relative to the content in the containerPanel.
+                Point mousePosition = new Point(e.X - panelMain.AutoScrollPosition.X, e.Y - panelMain.AutoScrollPosition.Y);
+
+                // Calculate what the new scroll position should be so that the content under the mouse stays under the mouse.
+                Point newScrollPosition = new Point(
+                    (int)(mousePosition.X * (zoomFactor / oldZoomFactor)),
+                    (int)(mousePosition.Y * (zoomFactor / oldZoomFactor))
+                );
+
+                // Update the size of the imagePanel.
+                panelImage.Size = newSize;
+
+                // Update the scroll position of the containerPanel.
+                panelMain.AutoScrollPosition = new Point(newScrollPosition.X - e.X, newScrollPosition.Y - e.Y);
+
+
+
+                /*
+                int index = 0;
+                foreach (PictureBox overlay in overlayComponentsTab)
+                {
+                    // Dispose the current overlay
+                    if (overlay.Image != null)
+                    {
+                        overlay.Image.Dispose();
+                    }
+
+                    Size originalSize = overlayComponentsTabOriginalSizes[index];
+                    Point originalLocation = overlayComponentsTabOriginalLocations[index];
+                    int newWidth = (int)(originalSize.Width * zoomFactor);
+                    int newHeight = (int)(originalSize.Height * zoomFactor);
+                    overlay.Size = new Size(newWidth, newHeight);
+                    overlay.Location = new Point((int)(originalLocation.X * zoomFactor), (int)(originalLocation.Y * zoomFactor));
+
+                    // Dispose of the old bitmap
+                    if (overlay.Image != null)
+                    {
+                        overlay.Image.Dispose();
+                    }
+
+                    // Create a new bitmap
+                    Bitmap newBmp = new Bitmap(newWidth, newHeight);
+                    using (Graphics g = Graphics.FromImage(newBmp))
+                    {
+                        g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
+                    }
+                    overlay.Image = newBmp;
+                    overlay.DoubleBuffered(true);
+                    Debug.WriteLine("Attached PictureBox in ZOOM [" + imageSelected + "] with hash [" + overlay.GetHashCode() + "]");
+
+                    index++;
+                }
+                */
+
+                HighlightOverlays("tab");
+
+
+
+                /*
                 isResizedByMouseWheel = true;
                   
                 // Calculate the new size of the imagePanel.
@@ -681,6 +801,7 @@ namespace Commodore_Repair_Toolbox
                 panelMain.AutoScrollPosition = new Point(newScrollPosition.X - e.X, newScrollPosition.Y - e.Y);
 
                 Debug.WriteLine("After: panelMain.Width=" + panelMain.Width + ", panelImage.Width=" + panelImage.Width + ", image.Width=" + image.Width + ", panelMain.AutoScrollPosition.X=" + panelMain.AutoScrollPosition.X);
+                */
 
             }
         }
@@ -727,6 +848,22 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
+        private void PanelImageComponent_MouseClick(object sender, MouseEventArgs e)
+        {
+
+            if (e.Button == MouseButtons.Left)
+            {
+
+                // Cast "sender" as a PictureBox and create an instance of it
+                if (sender is PictureBox pb)
+                {
+                    Debug.WriteLine(pb.Name);
+                    FormComponent formComponent = new FormComponent(pb.Name);
+                    formComponent.ShowDialog();
+                }
+            }
+        }
+
 
         // ---------------------------------------------------------------------------------
 
@@ -742,6 +879,23 @@ namespace Commodore_Repair_Toolbox
             label3.Visible = true;
         }
 
+        private void PanelList2_MouseEnter(object sender, EventArgs e)
+        {
+            this.Cursor = Cursors.Hand;
+        }
+
+        private void PanelList2_MouseClick(object sender, MouseEventArgs e)
+        {
+            if (sender is Panel pan)
+            {
+                
+
+                if (e.Button == MouseButtons.Left)
+                {
+                    Debug.WriteLine(pan.Name);
+                }
+            }
+        }
 
         // ---------------------------------------------------------------------------------
 
@@ -750,6 +904,11 @@ namespace Commodore_Repair_Toolbox
         {
             this.Cursor = Cursors.Default;
             label3.Visible = false;
+        }
+
+        private void PanelList2_MouseLeave(object sender, EventArgs e)
+        {
+            this.Cursor = Cursors.Default;
         }
 
         private void button1_Click(object sender, EventArgs e)
