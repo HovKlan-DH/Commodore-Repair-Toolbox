@@ -294,11 +294,12 @@
             "Capacitor",
             "Diode",
             "IC",
-            "Resistor"});
+            "Resistor",
+            "Transistor"});
             this.listBox2.Location = new System.Drawing.Point(12, 159);
             this.listBox2.Name = "listBox2";
             this.listBox2.SelectionMode = System.Windows.Forms.SelectionMode.MultiSimple;
-            this.listBox2.Size = new System.Drawing.Size(208, 84);
+            this.listBox2.Size = new System.Drawing.Size(208, 100);
             this.listBox2.TabIndex = 10;
             // 
             // label8

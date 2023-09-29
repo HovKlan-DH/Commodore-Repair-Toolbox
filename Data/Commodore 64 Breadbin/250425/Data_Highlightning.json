@@ -50,7 +50,7 @@
       "highlight-list-color": "Yellow",
       "highlight-list-opacity": "100%",
       "component": [{
-          "U1": [
+          "U3": [
               {
               "x": 1055,
               "y": 2811,
@@ -84,7 +84,7 @@
       "highlight-list-color": "Yellow",
       "highlight-list-opacity": "100%",
       "component": [{
-          "U8": [
+          "U3": [
               {
               "x": 2237,
               "y": 167,
@@ -102,7 +102,7 @@
       "highlight-list-color": "Yellow",
       "highlight-list-opacity": "100%",
       "component": [{
-          "U8": [
+          "U3": [
               {
               "x": 2091,
               "y": 95,
@@ -120,12 +120,48 @@
       "highlight-list-color": "Yellow",
       "highlight-list-opacity": "100%",
       "component": [{
-          "U8": [
+          "U3": [
               {
               "x": 237,
               "y": 167,
               "width": 664,
               "height": 653
+              }
+          ]
+      }]
+    }
+  ],
+  "Traces, Top": [
+    {
+      "highlight-tab-color": "Yellow",
+      "highlight-tab-opacity": "75%",
+      "highlight-list-color": "Yellow",
+      "highlight-list-opacity": "100%",
+      "component": [{
+          "U3": [
+              {
+              "x": 1237,
+              "y": 167,
+              "width": 664,
+              "height": 653
+              }
+          ]
+      }]
+    }
+  ],
+  "Traces, Back": [
+    {
+      "highlight-tab-color": "Yellow",
+      "highlight-tab-opacity": "75%",
+      "highlight-list-color": "Yellow",
+      "highlight-list-opacity": "100%",
+      "component": [{
+          "U3": [
+              {
+              "x": 837,
+              "y": 190,
+              "width": 164,
+              "height": 353
               }
           ]
       }]

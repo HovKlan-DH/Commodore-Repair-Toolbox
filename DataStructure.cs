@@ -114,7 +114,7 @@ namespace Commodore_Retro_Toolbox
                 {
                     using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\Data.xlsx")))
                     {
-                        var worksheet = package.Workbook.Worksheets[0];
+                        var worksheet = package.Workbook.Worksheets["Images"];
 
                         // Find the row that starts with the "searchHeader"
                         string searchHeader = "LIST IMAGES";
@@ -170,7 +170,7 @@ namespace Commodore_Retro_Toolbox
 
                     using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\Data.xlsx")))
                     {
-                        var worksheet = package.Workbook.Worksheets[0];
+                        var worksheet = package.Workbook.Worksheets["Components"];
 
                         // Find the row that starts with the "searchHeader"
                         string searchHeader = "COMPONENTS";
@@ -227,7 +227,7 @@ namespace Commodore_Retro_Toolbox
 
                         using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\Data.xlsx")))
                         {
-                            var worksheet = package.Workbook.Worksheets[0];
+                            var worksheet = package.Workbook.Worksheets["Components"];
 
                             // Find the row that starts with the "searchHeader"
                             string searchHeader = "COMPONENTS";

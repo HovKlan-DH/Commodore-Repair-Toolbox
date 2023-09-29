@@ -45,11 +45,15 @@ namespace Commodore_Repair_Toolbox
 
         List<Hardware> classHardware = new List<Hardware>();
 
-        private Image image = Image.FromFile(Application.StartupPath + "\\Data\\Commodore 64 Breadbin\\250425\\Schematics 1of2.gif");
+        
         //private int yPosition = 0;
-        private string hardwareSelected = "Commodore 64 (Breadbin)";
-        private string boardSelected = "250425";
-        private string imageSelected = "Schematics 1 of 2";
+        private static string hardwareSelectedName = "Commodore 64 (Breadbin)";
+        private static string hardwareSelectedFolder = "Commodore 64 Breadbin";
+        private static string boardSelectedName = "250425";
+        private static string boardSelectedFolder = "250425";
+        private static string imageSelectedName = "Schematics 1 of 2";
+        private static string imageSelectedFile = "Schematics 1of2.gif";
+        private Image image;
 
         private List<PictureBox> visiblePictureBoxes = new List<PictureBox>();
 
@@ -62,7 +66,14 @@ namespace Commodore_Repair_Toolbox
         public Main()
         {
             InitializeComponent();
+            
+            hest();
+            
+        }
 
+        private void hest ()
+        {
+            image = Image.FromFile(Application.StartupPath + "\\Data\\" + hardwareSelectedFolder + "\\" + boardSelectedFolder + "\\" + imageSelectedFile);
             DataStructure.GetAllData(classHardware);
 
             /*
@@ -114,7 +125,6 @@ namespace Commodore_Repair_Toolbox
             this.ResizeEnd += new EventHandler(this.Form_ResizeEnd);
             this.Shown += new System.EventHandler(this.Main_Shown);
         }
-
 
         // ---------------------------------------------------------------------------------
 
@@ -229,7 +239,7 @@ namespace Commodore_Repair_Toolbox
             {
                 overlayTab.DoubleBuffered(true); 
                 panelImage.Controls.Add(overlayTab);
-                Debug.WriteLine("Attached PictureBox in ZOOM ["+ imageSelected +"] with hash [" + overlayTab.GetHashCode() +"]");
+                Debug.WriteLine("Attached PictureBox in ZOOM ["+ imageSelectedName +"] with hash [" + overlayTab.GetHashCode() +"]");
 
                 // Trigger on events
                 overlayTab.MouseDown += PanelImage_MouseDown;
@@ -260,11 +270,11 @@ namespace Commodore_Repair_Toolbox
 
             foreach (Hardware hardware in classHardware)
             {
-                if (hardware.Name == hardwareSelected)
+                if (hardware.Name == hardwareSelectedName)
                 {
                     foreach (Board board in hardware.Boards)
                     {
-                        if (board.Name == boardSelected)
+                        if (board.Name == boardSelectedName)
                         {
                             foreach (Commodore_Repair_Toolbox.File file in board.Files)
                             {
@@ -290,7 +300,7 @@ namespace Commodore_Repair_Toolbox
                                 panelList2.MouseClick += new MouseEventHandler(this.PanelList2_MouseClick);
 
                                 // Add the Paint event handler to draw the border
-                                if (imageSelected == file.Name)
+                                if (imageSelectedName == file.Name)
                                 {
                                     panelList2.Paint += new PaintEventHandler((sender, e) =>
                                     {
@@ -455,7 +465,7 @@ namespace Commodore_Repair_Toolbox
                         }
                         overlay.Image = newBmp;
                         overlay.DoubleBuffered(true);
-                        Debug.WriteLine("Attached PictureBox in ZOOM [" + imageSelected + "] with hash [" + overlay.GetHashCode() + "]");
+                        Debug.WriteLine("Attached PictureBox in ZOOM [" + imageSelectedName + "] with hash [" + overlay.GetHashCode() + "]");
 
                         index++;
                     }
@@ -519,10 +529,10 @@ namespace Commodore_Repair_Toolbox
 
             // Walk through the class object and find the specific selected
             // hardware and board
-            Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelected);
+            Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             if (foundHardware != null)
             {
-                Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardSelected);
+                Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
                 if (foundBoard != null)
                 {
 
@@ -547,7 +557,7 @@ namespace Commodore_Repair_Toolbox
                                     // "Tab" - only create a PictureBox if we are processing
                                     // the same image as the one shown in the zoomable
                                     // image
-                                    if (file.Name == imageSelected)
+                                    if (file.Name == imageSelectedName)
                                     {
 
                                         // Define a new PictureBox
@@ -862,6 +872,20 @@ namespace Commodore_Repair_Toolbox
                     formComponent.ShowDialog();
                 }
             }
+
+            if (e.Button == MouseButtons.Right)
+            {
+
+                // Cast "sender" as a PictureBox and create an instance of it
+                if (sender is PictureBox pb)
+                {
+                    Debug.WriteLine(pb.Name);
+
+                    string key = listBoxNameValueMapping.FirstOrDefault(x => x.Value == pb.Name).Key;
+                    int index = listBox1.FindString(key);
+                    listBox1.SetSelected(index, !listBox1.GetSelected(index));
+                }
+            }
         }
 
 
@@ -893,6 +917,47 @@ namespace Commodore_Repair_Toolbox
                 if (e.Button == MouseButtons.Left)
                 {
                     Debug.WriteLine(pan.Name);
+
+                    imageSelectedName = pan.Name;
+
+                    foreach (Hardware hardware in classHardware)
+                    {
+                        if (hardware.Name == hardwareSelectedName)
+                        {
+                            Debug.WriteLine("Hardware Name = " + hardware.Name + ", Folder = " + hardware.Folder);
+                            foreach (Board board in hardware.Boards)
+                            {
+                                if (board.Name == boardSelectedName)
+                                {
+                                    Debug.WriteLine("  Board Name = " + board.Name + ", Folder = " + board.Folder);
+                                    foreach (Commodore_Repair_Toolbox.File file in board.Files)
+                                    {
+                                        if (file.Name == imageSelectedName)
+                                        {
+                                            Debug.WriteLine("    File Name = " + file.Name + ", FileName = " + file.FileName);
+                                            imageSelectedFile = file.FileName;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+
+                    panelListAutoscroll.Controls.Clear();
+                    panelZoom.Controls.Clear();
+                    
+                    listBoxSelectedActualValues.Clear();
+                    listBoxNameValueMapping.Clear();
+                    overlayComponentsList.Clear();
+                    overlayComponentsTab.Clear();
+                    overlayComponentsTabOriginalSizes.Clear();
+                    overlayComponentsTabOriginalLocations.Clear();
+                    classHardware.Clear();
+                    visiblePictureBoxes.Clear();
+
+
+                                hest();
                 }
             }
         }
