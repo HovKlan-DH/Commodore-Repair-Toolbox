@@ -117,4 +117,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="textBox1.Text" xml:space="preserve">
+    <value>Step back in time with a smile, as we reminisce about the magic of the 80's and 90's — the era of our beloved Commodore computers.
+
+Whether we were captivated by pixelated games, mesmerized by groundbreaking demos, or even coding our own digital adventures, those machines sparked pure joy and life-long friendships. As we have grown, our fascination for this vintage technology has not waned and maybe now it has matured into a newfound passion for restoration? :-)</value>
+  </data>
 </root>

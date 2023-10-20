@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Main));
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabMain = new System.Windows.Forms.TabPage();
             this.panelListMain = new System.Windows.Forms.Panel();
@@ -51,10 +52,14 @@
             this.label5 = new System.Windows.Forms.Label();
             this.listBox2 = new System.Windows.Forms.ListBox();
             this.label8 = new System.Windows.Forms.Label();
+            this.label9 = new System.Windows.Forms.Label();
+            this.label10 = new System.Windows.Forms.Label();
+            this.textBox1 = new System.Windows.Forms.TextBox();
             this.tabControl1.SuspendLayout();
             this.tabMain.SuspendLayout();
             this.panelListMain.SuspendLayout();
             this.panelZoom.SuspendLayout();
+            this.tabAbout.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl1
@@ -144,7 +149,7 @@
             // 
             // tabTrivia
             // 
-            this.tabTrivia.BackColor = System.Drawing.Color.Transparent;
+            this.tabTrivia.BackColor = System.Drawing.Color.WhiteSmoke;
             this.tabTrivia.Location = new System.Drawing.Point(4, 25);
             this.tabTrivia.Name = "tabTrivia";
             this.tabTrivia.Padding = new System.Windows.Forms.Padding(3);
@@ -163,6 +168,7 @@
             // 
             // tabLinks
             // 
+            this.tabLinks.BackColor = System.Drawing.Color.WhiteSmoke;
             this.tabLinks.Location = new System.Drawing.Point(4, 25);
             this.tabLinks.Name = "tabLinks";
             this.tabLinks.Size = new System.Drawing.Size(927, 650);
@@ -171,21 +177,25 @@
             // 
             // tabSettings
             // 
+            this.tabSettings.BackColor = System.Drawing.Color.WhiteSmoke;
             this.tabSettings.Location = new System.Drawing.Point(4, 25);
             this.tabSettings.Name = "tabSettings";
             this.tabSettings.Size = new System.Drawing.Size(927, 650);
             this.tabSettings.TabIndex = 4;
             this.tabSettings.Text = "Settings";
-            this.tabSettings.UseVisualStyleBackColor = true;
             // 
             // tabAbout
             // 
+            this.tabAbout.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.tabAbout.Controls.Add(this.textBox1);
+            this.tabAbout.Controls.Add(this.label10);
+            this.tabAbout.Controls.Add(this.label9);
+            this.tabAbout.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
             this.tabAbout.Location = new System.Drawing.Point(4, 25);
             this.tabAbout.Name = "tabAbout";
             this.tabAbout.Size = new System.Drawing.Size(927, 650);
             this.tabAbout.TabIndex = 5;
             this.tabAbout.Text = "About";
-            this.tabAbout.UseVisualStyleBackColor = true;
             // 
             // comboBox1
             // 
@@ -311,6 +321,39 @@
             this.label8.TabIndex = 11;
             this.label8.Text = "Show component categories";
             // 
+            // label9
+            // 
+            this.label9.AutoSize = true;
+            this.label9.Font = new System.Drawing.Font("Microsoft Sans Serif", 16.2F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label9.Location = new System.Drawing.Point(21, 24);
+            this.label9.Name = "label9";
+            this.label9.Size = new System.Drawing.Size(393, 32);
+            this.label9.TabIndex = 0;
+            this.label9.Text = "Commodore Repair Toolbox";
+            // 
+            // label10
+            // 
+            this.label10.AutoSize = true;
+            this.label10.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label10.Location = new System.Drawing.Point(24, 60);
+            this.label10.Name = "label10";
+            this.label10.Size = new System.Drawing.Size(174, 18);
+            this.label10.TabIndex = 1;
+            this.label10.Text = "Version 2023-October-20";
+            // 
+            // textBox1
+            // 
+            this.textBox1.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.textBox1.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.textBox1.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.textBox1.Location = new System.Drawing.Point(36, 122);
+            this.textBox1.Multiline = true;
+            this.textBox1.Name = "textBox1";
+            this.textBox1.Size = new System.Drawing.Size(726, 284);
+            this.textBox1.TabIndex = 3;
+            this.textBox1.Text = resources.GetString("textBox1.Text");
+            this.textBox1.TextChanged += new System.EventHandler(this.textBox1_TextChanged);
+            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -334,6 +377,8 @@
             this.panelListMain.ResumeLayout(false);
             this.panelZoom.ResumeLayout(false);
             this.panelZoom.PerformLayout();
+            this.tabAbout.ResumeLayout(false);
+            this.tabAbout.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -364,5 +409,8 @@
         private System.Windows.Forms.Panel panelListAutoscroll;
         private System.Windows.Forms.ListBox listBox2;
         private System.Windows.Forms.Label label8;
+        private System.Windows.Forms.Label label10;
+        private System.Windows.Forms.Label label9;
+        private System.Windows.Forms.TextBox textBox1;
     }
 }
