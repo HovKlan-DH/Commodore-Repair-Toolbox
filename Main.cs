@@ -5,6 +5,9 @@ using System.Drawing;
 using System.Windows.Forms;
 using Commodore_Retro_Toolbox;
 using System.Linq;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using System.CodeDom;
+using System.Runtime.Remoting.Metadata.W3cXsd2001;
 
 namespace Commodore_Repair_Toolbox
 {
@@ -16,118 +19,119 @@ namespace Commodore_Repair_Toolbox
     public partial class Main : Form
     {
 
-        // UI elements
-        private CustomPanel panelMain;
-        private Panel panelImage;
-
-        FormComponent formComponent;
-        //FormComponent formComponent = new FormComponent(string pictureBoxName);
-
-        Dictionary<string, string> listBoxNameValueMapping = new Dictionary<string, string>();
-
-        // List to hold the actual values of selected items
-        List<string> listBoxSelectedActualValues = new List<string>();
-
-        // Main variables
-        private float zoomFactor = 1.0f;
-        private Point lastMousePosition;
         private bool isResizedByMouseWheel = false;
-
-        // Overlay array in "Main" tab
-        //List<PictureBox> overlayComponentsList = new List<PictureBox>();
-        Dictionary<string, List<PictureBox>> overlayComponentsList = new Dictionary<string, List<PictureBox>>();
-        List<PictureBox> overlayComponentsTab = new List<PictureBox>();
-        Dictionary<int, Size> overlayComponentsTabOriginalSizes = new Dictionary<int, Size>();
-        Dictionary<int, Point> overlayComponentsTabOriginalLocations = new Dictionary<int, Point>();
-
-        // Create a Dictionary to map each image to its list of PictureBox overlays
-        //Dictionary<string, List<PictureBox>> imageToOverlays = new Dictionary<string, List<PictureBox>>();
-
-        List<Hardware> classHardware = new List<Hardware>();
-
-        
-        //private int yPosition = 0;
-        private static string hardwareSelectedName = "Commodore 64 (Breadbin)";
-        private static string hardwareSelectedFolder = "Commodore 64 Breadbin";
-        private static string boardSelectedName = "250425";
-        private static string boardSelectedFolder = "250425";
-        private static string imageSelectedName = "Schematics 1 of 2";
-        private static string imageSelectedFile = "Schematics 1of2.gif";
-        private Image image;
-
-        private List<PictureBox> visiblePictureBoxes = new List<PictureBox>();
-
         private bool isResizing = false;
-
+        private CustomPanel panelMain;
+        private List<string> selectedItems = new List<string>();
+        private Dictionary<int, Point> overlayComponentsTabOriginalLocations = new Dictionary<int, Point>();
+        private Dictionary<int, Size> overlayComponentsTabOriginalSizes = new Dictionary<int, Size>();
+        private Dictionary<string, List<PictureBox>> overlayComponentsList = new Dictionary<string, List<PictureBox>>();
+        private Dictionary<string, string> listBoxNameValueMapping = new Dictionary<string, string>();
+        private float zoomFactor = 1.0f;
+        private Image image;
+        public List<Hardware> classHardware = new List<Hardware>();
+        private List<PictureBox> overlayComponentsTab = new List<PictureBox>();
+        private List<PictureBox> visiblePictureBoxes = new List<PictureBox>();
+        private List<string> listBoxSelectedActualValues = new List<string>();
+        private Panel panelImage;
+        private Point lastMousePosition;
+        public string hardwareSelectedName;
+        private string hardwareSelectedFolder;
+        private string boardSelectedName;
+        private string boardSelectedFolder;
+        private string imageSelectedName;
+        private string imageSelectedFile;
 
         // ---------------------------------------------------------------------------------
 
-
         public Main()
         {
+            // Initialize the UI form
             InitializeComponent();
-            
-            hest();
-            
-        }
 
-        private void hest ()
-        {
-            image = Image.FromFile(Application.StartupPath + "\\Data\\" + hardwareSelectedFolder + "\\" + boardSelectedFolder + "\\" + imageSelectedFile);
+            // Bind some needed events
+            this.ResizeBegin += new EventHandler(this.Form_ResizeBegin);
+            this.ResizeEnd += new EventHandler(this.Form_ResizeEnd);
+            this.Shown += new System.EventHandler(this.Main_Shown);
+
+            // Optimize drawing performance
+            panelZoom.DoubleBuffered(true);
+            panelListMain.DoubleBuffered(true);
+            panelListAutoscroll.DoubleBuffered(true);
+
+            // Read all data from Excel and JSON files once only
             DataStructure.GetAllData(classHardware);
 
-            /*
-            // Now you have a list of hardware, each containing a list of associated boards
+            // Debug output to show if we have the correct data
             foreach (Hardware hardware in classHardware)
             {
-                Debug.WriteLine("Hardware Name = " + hardware.Name + ", Folder = " + hardware.Folder);
+                Debug.WriteLine("[" + hardware.Name + "]");
+                Debug.WriteLine("  [Folder]=[" + hardware.Folder + "]");
                 foreach (Board board in hardware.Boards)
                 {
-                    Debug.WriteLine("  Board Name = " + board.Name + ", Folder = " + board.Folder);
+                    Debug.WriteLine("  [" + board.Name + "]");
+                    Debug.WriteLine("    [Folder]=[" + board.Folder + "]");
+                    Debug.WriteLine("    [Component]");
                     foreach (ComponentBoard component in board.Components)
                     {
-                        Debug.WriteLine("    Component Name = " + component.NameLabel);
+                        Debug.WriteLine("      [" + component.Label + "] ("+ component.Type +")");
                     }
                     foreach (Commodore_Repair_Toolbox.File file in board.Files)
                     {
-                        Debug.WriteLine("    File Name = " + file.Name + ", FileName = " + file.FileName);
+                        Debug.WriteLine("    [" + file.Name + "]");
+                        Debug.WriteLine("      [FileName]=[" + file.FileName + "]");
+                        Debug.WriteLine("      [Component]");
                         foreach (ComponentBounds component in file.Components)
                         {
-                            Debug.WriteLine("      Component Name = " + component.NameLabel);
+                            Debug.WriteLine("        [" + component.Label + "]");
                             if (component.Overlays != null)
                             {
                                 foreach (Overlay overlay in component.Overlays)
                                 {
-                                    Debug.WriteLine("        Overlay X=" + overlay.Bounds.X + ", Y=" + overlay.Bounds.Y + ", Width=" + overlay.Bounds.Width + ", Height=" + overlay.Bounds.Height);
+                                    Debug.WriteLine("          [X]=[" + overlay.Bounds.X + "], [Y]=[" + overlay.Bounds.Y + "], [Width]=[" + overlay.Bounds.Width + "], [Height]=[" + overlay.Bounds.Height + "]");
                                 }
                             }
                         }
                     }
                 }
             }
-            */
 
-            // Create the array that will be used for all overlays
-            CreateOverlayArrays();
+            // Populate the "hardware" and "board" combobox'es and set variables for selected hardware/board
+            foreach (Hardware hardware in classHardware)
+            {
+                comboBox1.Items.Add(hardware.Name);
+            }
+            comboBox1.SelectedIndex = 0;
+            hardwareSelectedName = comboBox1.SelectedItem.ToString();
 
-            // Initialize the two parts in the "Main" tab, the zoomable area and the image list
-            InitializeTabMain();
-            InitializeList();
-
-            // Optimize drawing
-            panelZoom.DoubleBuffered(true);
-            panelListMain.DoubleBuffered(true);
-            panelListAutoscroll.DoubleBuffered(true);
-
-            InitializeComponentList();
-
-            this.ResizeBegin += new EventHandler(this.Form_ResizeBegin);
-            this.ResizeEnd += new EventHandler(this.Form_ResizeEnd);
-            this.Shown += new System.EventHandler(this.Main_Shown);
+            //            foreach (Board board in classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName).Boards)
+            //            {
+            //                comboBox2.Items.Add(board.Name);
+            //            }
+            //            comboBox2.SelectedIndex = 0;
         }
+
 
         // ---------------------------------------------------------------------------------
 
+
+        private void SetupNewBoard()
+        {
+            boardSelectedName = comboBox2.SelectedItem.ToString();
+            var selectedHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var selectedBoard = selectedHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            hardwareSelectedFolder = selectedHardware.Folder;
+            boardSelectedFolder = selectedHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName).Folder;
+            imageSelectedName = selectedBoard.Files.FirstOrDefault().Name;
+            imageSelectedFile = selectedBoard.Files.FirstOrDefault(f => f.Name == imageSelectedName).FileName;
+
+            // Show the components in the list for this specific board
+            InitializeComponentCategories();
+            InitializeComponentList();
+
+            InitializeList();
+            InitializeTabMain();
+        }
 
         private void Form_ResizeBegin(object sender, EventArgs e)
         {
@@ -144,11 +148,11 @@ namespace Commodore_Repair_Toolbox
         private void Form_ResizeEnd(object sender, EventArgs e)
         {
             Debug.WriteLine("Form_ResizeEnd");
-//            foreach (PictureBox pictureBox in visiblePictureBoxes)
-//            {
-//                pictureBox.Visible = true;
-//            }
-//            visiblePictureBoxes.Clear();
+            //            foreach (PictureBox pictureBox in visiblePictureBoxes)
+            //            {
+            //                pictureBox.Visible = true;
+            //            }
+            //            visiblePictureBoxes.Clear();
             isResizing = false;
 
             // Highlight (relevant) overlays
@@ -175,31 +179,96 @@ namespace Commodore_Repair_Toolbox
                 }
             }
         }
-        
-        
+
+
         // ---------------------------------------------------------------------------------
 
 
-        private void InitializeComponentList()
+        private void InitializeComponentCategories()
         {
 
+            listBox2.Items.Clear();
+
             // Search for the correct Hardware and Board
-            Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == "Commodore 64 (Breadbin)");
+            Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             if (foundHardware != null)
             {
-                Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == "250425");
+                Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
                 if (foundBoard != null)
                 {
                     foreach (ComponentBoard component in foundBoard.Components)
                     {
-                        
-                        string displayText = component.NameLabel + "   6526   Resistor";
-                        string actualValue = component.NameLabel;
-                        listBox1.Items.Add(displayText);
-                        listBoxNameValueMapping[displayText] = actualValue;
+                        if (!string.IsNullOrEmpty(component.Type) && !listBox2.Items.Contains(component.Type)) { 
+                            listBox2.Items.Add(component.Type);
+                        }
                     }
                 }
             }
+
+            for (int i = 0; i < listBox2.Items.Count; i++)
+            {
+                listBox2.SetSelected(i, true);
+            }
+        }
+
+        private void InitializeComponentList(bool clearList = true)
+        {
+
+            foreach (var item in listBox1.SelectedItems)
+            {
+                selectedItems.Add(listBoxNameValueMapping[item.ToString()]);
+            }
+
+            listBox1.Items.Clear();
+            listBoxNameValueMapping.Clear();
+            if (clearList)
+            {
+                
+            }
+
+            // Search for the correct Hardware and Board
+            Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            if (foundHardware != null)
+            {
+                Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+                if (foundBoard != null)
+                {
+                    foreach (ComponentBoard component in foundBoard.Components)
+                    {
+                        if (listBox2.SelectedItems.Contains(component.Type))
+                        {
+                            string displayText = component.Label + "   "+ component.NameTechnical + "   "+ component.NameFriendly;
+                            string actualValue = component.Label;
+                            listBox1.Items.Add(displayText);
+                            listBoxNameValueMapping[displayText] = actualValue;
+
+                            // Check if the component.Label is in the selectedItems list
+                            if (selectedItems.Contains(component.Label))
+                            {
+                                int index = listBox1.Items.IndexOf(displayText);
+                                listBox1.SetSelected(index, true);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Remove the selection, if the component is no longer visible in the component list.
+            // This could have been done in one "foreach" loop, but it is bad practise to modify directly in the list you are iterating
+            List<string> itemsToRemove = new List<string>();
+            foreach (string selectedItem in selectedItems)
+            {
+                bool isVisible = listBoxNameValueMapping.Values.Contains(selectedItem);
+                if (!isVisible)
+                {
+                    itemsToRemove.Add(selectedItem);
+                }
+            }
+            foreach (string itemToRemove in itemsToRemove)
+            {
+                selectedItems.Remove(itemToRemove);
+            }
+
         }
 
 
@@ -208,6 +277,17 @@ namespace Commodore_Repair_Toolbox
 
         private void InitializeTabMain()
         {
+            // Get the image for the main tab
+            image = Image.FromFile(Application.StartupPath + "\\Data\\" + hardwareSelectedFolder + "\\" + boardSelectedFolder + "\\" + imageSelectedFile);
+
+            // Reset existing main tab (if already set)
+            panelZoom.Controls.Clear();
+
+            overlayComponentsTab.Clear();
+            overlayComponentsTabOriginalSizes.Clear();
+            overlayComponentsTabOriginalLocations.Clear();
+
+            CreateOverlayArraysToTab();
 
             // Initialize main panel, make it part of the "tabMain" and fill the entire size
             panelMain = new CustomPanel
@@ -219,14 +299,10 @@ namespace Commodore_Repair_Toolbox
             panelMain.DoubleBuffered(true);
             panelZoom.Controls.Add(panelMain);
 
-            // Calculate the new size of the imagePanel.
-//            Size newSize = new Size((int)(image.Width * zoomFactor), (int)(image.Height * zoomFactor));
-
             // Initialize zoomable image panel
             panelImage = new Panel
             {
                 Size = image.Size,
-                //Size = newSize,
                 BackgroundImage = image,
                 BackgroundImageLayout = ImageLayout.Zoom,
                 Dock = DockStyle.None,
@@ -237,9 +313,9 @@ namespace Commodore_Repair_Toolbox
             // Create all overlays defined in the array
             foreach (PictureBox overlayTab in overlayComponentsTab)
             {
-                overlayTab.DoubleBuffered(true); 
+                overlayTab.DoubleBuffered(true);
                 panelImage.Controls.Add(overlayTab);
-                Debug.WriteLine("Attached PictureBox in ZOOM ["+ imageSelectedName +"] with hash [" + overlayTab.GetHashCode() +"]");
+                Debug.WriteLine("Attached PictureBox in ZOOM [" + imageSelectedName + "] with hash [" + overlayTab.GetHashCode() + "]");
 
                 // Trigger on events
                 overlayTab.MouseDown += PanelImage_MouseDown;
@@ -266,6 +342,11 @@ namespace Commodore_Repair_Toolbox
 
         private void InitializeList()
         {
+
+            CreateOverlayArraysToList();
+
+            panelListAutoscroll.Controls.Clear();
+
             int yPosition = 0;
 
             foreach (Hardware hardware in classHardware)
@@ -280,7 +361,7 @@ namespace Commodore_Repair_Toolbox
                             {
                                 Panel panelList2;
                                 Label labelList1;
-                                Image image2 = Image.FromFile(Application.StartupPath + "\\Data\\Commodore 64 Breadbin\\250425\\" + file.FileName);
+                                Image image2 = Image.FromFile(Application.StartupPath + "\\Data\\" + hardwareSelectedFolder + "\\" + boardSelectedFolder + "\\" + file.FileName);
 
                                 // Initialize image panel
                                 panelList2 = new Panel
@@ -299,6 +380,7 @@ namespace Commodore_Repair_Toolbox
                                 panelList2.MouseLeave += new EventHandler(this.PanelList2_MouseLeave);
                                 panelList2.MouseClick += new MouseEventHandler(this.PanelList2_MouseClick);
 
+                                /*
                                 // Add the Paint event handler to draw the border
                                 if (imageSelectedName == file.Name)
                                 {
@@ -313,7 +395,9 @@ namespace Commodore_Repair_Toolbox
                                             e.Graphics.DrawRectangle(pen, halfPenWidth, halfPenWidth, panelList2.Width - penWidth, panelList2.Height - penWidth);
                                         }
                                     });
+                                  
                                 }
+                                */
 
                                 labelList1 = new Label
                                 {
@@ -344,9 +428,9 @@ namespace Commodore_Repair_Toolbox
                                 // Create all overlays defined in the array
                                 foreach (PictureBox overlayList in overlayComponentsList[file.Name])
                                 {
-                                    if(overlayList.Tag == file.Name)
+                                    if (overlayList.Tag == file.Name)
                                     {
-                                        
+
                                         int newWidth = (int)(overlayList.Width * zoomFactor);
                                         int newHeight = (int)(overlayList.Height * zoomFactor);
 
@@ -366,13 +450,13 @@ namespace Commodore_Repair_Toolbox
                                                 g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
                                             }
                                             overlayList.Image = newBmp;
-                                        
+
                                             overlayList.DoubleBuffered(true);
                                             panelList2.Controls.Add(overlayList);
-                                            Debug.WriteLine("Attached PictureBox in LIST ["+ file.Name + "] with hash [" + overlayList.GetHashCode() +"]");
+                                            Debug.WriteLine("Attached PictureBox in LIST [" + file.Name + "] with hash [" + overlayList.GetHashCode() + "]");
 
                                         }
-                                        
+
                                     }
                                 }
 
@@ -386,19 +470,94 @@ namespace Commodore_Repair_Toolbox
                 }
             }
 
+            DrawBorderInList();
+
             // Highlight (relevant) overlays
             HighlightOverlays("list");
+        }
+
+
+        private void DrawBorderInList()
+        {
+
+            foreach (Panel panel in panelListAutoscroll.Controls.OfType<Panel>())
+            {
+                // Remove existing Paint event handlers to avoid duplication
+                panel.Paint -= Panel_Paint_Standard;
+                panel.Paint -= Panel_Paint_Special;
+
+                if (panel.Name == imageSelectedName)
+                {
+                    // Special border for selected panel
+                    panel.Paint += Panel_Paint_Special;
+                }
+                else
+                {
+                    // Standard border for all other panels
+                    panel.Paint += Panel_Paint_Standard;
+                }
+
+                panel.Invalidate();  // Force the panel to repaint
+            }
+
+
+            /*
+            Panel foundPanel = panelListAutoscroll.Controls.OfType<Panel>().FirstOrDefault(p => p.Name == imageSelectedName);
+            if (foundPanel != null)
+            {
+                foundPanel.Paint += new PaintEventHandler((sender, e) =>
+                {
+                    float penWidth = 1;
+                    using (Pen pen = new Pen(Color.Red, penWidth))
+                    {
+                        pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Custom;
+                        pen.DashPattern = new float[] { 4, 2 };
+                        float halfPenWidth = penWidth / 2;
+                        e.Graphics.DrawRectangle(pen, halfPenWidth, halfPenWidth, foundPanel.Width - penWidth, foundPanel.Height - penWidth);
+                    }
+                });
+            }
+            foundPanel.Invalidate();  // Force the panel to repaint
+            */
 
         }
 
+        private void Panel_Paint_Standard(object sender, PaintEventArgs e)
+        {
+            // Draw standard border
+            float penWidth = 1;
+            using (Pen pen = new Pen(Color.Black, penWidth))
+            {
+                float halfPenWidth = penWidth / 2;
+                e.Graphics.DrawRectangle(pen, halfPenWidth, halfPenWidth, ((Panel)sender).Width - penWidth, ((Panel)sender).Height - penWidth);
+            }
+        }
+
+        private void Panel_Paint_Special(object sender, PaintEventArgs e)
+        {
+            // Draw special border
+            float penWidth = 1;
+            using (Pen pen = new Pen(Color.Red, penWidth))
+            {
+                pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Custom;
+                pen.DashPattern = new float[] { 4, 2 };
+                float halfPenWidth = penWidth / 2;
+                e.Graphics.DrawRectangle(pen, halfPenWidth, halfPenWidth, ((Panel)sender).Width - penWidth, ((Panel)sender).Height - penWidth);
+            }
+        }
 
         // ---------------------------------------------------------------------------------
 
 
         private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
+            UpdateHighlights();
+        }
+
+        private void UpdateHighlights()
+        {
             listBoxSelectedActualValues.Clear();
-            
+
             // Loop through the SelectedItems collection of the ListBox
             foreach (var selectedItem in listBox1.SelectedItems)
             {
@@ -416,6 +575,7 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+
         // ---------------------------------------------------------------------------------
         //
         // HighlightOverlays
@@ -425,6 +585,12 @@ namespace Commodore_Repair_Toolbox
 
         private void HighlightOverlays (string scope)
         {
+            // Skip execution if the form is minimized (size would be 0)
+            if (this.WindowState == FormWindowState.Minimized)
+            {
+                return; 
+            }
+
             if (!isResizing)
             {
 
@@ -459,7 +625,7 @@ namespace Commodore_Repair_Toolbox
                                 g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
                             } else
                             {
-                                g.Clear(Color.FromArgb(0, Color.Transparent)); // 50% opacity
+                                g.Clear(Color.FromArgb(0, Color.Transparent)); // 0% opacity
                             }
                                 
                         }
@@ -517,65 +683,35 @@ namespace Commodore_Repair_Toolbox
 
         // ---------------------------------------------------------------------------------
         //
-        // CreateOverlayArrays
+        // CreateOverlayArraysToList
         //
         // Create a PictureBox per image and component in both the main zoomable image
         // and all the list images. This is the PictureBox only but it will not be
         // associated to any concrete object/image yet
         // ---------------------------------------------------------------------------------
 
-        private void CreateOverlayArrays ()
+        private void CreateOverlayArraysToList ()
         {
 
-            // Walk through the class object and find the specific selected
-            // hardware and board
+            // Walk through the class object and find the specific selected hardware and board
             Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             if (foundHardware != null)
             {
                 Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
                 if (foundBoard != null)
                 {
-
                     // Walk through all images for the specific board
                     foreach (Commodore_Repair_Toolbox.File file in foundBoard.Files)
                     {
-
                         // Walk through all the components, again for the specific board
                         foreach (ComponentBounds component in file.Components)
                         {
                             if (component.Overlays != null)
                             {
-
                                 // Create a PictureBox per component
                                 foreach (Overlay overlay in component.Overlays)
                                 {
-
                                     PictureBox overlayPictureBox;
-
-                                    // Tab
-                                    // ---
-                                    // "Tab" - only create a PictureBox if we are processing
-                                    // the same image as the one shown in the zoomable
-                                    // image
-                                    if (file.Name == imageSelectedName)
-                                    {
-
-                                        // Define a new PictureBox
-                                        overlayPictureBox = new PictureBox
-                                        {
-                                            Name = $"{component.NameLabel}",
-                                            Location = new Point(overlay.Bounds.X, overlay.Bounds.Y),
-                                            Size = new Size(overlay.Bounds.Width, overlay.Bounds.Height),
-                                            Tag = file.Name,
-                                        };
-
-                                        // Add the overlay to the array
-                                        overlayComponentsTab.Add(overlayPictureBox);
-                                        Debug.WriteLine("Created PictureBox in ZOOM [" + file.Name + "] with hash [" + overlayPictureBox.GetHashCode() + "] - Overlay Name:" + component.NameLabel + ", X:" + overlay.Bounds.X + ", Y:" + overlay.Bounds.Y + ", Width:" + overlay.Bounds.Width + ", Height:" + overlay.Bounds.Height);
-                                        int index = overlayComponentsTab.Count - 1;
-                                        overlayComponentsTabOriginalSizes.Add(index, overlayPictureBox.Size);
-                                        overlayComponentsTabOriginalLocations.Add(index, overlayPictureBox.Location);
-                                    }
 
                                     // List
                                     // ----
@@ -583,7 +719,7 @@ namespace Commodore_Repair_Toolbox
                                     // Define a new PictureBox
                                     overlayPictureBox = new PictureBox
                                     {
-                                        Name = $"{component.NameLabel}",
+                                        Name = $"{component.Label}",
                                         Location = new Point(overlay.Bounds.X, overlay.Bounds.Y),
                                         Size = new Size(overlay.Bounds.Width, overlay.Bounds.Height),
                                         Tag = file.Name,
@@ -598,7 +734,7 @@ namespace Commodore_Repair_Toolbox
 
                                     // Add the overlay to the array
                                     overlayComponentsList[file.Name].Add(overlayPictureBox);
-                                    Debug.WriteLine("Created PictureBox in LIST [" + file.Name + "] with hash [" + overlayPictureBox.GetHashCode() + "] - Overlay Name:"+ component.NameLabel + ", X:" + overlay.Bounds.X + ", Y:" + overlay.Bounds.Y + ", Width:" + overlay.Bounds.Width + ", Height:" + overlay.Bounds.Height);
+                                    Debug.WriteLine("Created PictureBox in LIST [" + file.Name + "] with hash [" + overlayPictureBox.GetHashCode() + "] - Overlay Name:"+ component.Label + ", X:" + overlay.Bounds.X + ", Y:" + overlay.Bounds.Y + ", Width:" + overlay.Bounds.Width + ", Height:" + overlay.Bounds.Height);
                                 }
                             }
                         }
@@ -608,6 +744,70 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+        // ---------------------------------------------------------------------------------
+        //
+        // CreateOverlayArraysToTab
+        //
+        // Create a PictureBox per image and component in both the main zoomable image
+        // and all the list images. This is the PictureBox only but it will not be
+        // associated to any concrete object/image yet
+        // ---------------------------------------------------------------------------------
+
+        private void CreateOverlayArraysToTab()
+        {
+
+            // Walk through the class object and find the specific selected hardware and board
+            Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            if (foundHardware != null)
+            {
+                Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+                if (foundBoard != null)
+                {
+                    // Walk through all images for the specific board
+                    foreach (Commodore_Repair_Toolbox.File file in foundBoard.Files)
+                    {
+                        // Walk through all the components, again for the specific board
+                        foreach (ComponentBounds component in file.Components)
+                        {
+                            if (component.Overlays != null)
+                            {
+                                // Create a PictureBox per component
+                                foreach (Overlay overlay in component.Overlays)
+                                {
+                                    PictureBox overlayPictureBox;
+
+                                    // Tab
+                                    // ---
+                                    // "Tab" - only create a PictureBox if we are processing
+                                    // the same image as the one shown in the zoomable
+                                    // image
+                                    if (file.Name == imageSelectedName)
+                                    {
+                                        // Define a new PictureBox
+                                        overlayPictureBox = new PictureBox
+                                        {
+                                            Name = $"{component.Label}",
+                                            Location = new Point(overlay.Bounds.X, overlay.Bounds.Y),
+                                            Size = new Size(overlay.Bounds.Width, overlay.Bounds.Height),
+                                            Tag = file.Name,
+                                        };
+
+                                        // Add the overlay to the array
+                                        overlayComponentsTab.Add(overlayPictureBox);
+                                        Debug.WriteLine("Created PictureBox in ZOOM [" + file.Name + "] with hash [" + overlayPictureBox.GetHashCode() + "] - Overlay Name:" + component.Label + ", X:" + overlay.Bounds.X + ", Y:" + overlay.Bounds.Y + ", Width:" + overlay.Bounds.Width + ", Height:" + overlay.Bounds.Height);
+                                        int index = overlayComponentsTab.Count - 1;
+                                        overlayComponentsTabOriginalSizes.Add(index, overlayPictureBox.Size);
+                                        overlayComponentsTabOriginalLocations.Add(index, overlayPictureBox.Location);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        
         // ---------------------------------------------------------------------------------
 
 
@@ -702,7 +902,7 @@ namespace Commodore_Repair_Toolbox
             bool hasZoomChanged = false;
             if (e.Delta > 0)
             {
-                if (zoomFactor <= 5)
+                if (zoomFactor <= 4.0)
                 {
                     Debug.WriteLine("Zoom In");
                     zoomFactor *= 1.5f;
@@ -936,6 +1136,7 @@ namespace Commodore_Repair_Toolbox
                                         {
                                             Debug.WriteLine("    File Name = " + file.Name + ", FileName = " + file.FileName);
                                             imageSelectedFile = file.FileName;
+                                            break;
                                         }
                                     }
                                 }
@@ -944,20 +1145,22 @@ namespace Commodore_Repair_Toolbox
                     }
 
 
-                    panelListAutoscroll.Controls.Clear();
-                    panelZoom.Controls.Clear();
-                    
-                    listBoxSelectedActualValues.Clear();
-                    listBoxNameValueMapping.Clear();
-                    overlayComponentsList.Clear();
-                    overlayComponentsTab.Clear();
-                    overlayComponentsTabOriginalSizes.Clear();
-                    overlayComponentsTabOriginalLocations.Clear();
-                    classHardware.Clear();
-                    visiblePictureBoxes.Clear();
+                    //                    panelListAutoscroll.Controls.Clear();
+                    //                    panelZoom.Controls.Clear();
+
+                    //                    listBoxSelectedActualValues.Clear();
+                    //                    listBoxNameValueMapping.Clear();
+                    //                    overlayComponentsList.Clear();
+                    //                    overlayComponentsTab.Clear();
+                    //                    overlayComponentsTabOriginalSizes.Clear();
+                    //                    overlayComponentsTabOriginalLocations.Clear();
+                    //                    classHardware.Clear();
+                    //                    visiblePictureBoxes.Clear();
 
 
-                                hest();
+                    DrawBorderInList();
+                    InitializeTabMain();
+
                 }
             }
         }
@@ -978,11 +1181,40 @@ namespace Commodore_Repair_Toolbox
 
         private void button1_Click(object sender, EventArgs e)
         {
+            listBox1.SelectedIndex = -1;
+            UpdateHighlights();
         }
 
         private void textBox1_TextChanged(object sender, EventArgs e)
         {
 
+        }
+
+        private void comboBox2_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            SetupNewBoard();
+
+            // Update (remove) any highlights previously done, as no components are now selected in the list
+            UpdateHighlights();
+        }
+
+        private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            comboBox2.Items.Clear();
+            hardwareSelectedName = comboBox1.SelectedItem.ToString();
+
+            foreach (Board board in classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName).Boards)
+            {
+                comboBox2.Items.Add(board.Name);
+            }
+            comboBox2.SelectedIndex = 0;
+        }
+
+        private void listBox2_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            InitializeComponentList(false);
+            // Update (remove) any highlights previously done, as no components are now selected in the list
+            UpdateHighlights();
         }
     }
 
@@ -1033,15 +1265,16 @@ namespace Commodore_Repair_Toolbox
 
     public class ComponentBoard
     {
-        public string NameLabel { get; set; }
+        public string Label { get; set; }
         public string NameTechnical { get; set; }
         public string NameFriendly { get; set; }
+        public string Type { get; set; }
     }
 
 
     public class ComponentBounds
     {
-        public string NameLabel { get; set; }
+        public string Label { get; set; }
         public List<Overlay> Overlays { get; set; }
     }
 

@@ -28,7 +28,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Main));
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabMain = new System.Windows.Forms.TabPage();
             this.panelListMain = new System.Windows.Forms.Panel();
@@ -39,8 +38,11 @@
             this.tabTrivia = new System.Windows.Forms.TabPage();
             this.tabTroubleshooting = new System.Windows.Forms.TabPage();
             this.tabLinks = new System.Windows.Forms.TabPage();
-            this.tabSettings = new System.Windows.Forms.TabPage();
+            this.tabData = new System.Windows.Forms.TabPage();
             this.tabAbout = new System.Windows.Forms.TabPage();
+            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.label10 = new System.Windows.Forms.Label();
+            this.label9 = new System.Windows.Forms.Label();
             this.comboBox1 = new System.Windows.Forms.ComboBox();
             this.label1 = new System.Windows.Forms.Label();
             this.label6 = new System.Windows.Forms.Label();
@@ -52,14 +54,22 @@
             this.label5 = new System.Windows.Forms.Label();
             this.listBox2 = new System.Windows.Forms.ListBox();
             this.label8 = new System.Windows.Forms.Label();
-            this.label9 = new System.Windows.Forms.Label();
-            this.label10 = new System.Windows.Forms.Label();
-            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.label11 = new System.Windows.Forms.Label();
+            this.label12 = new System.Windows.Forms.Label();
+            this.label13 = new System.Windows.Forms.Label();
+            this.tabContact = new System.Windows.Forms.TabPage();
+            this.label14 = new System.Windows.Forms.Label();
+            this.label15 = new System.Windows.Forms.Label();
             this.tabControl1.SuspendLayout();
             this.tabMain.SuspendLayout();
             this.panelListMain.SuspendLayout();
             this.panelZoom.SuspendLayout();
+            this.tabTrivia.SuspendLayout();
+            this.tabTroubleshooting.SuspendLayout();
+            this.tabLinks.SuspendLayout();
+            this.tabData.SuspendLayout();
             this.tabAbout.SuspendLayout();
+            this.tabContact.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl1
@@ -71,7 +81,8 @@
             this.tabControl1.Controls.Add(this.tabTrivia);
             this.tabControl1.Controls.Add(this.tabTroubleshooting);
             this.tabControl1.Controls.Add(this.tabLinks);
-            this.tabControl1.Controls.Add(this.tabSettings);
+            this.tabControl1.Controls.Add(this.tabData);
+            this.tabControl1.Controls.Add(this.tabContact);
             this.tabControl1.Controls.Add(this.tabAbout);
             this.tabControl1.Location = new System.Drawing.Point(235, 12);
             this.tabControl1.Name = "tabControl1";
@@ -150,6 +161,7 @@
             // tabTrivia
             // 
             this.tabTrivia.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.tabTrivia.Controls.Add(this.label11);
             this.tabTrivia.Location = new System.Drawing.Point(4, 25);
             this.tabTrivia.Name = "tabTrivia";
             this.tabTrivia.Padding = new System.Windows.Forms.Padding(3);
@@ -160,6 +172,7 @@
             // tabTroubleshooting
             // 
             this.tabTroubleshooting.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.tabTroubleshooting.Controls.Add(this.label12);
             this.tabTroubleshooting.Location = new System.Drawing.Point(4, 25);
             this.tabTroubleshooting.Name = "tabTroubleshooting";
             this.tabTroubleshooting.Size = new System.Drawing.Size(927, 650);
@@ -169,20 +182,22 @@
             // tabLinks
             // 
             this.tabLinks.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.tabLinks.Controls.Add(this.label13);
             this.tabLinks.Location = new System.Drawing.Point(4, 25);
             this.tabLinks.Name = "tabLinks";
             this.tabLinks.Size = new System.Drawing.Size(927, 650);
             this.tabLinks.TabIndex = 3;
             this.tabLinks.Text = "Links";
             // 
-            // tabSettings
+            // tabData
             // 
-            this.tabSettings.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.tabSettings.Location = new System.Drawing.Point(4, 25);
-            this.tabSettings.Name = "tabSettings";
-            this.tabSettings.Size = new System.Drawing.Size(927, 650);
-            this.tabSettings.TabIndex = 4;
-            this.tabSettings.Text = "Settings";
+            this.tabData.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.tabData.Controls.Add(this.label14);
+            this.tabData.Location = new System.Drawing.Point(4, 25);
+            this.tabData.Name = "tabData";
+            this.tabData.Size = new System.Drawing.Size(927, 650);
+            this.tabData.TabIndex = 4;
+            this.tabData.Text = "Data";
             // 
             // tabAbout
             // 
@@ -197,19 +212,48 @@
             this.tabAbout.TabIndex = 5;
             this.tabAbout.Text = "About";
             // 
+            // textBox1
+            // 
+            this.textBox1.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.textBox1.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.textBox1.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.textBox1.Location = new System.Drawing.Point(36, 122);
+            this.textBox1.Multiline = true;
+            this.textBox1.Name = "textBox1";
+            this.textBox1.Size = new System.Drawing.Size(726, 284);
+            this.textBox1.TabIndex = 3;
+            this.textBox1.Text = "All programming done by Dennis Helligsoe.\r\n";
+            this.textBox1.TextChanged += new System.EventHandler(this.textBox1_TextChanged);
+            // 
+            // label10
+            // 
+            this.label10.AutoSize = true;
+            this.label10.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label10.Location = new System.Drawing.Point(24, 60);
+            this.label10.Name = "label10";
+            this.label10.Size = new System.Drawing.Size(174, 18);
+            this.label10.TabIndex = 1;
+            this.label10.Text = "Version 2023-October-22";
+            // 
+            // label9
+            // 
+            this.label9.AutoSize = true;
+            this.label9.Font = new System.Drawing.Font("Microsoft Sans Serif", 16.2F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label9.Location = new System.Drawing.Point(21, 24);
+            this.label9.Name = "label9";
+            this.label9.Size = new System.Drawing.Size(393, 32);
+            this.label9.TabIndex = 0;
+            this.label9.Text = "Commodore Repair Toolbox";
+            // 
             // comboBox1
             // 
             this.comboBox1.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.comboBox1.FormattingEnabled = true;
-            this.comboBox1.Items.AddRange(new object[] {
-            "Commodore C64 (Breadbin)",
-            "Commodore 64C",
-            "Commodore C128",
-            "Commodore C128D"});
             this.comboBox1.Location = new System.Drawing.Point(12, 37);
             this.comboBox1.Name = "comboBox1";
             this.comboBox1.Size = new System.Drawing.Size(208, 24);
             this.comboBox1.TabIndex = 1;
+            this.comboBox1.SelectedIndexChanged += new System.EventHandler(this.comboBox1_SelectedIndexChanged);
             // 
             // label1
             // 
@@ -225,21 +269,19 @@
             this.label6.AutoSize = true;
             this.label6.Location = new System.Drawing.Point(9, 77);
             this.label6.Name = "label6";
-            this.label6.Size = new System.Drawing.Size(45, 16);
+            this.label6.Size = new System.Drawing.Size(44, 16);
             this.label6.TabIndex = 4;
-            this.label6.Text = "Model";
+            this.label6.Text = "Board";
             // 
             // comboBox2
             // 
             this.comboBox2.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.comboBox2.FormattingEnabled = true;
-            this.comboBox2.Items.AddRange(new object[] {
-            "250407",
-            "321245"});
             this.comboBox2.Location = new System.Drawing.Point(12, 96);
             this.comboBox2.Name = "comboBox2";
             this.comboBox2.Size = new System.Drawing.Size(208, 24);
             this.comboBox2.TabIndex = 3;
+            this.comboBox2.SelectedIndexChanged += new System.EventHandler(this.comboBox2_SelectedIndexChanged);
             // 
             // listBox1
             // 
@@ -300,17 +342,13 @@
             // 
             this.listBox2.FormattingEnabled = true;
             this.listBox2.ItemHeight = 16;
-            this.listBox2.Items.AddRange(new object[] {
-            "Capacitor",
-            "Diode",
-            "IC",
-            "Resistor",
-            "Transistor"});
             this.listBox2.Location = new System.Drawing.Point(12, 159);
             this.listBox2.Name = "listBox2";
             this.listBox2.SelectionMode = System.Windows.Forms.SelectionMode.MultiSimple;
             this.listBox2.Size = new System.Drawing.Size(208, 100);
+            this.listBox2.Sorted = true;
             this.listBox2.TabIndex = 10;
+            this.listBox2.SelectedIndexChanged += new System.EventHandler(this.listBox2_SelectedIndexChanged);
             // 
             // label8
             // 
@@ -321,38 +359,61 @@
             this.label8.TabIndex = 11;
             this.label8.Text = "Show component categories";
             // 
-            // label9
+            // label11
             // 
-            this.label9.AutoSize = true;
-            this.label9.Font = new System.Drawing.Font("Microsoft Sans Serif", 16.2F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label9.Location = new System.Drawing.Point(21, 24);
-            this.label9.Name = "label9";
-            this.label9.Size = new System.Drawing.Size(393, 32);
-            this.label9.TabIndex = 0;
-            this.label9.Text = "Commodore Repair Toolbox";
+            this.label11.AutoSize = true;
+            this.label11.Location = new System.Drawing.Point(67, 59);
+            this.label11.Name = "label11";
+            this.label11.Size = new System.Drawing.Size(353, 16);
+            this.label11.TabIndex = 0;
+            this.label11.Text = "Should show info from the \"Trivia\" tab in the data Excel file?";
             // 
-            // label10
+            // label12
             // 
-            this.label10.AutoSize = true;
-            this.label10.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label10.Location = new System.Drawing.Point(24, 60);
-            this.label10.Name = "label10";
-            this.label10.Size = new System.Drawing.Size(174, 18);
-            this.label10.TabIndex = 1;
-            this.label10.Text = "Version 2023-October-20";
+            this.label12.AutoSize = true;
+            this.label12.Location = new System.Drawing.Point(43, 77);
+            this.label12.Name = "label12";
+            this.label12.Size = new System.Drawing.Size(417, 16);
+            this.label12.TabIndex = 1;
+            this.label12.Text = "Should show info from the \"Troubleshooting\" tab in the data Excel file?";
             // 
-            // textBox1
+            // label13
             // 
-            this.textBox1.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.textBox1.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.textBox1.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.textBox1.Location = new System.Drawing.Point(36, 122);
-            this.textBox1.Multiline = true;
-            this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(726, 284);
-            this.textBox1.TabIndex = 3;
-            this.textBox1.Text = resources.GetString("textBox1.Text");
-            this.textBox1.TextChanged += new System.EventHandler(this.textBox1_TextChanged);
+            this.label13.AutoSize = true;
+            this.label13.Location = new System.Drawing.Point(52, 81);
+            this.label13.Name = "label13";
+            this.label13.Size = new System.Drawing.Size(350, 16);
+            this.label13.TabIndex = 2;
+            this.label13.Text = "Should show info from the \"Links\" tab in the data Excel file?";
+            // 
+            // tabContact
+            // 
+            this.tabContact.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.tabContact.Controls.Add(this.label15);
+            this.tabContact.Location = new System.Drawing.Point(4, 25);
+            this.tabContact.Name = "tabContact";
+            this.tabContact.Size = new System.Drawing.Size(927, 650);
+            this.tabContact.TabIndex = 6;
+            this.tabContact.Text = "Contact";
+            // 
+            // label14
+            // 
+            this.label14.AutoSize = true;
+            this.label14.Location = new System.Drawing.Point(62, 103);
+            this.label14.Name = "label14";
+            this.label14.Size = new System.Drawing.Size(592, 16);
+            this.label14.TabIndex = 3;
+            this.label14.Text = "It would be cool if it is possible to submit my local data to the server and then" +
+    " also to fetch new data?";
+            // 
+            // label15
+            // 
+            this.label15.AutoSize = true;
+            this.label15.Location = new System.Drawing.Point(45, 87);
+            this.label15.Name = "label15";
+            this.label15.Size = new System.Drawing.Size(267, 16);
+            this.label15.TabIndex = 4;
+            this.label15.Text = "Should it be possible to contact me directly?";
             // 
             // Main
             // 
@@ -377,8 +438,18 @@
             this.panelListMain.ResumeLayout(false);
             this.panelZoom.ResumeLayout(false);
             this.panelZoom.PerformLayout();
+            this.tabTrivia.ResumeLayout(false);
+            this.tabTrivia.PerformLayout();
+            this.tabTroubleshooting.ResumeLayout(false);
+            this.tabTroubleshooting.PerformLayout();
+            this.tabLinks.ResumeLayout(false);
+            this.tabLinks.PerformLayout();
+            this.tabData.ResumeLayout(false);
+            this.tabData.PerformLayout();
             this.tabAbout.ResumeLayout(false);
             this.tabAbout.PerformLayout();
+            this.tabContact.ResumeLayout(false);
+            this.tabContact.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -391,7 +462,7 @@
         private System.Windows.Forms.TabPage tabTrivia;
         private System.Windows.Forms.TabPage tabTroubleshooting;
         private System.Windows.Forms.TabPage tabLinks;
-        private System.Windows.Forms.TabPage tabSettings;
+        private System.Windows.Forms.TabPage tabData;
         private System.Windows.Forms.TabPage tabAbout;
         private System.Windows.Forms.ComboBox comboBox1;
         private System.Windows.Forms.Label label1;
@@ -412,5 +483,11 @@
         private System.Windows.Forms.Label label10;
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.TextBox textBox1;
+        private System.Windows.Forms.Label label11;
+        private System.Windows.Forms.Label label12;
+        private System.Windows.Forms.Label label13;
+        private System.Windows.Forms.TabPage tabContact;
+        private System.Windows.Forms.Label label14;
+        private System.Windows.Forms.Label label15;
     }
 }

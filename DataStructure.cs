@@ -6,11 +6,19 @@ using System.Linq;
 using System.Drawing;
 using System.Windows.Forms;
 using Newtonsoft.Json.Linq;
+using OfficeOpenXml.Style;
+using System.Xml.Linq;
 
 namespace Commodore_Retro_Toolbox
 {
     public class DataStructure
     {
+
+        // ##############################################################################
+
+
+
+        // ##############################################################################
 
         public static void GetAllData(List<Hardware> classHardware)
         {
@@ -26,7 +34,7 @@ namespace Commodore_Retro_Toolbox
                 var worksheet = package.Workbook.Worksheets[0];
 
                 // Find the row that starts with the "searchHeader"
-                string searchHeader = "\"Hardware\" name in drop-down";
+                string searchHeader = "Hardware name in drop-down";
                 int row = 1;
                 while (row <= worksheet.Dimension.End.Row)
                 {
@@ -55,6 +63,7 @@ namespace Commodore_Retro_Toolbox
                 }
             }
 
+
             // --------------------------------------------------------------------
             // Get all "board" types/names from the Excel data file, within the specific hardware
 
@@ -66,7 +75,7 @@ namespace Commodore_Retro_Toolbox
                     var worksheet = package.Workbook.Worksheets[0];
 
                     // Find the row that starts with the "searchHeader"
-                    string searchHeader = "\"Board\" name in drop-down";
+                    string searchHeader = "Board name in drop-down";
                     int row = 1;
                     while (row <= worksheet.Dimension.End.Row)
                     {
@@ -117,7 +126,7 @@ namespace Commodore_Retro_Toolbox
                         var worksheet = package.Workbook.Worksheets["Images"];
 
                         // Find the row that starts with the "searchHeader"
-                        string searchHeader = "LIST IMAGES";
+                        string searchHeader = "IMAGES IN LIST";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
                         {
@@ -191,10 +200,16 @@ namespace Commodore_Retro_Toolbox
                         // Now, start reading data from the identified row
                         while (worksheet.Cells[row, 1].Value != null)
                         {
-                            string name = worksheet.Cells[row, 1].Value.ToString();
+                            string label = worksheet.Cells[row, 1].Value.ToString();
+                            string nameTechnical = worksheet.Cells[row, 2].Value?.ToString() ?? "?";
+                            string nameFriendly = worksheet.Cells[row, 3].Value?.ToString() ?? "?";
+                            string type = worksheet.Cells[row, 4].Value?.ToString() ?? "Misc";
                             ComponentBoard component = new ComponentBoard
                             {
-                                NameLabel = name,
+                                Label = label,
+                                NameTechnical = nameTechnical,
+                                NameFriendly = nameFriendly,
+                                Type = type
                             };
                             classComponentBoard.Add(component);
 
@@ -251,7 +266,7 @@ namespace Commodore_Retro_Toolbox
                                 string name = worksheet.Cells[row, 1].Value.ToString();
                                 ComponentBounds component = new ComponentBounds
                                 {
-                                    NameLabel = name,
+                                    Label = name,
                                 };
                                 classComponentBounds.Add(component);
 
@@ -302,7 +317,7 @@ namespace Commodore_Retro_Toolbox
                                     foreach (JProperty componentProp in componentData)
                                     {
                                         string componentName = componentProp.Name;
-                                        var componentBounds = file.Components.FirstOrDefault(c => c.NameLabel == componentName);
+                                        var componentBounds = file.Components.FirstOrDefault(c => c.Label == componentName);
 
                                         if (componentBounds != null)
                                         {
@@ -334,92 +349,6 @@ namespace Commodore_Retro_Toolbox
                     }
                 }
             }
-
-            /*
-            foreach (Hardware hardware in classHardware)
-            {
-                string hardwareName = hardware.Name;
-                string hardwareFolder = hardware.Folder;
-
-                foreach (Board board in hardware.Boards)
-                {
-                    string boardName = board.Name;
-                    string boardFolder = board.Folder;
-
-                    // Read the JSON data file
-                    string jsonFilePath = Application.StartupPath + "\\Data\\" + hardwareFolder + "\\" + boardFolder + "\\Data_Highlightning.json";
-                    string jsonContent = System.IO.File.ReadAllText(jsonFilePath);
-
-                    JObject jsonData = JObject.Parse(jsonContent);
-
-                    // The first data point in the file is the image name (not the file name)
-                    foreach (var image in jsonData)
-                    {
-                        string imageName = image.Key;
-
-                        // Walk through data inside the image data
-                        foreach (var boardData in image.Value)
-                        {
-                            // HEST - set this data in the data structure!!!
-                            string htc = boardData["highlight-tab-color"].ToString();
-
-                            // Walk through data inside the component area
-                            foreach (var componentData in (JArray)boardData["component"])
-                            {
-                                // Walk through data inside a specific component
-                                foreach (JProperty hest in componentData)
-                                {
-                                    string componentName = hest.Name;
-
-                                    // Get all bounds for the specific component (coordinate and size)
-                                    foreach (var bounds in (JArray)hest.Value)
-                                    {
-                                        int x = (int)bounds["x"];
-                                        int y = (int)bounds["y"];
-                                        int width = (int)bounds["width"];
-                                        int height = (int)bounds["height"];
-                                        Rectangle rect = new Rectangle(x, y, width, height);
-
-                                        // Define a new class element
-                                        Overlay overlay = new Overlay
-                                        {
-                                            Bounds = rect
-                                        };
-
-                                        // Now we need to find 
-                                        
-                                        // Search for the correct Hardware, Board, File, and ComponentBounds
-                                        Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareName);  // Replace with actual criteria
-                                        if (foundHardware != null)
-                                        {
-                                            Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardName);  // Replace with actual criteria
-                                            if (foundBoard != null)
-                                            {
-                                                Commodore_Repair_Toolbox.File foundFile = foundBoard.Files.FirstOrDefault(f => f.Name == imageName);  // Replace with actual criteria
-                                                if (foundFile != null)
-                                                {
-                                                    ComponentBounds foundComponentBounds = foundFile.Components.FirstOrDefault(c => c.NameLabel == componentName);
-                                                    if (foundComponentBounds != null)
-                                                    {
-                                                        if (foundComponentBounds.Overlays == null)
-                                                        {
-                                                            foundComponentBounds.Overlays = new List<Overlay>();
-                                                        }
-
-                                                        // Add the Overlay object to the Overlays list of the found ComponentBounds
-                                                        foundComponentBounds.Overlays.Add(overlay);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            */
         }
 
         // ------------------------------------------------
