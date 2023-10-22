@@ -53,10 +53,12 @@ namespace Commodore_Retro_Toolbox
                 {
                     string name = worksheet.Cells[row, 1].Value.ToString();
                     string folder = worksheet.Cells[row, 2].Value.ToString();
+                    string datafile = worksheet.Cells[row, 3].Value.ToString();
                     Hardware hardware = new Hardware
                     {
                         Name = name,
                         Folder = folder,
+                        Datafile = datafile
                     };
                     classHardware.Add(hardware);
                     row++;
@@ -70,7 +72,7 @@ namespace Commodore_Retro_Toolbox
             List<Board> classBoard = new List<Board>();
             foreach (Hardware hardware in classHardware)
             {
-                using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\Data.xlsx")))
+                using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\"+ hardware.Datafile)))
                 {
                     var worksheet = package.Workbook.Worksheets[0];
 
@@ -94,10 +96,12 @@ namespace Commodore_Retro_Toolbox
                     {
                         string name = worksheet.Cells[row, 1].Value.ToString();
                         string folder = worksheet.Cells[row, 2].Value.ToString();
+                        string datafile = worksheet.Cells[row, 3].Value.ToString();
                         Board boarda = new Board
                         {
                             Name = name,
                             Folder = folder,
+                            Datafile = datafile
                         };
                         classBoard.Add(boarda);
 
@@ -121,7 +125,7 @@ namespace Commodore_Retro_Toolbox
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\Data.xlsx")))
+                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\"+ board.Datafile)))
                     {
                         var worksheet = package.Workbook.Worksheets["Images"];
 
@@ -177,7 +181,7 @@ namespace Commodore_Retro_Toolbox
                 foreach (Board board in hardware.Boards)
                 {
 
-                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\Data.xlsx")))
+                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\"+ board.Datafile)))
                     {
                         var worksheet = package.Workbook.Worksheets["Components"];
 
@@ -228,7 +232,6 @@ namespace Commodore_Retro_Toolbox
 
             // --------------------------------------------------------------------
             // Get all "components" from the Excel data file, within the specific board.
-            // This is the component bounds (coordinates and size).
             // The components are processed per file for the specific board.
             // This is merely to create the data structure - not to populate with data.
 
@@ -240,7 +243,7 @@ namespace Commodore_Retro_Toolbox
                     foreach (Commodore_Repair_Toolbox.File file in board.Files)
                     {
 
-                        using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\Data.xlsx")))
+                        using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\"+ board.Datafile)))
                         {
                             var worksheet = package.Workbook.Worksheets["Components"];
 
@@ -288,6 +291,79 @@ namespace Commodore_Retro_Toolbox
             // Get all bounds (coordinates and sizes) and populate it in 
             // data data structure.
 
+            // Assuming that classHardware is already populated and well-formed
+            foreach (Hardware hardware in classHardware)
+            {   
+                foreach (Board board in hardware.Boards)
+                {
+
+                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
+                    {
+                        var worksheet = package.Workbook.Worksheets["Highlights"];
+
+                        // Find the row that starts with the "searchHeader"
+                        string searchHeader = "IMAGE / COMPONENT HIGHLIGHT BOUNDS";
+                        int row = 1;
+                        while (row <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
+                            {
+                                break; // found the starting row
+                            }
+                            row++;
+                        }
+
+                        // Skip the header row
+                        row++;
+                        row++;
+
+                        // Now, start reading data from the identified row
+                        while (worksheet.Cells[row, 1].Value != null)
+                        {
+                            string imageName = worksheet.Cells[row, 1].Value.ToString();
+                            string componentName = worksheet.Cells[row, 2].Value.ToString();
+                            int x = (int)((double)worksheet.Cells[row, 3].Value);
+                            int y = (int)((double)worksheet.Cells[row, 4].Value);
+                            int width = (int)((double)worksheet.Cells[row, 5].Value);
+                            int height = (int)((double)worksheet.Cells[row, 6].Value);
+
+
+                            var file = board.Files.FirstOrDefault(f => f.Name == imageName);
+                            var componentBounds = file.Components.FirstOrDefault(c => c.Label == componentName);
+
+                            if (componentBounds != null)
+                            {
+                                if (componentBounds.Overlays == null)
+                                {
+                                    componentBounds.Overlays = new List<Overlay>();
+                                }
+
+                                Rectangle rect = new Rectangle(x, y, width, height);
+
+                                Overlay overlay = new Overlay
+                                {
+                                    Bounds = rect
+                                };
+
+                                componentBounds.Overlays.Add(overlay);
+                            }
+
+
+
+
+
+                            row++;
+                        }
+                    }
+
+
+                    //                    foreach (Commodore_Repair_Toolbox.File file in board.Files)
+                    //                    {                        
+                    //                    }
+                }
+            }
+
+            /*
             // Assuming that classHardware is already populated and well-formed
             foreach (Hardware hardware in classHardware)
             {
@@ -349,7 +425,9 @@ namespace Commodore_Retro_Toolbox
                     }
                 }
             }
+            */
         }
+
 
         // ------------------------------------------------
 

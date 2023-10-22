@@ -8,6 +8,7 @@ using System.Linq;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using System.CodeDom;
 using System.Runtime.Remoting.Metadata.W3cXsd2001;
+using System.Reflection.Emit;
 
 namespace Commodore_Repair_Toolbox
 {
@@ -42,12 +43,17 @@ namespace Commodore_Repair_Toolbox
         private string imageSelectedName;
         private string imageSelectedFile;
 
+
+        
+
         // ---------------------------------------------------------------------------------
 
         public Main()
         {
             // Initialize the UI form
             InitializeComponent();
+
+        
 
             // Bind some needed events
             this.ResizeBegin += new EventHandler(this.Form_ResizeBegin);
@@ -113,6 +119,7 @@ namespace Commodore_Repair_Toolbox
 
 
         // ---------------------------------------------------------------------------------
+
 
 
         private void SetupNewBoard()
@@ -326,6 +333,38 @@ namespace Commodore_Repair_Toolbox
                 overlayTab.MouseClick += new MouseEventHandler(this.PanelImageComponent_MouseClick);
             }
 
+            
+            System.Windows.Forms.Label labelFile = new System.Windows.Forms.Label
+            {
+                Text = imageSelectedName,
+                BackColor = Color.White,
+                ForeColor = Color.Black,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Arial", 9),
+                Location = new Point(5, 5),
+                AutoSize = true,
+                Name = "labelFile",
+            };
+            labelFile.DoubleBuffered(true);
+            panelMain.Controls.Add(labelFile);
+            labelFile.BringToFront();
+
+            System.Windows.Forms.Label labelComponent = new System.Windows.Forms.Label
+            {
+                Text = "Hest",
+                BackColor = Color.Red,
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Arial", 9),
+                Location = new Point(5, 25),
+                AutoSize = true,
+                Visible = false,
+                Name = "labelComponent",
+            };
+            labelComponent.DoubleBuffered(true);
+            panelMain.Controls.Add(labelComponent);
+            labelComponent.BringToFront();
+
             ResizeTabImage();
 
             // Attach event handlers for mouse events and form shown
@@ -360,7 +399,7 @@ namespace Commodore_Repair_Toolbox
                             foreach (Commodore_Repair_Toolbox.File file in board.Files)
                             {
                                 Panel panelList2;
-                                Label labelList1;
+                                System.Windows.Forms.Label labelList1;
                                 Image image2 = Image.FromFile(Application.StartupPath + "\\Data\\" + hardwareSelectedFolder + "\\" + boardSelectedFolder + "\\" + file.FileName);
 
                                 // Initialize image panel
@@ -399,7 +438,7 @@ namespace Commodore_Repair_Toolbox
                                 }
                                 */
 
-                                labelList1 = new Label
+                                labelList1 = new System.Windows.Forms.Label
                                 {
                                     Text = file.Name,
                                     Location = new Point(0, 0),
@@ -1067,8 +1106,13 @@ namespace Commodore_Repair_Toolbox
                 // Cast "sender" as a PictureBox and create an instance of it
                 if (sender is PictureBox pb)
                 {
+
+                    var hardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+                    var board = hardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+                    var components = board.Components.FirstOrDefault(c => c.Label == pb.Name);
+
                     Debug.WriteLine(pb.Name);
-                    FormComponent formComponent = new FormComponent(pb.Name);
+                    FormComponent formComponent = new FormComponent(components);
                     formComponent.ShowDialog();
                 }
             }
@@ -1096,11 +1140,16 @@ namespace Commodore_Repair_Toolbox
         {
             this.Cursor = Cursors.Hand;
             Control control = sender as Control;
+            System.Windows.Forms.Label label;
             if (control != null)
             {
-                label3.Text = control.Name;
+//                label3.Text = control.Name;
+                label = (System.Windows.Forms.Label)this.Controls.Find("labelComponent", true).FirstOrDefault();
+                label.Text = control.Name;
             }
-            label3.Visible = true;
+//            Label label3.Visible = true;
+            label = (System.Windows.Forms.Label)this.Controls.Find("labelComponent", true).FirstOrDefault();
+            label.Visible = true;
         }
 
         private void PanelList2_MouseEnter(object sender, EventArgs e)
@@ -1171,7 +1220,9 @@ namespace Commodore_Repair_Toolbox
         private void Overlay_MouseLeave(object sender, EventArgs e)
         {
             this.Cursor = Cursors.Default;
-            label3.Visible = false;
+            //label3.Visible = false;
+            System.Windows.Forms.Label label = (System.Windows.Forms.Label)this.Controls.Find("labelComponent", true).FirstOrDefault();
+            label.Visible = false;
         }
 
         private void PanelList2_MouseLeave(object sender, EventArgs e)
@@ -1238,6 +1289,7 @@ namespace Commodore_Repair_Toolbox
     {
         public string Name { get; set; }
         public string Folder { get; set; }
+        public string Datafile { get; set; }
         public List<Board> Boards { get; set; }
     }
 
@@ -1246,6 +1298,7 @@ namespace Commodore_Repair_Toolbox
     {
         public string Name { get; set; }
         public string Folder { get; set; }
+        public string Datafile { get; set; }
         public List<File> Files { get; set; }
         public List<ComponentBoard> Components { get; set; }
     }

@@ -33,12 +33,16 @@
             this.panelListMain = new System.Windows.Forms.Panel();
             this.panelListAutoscroll = new System.Windows.Forms.Panel();
             this.panelZoom = new System.Windows.Forms.Panel();
-            this.label4 = new System.Windows.Forms.Label();
-            this.label3 = new System.Windows.Forms.Label();
             this.tabTrivia = new System.Windows.Forms.TabPage();
+            this.label11 = new System.Windows.Forms.Label();
             this.tabTroubleshooting = new System.Windows.Forms.TabPage();
+            this.label12 = new System.Windows.Forms.Label();
             this.tabLinks = new System.Windows.Forms.TabPage();
+            this.label13 = new System.Windows.Forms.Label();
             this.tabData = new System.Windows.Forms.TabPage();
+            this.label14 = new System.Windows.Forms.Label();
+            this.tabContact = new System.Windows.Forms.TabPage();
+            this.label15 = new System.Windows.Forms.Label();
             this.tabAbout = new System.Windows.Forms.TabPage();
             this.textBox1 = new System.Windows.Forms.TextBox();
             this.label10 = new System.Windows.Forms.Label();
@@ -54,22 +58,15 @@
             this.label5 = new System.Windows.Forms.Label();
             this.listBox2 = new System.Windows.Forms.ListBox();
             this.label8 = new System.Windows.Forms.Label();
-            this.label11 = new System.Windows.Forms.Label();
-            this.label12 = new System.Windows.Forms.Label();
-            this.label13 = new System.Windows.Forms.Label();
-            this.tabContact = new System.Windows.Forms.TabPage();
-            this.label14 = new System.Windows.Forms.Label();
-            this.label15 = new System.Windows.Forms.Label();
             this.tabControl1.SuspendLayout();
             this.tabMain.SuspendLayout();
             this.panelListMain.SuspendLayout();
-            this.panelZoom.SuspendLayout();
             this.tabTrivia.SuspendLayout();
             this.tabTroubleshooting.SuspendLayout();
             this.tabLinks.SuspendLayout();
             this.tabData.SuspendLayout();
-            this.tabAbout.SuspendLayout();
             this.tabContact.SuspendLayout();
+            this.tabAbout.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl1
@@ -127,36 +124,10 @@
             this.panelZoom.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.panelZoom.Controls.Add(this.label4);
-            this.panelZoom.Controls.Add(this.label3);
             this.panelZoom.Location = new System.Drawing.Point(6, 6);
             this.panelZoom.Name = "panelZoom";
             this.panelZoom.Size = new System.Drawing.Size(644, 638);
             this.panelZoom.TabIndex = 5;
-            // 
-            // label4
-            // 
-            this.label4.AutoSize = true;
-            this.label4.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.label4.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label4.Location = new System.Drawing.Point(22, 21);
-            this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(129, 20);
-            this.label4.TabIndex = 1;
-            this.label4.Text = "Schematics 1 of 2";
-            // 
-            // label3
-            // 
-            this.label3.AutoSize = true;
-            this.label3.BackColor = System.Drawing.Color.Bisque;
-            this.label3.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.label3.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label3.Location = new System.Drawing.Point(22, 49);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(60, 24);
-            this.label3.TabIndex = 0;
-            this.label3.Text = "label3";
-            this.label3.Visible = false;
             // 
             // tabTrivia
             // 
@@ -169,6 +140,15 @@
             this.tabTrivia.TabIndex = 1;
             this.tabTrivia.Text = "Trivia";
             // 
+            // label11
+            // 
+            this.label11.AutoSize = true;
+            this.label11.Location = new System.Drawing.Point(67, 59);
+            this.label11.Name = "label11";
+            this.label11.Size = new System.Drawing.Size(353, 16);
+            this.label11.TabIndex = 0;
+            this.label11.Text = "Should show info from the \"Trivia\" tab in the data Excel file?";
+            // 
             // tabTroubleshooting
             // 
             this.tabTroubleshooting.BackColor = System.Drawing.Color.WhiteSmoke;
@@ -178,6 +158,15 @@
             this.tabTroubleshooting.Size = new System.Drawing.Size(927, 650);
             this.tabTroubleshooting.TabIndex = 2;
             this.tabTroubleshooting.Text = "Troubleshooting";
+            // 
+            // label12
+            // 
+            this.label12.AutoSize = true;
+            this.label12.Location = new System.Drawing.Point(43, 77);
+            this.label12.Name = "label12";
+            this.label12.Size = new System.Drawing.Size(417, 16);
+            this.label12.TabIndex = 1;
+            this.label12.Text = "Should show info from the \"Troubleshooting\" tab in the data Excel file?";
             // 
             // tabLinks
             // 
@@ -189,6 +178,15 @@
             this.tabLinks.TabIndex = 3;
             this.tabLinks.Text = "Links";
             // 
+            // label13
+            // 
+            this.label13.AutoSize = true;
+            this.label13.Location = new System.Drawing.Point(52, 81);
+            this.label13.Name = "label13";
+            this.label13.Size = new System.Drawing.Size(350, 16);
+            this.label13.TabIndex = 2;
+            this.label13.Text = "Should show info from the \"Links\" tab in the data Excel file?";
+            // 
             // tabData
             // 
             this.tabData.BackColor = System.Drawing.Color.WhiteSmoke;
@@ -198,6 +196,35 @@
             this.tabData.Size = new System.Drawing.Size(927, 650);
             this.tabData.TabIndex = 4;
             this.tabData.Text = "Data";
+            // 
+            // label14
+            // 
+            this.label14.AutoSize = true;
+            this.label14.Location = new System.Drawing.Point(62, 103);
+            this.label14.Name = "label14";
+            this.label14.Size = new System.Drawing.Size(592, 16);
+            this.label14.TabIndex = 3;
+            this.label14.Text = "It would be cool if it is possible to submit my local data to the server and then" +
+    " also to fetch new data?";
+            // 
+            // tabContact
+            // 
+            this.tabContact.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.tabContact.Controls.Add(this.label15);
+            this.tabContact.Location = new System.Drawing.Point(4, 25);
+            this.tabContact.Name = "tabContact";
+            this.tabContact.Size = new System.Drawing.Size(927, 650);
+            this.tabContact.TabIndex = 6;
+            this.tabContact.Text = "Contact";
+            // 
+            // label15
+            // 
+            this.label15.AutoSize = true;
+            this.label15.Location = new System.Drawing.Point(45, 87);
+            this.label15.Name = "label15";
+            this.label15.Size = new System.Drawing.Size(267, 16);
+            this.label15.TabIndex = 4;
+            this.label15.Text = "Should it be possible to contact me directly?";
             // 
             // tabAbout
             // 
@@ -359,62 +386,6 @@
             this.label8.TabIndex = 11;
             this.label8.Text = "Show component categories";
             // 
-            // label11
-            // 
-            this.label11.AutoSize = true;
-            this.label11.Location = new System.Drawing.Point(67, 59);
-            this.label11.Name = "label11";
-            this.label11.Size = new System.Drawing.Size(353, 16);
-            this.label11.TabIndex = 0;
-            this.label11.Text = "Should show info from the \"Trivia\" tab in the data Excel file?";
-            // 
-            // label12
-            // 
-            this.label12.AutoSize = true;
-            this.label12.Location = new System.Drawing.Point(43, 77);
-            this.label12.Name = "label12";
-            this.label12.Size = new System.Drawing.Size(417, 16);
-            this.label12.TabIndex = 1;
-            this.label12.Text = "Should show info from the \"Troubleshooting\" tab in the data Excel file?";
-            // 
-            // label13
-            // 
-            this.label13.AutoSize = true;
-            this.label13.Location = new System.Drawing.Point(52, 81);
-            this.label13.Name = "label13";
-            this.label13.Size = new System.Drawing.Size(350, 16);
-            this.label13.TabIndex = 2;
-            this.label13.Text = "Should show info from the \"Links\" tab in the data Excel file?";
-            // 
-            // tabContact
-            // 
-            this.tabContact.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.tabContact.Controls.Add(this.label15);
-            this.tabContact.Location = new System.Drawing.Point(4, 25);
-            this.tabContact.Name = "tabContact";
-            this.tabContact.Size = new System.Drawing.Size(927, 650);
-            this.tabContact.TabIndex = 6;
-            this.tabContact.Text = "Contact";
-            // 
-            // label14
-            // 
-            this.label14.AutoSize = true;
-            this.label14.Location = new System.Drawing.Point(62, 103);
-            this.label14.Name = "label14";
-            this.label14.Size = new System.Drawing.Size(592, 16);
-            this.label14.TabIndex = 3;
-            this.label14.Text = "It would be cool if it is possible to submit my local data to the server and then" +
-    " also to fetch new data?";
-            // 
-            // label15
-            // 
-            this.label15.AutoSize = true;
-            this.label15.Location = new System.Drawing.Point(45, 87);
-            this.label15.Name = "label15";
-            this.label15.Size = new System.Drawing.Size(267, 16);
-            this.label15.TabIndex = 4;
-            this.label15.Text = "Should it be possible to contact me directly?";
-            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -436,8 +407,6 @@
             this.tabControl1.ResumeLayout(false);
             this.tabMain.ResumeLayout(false);
             this.panelListMain.ResumeLayout(false);
-            this.panelZoom.ResumeLayout(false);
-            this.panelZoom.PerformLayout();
             this.tabTrivia.ResumeLayout(false);
             this.tabTrivia.PerformLayout();
             this.tabTroubleshooting.ResumeLayout(false);
@@ -446,10 +415,10 @@
             this.tabLinks.PerformLayout();
             this.tabData.ResumeLayout(false);
             this.tabData.PerformLayout();
-            this.tabAbout.ResumeLayout(false);
-            this.tabAbout.PerformLayout();
             this.tabContact.ResumeLayout(false);
             this.tabContact.PerformLayout();
+            this.tabAbout.ResumeLayout(false);
+            this.tabAbout.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -475,8 +444,6 @@
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.Panel panelZoom;
         private System.Windows.Forms.Panel panelListMain;
-        private System.Windows.Forms.Label label3;
-        private System.Windows.Forms.Label label4;
         private System.Windows.Forms.Panel panelListAutoscroll;
         private System.Windows.Forms.ListBox listBox2;
         private System.Windows.Forms.Label label8;
