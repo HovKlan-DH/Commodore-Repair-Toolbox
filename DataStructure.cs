@@ -8,6 +8,8 @@ using System.Windows.Forms;
 using Newtonsoft.Json.Linq;
 using OfficeOpenXml.Style;
 using System.Xml.Linq;
+using System.Text;
+using System;
 
 namespace Commodore_Retro_Toolbox
 {
@@ -208,12 +210,22 @@ namespace Commodore_Retro_Toolbox
                             string nameTechnical = worksheet.Cells[row, 2].Value?.ToString() ?? "?";
                             string nameFriendly = worksheet.Cells[row, 3].Value?.ToString() ?? "?";
                             string type = worksheet.Cells[row, 4].Value?.ToString() ?? "Misc";
+                            string filePinout = worksheet.Cells[row, 5].Value?.ToString() ?? "";
+                            string oneliner = worksheet.Cells[row, 6].Value?.ToString() ?? "";
+                            string description = worksheet.Cells[row, 7].Text;
+                            description = description.Replace(((char)10).ToString(), Environment.NewLine);
+                            description = description.Replace(((char)13).ToString(), Environment.NewLine);
+
+
                             ComponentBoard component = new ComponentBoard
                             {
                                 Label = label,
                                 NameTechnical = nameTechnical,
                                 NameFriendly = nameFriendly,
-                                Type = type
+                                Type = type,
+                                ImagePinout = filePinout,
+                                OneLiner = oneliner,
+                                Description = description
                             };
                             classComponentBoard.Add(component);
 

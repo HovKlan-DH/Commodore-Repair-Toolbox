@@ -9,6 +9,7 @@ using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using System.CodeDom;
 using System.Runtime.Remoting.Metadata.W3cXsd2001;
 using System.Reflection.Emit;
+using OfficeOpenXml.Style;
 
 namespace Commodore_Repair_Toolbox
 {
@@ -1322,6 +1323,9 @@ namespace Commodore_Repair_Toolbox
         public string NameTechnical { get; set; }
         public string NameFriendly { get; set; }
         public string Type { get; set; }
+        public string ImagePinout { get; set; }
+        public string OneLiner { get; set; }
+        public string Description { get; set; }
     }
 
 

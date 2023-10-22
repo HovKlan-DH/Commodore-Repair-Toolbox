@@ -127,7 +127,7 @@
         1xbuFW5L2Y7ka9MFTileU2xnV6yfe6oXhhacqbjSZbYyyhgTTKJjssISWfJEZHVE8YjJfrSMvyXwT4rL
         FNcSljiGWcbGCPyoP/jdrZfu6S4khaJQ/eT7b+1QswVfm77/eej7X0dQ+QgXTtG/fAAD76JvFrW2fWhY
         h7PLomZuw/kGND/kDNcIpEqZWjoNryfyTUlouoa62UJvP/sc30FCuhq/gt096MhI9lyZd9eW9vbnmaA/
-        ot+LmXKxFFda1gAAAAlwSFlzAAAN1gAADdYBkG95nAAAAAd0SU1FB+cCDwo5DgGd58cAAGbcSURBVHhe
+        ot+LmXKxFFda1gAAAAlwSFlzAAAN1AAADdQB75G6FQAAAAd0SU1FB+cCDwo5DgGd58cAAGbcSURBVHhe
         7Z0L2B3FWccFBKxFiRAuwQCBcAmGCOFOIg1yLdoQYhFUoAiBFkrCLQlK5W4KAgJyKzcppCglBiuXIFFI
         hYAKotQIpECsYrg2kBJuBUzs+vwm5/0632R2zu6e883Zne/9P8//+c7u7J5zvnPe/e/MO3Pe/89kCoVC
         0XCokCkUisZDhUyhUDQeKmQKhaLxUCFTKBSNhwqZQqFoPFTIFApF46FCplAoGg8VMoVC0XiokCl6jt/4
@@ -570,4 +570,7 @@
         TkSuQmCC
 </value>
   </data>
+  <metadata name="contextMenuStrip1.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+    <value>17, 17</value>
+  </metadata>
 </root>

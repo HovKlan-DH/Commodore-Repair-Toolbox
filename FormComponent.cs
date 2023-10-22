@@ -1,5 +1,6 @@
 ﻿using Commodore_Repair_Toolbox;
 using System;
+using System.Text;
 using System.Windows.Forms;
 
 namespace Commodore_Retro_Toolbox
@@ -15,6 +16,11 @@ namespace Commodore_Retro_Toolbox
             label1.Text = component.Label;
             label2.Text = component.NameTechnical;
             label3.Text = component.NameFriendly;
+            label4.Text = component.Type;
+            label5.Text = component.OneLiner;
+            textBox1.Text = component.Description;
+            textBox1.ScrollBars = ScrollBars.Vertical;
+
 
             this.KeyPreview = true;
             this.KeyPress += new KeyPressEventHandler(Form_KeyPress);
@@ -30,6 +36,9 @@ namespace Commodore_Retro_Toolbox
 
             foreach (Control control in parentControl.Controls)
             {
+                if (control is TextBox && control.Name == "textBox1") { 
+                    continue;
+                }
                 AttachMouseDownEventHandlers(control);
             }
         }
