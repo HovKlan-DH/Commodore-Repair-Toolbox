@@ -352,7 +352,7 @@ namespace Commodore_Repair_Toolbox
 
             System.Windows.Forms.Label labelComponent = new System.Windows.Forms.Label
             {
-                Text = "Hest",
+//                Text = "Hest",
                 BackColor = Color.Red,
                 ForeColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle,
@@ -419,25 +419,6 @@ namespace Commodore_Repair_Toolbox
                                 panelList2.MouseEnter += new EventHandler(this.PanelList2_MouseEnter);
                                 panelList2.MouseLeave += new EventHandler(this.PanelList2_MouseLeave);
                                 panelList2.MouseClick += new MouseEventHandler(this.PanelList2_MouseClick);
-
-                                /*
-                                // Add the Paint event handler to draw the border
-                                if (imageSelectedName == file.Name)
-                                {
-                                    panelList2.Paint += new PaintEventHandler((sender, e) =>
-                                    {
-                                        float penWidth = 1;
-                                        using (Pen pen = new Pen(Color.Red, penWidth))
-                                        {
-                                            pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Custom;
-                                            pen.DashPattern = new float[] { 4, 2 };
-                                            float halfPenWidth = penWidth / 2;
-                                            e.Graphics.DrawRectangle(pen, halfPenWidth, halfPenWidth, panelList2.Width - penWidth, panelList2.Height - penWidth);
-                                        }
-                                    });
-                                  
-                                }
-                                */
 
                                 labelList1 = new System.Windows.Forms.Label
                                 {
@@ -539,27 +520,6 @@ namespace Commodore_Repair_Toolbox
 
                 panel.Invalidate();  // Force the panel to repaint
             }
-
-
-            /*
-            Panel foundPanel = panelListAutoscroll.Controls.OfType<Panel>().FirstOrDefault(p => p.Name == imageSelectedName);
-            if (foundPanel != null)
-            {
-                foundPanel.Paint += new PaintEventHandler((sender, e) =>
-                {
-                    float penWidth = 1;
-                    using (Pen pen = new Pen(Color.Red, penWidth))
-                    {
-                        pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Custom;
-                        pen.DashPattern = new float[] { 4, 2 };
-                        float halfPenWidth = penWidth / 2;
-                        e.Graphics.DrawRectangle(pen, halfPenWidth, halfPenWidth, foundPanel.Width - penWidth, foundPanel.Height - penWidth);
-                    }
-                });
-            }
-            foundPanel.Invalidate();  // Force the panel to repaint
-            */
-
         }
 
         private void Panel_Paint_Standard(object sender, PaintEventArgs e)
@@ -662,7 +622,7 @@ namespace Commodore_Repair_Toolbox
                         {
                             if (listBoxSelectedActualValues.Contains(overlay.Name))
                             {
-                                g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
+                                g.Clear(Color.FromArgb(128, Color.Blue)); // 50% opacity
                             } else
                             {
                                 g.Clear(Color.FromArgb(0, Color.Transparent)); // 0% opacity
@@ -1266,6 +1226,15 @@ namespace Commodore_Repair_Toolbox
         {
             InitializeComponentList(false);
             // Update (remove) any highlights previously done, as no components are now selected in the list
+            UpdateHighlights();
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            for (int i = 0; i < listBox1.Items.Count; i++)
+            {
+                listBox1.SetSelected(i, true);
+            }
             UpdateHighlights();
         }
     }
