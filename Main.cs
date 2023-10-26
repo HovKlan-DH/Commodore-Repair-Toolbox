@@ -5,11 +5,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using Commodore_Retro_Toolbox;
 using System.Linq;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
-using System.CodeDom;
-using System.Runtime.Remoting.Metadata.W3cXsd2001;
-using System.Reflection.Emit;
-using OfficeOpenXml.Style;
+//using System.Windows.Media;
 
 namespace Commodore_Repair_Toolbox
 {
@@ -403,6 +399,9 @@ namespace Commodore_Repair_Toolbox
                                 System.Windows.Forms.Label labelList1;
                                 Image image2 = Image.FromFile(Application.StartupPath + "\\Data\\" + hardwareSelectedFolder + "\\" + boardSelectedFolder + "\\" + file.FileName);
 
+                                Color colorList = Color.FromName(file.HighlightColorList);
+                                int opacityList = file.HighlightOpacityList;
+
                                 // Initialize image panel
                                 panelList2 = new Panel
                                 {
@@ -426,7 +425,7 @@ namespace Commodore_Repair_Toolbox
                                     Location = new Point(0, 0),
                                     BorderStyle = BorderStyle.FixedSingle,
                                     AutoSize = true,
-                                    BackColor = Color.White,
+                                    BackColor = System.Drawing.Color.White,
                                     Padding = new Padding(left: 2, top: 2, right: 2, bottom: 2),
                                 };
                                 //panelList2.Controls.Add(labelList1);
@@ -468,7 +467,7 @@ namespace Commodore_Repair_Toolbox
                                             Bitmap newBmp = new Bitmap(newWidth, newHeight);
                                             using (Graphics g = Graphics.FromImage(newBmp))
                                             {
-                                                g.Clear(Color.FromArgb(128, Color.Red)); // 50% opacity
+                                                g.Clear(Color.FromArgb(opacityList, colorList)); // 50% opacity
                                             }
                                             overlayList.Image = newBmp;
 
@@ -594,8 +593,17 @@ namespace Commodore_Repair_Toolbox
             if (!isResizing)
             {
 
+                List<Hardware> hardwareList = classHardware;
+                var hardware = hardwareList.FirstOrDefault(h => h.Name == hardwareSelectedName);
+                var board = hardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+                var file = board.Files.FirstOrDefault(f => f.Name == imageSelectedName);
+                Color colorZoom = Color.FromName(file.HighlightColorTab);
+                Color colorList = Color.FromName(file.HighlightColorList);
+                int opacityZoom = file.HighlightOpacityTab;
+                int opacityList = file.HighlightOpacityList;
+
                 // Tab
-                if(scope == "tab")
+                if (scope == "tab")
                 {
 
 
@@ -622,7 +630,7 @@ namespace Commodore_Repair_Toolbox
                         {
                             if (listBoxSelectedActualValues.Contains(overlay.Name))
                             {
-                                g.Clear(Color.FromArgb(128, Color.Blue)); // 50% opacity
+                                g.Clear(Color.FromArgb(opacityZoom, colorZoom)); // 50% opacity
                             } else
                             {
                                 g.Clear(Color.FromArgb(0, Color.Transparent)); // 0% opacity
@@ -635,25 +643,6 @@ namespace Commodore_Repair_Toolbox
 
                         index++;
                     }
-
-                    /*
-                    foreach (var pb in overlayComponentsTab)
-                    {
-
-                        if (listBoxSelectedActualValues.Contains(pb.Name))
-                        {
-                            Debug.WriteLine("Toggling PictureBox in ZOOM ["+ imageSelected +"] to [Visible] with hash [" + pb.GetHashCode() + "]");
-                            pb.Visible = true;
-                        }
-                        else
-                        {
-                            Debug.WriteLine("Toggling PictureBox in ZOOM ["+ imageSelected +"] to [Hide] with hash [" + pb.GetHashCode() + "]");
-                            pb.Visible = false;
-                            //pb.BackColor = Color.Blue;
-                        }
-                    }
-                    */
-
                 }
 
                 // List
@@ -1073,7 +1062,7 @@ namespace Commodore_Repair_Toolbox
                     var components = board.Components.FirstOrDefault(c => c.Label == pb.Name);
 
                     Debug.WriteLine(pb.Name);
-                    FormComponent formComponent = new FormComponent(components);
+                    FormComponent formComponent = new FormComponent(components, hardwareSelectedFolder, boardSelectedFolder);
                     formComponent.ShowDialog();
                 }
             }
@@ -1280,8 +1269,8 @@ namespace Commodore_Repair_Toolbox
         public string FileName { get; set; }
         public string HighlightColorTab { get; set; }
         public string HighlightColorList { get; set; }
-        public string HighlightOpacityTab { get; set; }
-        public string HighlightOpacityList { get; set; }
+        public int HighlightOpacityTab { get; set; }
+        public int HighlightOpacityList { get; set; }
         public List<ComponentBounds> Components { get; set; }
     }
 

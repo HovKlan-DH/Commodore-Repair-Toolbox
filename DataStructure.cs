@@ -360,84 +360,66 @@ namespace Commodore_Retro_Toolbox
                                 componentBounds.Overlays.Add(overlay);
                             }
 
-
-
-
-
                             row++;
                         }
                     }
-
-
-                    //                    foreach (Commodore_Repair_Toolbox.File file in board.Files)
-                    //                    {                        
-                    //                    }
                 }
             }
 
-            /*
+            // --------------------------------------------------------------------
+            // Get all colors for the images.
+
             // Assuming that classHardware is already populated and well-formed
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    // Construct your file path here
-                    string jsonFilePath = Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\Data_Highlightning.json";
-                    string jsonContent = System.IO.File.ReadAllText(jsonFilePath);
-                    JObject jsonData = JObject.Parse(jsonContent);
 
-                    foreach (var image in jsonData)
+                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
                     {
-                        string imageName = image.Key;
+                        var worksheet = package.Workbook.Worksheets["Highlights"];
 
-                        // Assume you find the file by its name
-                        var file = board.Files.FirstOrDefault(f => f.Name == imageName);
-
-                        if (file != null)
+                        // Find the row that starts with the "searchHeader"
+                        string searchHeader = "IMAGE / COMPONENT COLORS";
+                        int row = 1;
+                        while (row <= worksheet.Dimension.End.Row)
                         {
-                            foreach (var boardData in image.Value)
+                            if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
                             {
-                                // Populate other file properties like highlight-tab-color
-                                file.HighlightColorTab = boardData["highlight-tab-color"].ToString();
-
-                                foreach (var componentData in (JArray)boardData["component"])
-                                {
-                                    foreach (JProperty componentProp in componentData)
-                                    {
-                                        string componentName = componentProp.Name;
-                                        var componentBounds = file.Components.FirstOrDefault(c => c.Label == componentName);
-
-                                        if (componentBounds != null)
-                                        {
-                                            if (componentBounds.Overlays == null)
-                                            {
-                                                componentBounds.Overlays = new List<Overlay>();
-                                            }
-
-                                            foreach (var bounds in (JArray)componentProp.Value)
-                                            {
-                                                int x = (int)bounds["x"];
-                                                int y = (int)bounds["y"];
-                                                int width = (int)bounds["width"];
-                                                int height = (int)bounds["height"];
-                                                Rectangle rect = new Rectangle(x, y, width, height);
-
-                                                Overlay overlay = new Overlay
-                                                {
-                                                    Bounds = rect
-                                                };
-
-                                                componentBounds.Overlays.Add(overlay);
-                                            }
-                                        }
-                                    }
-                                }
+                                break; // found the starting row
                             }
+                            row++;
+                        }
+
+                        // Skip the header row
+                        row++;
+                        row++;
+
+                        // Now, start reading data from the identified row
+                        while (worksheet.Cells[row, 1].Value != null)
+                        {
+                            string imageName = worksheet.Cells[row, 1].Value.ToString();
+                            string colorZoom = worksheet.Cells[row, 2].Value.ToString();
+                            string colorList = worksheet.Cells[row, 3].Value.ToString();
+                            string cellValue = worksheet.Cells[row, 4].Value.ToString();
+                            int opacityZoom = (int)(double.Parse(cellValue) * 100);
+                            opacityZoom = (int)((opacityZoom / 100.0) * 255);
+                            cellValue = worksheet.Cells[row, 5].Value.ToString();
+                            int opacityList = (int)(double.Parse(cellValue) * 100);
+                            opacityList = (int)((opacityList / 100.0) * 255);
+
+
+                            var file = board.Files.FirstOrDefault(f => f.Name == imageName);
+                            file.HighlightColorTab = colorZoom;
+                            file.HighlightColorList = colorList;
+                            file.HighlightOpacityTab = opacityZoom; // will be a number; 0-255
+                            file.HighlightOpacityList = opacityList; // will be a number; 0-255
+
+                            row++;
                         }
                     }
                 }
             }
-            */
         }
 
 

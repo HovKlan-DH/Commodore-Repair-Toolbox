@@ -1,6 +1,7 @@
 ﻿using Commodore_Repair_Toolbox;
 using System;
-using System.Text;
+using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 
 namespace Commodore_Retro_Toolbox
@@ -9,9 +10,10 @@ namespace Commodore_Retro_Toolbox
     {
         public string PictureBoxName { get; private set; }
 
-        public FormComponent(ComponentBoard component)
+        public FormComponent(ComponentBoard component, string hardwareSelectedFolder, string boardSelectedFolder)
         {
             InitializeComponent();
+
             this.PictureBoxName = component.Label;
             label1.Text = component.Label;
             label2.Text = component.NameTechnical;
@@ -20,6 +22,12 @@ namespace Commodore_Retro_Toolbox
             label5.Text = component.OneLiner;
             textBox1.Text = component.Description;
             textBox1.ScrollBars = ScrollBars.Vertical;
+
+            if(System.IO.File.Exists(Application.StartupPath + "\\Data\\" + hardwareSelectedFolder + "\\" + boardSelectedFolder + "\\" + component.ImagePinout))
+            {
+                Image image = Image.FromFile(Application.StartupPath + "\\Data\\" + hardwareSelectedFolder + "\\" + boardSelectedFolder + "\\" + component.ImagePinout);
+                pictureBox1.Image = image;
+            }
 
 
             this.KeyPreview = true;
