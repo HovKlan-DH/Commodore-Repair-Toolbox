@@ -135,6 +135,9 @@ namespace Commodore_Repair_Toolbox
 
             InitializeList();
             InitializeTabMain();
+            InitializeTrivia();
+            InitializeTroubleshooting();
+            InitializeLinks();
         }
 
         private void Form_ResizeBegin(object sender, EventArgs e)
@@ -145,6 +148,59 @@ namespace Commodore_Repair_Toolbox
             //FindPictureBoxes(this);
         }
 
+        private void InitializeTrivia ()
+        {
+            textBox2.Clear();
+            Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            if (foundHardware != null)
+            {
+                Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+                if (foundBoard != null)
+                {
+                    foreach (Trivia trivia in foundBoard.Trivia)
+                    {
+                        textBox2.AppendText(trivia.Line + Environment.NewLine);
+                    }
+                }
+            }
+
+        }
+
+        private void InitializeTroubleshooting()
+        {
+            textBox3.Clear();
+            Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            if (foundHardware != null)
+            {
+                Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+                if (foundBoard != null)
+                {
+                    foreach (Troubleshooting troubleshooting in foundBoard.Troubleshooting)
+                    {
+                        textBox3.AppendText(troubleshooting.Line + Environment.NewLine);
+                    }
+                }
+            }
+
+        }
+
+        private void InitializeLinks()
+        {
+            textBox4.Clear();
+            Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            if (foundHardware != null)
+            {
+                Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+                if (foundBoard != null)
+                {
+                    foreach (Links link in foundBoard.Links)
+                    {
+                        textBox4.AppendText(link.Line + Environment.NewLine);
+                    }
+                }
+            }
+
+        }
 
         // ---------------------------------------------------------------------------------
 
@@ -1260,6 +1316,9 @@ namespace Commodore_Repair_Toolbox
         public string Datafile { get; set; }
         public List<File> Files { get; set; }
         public List<ComponentBoard> Components { get; set; }
+        public List<Trivia> Trivia { get; set; }
+        public List<Troubleshooting> Troubleshooting { get; set; }
+        public List<Links> Links{ get; set; }
     }
 
 
@@ -1284,6 +1343,8 @@ namespace Commodore_Repair_Toolbox
         public string ImagePinout { get; set; }
         public string OneLiner { get; set; }
         public string Description { get; set; }
+        public List<LocalFiles> LocalFiles { get; set; }
+        public List<ComponentLinks> ComponentLinks { get; set; }
     }
 
 
@@ -1294,9 +1355,39 @@ namespace Commodore_Repair_Toolbox
     }
 
 
+
     public class Overlay
     {
         public Rectangle Bounds { get; set; }
+    }
+
+    public class LocalFiles
+    {
+        public string Name { get; set; }
+        public string FileName { get; set; }
+    }
+
+    public class ComponentLinks
+    {
+        public string Name { get; set; }
+        public string Url { get; set; }
+    }
+
+    public class Trivia
+    {
+        public string Line { get; set; }
+    }
+
+    public class Troubleshooting
+    {
+        public string Line { get; set; }
+    }
+
+    public class Links
+    {
+        public string Line { get; set; }
+        public string Url { get; set; }
+
     }
 
 

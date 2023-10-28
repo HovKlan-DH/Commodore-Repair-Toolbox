@@ -172,6 +172,198 @@ namespace Commodore_Retro_Toolbox
                 }
             }
 
+
+            // --------------------------------------------------------------------
+            // Get all trivias.
+
+            foreach (Hardware hardware in classHardware)
+            {
+                foreach (Board board in hardware.Boards)
+                {
+                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
+                    {
+                        var worksheet = package.Workbook.Worksheets["Trivia"];
+
+                        // Find the row that starts with the "searchHeader"
+                        string searchHeader = "TRIVIA START";
+                        int rowStart = 1;
+                        while (rowStart <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[rowStart, 1].Value != null && worksheet.Cells[rowStart, 1].Value.ToString() == searchHeader)
+                            {
+                                break; // found the starting row
+                            }
+                            rowStart++;
+                        }
+
+                        // Skip the header row
+                        rowStart++;
+
+                        // Find the row that ends the trivia
+                        searchHeader = "TRIVIA END";
+                        int rowEnd = rowStart;
+                        while (rowEnd <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[rowEnd, 1].Value != null && worksheet.Cells[rowEnd, 1].Value.ToString() == searchHeader)
+                            {
+                                break; // found the starting row
+                            }
+                            rowEnd++;
+                        }
+
+                        int row = rowStart;
+
+                        // Now, start reading data from the identified row
+                        while (row < rowEnd)
+                        {
+                            string line = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+
+                            Commodore_Repair_Toolbox.Trivia trivia = new Commodore_Repair_Toolbox.Trivia
+                            {
+                                Line = line,
+                            };
+
+                            if (board.Trivia == null)
+                            {
+                                board.Trivia = new List<Commodore_Repair_Toolbox.Trivia>();
+                            }
+                            board.Trivia.Add(trivia);
+                            row++;
+                        }
+                    }
+                }
+            }
+
+
+            // --------------------------------------------------------------------
+            // Get all troubleshooting
+
+            foreach (Hardware hardware in classHardware)
+            {
+                foreach (Board board in hardware.Boards)
+                {
+                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
+                    {
+                        var worksheet = package.Workbook.Worksheets["Troubleshooting"];
+
+                        // Find the row that starts with the "searchHeader"
+                        string searchHeader = "TROUBLESHOOTING START";
+                        int rowStart = 1;
+                        while (rowStart <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[rowStart, 1].Value != null && worksheet.Cells[rowStart, 1].Value.ToString() == searchHeader)
+                            {
+                                break; // found the starting row
+                            }
+                            rowStart++;
+                        }
+
+                        // Skip the header row
+                        rowStart++;
+
+                        // Find the row that ends the trivia
+                        searchHeader = "TROUBLESHOOTING END";
+                        int rowEnd = rowStart;
+                        while (rowEnd <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[rowEnd, 1].Value != null && worksheet.Cells[rowEnd, 1].Value.ToString() == searchHeader)
+                            {
+                                break; // found the starting row
+                            }
+                            rowEnd++;
+                        }
+
+                        rowEnd--;
+
+                        int row = rowStart;
+
+                        // Now, start reading data from the identified row
+                        while (row < rowEnd)
+                        {
+                            string line = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+
+                            Commodore_Repair_Toolbox.Troubleshooting troubleshooting = new Commodore_Repair_Toolbox.Troubleshooting
+                            {
+                                Line = line,
+                            };
+
+                            if (board.Troubleshooting == null)
+                            {
+                                board.Troubleshooting = new List<Commodore_Repair_Toolbox.Troubleshooting>();
+                            }
+                            board.Troubleshooting.Add(troubleshooting);
+                            row++;
+                        }
+                    }
+                }
+            }
+
+
+            // --------------------------------------------------------------------
+            // Get all links
+
+            foreach (Hardware hardware in classHardware)
+            {
+                foreach (Board board in hardware.Boards)
+                {
+                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
+                    {
+                        var worksheet = package.Workbook.Worksheets["Links"];
+
+                        // Find the row that starts with the "searchHeader"
+                        string searchHeader = "LINKS START";
+                        int rowStart = 1;
+                        while (rowStart <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[rowStart, 1].Value != null && worksheet.Cells[rowStart, 1].Value.ToString() == searchHeader)
+                            {
+                                break; // found the starting row
+                            }
+                            rowStart++;
+                        }
+
+                        // Skip the header row
+                        rowStart++;
+
+                        // Find the row that ends the trivia
+                        searchHeader = "LINKS END";
+                        int rowEnd = rowStart;
+                        while (rowEnd <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[rowEnd, 1].Value != null && worksheet.Cells[rowEnd, 1].Value.ToString() == searchHeader)
+                            {
+                                break; // found the starting row
+                            }
+                            rowEnd++;
+                        }
+
+                        rowEnd--;
+
+                        int row = rowStart;
+
+                        // Now, start reading data from the identified row
+                        while (row < rowEnd)
+                        {
+                            string line = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+//                            var url = worksheet.Cells[row, 1]. .Value?.ToString() ?? "";
+
+                            Commodore_Repair_Toolbox.Links link = new Commodore_Repair_Toolbox.Links
+                            {
+                                Line = line,
+                            };
+
+                            if (board.Links == null)
+                            {
+                                board.Links = new List<Commodore_Repair_Toolbox.Links>();
+                            }
+                            board.Links.Add(link);
+                            row++;
+                        }
+                    }
+                }
+            }
+
+
             // --------------------------------------------------------------------
             // Get all "components" from the Excel data file, within the specific board.
             // This is the main component data - not the bounds with coordinates.
@@ -298,6 +490,131 @@ namespace Commodore_Retro_Toolbox
                     }
                 }
             }
+
+
+            // --------------------------------------------------------------------
+            // Get all component local files (typically datasheet).
+
+            // Assuming that classHardware is already populated and well-formed
+            foreach (Hardware hardware in classHardware)
+            {
+                foreach (Board board in hardware.Boards)
+                {
+
+                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
+                    {
+                        var worksheet = package.Workbook.Worksheets["Components"];
+
+                        // Find the row that starts with the "searchHeader"
+                        string searchHeader = "COMPONENT LOCAL FILES";
+                        int row = 1;
+                        while (row <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
+                            {
+                                break; // found the starting row
+                            }
+                            row++;
+                        }
+
+                        // Skip the header row
+                        row++;
+                        row++;
+
+                        // Now, start reading data from the identified row
+                        while (worksheet.Cells[row, 1].Value != null)
+                        {
+                            string componentName = worksheet.Cells[row, 1].Value.ToString();
+                            string name = worksheet.Cells[row, 2].Value.ToString();
+                            string fileName = worksheet.Cells[row, 3].Value.ToString();
+
+                            var classComponent = board.Components.FirstOrDefault(c => c.Label == componentName);
+
+                            if (classComponent != null)
+                            {
+                                if (classComponent.LocalFiles == null)
+                                {
+                                    classComponent.LocalFiles = new List<LocalFiles>();
+                                }
+
+                                LocalFiles localFile = new LocalFiles
+                                {
+                                    Name = name,
+                                    FileName = fileName
+                                };
+
+                                classComponent.LocalFiles.Add(localFile);
+                            }
+
+                            row++;
+                        }
+                    }
+                }
+            }
+
+
+
+            // --------------------------------------------------------------------
+            // Get all component links
+
+            // Assuming that classHardware is already populated and well-formed
+            foreach (Hardware hardware in classHardware)
+            {
+                foreach (Board board in hardware.Boards)
+                {
+
+                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
+                    {
+                        var worksheet = package.Workbook.Worksheets["Components"];
+
+                        // Find the row that starts with the "searchHeader"
+                        string searchHeader = "COMPONENT LINKS";
+                        int row = 1;
+                        while (row <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
+                            {
+                                break; // found the starting row
+                            }
+                            row++;
+                        }
+
+                        // Skip the header row
+                        row++;
+                        row++;
+
+                        // Now, start reading data from the identified row
+                        while (worksheet.Cells[row, 1].Value != null)
+                        {
+                            string componentName = worksheet.Cells[row, 1].Value.ToString();
+                            string name = worksheet.Cells[row, 2].Value.ToString();
+                            string url = worksheet.Cells[row, 3].Value.ToString();
+
+                            var classComponent = board.Components.FirstOrDefault(c => c.Label == componentName);
+
+                            if (classComponent != null)
+                            {
+                                if (classComponent.ComponentLinks == null)
+                                {
+                                    classComponent.ComponentLinks = new List<ComponentLinks>();
+                                }
+
+                                ComponentLinks link = new ComponentLinks
+                                {
+                                    Name = name,
+                                    Url = url
+                                };
+
+                                classComponent.ComponentLinks.Add(link);
+                            }
+
+                            row++;
+                        }
+                    }
+                }
+            }
+
+
 
             // --------------------------------------------------------------------
             // Get all bounds (coordinates and sizes) and populate it in 

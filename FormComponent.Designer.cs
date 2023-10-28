@@ -132,6 +132,7 @@
             this.listBox1.Name = "listBox1";
             this.listBox1.Size = new System.Drawing.Size(396, 100);
             this.listBox1.TabIndex = 8;
+            this.listBox1.SelectedIndexChanged += new System.EventHandler(this.listBox1_SelectedIndexChanged);
             // 
             // listBox2
             // 
@@ -142,6 +143,7 @@
             this.listBox2.Name = "listBox2";
             this.listBox2.Size = new System.Drawing.Size(396, 100);
             this.listBox2.TabIndex = 9;
+            this.listBox2.SelectedIndexChanged += new System.EventHandler(this.listBox2_SelectedIndexChanged);
             // 
             // label6
             // 
@@ -159,9 +161,9 @@
             this.label7.AutoSize = true;
             this.label7.Location = new System.Drawing.Point(459, 310);
             this.label7.Name = "label7";
-            this.label7.Size = new System.Drawing.Size(76, 16);
+            this.label7.Size = new System.Drawing.Size(67, 16);
             this.label7.TabIndex = 11;
-            this.label7.Text = "Datasheets";
+            this.label7.Text = "Local files";
             // 
             // label8
             // 
