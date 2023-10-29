@@ -7,15 +7,26 @@ using Commodore_Retro_Toolbox;
 using System.Linq;
 //using System.Windows.Media;
 
+using Excel = Microsoft.Office.Interop.Excel;
+using System.Runtime.InteropServices;
+using System.Windows.Input;
+using System.Net.Http;
+using System.Security.Policy;
+
 namespace Commodore_Repair_Toolbox
 {
 
+
+    
 
     // #################################################################################
 
 
     public partial class Main : Form
     {
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
         private bool isResizedByMouseWheel = false;
         private bool isResizing = false;
@@ -41,7 +52,8 @@ namespace Commodore_Repair_Toolbox
         private string imageSelectedFile;
 
 
-        
+
+
 
         // ---------------------------------------------------------------------------------
 
@@ -49,8 +61,6 @@ namespace Commodore_Repair_Toolbox
         {
             // Initialize the UI form
             InitializeComponent();
-
-        
 
             // Bind some needed events
             this.ResizeBegin += new EventHandler(this.Form_ResizeBegin);
@@ -112,11 +122,11 @@ namespace Commodore_Repair_Toolbox
             //                comboBox2.Items.Add(board.Name);
             //            }
             //            comboBox2.SelectedIndex = 0;
+
         }
 
 
         // ---------------------------------------------------------------------------------
-
 
 
         private void SetupNewBoard()
@@ -135,10 +145,50 @@ namespace Commodore_Repair_Toolbox
 
             InitializeList();
             InitializeTabMain();
-            InitializeTrivia();
-            InitializeTroubleshooting();
-            InitializeLinks();
+
+            NavigateWithPreCheck(initialUrl);
+
         }
+
+        private string initialUrl = "https://commodore-repair-toolbox.dk/hest1";
+
+        private async void NavigateWithPreCheck(string url)
+        {
+            using (HttpClient httpClient = new HttpClient())
+            {
+                try
+                {
+                    HttpResponseMessage response = await httpClient.GetAsync(url);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        // Navigate with WebBrowser if the request is successful
+                        webBrowser1.Navigate(url);
+                    }
+                    else
+                    {
+                        // Handle HTTP errors here
+                        webBrowser1.DocumentText = $"Failed to load content: HTTP error. Status code: {response.StatusCode}, Reason: {response.ReasonPhrase}";
+                    }
+                }
+                catch (HttpRequestException ex)
+                {
+                    // Handle network errors here
+                    webBrowser1.DocumentText = $"Failed to load content: Network error. Exception: {ex.Message}";
+                }
+            }
+        }
+
+
+        private void webBrowser1_Navigating_1(object sender, WebBrowserNavigatingEventArgs e)
+        {
+            if (e.Url.ToString() != initialUrl)
+            {
+                e.Cancel = true;
+                System.Diagnostics.Process.Start("explorer.exe", e.Url.ToString());
+            }
+        }
+
+
 
         private void Form_ResizeBegin(object sender, EventArgs e)
         {
@@ -148,59 +198,26 @@ namespace Commodore_Repair_Toolbox
             //FindPictureBoxes(this);
         }
 
-        private void InitializeTrivia ()
+        private void webBrowser1_Navigated(object sender, WebBrowserNavigatedEventArgs e)
         {
-            textBox2.Clear();
-            Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            if (foundHardware != null)
-            {
-                Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-                if (foundBoard != null)
-                {
-                    foreach (Trivia trivia in foundBoard.Trivia)
-                    {
-                        textBox2.AppendText(trivia.Line + Environment.NewLine);
-                    }
-                }
-            }
-
         }
 
-        private void InitializeTroubleshooting()
+        private void webBrowser1_DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
         {
-            textBox3.Clear();
-            Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            if (foundHardware != null)
+            if (webBrowser1.DocumentText.Contains("Hest"))
             {
-                Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-                if (foundBoard != null)
-                {
-                    foreach (Troubleshooting troubleshooting in foundBoard.Troubleshooting)
-                    {
-                        textBox3.AppendText(troubleshooting.Line + Environment.NewLine);
-                    }
-                }
+                // Page loaded successfully; do nothing
             }
-
+            else
+            {
+                webBrowser1.DocumentText = "Failed to load page.";
+            }
         }
 
-        private void InitializeLinks()
-        {
-            textBox4.Clear();
-            Hardware foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            if (foundHardware != null)
-            {
-                Board foundBoard = foundHardware.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-                if (foundBoard != null)
-                {
-                    foreach (Links link in foundBoard.Links)
-                    {
-                        textBox4.AppendText(link.Line + Environment.NewLine);
-                    }
-                }
-            }
+        
 
-        }
+
+
 
         // ---------------------------------------------------------------------------------
 
@@ -383,7 +400,7 @@ namespace Commodore_Repair_Toolbox
                 overlayTab.MouseMove += PanelImage_MouseMove;
                 overlayTab.MouseEnter += new EventHandler(this.Overlay_MouseEnter);
                 overlayTab.MouseLeave += new EventHandler(this.Overlay_MouseLeave);
-                overlayTab.MouseClick += new MouseEventHandler(this.PanelImageComponent_MouseClick);
+                overlayTab.MouseClick += new System.Windows.Forms.MouseEventHandler(this.PanelImageComponent_MouseClick);
             }
 
             
@@ -421,7 +438,7 @@ namespace Commodore_Repair_Toolbox
             ResizeTabImage();
 
             // Attach event handlers for mouse events and form shown
-            panelMain.CustomMouseWheel += new MouseEventHandler(PanelMain_MouseWheel);
+            panelMain.CustomMouseWheel += new System.Windows.Forms.MouseEventHandler(PanelMain_MouseWheel);
             panelImage.MouseDown += PanelImage_MouseDown;
             panelImage.MouseUp += PanelImage_MouseUp;
             panelImage.MouseMove += PanelImage_MouseMove;
@@ -473,7 +490,7 @@ namespace Commodore_Repair_Toolbox
 
                                 panelList2.MouseEnter += new EventHandler(this.PanelList2_MouseEnter);
                                 panelList2.MouseLeave += new EventHandler(this.PanelList2_MouseLeave);
-                                panelList2.MouseClick += new MouseEventHandler(this.PanelList2_MouseClick);
+                                panelList2.MouseClick += new System.Windows.Forms.MouseEventHandler(this.PanelList2_MouseClick);
 
                                 labelList1 = new System.Windows.Forms.Label
                                 {
@@ -934,7 +951,7 @@ namespace Commodore_Repair_Toolbox
         // ---------------------------------------------------------------------------------
 
 
-        private void PanelMain_MouseWheel(object sender, MouseEventArgs e)
+        private void PanelMain_MouseWheel(object sender, System.Windows.Forms.MouseEventArgs e)
         {
             Debug.WriteLine("MouseWheel event");
             float oldZoomFactor = zoomFactor;
@@ -1065,7 +1082,7 @@ namespace Commodore_Repair_Toolbox
         // ---------------------------------------------------------------------------------
 
 
-        private void PanelImage_MouseDown(object sender, MouseEventArgs e)
+        private void PanelImage_MouseDown(object sender, System.Windows.Forms.MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Right)
             {
@@ -1078,7 +1095,7 @@ namespace Commodore_Repair_Toolbox
         // ---------------------------------------------------------------------------------
 
 
-        private void PanelImage_MouseMove(object sender, MouseEventArgs e)
+        private void PanelImage_MouseMove(object sender, System.Windows.Forms.MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Right)
             {
@@ -1094,7 +1111,7 @@ namespace Commodore_Repair_Toolbox
         // ---------------------------------------------------------------------------------
 
 
-        private void PanelImage_MouseUp(object sender, MouseEventArgs e)
+        private void PanelImage_MouseUp(object sender, System.Windows.Forms.MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Right)
             {
@@ -1103,7 +1120,7 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        private void PanelImageComponent_MouseClick(object sender, MouseEventArgs e)
+        private void PanelImageComponent_MouseClick(object sender, System.Windows.Forms.MouseEventArgs e)
         {
 
             if (e.Button == MouseButtons.Left)
@@ -1144,7 +1161,7 @@ namespace Commodore_Repair_Toolbox
 
         private void Overlay_MouseEnter(object sender, EventArgs e)
         {
-            this.Cursor = Cursors.Hand;
+            this.Cursor = System.Windows.Forms.Cursors.Hand;
             Control control = sender as Control;
             System.Windows.Forms.Label label;
             if (control != null)
@@ -1160,10 +1177,10 @@ namespace Commodore_Repair_Toolbox
 
         private void PanelList2_MouseEnter(object sender, EventArgs e)
         {
-            this.Cursor = Cursors.Hand;
+            this.Cursor = System.Windows.Forms.Cursors.Hand;
         }
 
-        private void PanelList2_MouseClick(object sender, MouseEventArgs e)
+        private void PanelList2_MouseClick(object sender, System.Windows.Forms.MouseEventArgs e)
         {
             if (sender is Panel pan)
             {
@@ -1225,7 +1242,7 @@ namespace Commodore_Repair_Toolbox
 
         private void Overlay_MouseLeave(object sender, EventArgs e)
         {
-            this.Cursor = Cursors.Default;
+            this.Cursor = System.Windows.Forms.Cursors.Default;
             //label3.Visible = false;
             System.Windows.Forms.Label label = (System.Windows.Forms.Label)this.Controls.Find("labelComponent", true).FirstOrDefault();
             label.Visible = false;
@@ -1233,7 +1250,7 @@ namespace Commodore_Repair_Toolbox
 
         private void PanelList2_MouseLeave(object sender, EventArgs e)
         {
-            this.Cursor = Cursors.Default;
+            this.Cursor = System.Windows.Forms.Cursors.Default;
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -1282,6 +1299,7 @@ namespace Commodore_Repair_Toolbox
             }
             UpdateHighlights();
         }
+
     }
 
 
@@ -1291,9 +1309,9 @@ namespace Commodore_Repair_Toolbox
 
     public class CustomPanel : Panel
     {
-        public event MouseEventHandler CustomMouseWheel;
+        public event System.Windows.Forms.MouseEventHandler CustomMouseWheel;
 
-        protected override void OnMouseWheel(MouseEventArgs e)
+        protected override void OnMouseWheel(System.Windows.Forms.MouseEventArgs e)
         {
             CustomMouseWheel?.Invoke(this, e);
         }
@@ -1316,9 +1334,7 @@ namespace Commodore_Repair_Toolbox
         public string Datafile { get; set; }
         public List<File> Files { get; set; }
         public List<ComponentBoard> Components { get; set; }
-        public List<Trivia> Trivia { get; set; }
-        public List<Troubleshooting> Troubleshooting { get; set; }
-        public List<Links> Links{ get; set; }
+        
     }
 
 
@@ -1373,22 +1389,6 @@ namespace Commodore_Repair_Toolbox
         public string Url { get; set; }
     }
 
-    public class Trivia
-    {
-        public string Line { get; set; }
-    }
-
-    public class Troubleshooting
-    {
-        public string Line { get; set; }
-    }
-
-    public class Links
-    {
-        public string Line { get; set; }
-        public string Url { get; set; }
-
-    }
 
 
     // #################################################################################
