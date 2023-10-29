@@ -18,15 +18,12 @@ namespace Commodore_Retro_Toolbox
 
         // ##############################################################################
 
-
-
-        // ##############################################################################
-
         public static void GetAllData(List<Hardware> classHardware)
         {
             // I am using this as "Polyform Noncommercial license"
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
+            
             // --------------------------------------------------------------------
             // Get all "hardware" types/names from the Excel data file
 
@@ -119,6 +116,7 @@ namespace Commodore_Retro_Toolbox
                 }
             }
 
+            
             // --------------------------------------------------------------------
             // Get all "image files" from the Excel data file, within the specific board
 
@@ -132,7 +130,7 @@ namespace Commodore_Retro_Toolbox
                         var worksheet = package.Workbook.Worksheets["Images"];
 
                         // Find the row that starts with the "searchHeader"
-                        string searchHeader = "IMAGES IN LIST";
+                        string searchHeader = "Images in list";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
                         {
@@ -152,10 +150,24 @@ namespace Commodore_Retro_Toolbox
                         {
                             string name = worksheet.Cells[row, 1].Value.ToString();
                             string file = worksheet.Cells[row, 2].Value.ToString();
+                            string colorZoom = worksheet.Cells[row, 3].Value.ToString();
+                            string colorList = worksheet.Cells[row, 4].Value.ToString();
+                            string cellValue = worksheet.Cells[row, 5].Value.ToString();
+                            int opacityZoom = (int)(double.Parse(cellValue) * 100);
+                            opacityZoom = (int)((opacityZoom / 100.0) * 255);
+                            cellValue = worksheet.Cells[row, 6].Value.ToString();
+                            int opacityList = (int)(double.Parse(cellValue) * 100);
+                            opacityList = (int)((opacityList / 100.0) * 255);
+
                             Commodore_Repair_Toolbox.File filea = new Commodore_Repair_Toolbox.File
                             {
                                 Name = name,
                                 FileName = file,
+                                HighlightColorTab = colorZoom,
+                                HighlightColorList = colorList,
+                                HighlightOpacityTab = opacityZoom, // will be a number; 0-255
+                                HighlightOpacityList = opacityList // will be a number; 0-255
+
                             };
                             classFile.Add(filea);
 
@@ -171,10 +183,7 @@ namespace Commodore_Retro_Toolbox
                     }
                 }
             }
-
-
             
-
 
             // --------------------------------------------------------------------
             // Get all "components" from the Excel data file, within the specific board.
@@ -192,7 +201,7 @@ namespace Commodore_Retro_Toolbox
                         var worksheet = package.Workbook.Worksheets["Components"];
 
                         // Find the row that starts with the "searchHeader"
-                        string searchHeader = "COMPONENTS";
+                        string searchHeader = "Components";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
                         {
@@ -246,6 +255,7 @@ namespace Commodore_Retro_Toolbox
                 }
             }
 
+
             // --------------------------------------------------------------------
             // Get all "components" from the Excel data file, within the specific board.
             // The components are processed per file for the specific board.
@@ -264,7 +274,7 @@ namespace Commodore_Retro_Toolbox
                             var worksheet = package.Workbook.Worksheets["Components"];
 
                             // Find the row that starts with the "searchHeader"
-                            string searchHeader = "COMPONENTS";
+                            string searchHeader = "Components";
                             int row = 1;
                             while (row <= worksheet.Dimension.End.Row)
                             {
@@ -315,10 +325,10 @@ namespace Commodore_Retro_Toolbox
 
                     using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
                     {
-                        var worksheet = package.Workbook.Worksheets["Components"];
+                        var worksheet = package.Workbook.Worksheets["Component local files"];
 
                         // Find the row that starts with the "searchHeader"
-                        string searchHeader = "COMPONENT LOCAL FILES";
+                        string searchHeader = "Component local files";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
                         {
@@ -377,7 +387,7 @@ namespace Commodore_Retro_Toolbox
 
                     using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
                     {
-                        var worksheet = package.Workbook.Worksheets["Components"];
+                        var worksheet = package.Workbook.Worksheets["Component links"];
 
                         // Find the row that starts with the "searchHeader"
                         string searchHeader = "COMPONENT LINKS";
@@ -440,10 +450,10 @@ namespace Commodore_Retro_Toolbox
 
                     using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
                     {
-                        var worksheet = package.Workbook.Worksheets["Highlights"];
+                        var worksheet = package.Workbook.Worksheets["Component highlights"];
 
                         // Find the row that starts with the "searchHeader"
-                        string searchHeader = "IMAGE / COMPONENT HIGHLIGHT BOUNDS";
+                        string searchHeader = "Image and component highlight bounds";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
                         {
@@ -495,6 +505,7 @@ namespace Commodore_Retro_Toolbox
                 }
             }
 
+            /*
             // --------------------------------------------------------------------
             // Get all colors for the images.
 
@@ -549,6 +560,7 @@ namespace Commodore_Retro_Toolbox
                     }
                 }
             }
+            */
         }
 
 
