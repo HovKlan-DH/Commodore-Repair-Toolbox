@@ -34,9 +34,7 @@
             this.panelListAutoscroll = new System.Windows.Forms.Panel();
             this.panelZoom = new System.Windows.Forms.Panel();
             this.tabLinks = new System.Windows.Forms.TabPage();
-            this.tabData = new System.Windows.Forms.TabPage();
-            this.tabContact = new System.Windows.Forms.TabPage();
-            this.label15 = new System.Windows.Forms.Label();
+            this.webBrowser1 = new System.Windows.Forms.WebBrowser();
             this.tabAbout = new System.Windows.Forms.TabPage();
             this.textBox1 = new System.Windows.Forms.TextBox();
             this.label10 = new System.Windows.Forms.Label();
@@ -53,14 +51,10 @@
             this.listBox2 = new System.Windows.Forms.ListBox();
             this.label8 = new System.Windows.Forms.Label();
             this.button2 = new System.Windows.Forms.Button();
-            this.webBrowser1 = new System.Windows.Forms.WebBrowser();
-            this.textBox2 = new System.Windows.Forms.TextBox();
             this.tabControl1.SuspendLayout();
             this.tabMain.SuspendLayout();
             this.panelListMain.SuspendLayout();
             this.tabLinks.SuspendLayout();
-            this.tabData.SuspendLayout();
-            this.tabContact.SuspendLayout();
             this.tabAbout.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -71,8 +65,6 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.tabControl1.Controls.Add(this.tabMain);
             this.tabControl1.Controls.Add(this.tabLinks);
-            this.tabControl1.Controls.Add(this.tabData);
-            this.tabControl1.Controls.Add(this.tabContact);
             this.tabControl1.Controls.Add(this.tabAbout);
             this.tabControl1.Location = new System.Drawing.Point(235, 12);
             this.tabControl1.Name = "tabControl1";
@@ -132,34 +124,15 @@
             this.tabLinks.TabIndex = 3;
             this.tabLinks.Text = "Links";
             // 
-            // tabData
+            // webBrowser1
             // 
-            this.tabData.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.tabData.Controls.Add(this.textBox2);
-            this.tabData.Location = new System.Drawing.Point(4, 25);
-            this.tabData.Name = "tabData";
-            this.tabData.Size = new System.Drawing.Size(927, 650);
-            this.tabData.TabIndex = 4;
-            this.tabData.Text = "Data";
-            // 
-            // tabContact
-            // 
-            this.tabContact.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.tabContact.Controls.Add(this.label15);
-            this.tabContact.Location = new System.Drawing.Point(4, 25);
-            this.tabContact.Name = "tabContact";
-            this.tabContact.Size = new System.Drawing.Size(927, 650);
-            this.tabContact.TabIndex = 6;
-            this.tabContact.Text = "Contact";
-            // 
-            // label15
-            // 
-            this.label15.AutoSize = true;
-            this.label15.Location = new System.Drawing.Point(27, 40);
-            this.label15.Name = "label15";
-            this.label15.Size = new System.Drawing.Size(381, 16);
-            this.label15.TabIndex = 4;
-            this.label15.Text = "Connect with the developer (will submit an email via a web form)";
+            this.webBrowser1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.webBrowser1.Location = new System.Drawing.Point(0, 0);
+            this.webBrowser1.MinimumSize = new System.Drawing.Size(20, 20);
+            this.webBrowser1.Name = "webBrowser1";
+            this.webBrowser1.Size = new System.Drawing.Size(927, 650);
+            this.webBrowser1.TabIndex = 0;
+            this.webBrowser1.Navigating += new System.Windows.Forms.WebBrowserNavigatingEventHandler(this.webBrowser1_Navigating_1);
             // 
             // tabAbout
             // 
@@ -184,7 +157,7 @@
             this.textBox1.Name = "textBox1";
             this.textBox1.Size = new System.Drawing.Size(726, 284);
             this.textBox1.TabIndex = 3;
-            this.textBox1.Text = "All programming done by Dennis Helligsoe.\r\n";
+            this.textBox1.Text = "All programming done by Dennis Helligsø.\r\n";
             this.textBox1.TextChanged += new System.EventHandler(this.textBox1_TextChanged);
             // 
             // label10
@@ -331,26 +304,6 @@
             this.button2.UseVisualStyleBackColor = true;
             this.button2.Click += new System.EventHandler(this.button2_Click);
             // 
-            // webBrowser1
-            // 
-            this.webBrowser1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.webBrowser1.Location = new System.Drawing.Point(0, 0);
-            this.webBrowser1.MinimumSize = new System.Drawing.Size(20, 20);
-            this.webBrowser1.Name = "webBrowser1";
-            this.webBrowser1.Size = new System.Drawing.Size(927, 650);
-            this.webBrowser1.TabIndex = 0;
-            this.webBrowser1.Navigating += new System.Windows.Forms.WebBrowserNavigatingEventHandler(this.webBrowser1_Navigating_1);
-            // 
-            // textBox2
-            // 
-            this.textBox2.Location = new System.Drawing.Point(29, 37);
-            this.textBox2.Multiline = true;
-            this.textBox2.Name = "textBox2";
-            this.textBox2.Size = new System.Drawing.Size(261, 144);
-            this.textBox2.TabIndex = 0;
-            this.textBox2.Text = "It would be cool if it is possible to submit my local data to the server and then" +
-    " also to fetch new/up-to-date data?";
-            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -374,10 +327,6 @@
             this.tabMain.ResumeLayout(false);
             this.panelListMain.ResumeLayout(false);
             this.tabLinks.ResumeLayout(false);
-            this.tabData.ResumeLayout(false);
-            this.tabData.PerformLayout();
-            this.tabContact.ResumeLayout(false);
-            this.tabContact.PerformLayout();
             this.tabAbout.ResumeLayout(false);
             this.tabAbout.PerformLayout();
             this.ResumeLayout(false);
@@ -390,7 +339,6 @@
         private System.Windows.Forms.TabControl tabControl1;
         private System.Windows.Forms.TabPage tabMain;
         private System.Windows.Forms.TabPage tabLinks;
-        private System.Windows.Forms.TabPage tabData;
         private System.Windows.Forms.TabPage tabAbout;
         private System.Windows.Forms.ComboBox comboBox1;
         private System.Windows.Forms.Label label1;
@@ -409,10 +357,7 @@
         private System.Windows.Forms.Label label10;
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.TextBox textBox1;
-        private System.Windows.Forms.TabPage tabContact;
-        private System.Windows.Forms.Label label15;
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.WebBrowser webBrowser1;
-        private System.Windows.Forms.TextBox textBox2;
     }
 }
