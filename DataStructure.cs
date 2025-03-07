@@ -1,222 +1,157 @@
-﻿using Commodore_Repair_Toolbox;
-using OfficeOpenXml;
+﻿using OfficeOpenXml;
+using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Drawing;
 using System.Windows.Forms;
-using Newtonsoft.Json.Linq;
-using OfficeOpenXml.Style;
-using System.Xml.Linq;
-using System.Text;
-using System;
 
-namespace Commodore_Retro_Toolbox
+namespace Commodore_Repair_Toolbox
 {
     public class DataStructure
     {
-
-        // ##############################################################################
-
+        // Loads all data from Excel into classHardware
         public static void GetAllData(List<Hardware> classHardware)
         {
-            // I am using this as "Polyform Noncommercial license"
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-            
-            // --------------------------------------------------------------------
-            // Get all "hardware" types/names from the Excel data file
-
-            using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\Data.xlsx")))
+            // 1) Load hardware from Data.xlsx
+            using (var package = new ExcelPackage(new FileInfo(
+                Path.Combine(Application.StartupPath, "Data", "Data.xlsx"))))
             {
-                // Assuming data is in the first worksheet
                 var worksheet = package.Workbook.Worksheets[0];
-
-                // Find the row that starts with the "searchHeader"
                 string searchHeader = "Hardware name in drop-down";
                 int row = 1;
                 while (row <= worksheet.Dimension.End.Row)
                 {
-                    if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
-                    {
-                        break; // found the starting row
-                    }
+                    if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
                     row++;
                 }
+                row++; // skip header
 
-                // Skip the header row
-                row++;
-
-                // Now, start reading data from the identified row
                 while (worksheet.Cells[row, 1].Value != null)
                 {
                     string name = worksheet.Cells[row, 1].Value.ToString();
                     string folder = worksheet.Cells[row, 2].Value.ToString();
                     string datafile = worksheet.Cells[row, 3].Value.ToString();
-                    Hardware hardware = new Hardware
+
+                    Hardware hw = new Hardware
                     {
                         Name = name,
                         Folder = folder,
                         Datafile = datafile
                     };
-                    classHardware.Add(hardware);
+                    classHardware.Add(hw);
                     row++;
                 }
             }
 
-
-            // --------------------------------------------------------------------
-            // Get all "board" types/names from the Excel data file, within the specific hardware
-
-            List<Board> classBoard = new List<Board>();
+            // 2) Load boards for each hardware
             foreach (Hardware hardware in classHardware)
             {
-                using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\"+ hardware.Datafile)))
+                using (var package = new ExcelPackage(new FileInfo(
+                    Path.Combine(Application.StartupPath, "Data", hardware.Folder, hardware.Datafile))))
                 {
                     var worksheet = package.Workbook.Worksheets[0];
-
-                    // Find the row that starts with the "searchHeader"
                     string searchHeader = "Board name in drop-down";
                     int row = 1;
                     while (row <= worksheet.Dimension.End.Row)
                     {
-                        if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
-                        {
-                            break; // found the starting row
-                        }
+                        if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
                         row++;
                     }
+                    row++; // skip header
 
-                    // Skip the header row
-                    row++;
-
-                    // Now, start reading data from the identified row
                     while (worksheet.Cells[row, 1].Value != null)
                     {
                         string name = worksheet.Cells[row, 1].Value.ToString();
                         string folder = worksheet.Cells[row, 2].Value.ToString();
                         string datafile = worksheet.Cells[row, 3].Value.ToString();
+
                         Board boarda = new Board
                         {
                             Name = name,
                             Folder = folder,
                             Datafile = datafile
                         };
-                        classBoard.Add(boarda);
-
-                        // Associate the board with the hardware
-                        // Create the "Boards" property if it is NULL and then add the board
-                        if (hardware.Boards == null)
-                        {
-                            hardware.Boards = new List<Board>();
-                        }
+                        if (hardware.Boards == null) hardware.Boards = new List<Board>();
                         hardware.Boards.Add(boarda);
                         row++;
                     }
                 }
             }
 
-            
-            // --------------------------------------------------------------------
-            // Get all "image files" from the Excel data file, within the specific board
-
-            List<Commodore_Repair_Toolbox.File> classFile = new List<Commodore_Repair_Toolbox.File>();
+            // 3) Load "BoardFile" entries (images)
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\"+ board.Datafile)))
+                    using (var package = new ExcelPackage(new FileInfo(
+                        Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
                     {
                         var worksheet = package.Workbook.Worksheets["Images"];
-
-                        // Find the row that starts with the "searchHeader"
                         string searchHeader = "Images in list";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
                         {
-                            if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
-                            {
-                                break; // found the starting row
-                            }
+                            if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
                             row++;
                         }
-
-                        // Skip the header row
                         row++;
                         row++;
 
-                        // Now, start reading data from the identified row
                         while (worksheet.Cells[row, 1].Value != null)
                         {
                             string name = worksheet.Cells[row, 1].Value.ToString();
-                            string file = worksheet.Cells[row, 2].Value.ToString();
+                            string fileName = worksheet.Cells[row, 2].Value.ToString();
                             string colorZoom = worksheet.Cells[row, 3].Value.ToString();
                             string colorList = worksheet.Cells[row, 4].Value.ToString();
+
+                            // Convert from fraction to 0-255
                             string cellValue = worksheet.Cells[row, 5].Value.ToString();
                             int opacityZoom = (int)(double.Parse(cellValue) * 100);
                             opacityZoom = (int)((opacityZoom / 100.0) * 255);
+
                             cellValue = worksheet.Cells[row, 6].Value.ToString();
                             int opacityList = (int)(double.Parse(cellValue) * 100);
                             opacityList = (int)((opacityList / 100.0) * 255);
 
-                            Commodore_Repair_Toolbox.File filea = new Commodore_Repair_Toolbox.File
+                            BoardFile bf = new BoardFile
                             {
                                 Name = name,
-                                FileName = file,
+                                FileName = fileName,
                                 HighlightColorTab = colorZoom,
                                 HighlightColorList = colorList,
-                                HighlightOpacityTab = opacityZoom, // will be a number; 0-255
-                                HighlightOpacityList = opacityList // will be a number; 0-255
-
+                                HighlightOpacityTab = opacityZoom,
+                                HighlightOpacityList = opacityList
                             };
-                            classFile.Add(filea);
-
-                            // Associate the board with the hardware
-                            // Create the "Boards" property if it is NULL and then add the board
-                            if (board.Files == null)
-                            {
-                                board.Files = new List<Commodore_Repair_Toolbox.File>();
-                            }
-                            board.Files.Add(filea);
+                            if (board.Files == null) board.Files = new List<BoardFile>();
+                            board.Files.Add(bf);
                             row++;
                         }
                     }
                 }
             }
-            
 
-            // --------------------------------------------------------------------
-            // Get all "components" from the Excel data file, within the specific board.
-            // This is the main component data - not the bounds with coordinates.
-            // The components are processed one time per board.
-
-            List<ComponentBoard> classComponentBoard = new List<ComponentBoard>();
+            // 4) Load main "Components" for each board
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
-
-                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\"+ board.Datafile)))
+                    using (var package = new ExcelPackage(new FileInfo(
+                        Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
                     {
                         var worksheet = package.Workbook.Worksheets["Components"];
-
-                        // Find the row that starts with the "searchHeader"
                         string searchHeader = "Components";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
                         {
-                            if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
-                            {
-                                break; // found the starting row
-                            }
+                            if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
                             row++;
                         }
-
-                        // Skip the header row
                         row++;
                         row++;
 
-                        // Now, start reading data from the identified row
                         while (worksheet.Cells[row, 1].Value != null)
                         {
                             string label = worksheet.Cells[row, 1].Value.ToString();
@@ -229,8 +164,7 @@ namespace Commodore_Retro_Toolbox
                             description = description.Replace(((char)10).ToString(), Environment.NewLine);
                             description = description.Replace(((char)13).ToString(), Environment.NewLine);
 
-
-                            ComponentBoard component = new ComponentBoard
+                            ComponentBoard comp = new ComponentBoard
                             {
                                 Label = label,
                                 NameTechnical = nameTechnical,
@@ -240,72 +174,44 @@ namespace Commodore_Retro_Toolbox
                                 OneLiner = oneliner,
                                 Description = description
                             };
-                            classComponentBoard.Add(component);
-
-                            // Associate the board with the hardware
-                            // Create the "Boards" property if it is NULL and then add the board
-                            if (board.Components == null)
-                            {
-                                board.Components = new List<ComponentBoard>();
-                            }
-                            board.Components.Add(component);
+                            if (board.Components == null) board.Components = new List<ComponentBoard>();
+                            board.Components.Add(comp);
                             row++;
                         }
                     }
                 }
             }
 
-
-            // --------------------------------------------------------------------
-            // Get all "components" from the Excel data file, within the specific board.
-            // The components are processed per file for the specific board.
-            // This is merely to create the data structure - not to populate with data.
-
-            List<ComponentBounds> classComponentBounds = new List<ComponentBounds>();
+            // 5) Create empty "ComponentBounds" for each BoardFile
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    foreach (Commodore_Repair_Toolbox.File file in board.Files)
+                    foreach (BoardFile bf in board.Files)
                     {
-
-                        using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\"+ board.Datafile)))
+                        using (var package = new ExcelPackage(new FileInfo(
+                            Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
                         {
                             var worksheet = package.Workbook.Worksheets["Components"];
-
-                            // Find the row that starts with the "searchHeader"
                             string searchHeader = "Components";
                             int row = 1;
                             while (row <= worksheet.Dimension.End.Row)
                             {
-                                if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
-                                {
-                                    break; // found the starting row
-                                }
+                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
                                 row++;
                             }
-
-                            // Skip the header row
                             row++;
                             row++;
 
-                            // Now, start reading data from the identified row
                             while (worksheet.Cells[row, 1].Value != null)
                             {
                                 string name = worksheet.Cells[row, 1].Value.ToString();
-                                ComponentBounds component = new ComponentBounds
+                                ComponentBounds cb = new ComponentBounds
                                 {
-                                    Label = name,
+                                    Label = name
                                 };
-                                classComponentBounds.Add(component);
-
-                                // Associate the board with the hardware
-                                // Create the "Boards" property if it is NULL and then add the board
-                                if (file.Components == null)
-                                {
-                                    file.Components = new List<ComponentBounds>();
-                                }
-                                file.Components.Add(component);
+                                if (bf.Components == null) bf.Components = new List<ComponentBounds>();
+                                bf.Components.Add(cb);
                                 row++;
                             }
                         }
@@ -313,37 +219,25 @@ namespace Commodore_Retro_Toolbox
                 }
             }
 
-
-            // --------------------------------------------------------------------
-            // Get all component local files (typically datasheet).
-
-            // Assuming that classHardware is already populated and well-formed
+            // 6) Load "component local files" (datasheets)
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
-
-                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
+                    using (var package = new ExcelPackage(new FileInfo(
+                        Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
                     {
                         var worksheet = package.Workbook.Worksheets["Component local files"];
-
-                        // Find the row that starts with the "searchHeader"
                         string searchHeader = "Component local files";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
                         {
-                            if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
-                            {
-                                break; // found the starting row
-                            }
+                            if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
                             row++;
                         }
-
-                        // Skip the header row
                         row++;
                         row++;
 
-                        // Now, start reading data from the identified row
                         while (worksheet.Cells[row, 1].Value != null)
                         {
                             string componentName = worksheet.Cells[row, 1].Value.ToString();
@@ -351,220 +245,105 @@ namespace Commodore_Retro_Toolbox
                             string fileName = worksheet.Cells[row, 3].Value.ToString();
 
                             var classComponent = board.Components.FirstOrDefault(c => c.Label == componentName);
-
                             if (classComponent != null)
                             {
-                                if (classComponent.LocalFiles == null)
-                                {
-                                    classComponent.LocalFiles = new List<LocalFiles>();
-                                }
-
-                                LocalFiles localFile = new LocalFiles
+                                if (classComponent.LocalFiles == null) classComponent.LocalFiles = new List<LocalFiles>();
+                                classComponent.LocalFiles.Add(new LocalFiles
                                 {
                                     Name = name,
                                     FileName = fileName
-                                };
-
-                                classComponent.LocalFiles.Add(localFile);
+                                });
                             }
-
                             row++;
                         }
                     }
                 }
             }
 
-
-
-            // --------------------------------------------------------------------
-            // Get all component links
-
-            // Assuming that classHardware is already populated and well-formed
+            // 7) Load "component links"
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
-
-                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
+                    using (var package = new ExcelPackage(new FileInfo(
+                        Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
                     {
                         var worksheet = package.Workbook.Worksheets["Component links"];
-
-                        // Find the row that starts with the "searchHeader"
                         string searchHeader = "COMPONENT LINKS";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
                         {
-                            if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
-                            {
-                                break; // found the starting row
-                            }
+                            if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
                             row++;
                         }
-
-                        // Skip the header row
                         row++;
                         row++;
 
-                        // Now, start reading data from the identified row
                         while (worksheet.Cells[row, 1].Value != null)
                         {
                             string componentName = worksheet.Cells[row, 1].Value.ToString();
-                            string name = worksheet.Cells[row, 2].Value.ToString();
-                            string url = worksheet.Cells[row, 3].Value.ToString();
+                            string linkName = worksheet.Cells[row, 2].Value.ToString();
+                            string linkUrl = worksheet.Cells[row, 3].Value.ToString();
 
-                            var classComponent = board.Components.FirstOrDefault(c => c.Label == componentName);
-
-                            if (classComponent != null)
+                            var comp = board.Components.FirstOrDefault(c => c.Label == componentName);
+                            if (comp != null)
                             {
-                                if (classComponent.ComponentLinks == null)
+                                if (comp.ComponentLinks == null) comp.ComponentLinks = new List<ComponentLinks>();
+                                comp.ComponentLinks.Add(new ComponentLinks
                                 {
-                                    classComponent.ComponentLinks = new List<ComponentLinks>();
-                                }
-
-                                ComponentLinks link = new ComponentLinks
-                                {
-                                    Name = name,
-                                    Url = url
-                                };
-
-                                classComponent.ComponentLinks.Add(link);
+                                    Name = linkName,
+                                    Url = linkUrl
+                                });
                             }
-
                             row++;
                         }
                     }
                 }
             }
 
-
-
-            // --------------------------------------------------------------------
-            // Get all bounds (coordinates and sizes) and populate it in 
-            // data data structure.
-
-            // Assuming that classHardware is already populated and well-formed
-            foreach (Hardware hardware in classHardware)
-            {   
-                foreach (Board board in hardware.Boards)
-                {
-
-                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
-                    {
-                        var worksheet = package.Workbook.Worksheets["Component highlights"];
-
-                        // Find the row that starts with the "searchHeader"
-                        string searchHeader = "Image and component highlight bounds";
-                        int row = 1;
-                        while (row <= worksheet.Dimension.End.Row)
-                        {
-                            if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
-                            {
-                                break; // found the starting row
-                            }
-                            row++;
-                        }
-
-                        // Skip the header row
-                        row++;
-                        row++;
-
-                        // Now, start reading data from the identified row
-                        while (worksheet.Cells[row, 1].Value != null)
-                        {
-                            string imageName = worksheet.Cells[row, 1].Value.ToString();
-                            string componentName = worksheet.Cells[row, 2].Value.ToString();
-                            int x = (int)((double)worksheet.Cells[row, 3].Value);
-                            int y = (int)((double)worksheet.Cells[row, 4].Value);
-                            int width = (int)((double)worksheet.Cells[row, 5].Value);
-                            int height = (int)((double)worksheet.Cells[row, 6].Value);
-
-
-                            var file = board.Files.FirstOrDefault(f => f.Name == imageName);
-                            var componentBounds = file.Components.FirstOrDefault(c => c.Label == componentName);
-
-                            if (componentBounds != null)
-                            {
-                                if (componentBounds.Overlays == null)
-                                {
-                                    componentBounds.Overlays = new List<Overlay>();
-                                }
-
-                                Rectangle rect = new Rectangle(x, y, width, height);
-
-                                Overlay overlay = new Overlay
-                                {
-                                    Bounds = rect
-                                };
-
-                                componentBounds.Overlays.Add(overlay);
-                            }
-
-                            row++;
-                        }
-                    }
-                }
-            }
-
-            /*
-            // --------------------------------------------------------------------
-            // Get all colors for the images.
-
-            // Assuming that classHardware is already populated and well-formed
+            // 8) Load "component highlights" (overlay rectangles)
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
-
-                    using (var package = new ExcelPackage(new FileInfo(Application.StartupPath + "\\Data\\" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile)))
+                    using (var package = new ExcelPackage(new FileInfo(
+                        Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
                     {
-                        var worksheet = package.Workbook.Worksheets["Highlights"];
-
-                        // Find the row that starts with the "searchHeader"
-                        string searchHeader = "IMAGE / COMPONENT COLORS";
+                        var worksheet = package.Workbook.Worksheets["Component highlights"];
+                        string searchHeader = "Image and component highlight bounds";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
                         {
-                            if (worksheet.Cells[row, 1].Value != null && worksheet.Cells[row, 1].Value.ToString() == searchHeader)
-                            {
-                                break; // found the starting row
-                            }
+                            if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
                             row++;
                         }
-
-                        // Skip the header row
                         row++;
                         row++;
 
-                        // Now, start reading data from the identified row
                         while (worksheet.Cells[row, 1].Value != null)
                         {
                             string imageName = worksheet.Cells[row, 1].Value.ToString();
-                            string colorZoom = worksheet.Cells[row, 2].Value.ToString();
-                            string colorList = worksheet.Cells[row, 3].Value.ToString();
-                            string cellValue = worksheet.Cells[row, 4].Value.ToString();
-                            int opacityZoom = (int)(double.Parse(cellValue) * 100);
-                            opacityZoom = (int)((opacityZoom / 100.0) * 255);
-                            cellValue = worksheet.Cells[row, 5].Value.ToString();
-                            int opacityList = (int)(double.Parse(cellValue) * 100);
-                            opacityList = (int)((opacityList / 100.0) * 255);
+                            string componentName = worksheet.Cells[row, 2].Value.ToString();
+                            int x = (int)(double)worksheet.Cells[row, 3].Value;
+                            int y = (int)(double)worksheet.Cells[row, 4].Value;
+                            int w = (int)(double)worksheet.Cells[row, 5].Value;
+                            int h = (int)(double)worksheet.Cells[row, 6].Value;
 
-
-                            var file = board.Files.FirstOrDefault(f => f.Name == imageName);
-                            file.HighlightColorTab = colorZoom;
-                            file.HighlightColorList = colorList;
-                            file.HighlightOpacityTab = opacityZoom; // will be a number; 0-255
-                            file.HighlightOpacityList = opacityList; // will be a number; 0-255
-
+                            var bf = board.Files?.FirstOrDefault(f => f.Name == imageName);
+                            var compBounds = bf?.Components.FirstOrDefault(c => c.Label == componentName);
+                            if (compBounds != null)
+                            {
+                                if (compBounds.Overlays == null) compBounds.Overlays = new List<Overlay>();
+                                compBounds.Overlays.Add(new Overlay
+                                {
+                                    Bounds = new Rectangle(x, y, w, h)
+                                });
+                            }
                             row++;
                         }
                     }
                 }
             }
-            */
         }
-
-
-        // ------------------------------------------------
-
     }
 }

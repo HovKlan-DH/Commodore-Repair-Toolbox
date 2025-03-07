@@ -9,16 +9,17 @@ namespace Commodore_Retro_Toolbox
     {
         public Rectangle Bounds { get; set; }
         public Color Color { get; set; }
-        public int Opacity { get; set; }
+        public int Opacity { get; set; } // 0-255
         public bool Highlighted { get; set; }
         public string ComponentLabel { get; set; }
     }
 
-    // For clicks on overlays
+    // Fired when an overlay is clicked (left or right)
     public class OverlayClickedEventArgs : EventArgs
     {
         public OverlayInfo OverlayInfo { get; }
         public MouseEventArgs MouseArgs { get; }
+
         public OverlayClickedEventArgs(OverlayInfo overlayInfo, MouseEventArgs mouseArgs)
         {
             OverlayInfo = overlayInfo;
@@ -26,12 +27,13 @@ namespace Commodore_Retro_Toolbox
         }
     }
 
-    // For hover changes (enter/leave)
+    // Fired when mouse enters or leaves an overlay
     public class OverlayHoverChangedEventArgs : EventArgs
     {
         public OverlayInfo OverlayInfo { get; }
         public bool IsHovering { get; }
         public Point MouseLocation { get; }
+
         public OverlayHoverChangedEventArgs(OverlayInfo overlayInfo, bool isHovering, Point mouseLocation)
         {
             OverlayInfo = overlayInfo;
@@ -44,24 +46,30 @@ namespace Commodore_Retro_Toolbox
     {
         public List<OverlayInfo> Overlays { get; } = new List<OverlayInfo>();
 
-        // Fired if an overlay is clicked (left or right)
+        // Events
         public event EventHandler<OverlayClickedEventArgs> OverlayClicked;
-
-        // Fired if mouse enters or leaves an overlay
         public event EventHandler<OverlayHoverChangedEventArgs> OverlayHoverChanged;
 
-        // Fired if the user clicked empty space in the panel
+        // These let Main.cs handle "empty space" logic, e.g. panning
         public event MouseEventHandler OverlayPanelMouseDown;
         public event MouseEventHandler OverlayPanelMouseMove;
         public event MouseEventHandler OverlayPanelMouseUp;
 
-        private OverlayInfo currentHover; // track which overlay is currently hovered
+        private OverlayInfo currentHover;
+
+        // --- Right-click single-click vs. drag logic ---
+        private bool _isRightPanning = false;
+        private Point _rightDownLocation = Point.Empty;
+        private const int DRAG_THRESHOLD = 5;
 
         public OverlayPanel()
         {
-            SetStyle(ControlStyles.AllPaintingInWmPaint |
-                     ControlStyles.OptimizedDoubleBuffer |
-                     ControlStyles.UserPaint, true);
+            SetStyle(
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.UserPaint,
+                true
+            );
             BackColor = Color.Transparent;
             Dock = DockStyle.Fill;
         }
@@ -83,20 +91,34 @@ namespace Commodore_Retro_Toolbox
         {
             base.OnMouseDown(e);
 
-            bool clickedOverlay = false;
-            for (int i = Overlays.Count - 1; i >= 0; i--)
+            if (e.Button == MouseButtons.Left)
             {
-                if (Overlays[i].Bounds.Contains(e.Location))
+                // LEFT-CLICK => detect overlays immediately
+                bool clickedOverlay = false;
+                for (int i = Overlays.Count - 1; i >= 0; i--)
                 {
-                    clickedOverlay = true;
-                    OverlayClicked?.Invoke(this, new OverlayClickedEventArgs(Overlays[i], e));
-                    break;
+                    if (Overlays[i].Bounds.Contains(e.Location))
+                    {
+                        clickedOverlay = true;
+                        OverlayClicked?.Invoke(this, new OverlayClickedEventArgs(Overlays[i], e));
+                        break;
+                    }
+                }
+
+                if (!clickedOverlay)
+                {
+                    // No overlay => empty space
+                    OverlayPanelMouseDown?.Invoke(this, e);
                 }
             }
-
-            if (!clickedOverlay)
+            else if (e.Button == MouseButtons.Right)
             {
-                // Fire "empty space" mouse-down
+                // RIGHT-CLICK => we won't detect overlays yet
+                // We'll decide on single-click vs. drag later
+                _isRightPanning = false;
+                _rightDownLocation = e.Location;
+
+                // Fire "empty space" down in case user drags
                 OverlayPanelMouseDown?.Invoke(this, e);
             }
         }
@@ -105,10 +127,26 @@ namespace Commodore_Retro_Toolbox
         {
             base.OnMouseMove(e);
 
-            // Fire "empty space" mouse-move always
+            // Always pass mouse-move to "empty space" event
             OverlayPanelMouseMove?.Invoke(this, e);
 
-            // Check if we are hovering any overlay
+            // LEFT button or no button => do normal hover detection
+            // RIGHT => we might be panning or deciding to pan
+            if (e.Button == MouseButtons.Right)
+            {
+                // Check if we've moved enough to call it a drag
+                int dx = e.Location.X - _rightDownLocation.X;
+                int dy = e.Location.Y - _rightDownLocation.Y;
+                if (!_isRightPanning && (Math.Abs(dx) > DRAG_THRESHOLD || Math.Abs(dy) > DRAG_THRESHOLD))
+                {
+                    _isRightPanning = true;
+                }
+
+                // If we're panning, skip overlay hover detection
+                if (_isRightPanning) return;
+            }
+
+            // If not panning with right-click, do hover detection
             OverlayInfo found = null;
             for (int i = Overlays.Count - 1; i >= 0; i--)
             {
@@ -121,7 +159,7 @@ namespace Commodore_Retro_Toolbox
 
             if (found != currentHover)
             {
-                // Hover changed: left old overlay or entered a new one
+                // Hover changed
                 if (currentHover != null)
                 {
                     // We left the old overlay
@@ -141,7 +179,34 @@ namespace Commodore_Retro_Toolbox
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
+
             OverlayPanelMouseUp?.Invoke(this, e);
+
+            if (e.Button == MouseButtons.Right)
+            {
+                if (_isRightPanning)
+                {
+                    // We were dragging => done panning
+                    _isRightPanning = false;
+                }
+                else
+                {
+                    // Single right-click => detect overlays
+                    bool clickedOverlay = false;
+                    for (int i = Overlays.Count - 1; i >= 0; i--)
+                    {
+                        if (Overlays[i].Bounds.Contains(e.Location))
+                        {
+                            clickedOverlay = true;
+                            // Pass a "right-click" overlay event
+                            OverlayClicked?.Invoke(this, new OverlayClickedEventArgs(Overlays[i], e));
+                            break;
+                        }
+                    }
+                    // If not clickedOverlay => empty space right-click
+                    // (Your Main.cs can handle that if you want.)
+                }
+            }
         }
     }
 }

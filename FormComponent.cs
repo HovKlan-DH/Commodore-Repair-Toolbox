@@ -1,7 +1,6 @@
 ﻿using Commodore_Repair_Toolbox;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
@@ -10,11 +9,13 @@ namespace Commodore_Retro_Toolbox
 {
     public partial class FormComponent : Form
     {
-        public string PictureBoxName { get; private set; }
-        Dictionary<string, string> localFiles = new Dictionary<string, string>();
-        Dictionary<string, string> links = new Dictionary<string, string>();
-        string hardwareSelectedFolder;
-        string boardSelectedFolder;
+        private readonly Dictionary<string, string> localFiles = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> links = new Dictionary<string, string>();
+
+        private readonly string hardwareSelectedFolder;
+        private readonly string boardSelectedFolder;
+
+        public string PictureBoxName { get; }
 
         public FormComponent(ComponentBoard component, string hwSelectedFolder, string bdSelectedFolder)
         {
@@ -23,108 +24,102 @@ namespace Commodore_Retro_Toolbox
             hardwareSelectedFolder = hwSelectedFolder;
             boardSelectedFolder = bdSelectedFolder;
 
-            this.PictureBoxName = component.Label;
+            PictureBoxName = component.Label;
+
+            // Basic labels
             label1.Text = component.Label;
             label2.Text = component.NameTechnical;
             label3.Text = component.NameFriendly;
             label4.Text = component.Type;
             label5.Text = component.OneLiner;
+
+            // Description box
             textBox1.Text = component.Description;
             textBox1.ScrollBars = ScrollBars.Vertical;
 
-            if(System.IO.File.Exists(Application.StartupPath + "\\Data\\" + hardwareSelectedFolder + "\\" + boardSelectedFolder + "\\" + component.ImagePinout))
+            // Pinout image
+            if (!string.IsNullOrEmpty(component.ImagePinout))
             {
-                Image image = Image.FromFile(Application.StartupPath + "\\Data\\" + hardwareSelectedFolder + "\\" + boardSelectedFolder + "\\" + component.ImagePinout);
-                pictureBox1.Image = image;
+                var imagePath = Path.Combine(
+                    Application.StartupPath, "Data",
+                    hardwareSelectedFolder, boardSelectedFolder,
+                    component.ImagePinout
+                );
+                if (File.Exists(imagePath))
+                {
+                    pictureBox1.Image = Image.FromFile(imagePath);
+                }
             }
 
-            if(component.LocalFiles != null)
+            // Local files (datasheets, etc.)
+            if (component.LocalFiles != null)
             {
-                foreach (LocalFiles localFile in component.LocalFiles)
+                foreach (var localFile in component.LocalFiles)
                 {
                     listBox1.Items.Add(localFile.Name);
-                    localFiles.Add(localFile.Name, localFile.FileName);
+                    localFiles[localFile.Name] = localFile.FileName;
                 }
             }
 
-            if(component.ComponentLinks != null)
+            // Links (URLs)
+            if (component.ComponentLinks != null)
             {
-                foreach (ComponentLinks link in component.ComponentLinks)
+                foreach (var linkItem in component.ComponentLinks)
                 {
-                    listBox2.Items.Add(link.Name);
-                    links.Add(link.Name, link.Url);
+                    listBox2.Items.Add(linkItem.Name);
+                    links[linkItem.Name] = linkItem.Url;
                 }
             }
 
-            this.KeyPreview = true;
-            this.KeyPress += new KeyPressEventHandler(Form_KeyPress);
-
-            AttachMouseDownEventHandlers(this);
-
+            // Allow pressing Escape to close
+            KeyPreview = true;
+            KeyPress += Form_KeyPress;
         }
 
-
-        private void AttachMouseDownEventHandlers(Control parentControl)
-        {
-            parentControl.MouseDown += GenericMouseDownHandler;
-
-            foreach (Control control in parentControl.Controls)
-            {
-                if (control is TextBox && control.Name == "textBox1"
-                    || control is ListBox && control.Name == "listBox1"
-                    || control is ListBox && control.Name == "listBox2"
-                    ) { 
-                    continue;
-                }
-                AttachMouseDownEventHandlers(control);
-            }
-        }
-
-        private void GenericMouseDownHandler(object sender, MouseEventArgs e)
-        {
-            // Your code here
-            this.Close();
-        }
-
-
-        void Form_KeyPress(object sender, KeyPressEventArgs e)
+        private void Form_KeyPress(object sender, KeyPressEventArgs e)
         {
             if (e.KeyChar == (char)Keys.Escape)
             {
-                this.Close();
+                Close();
             }
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            this.Close();
+            // "Close" button
+            Close();
         }
 
+        // Handle local-file selection
         private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if(listBox1.SelectedItem != null)
+            if (listBox1.SelectedItem == null) return;
+
+            string selectedName = listBox1.SelectedItem.ToString();
+            if (!localFiles.ContainsKey(selectedName)) return;
+
+            var filePath = Path.Combine(
+                Application.StartupPath, "Data",
+                hardwareSelectedFolder, boardSelectedFolder,
+                localFiles[selectedName]
+            );
+
+            if (File.Exists(filePath))
             {
-                string selectedName = listBox1.SelectedItem.ToString();
-                if (localFiles.ContainsKey(selectedName))
-                {
-                    if (System.IO.File.Exists(Application.StartupPath + "\\Data\\" + hardwareSelectedFolder + "\\" + boardSelectedFolder + "\\" + localFiles[selectedName]))
-                    {
-                        System.Diagnostics.Process.Start(Application.StartupPath + "\\Data\\" + hardwareSelectedFolder + "\\" + boardSelectedFolder + "\\" + localFiles[selectedName]);
-                    }
-                }
+                System.Diagnostics.Process.Start(filePath);
             }
         }
 
+        // Handle link selection
         private void listBox2_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if(listBox2.SelectedItem != null)
-            {
-                string selectedName = listBox2.SelectedItem.ToString();
-                if (links.ContainsKey(selectedName))
-                {
-                    System.Diagnostics.Process.Start(links[selectedName]);
-                }
-            }
+            if (listBox2.SelectedItem == null) return;
+
+            string selectedName = listBox2.SelectedItem.ToString();
+            if (!links.ContainsKey(selectedName)) return;
+
+            string url = links[selectedName];
+            System.Diagnostics.Process.Start(url);
         }
     }
 }

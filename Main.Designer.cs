@@ -158,7 +158,7 @@
             this.textBox1.Size = new System.Drawing.Size(726, 284);
             this.textBox1.TabIndex = 3;
             this.textBox1.Text = "All programming done by Dennis Helligsø.\r\n";
-            this.textBox1.TextChanged += new System.EventHandler(this.textBox1_TextChanged);
+//            this.textBox1.TextChanged += new System.EventHandler(this.textBox1_TextChanged);
             // 
             // label10
             // 
