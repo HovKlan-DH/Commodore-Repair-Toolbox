@@ -9,6 +9,13 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
+/*
+
+VGG Image Annotator
+https://www.robots.ox.ac.uk/~vgg/software/via/
+
+*/
+
 namespace Commodore_Repair_Toolbox
 {
     public partial class Main : Form
@@ -16,6 +23,12 @@ namespace Commodore_Repair_Toolbox
 
         private FormComponent currentPopup = null;
 
+        // Fullscreen
+        private bool isFullscreen = false;
+        private FormWindowState formPreviousWindowState;
+        private FormBorderStyle formPreviousFormBorderStyle;
+        private Rectangle previousBoundsForm;
+        private Rectangle previousBoundsPanelBehindTab;
 
         // ---------------------------------------------------------------------
         // UI labels
@@ -79,25 +92,60 @@ namespace Commodore_Repair_Toolbox
         public Main()
         {
             InitializeComponent();
+            EnableDoubleBuffering();
+            AttachEventHandlers();
 
-            // Optional double-buffering for panels
+            LoadData();
+            PopulateComboBoxes();
+            LoadSettings();
+
+            ApplySavedSettings();
+
+            AttachConfigurationSaveEvents();
+        }
+
+        // ---------------------------------------------------------------------
+        // Enable double-buffering for smoother UI rendering
+        private void EnableDoubleBuffering()
+        {
+            this.SetStyle(
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.UserPaint,
+                true
+            );
+            this.UpdateStyles();
+
             panelZoom.DoubleBuffered(true);
             panelListMain.DoubleBuffered(true);
             panelListAutoscroll.DoubleBuffered(true);
+        }
 
-            // Form events
-            this.ResizeBegin += Form_ResizeBegin;
-            this.ResizeEnd += Form_ResizeEnd;
-            this.Shown += Main_Shown;
+        // ---------------------------------------------------------------------
+        // Attach necessary event handlers
+        private void AttachEventHandlers()
+        {
+            ResizeBegin += Form_ResizeBegin;
+            ResizeEnd += Form_ResizeEnd;
+            Resize += Form_Resize;
+            Shown += Main_Shown;
+            panelListAutoscroll.Resize += panelListAutoscroll_Resize;
+            panelListAutoscroll.Layout += PanelListAutoscroll_Layout;
+            this.Load += Form_Loaded;
+            tabControl1.Dock = DockStyle.Fill;
+        }
 
-            // Load data from Excel
+        // ---------------------------------------------------------------------
+        // Load hardware data from Excel
+        private void LoadData()
+        {
             DataStructure.GetAllData(classHardware);
 
-            // Debug
-            foreach (Hardware hw in classHardware)
+            // Debug print loaded data
+            foreach (Hardware hw2 in classHardware)
             {
-                Debug.WriteLine($"[Hardware: {hw.Name}] Folder={hw.Folder}");
-                foreach (Board bd in hw.Boards)
+                Debug.WriteLine($"[Hardware: {hw2.Name}] Folder={hw2.Folder}");
+                foreach (Board bd in hw2.Boards)
                 {
                     Debug.WriteLine($"   [Board: {bd.Name}] Folder={bd.Folder}");
                     foreach (BoardFile bf in bd.Files)
@@ -106,17 +154,181 @@ namespace Commodore_Repair_Toolbox
                     }
                 }
             }
+        }
 
-            // Populate comboBox1 with hardware names
+        // ---------------------------------------------------------------------
+        // Populate combo boxes with loaded data
+        private void PopulateComboBoxes()
+        {
             foreach (Hardware hardware in classHardware)
             {
                 comboBox1.Items.Add(hardware.Name);
             }
             comboBox1.SelectedIndex = 0;
             hardwareSelectedName = comboBox1.SelectedItem.ToString();
+        }
 
-            // Add a "loose close" on the info-popup
-            AttachClosePopupOnClick(this);
+        // ---------------------------------------------------------------------
+        // Load settings from configuration file
+        private void LoadSettings()
+        {
+            Configuration.LoadConfig();
+        }
+
+        // ---------------------------------------------------------------------
+        // Apply saved settings to controls
+        private void ApplySavedSettings()
+        {
+            // Load saved settings for combo boxes, splitter, and selected image
+            string splitterPosVal = Configuration.GetSetting("SplitterPosition", "250");
+            string comboBox1Val = Configuration.GetSetting("ComboBox1Index", "0");
+            string comboBox2Val = Configuration.GetSetting("ComboBox2Index", "0");
+            string selectedImageVal = Configuration.GetSetting("SelectedImage", "");
+
+            // Apply splitter position
+            if (int.TryParse(splitterPosVal, out int splitterPosition) && splitterPosition > 0)
+            {
+                splitContainer1.SplitterDistance = splitterPosition;
+            }
+
+            // Apply combo box selections
+            if (int.TryParse(comboBox1Val, out int comboBox1Index) && comboBox1Index >= 0 && comboBox1Index < comboBox1.Items.Count)
+            {
+                comboBox1.SelectedIndex = comboBox1Index;
+            }
+            else
+            {
+                comboBox1.SelectedIndex = 0;
+            }
+
+            if (int.TryParse(comboBox2Val, out int comboBox2Index) && comboBox2Index >= 0 && comboBox2Index < comboBox2.Items.Count)
+            {
+                comboBox2.SelectedIndex = comboBox2Index;
+            }
+            else
+            {
+                comboBox2.SelectedIndex = 0;
+            }
+
+            // Apply selected image if exists
+            if (!string.IsNullOrEmpty(selectedImageVal))
+            {
+                imageSelectedName = selectedImageVal;
+                LoadSelectedImage();
+            }
+        }
+
+        // ---------------------------------------------------------------------
+        // Load the selected image based on saved setting
+        private void LoadSelectedImage()
+        {
+            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            if (bd != null)
+            {
+                var file = bd.Files.FirstOrDefault(f => f.Name == imageSelectedName);
+                if (file != null)
+                {
+                    imageSelectedFile = file.FileName;
+                    InitializeTabMain();  // Load the selected image
+                }
+            }
+        }
+
+        // ---------------------------------------------------------------------
+        // Attach event handlers for saving settings
+        private void AttachConfigurationSaveEvents()
+        {
+            // Save combo box selections
+            comboBox1.SelectedIndexChanged += (s, e) =>
+            {
+                Configuration.SaveSetting("ComboBox1Index", comboBox1.SelectedIndex.ToString());
+            };
+
+            comboBox2.SelectedIndexChanged += (s, e) =>
+            {
+                Configuration.SaveSetting("ComboBox2Index", comboBox2.SelectedIndex.ToString());
+            };
+
+            // Save splitter position
+            splitContainer1.SplitterMoved += (s, e) =>
+            {
+                Configuration.SaveSetting("SplitterPosition", splitContainer1.SplitterDistance.ToString());
+            };
+
+            // Save selected image when changed
+            panelListAutoscroll.ControlAdded += (s, e) =>
+            {
+                if (e.Control is Panel panel && panel.Name == imageSelectedName)
+                {
+                    Configuration.SaveSetting("SelectedImage", imageSelectedName);
+                }
+            };
+        }
+
+
+        // ---------------------------------------------------------------------------
+        // Fullscreen - Enter
+        // ---------------------------------------------------------------------------
+
+        private void FullscreenModeEnter()
+        {
+            // Save current and set new window state
+            formPreviousWindowState = this.WindowState;
+            formPreviousFormBorderStyle = this.FormBorderStyle;
+            previousBoundsForm = this.Bounds;
+            previousBoundsPanelBehindTab = panelBehindTab.Bounds;
+            this.FormBorderStyle = FormBorderStyle.None;
+            this.WindowState = FormWindowState.Normal;
+            this.Bounds = Screen.PrimaryScreen.Bounds;
+
+            // Set bounds for fullscreen panel
+            panelBehindTab.Location = new Point(panelBehindTab.Location.X, 0);
+            panelBehindTab.Width = ClientSize.Width;
+            panelBehindTab.Height = ClientSize.Height;
+
+            // Determine which tab should be maximized
+            panelBehindTab.Controls.Remove(panelZoom);
+            panelBehindTab.Controls.Add(panelZoom);
+
+            // Hide tabs, and show fullscreen panel
+            tabControl1.Visible = false;
+            buttonFullscreen.Text = "Exit fullscreen";
+            isFullscreen = true;
+        }
+
+        // ---------------------------------------------------------------------------
+        // Fullscreen - exit
+        // ---------------------------------------------------------------------------
+
+        private void FullscreenModeExit()
+        {
+            // Restore previous window state
+            this.FormBorderStyle = formPreviousFormBorderStyle;
+            this.WindowState = formPreviousWindowState;
+            this.Bounds = previousBoundsForm;
+            panelBehindTab.Bounds = previousBoundsPanelBehindTab;
+
+            // Determine which tab should be repopulated with the previous maximized panel
+            panelBehindTab.Controls.Remove(panelZoom);
+            splitContainer1.Panel1.Controls.Add(panelZoom);
+
+            // Show again the tabs, and hide the fullscreen panel
+            tabControl1.Visible = true;
+            //            AdjustPanelSchematicPanelsWidth();
+            buttonFullscreen.Text = "Fullscreen";
+            isFullscreen = false;
+        }
+
+        // ---------------------------------------------------------------------------
+        // Event - form initialized, but not yet shown
+        // ---------------------------------------------------------------------------
+
+        private void Form_Loaded(object sender, EventArgs e)
+        {
+//            panelBehindTab.Location = new Point(panelBehindTab.Location.X, 0);
+//            InitializeList();
+
         }
 
         private void AttachClosePopupOnClick(Control parent)
@@ -239,6 +451,12 @@ namespace Commodore_Repair_Toolbox
             ResizeTabImage();
             HighlightOverlays("tab");
             HighlightOverlays("list");
+        }
+
+        private void Form_Resize(object sender, EventArgs e)
+        {
+            Debug.WriteLine("Form_Resized");
+            InitializeList();
         }
 
         private void Main_Shown(object sender, EventArgs e)
@@ -381,10 +599,10 @@ namespace Commodore_Repair_Toolbox
                 Name = "labelFile",
                 Text = imageSelectedName,
                 AutoSize = true,
-                BackColor = Color.White,
+                BackColor = Color.Khaki,
                 ForeColor = Color.Black,
                 BorderStyle = BorderStyle.FixedSingle,
-                Font = new Font("Arial", 9),
+                Font = new Font("Calibri", 11),
                 Location = new Point(5, 5),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left
             };
@@ -397,11 +615,11 @@ namespace Commodore_Repair_Toolbox
             {
                 Name = "labelComponent",
                 AutoSize = true,
-                BackColor = Color.Red,
-                ForeColor = Color.White,
+                BackColor = Color.Khaki,
+                ForeColor = Color.Black,
                 BorderStyle = BorderStyle.FixedSingle,
-                Font = new Font("Arial", 9),
-                Location = new Point(5, 25),
+                Font = new Font("Calibri", 11),
+                Location = new Point(5, 30),
                 Visible = false,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left
             };
@@ -421,13 +639,18 @@ namespace Commodore_Repair_Toolbox
         // ---------------------------------------------------------------------
         // Right-side list (thumbnails)
 
+        private void PanelListAutoscroll_Layout(object sender, LayoutEventArgs e)
+        {
+            AdjustImageSizes();
+        }
+
         private void InitializeList()
         {
             panelListAutoscroll.Controls.Clear();
             overlayPanelsList.Clear();
             overlayListZoomFactors.Clear();
 
-            int yPosition = 0;
+            int yPosition = 5;
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (bd == null) return;
@@ -444,12 +667,15 @@ namespace Commodore_Repair_Toolbox
                     BackgroundImage = image2,
                     BackgroundImageLayout = ImageLayout.Zoom,
                     Location = new Point(0, yPosition),
-                    Dock = DockStyle.None
+                    Dock = DockStyle.None,
+                    Padding = new Padding(0),
+                    Margin = new Padding(0)
                 };
                 panelList2.DoubleBuffered(true);
 
-                float xZoomFactor = (float)panelListAutoscroll.Width / image2.Width;
-                float yZoomFactor = (float)panelListAutoscroll.Height / image2.Height;
+                // Initial size calculation
+                float xZoomFactor = (float)panelListAutoscroll.ClientSize.Width / image2.Width;
+                float yZoomFactor = (float)panelListAutoscroll.ClientSize.Height / image2.Height;
                 float zoomFactor = Math.Min(xZoomFactor, yZoomFactor);
 
                 panelList2.Size = new Size(
@@ -485,24 +711,70 @@ namespace Commodore_Repair_Toolbox
                     Location = new Point(0, 0),
                     BorderStyle = BorderStyle.FixedSingle,
                     AutoSize = true,
-                    BackColor = Color.White,
-                    Padding = new Padding(2)
+                    BackColor = Color.Khaki,
+                    ForeColor = Color.Black,
+                    Padding = new Padding(2),
+                    Margin = new Padding(0)
                 };
                 labelListFile.DoubleBuffered(true);
                 labelListFile.Parent = panelList2;
                 labelListFile.BringToFront();
 
                 panelListAutoscroll.Controls.Add(panelList2);
-                yPosition += panelList2.Height + 10;
+                yPosition += panelList2.Height + 3;
             }
+
+            // Adjust the height of the panelListAutoscroll to fit the thumbnails
+            panelListAutoscroll.AutoScrollMinSize = new Size(0, yPosition + 5);
 
             DrawBorderInList();
             HighlightOverlays("list");
         }
 
+        private void AdjustImageSizes()
+        {
+            int scrollbarWidth = panelListAutoscroll.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth - 14: 0;
+            int availableWidth = panelListAutoscroll.ClientSize.Width - scrollbarWidth;
+
+            int yPosition = 5;
+
+            foreach (Panel panelList2 in panelListAutoscroll.Controls.OfType<Panel>())
+            {
+                if (panelList2.BackgroundImage != null)
+                {
+                    float aspectRatio = (float)panelList2.BackgroundImage.Height / panelList2.BackgroundImage.Width;
+                    int newHeight = (int)(availableWidth * aspectRatio);
+
+                    panelList2.Bounds = new Rectangle(0, yPosition, availableWidth, newHeight);
+
+                    yPosition += newHeight + 5; // 5px spacing between panels
+                }
+            }
+
+            // Adjust the height of the panelListAutoscroll to fit the thumbnails
+            panelListAutoscroll.AutoScrollMinSize = new Size(0, yPosition + 5);
+        }
+
+
+
+
+
+        private void panelListAutoscroll_Resize(object sender, EventArgs e)
+        {
+            //AdjustImageSizes();
+        }
+
+
+
+
+
+
+
+
         private void OnListImageLeftClicked(Panel pan)
         {
             imageSelectedName = pan.Name;
+            Configuration.SaveSetting("SelectedImage", imageSelectedName);  // Save selected image
             Debug.WriteLine("User clicked thumbnail: " + imageSelectedName);
 
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
@@ -513,13 +785,15 @@ namespace Commodore_Repair_Toolbox
                 if (file != null)
                 {
                     imageSelectedFile = file.FileName;
-                    Debug.WriteLine($"    File Name = {file.Name}, FileName = {file.FileName}");
+                    InitializeTabMain();  // Load the selected image
                 }
             }
 
-            DrawBorderInList();
-            InitializeTabMain();
+            DrawBorderInList();  // Ensure border is updated
         }
+
+
+
 
         private void DrawBorderInList()
         {
@@ -558,7 +832,7 @@ namespace Commodore_Repair_Toolbox
 
         private void Panel_Paint_Special(object sender, PaintEventArgs e)
         {
-            float penWidth = 1;
+            float penWidth = 2;
             using (Pen pen = new Pen(Color.Red, penWidth))
             {
                 pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Custom;
@@ -659,48 +933,70 @@ namespace Commodore_Repair_Toolbox
 
         private void PanelMain_MouseWheel(object sender, MouseEventArgs e)
         {
+            ControlUpdateHelper.BeginControlUpdate(panelMain);
+
             Debug.WriteLine("MouseWheel event");
-            float oldZoomFactor = zoomFactor;
 
-            bool hasZoomChanged = false;
-            if (e.Delta > 0) // scroll up => zoom in
+            try
             {
-                if (zoomFactor <= 4.0f)
+                float oldZoomFactor = zoomFactor;
+                bool hasZoomChanged = false;
+
+                if (e.Delta > 0) // scrolling up => zoom in
                 {
-                    zoomFactor *= 1.5f;
-                    hasZoomChanged = true;
+                    if (zoomFactor <= 4.0f)
+                    {
+                        zoomFactor *= 1.5f;
+                        hasZoomChanged = true;
+                    }
+                }
+                else // scrolling down => zoom out
+                {
+                    // Only zoom out if the image is bigger than the container
+                    if (panelImage.Width > panelMain.Width || panelImage.Height > panelMain.Height)
+                    {
+                        zoomFactor /= 1.5f;
+                        hasZoomChanged = true;
+                    }
+                }
+
+                if (hasZoomChanged)
+                {
+                    isResizedByMouseWheel = true;
+
+                    // 2) Calculate new size
+                    Size newSize = new Size(
+                        (int)(image.Width * zoomFactor),
+                        (int)(image.Height * zoomFactor)
+                    );
+
+                    // 3) Figure out how to keep the same "point under mouse"
+                    Point mousePosition = new Point(
+                        e.X - panelMain.AutoScrollPosition.X,
+                        e.Y - panelMain.AutoScrollPosition.Y
+                    );
+
+                    Point newScrollPosition = new Point(
+                        (int)(mousePosition.X * (zoomFactor / oldZoomFactor)),
+                        (int)(mousePosition.Y * (zoomFactor / oldZoomFactor))
+                    );
+
+                    // 4) Apply the new size
+                    panelImage.Size = newSize;
+
+                    // 5) Update the scroll position
+                    panelMain.AutoScrollPosition = new Point(
+                        newScrollPosition.X - e.X,
+                        newScrollPosition.Y - e.Y
+                    );
+
+                    // 6) Re‐highlight overlays (so they scale properly)
+                    HighlightOverlays("tab");
                 }
             }
-            else // scroll down => zoom out
+            finally
             {
-                if (panelImage.Width > panelMain.Width || panelImage.Height > panelMain.Height)
-                {
-                    zoomFactor /= 1.5f;
-                    hasZoomChanged = true;
-                }
-            }
-
-            if (hasZoomChanged)
-            {
-                isResizedByMouseWheel = true;
-
-                Size newSize = new Size(
-                    (int)(image.Width * zoomFactor),
-                    (int)(image.Height * zoomFactor)
-                );
-                panelImage.Size = newSize;
-
-                // Keep mouse under same part of image
-                Point mousePosition = new Point(e.X - panelMain.AutoScrollPosition.X,
-                                                e.Y - panelMain.AutoScrollPosition.Y);
-                Point newScrollPosition = new Point(
-                    (int)(mousePosition.X * (zoomFactor / oldZoomFactor)),
-                    (int)(mousePosition.Y * (zoomFactor / oldZoomFactor))
-                );
-                panelMain.AutoScrollPosition = new Point(newScrollPosition.X - e.X,
-                                                         newScrollPosition.Y - e.Y);
-
-                HighlightOverlays("tab");
+                ControlUpdateHelper.EndControlUpdate(panelMain);
             }
         }
 
@@ -1017,11 +1313,83 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        // ---------------------------------------------------------------------
-        // Unused old logic: PanelList2_MouseClick, etc. can remain or be removed
-        // ...
+        private void splitContainer1_SplitterMoved(object sender, SplitterEventArgs e)
+        {
+            InitializeList();
+        }
 
+        // ---------------------------------------------------------------------------
+        // Custom paint event for SplitContainer
+        // ---------------------------------------------------------------------------
+
+/*
+        private void SplitContainer1_Paint(object sender, PaintEventArgs e)
+        {
+            SplitContainer splitContainer = sender as SplitContainer;
+            if (splitContainer != null)
+            {
+                // Draw a custom line in the middle of the splitter
+                int splitterWidth = splitContainer.SplitterWidth;
+                int halfWidth = splitterWidth / 2;
+                int x = splitContainer.SplitterDistance + halfWidth;
+                int y1 = splitContainer.Panel1.ClientRectangle.Top;
+                int y2 = splitContainer.Panel1.ClientRectangle.Bottom;
+
+                using (Pen pen = new Pen(Color.DarkGray, 2))
+                {
+                    e.Graphics.DrawLine(pen, x, y1, x, y2);
+                }
+            }
+        }
+*/
+
+        private void buttonFullscreen_Click(object sender, EventArgs e)
+        {
+            if (!isFullscreen)
+            {
+                FullscreenModeEnter();
+            }
+            else
+            {
+                FullscreenModeExit();
+                InitializeList();
+            }
+        }
+
+        // ---------------------------------------------------------------------------
+        // Keyboard handling
+        // ---------------------------------------------------------------------------
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            // Fullscreen mode toggle
+            if (keyData == Keys.F11)
+            {
+                buttonFullscreen_Click(null, null);
+                return true;
+            }
+            else if (keyData == Keys.Escape && isFullscreen)
+            {
+                buttonFullscreen_Click(null, null);
+                return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void tabControl1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (tabControl1.SelectedTab.Text == "Links" || tabControl1.SelectedTab.Text == "About")
+            {
+                buttonFullscreen.Enabled = false;
+            }
+            else
+            {
+                buttonFullscreen.Enabled = true;
+            }
+        }
     }
+
+
 
     // -------------------------------------------------------------------------
     // Support classes: renamed "File" -> "BoardFile" to avoid System.IO.File conflict

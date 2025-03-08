@@ -192,19 +192,17 @@ namespace Commodore_Retro_Toolbox
                 else
                 {
                     // Single right-click => detect overlays
-                    bool clickedOverlay = false;
+//                    bool clickedOverlay = false;
                     for (int i = Overlays.Count - 1; i >= 0; i--)
                     {
                         if (Overlays[i].Bounds.Contains(e.Location))
                         {
-                            clickedOverlay = true;
+//                            clickedOverlay = true;
                             // Pass a "right-click" overlay event
                             OverlayClicked?.Invoke(this, new OverlayClickedEventArgs(Overlays[i], e));
                             break;
                         }
                     }
-                    // If not clickedOverlay => empty space right-click
-                    // (Your Main.cs can handle that if you want.)
                 }
             }
         }

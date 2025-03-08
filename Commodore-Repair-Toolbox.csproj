@@ -76,7 +76,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Configuration.cs" />
     <Compile Include="ControlExtensions.cs" />
+    <Compile Include="ControlUpdateHelper.cs" />
     <Compile Include="DataStructure.cs" />
     <Compile Include="FormComponent.cs">
       <SubType>Form</SubType>
