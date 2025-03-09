@@ -28,16 +28,20 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Main));
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabSchematics = new System.Windows.Forms.TabPage();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.panelZoom = new System.Windows.Forms.Panel();
             this.panelListMain = new System.Windows.Forms.Panel();
             this.panelListAutoscroll = new System.Windows.Forms.Panel();
-            this.tabLinks = new System.Windows.Forms.TabPage();
+            this.tabRessources = new System.Windows.Forms.TabPage();
             this.webBrowser1 = new System.Windows.Forms.WebBrowser();
+            this.tabHelp = new System.Windows.Forms.TabPage();
+            this.richTextBox3 = new System.Windows.Forms.RichTextBox();
             this.tabAbout = new System.Windows.Forms.TabPage();
-            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.label3 = new System.Windows.Forms.Label();
+            this.richTextBox1 = new System.Windows.Forms.RichTextBox();
             this.label10 = new System.Windows.Forms.Label();
             this.label9 = new System.Windows.Forms.Label();
             this.comboBox1 = new System.Windows.Forms.ComboBox();
@@ -54,6 +58,7 @@
             this.button2 = new System.Windows.Forms.Button();
             this.buttonFullscreen = new System.Windows.Forms.Button();
             this.panelBehindTab = new System.Windows.Forms.Panel();
+            this.checkBox1 = new System.Windows.Forms.CheckBox();
             this.tabControl1.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
@@ -61,7 +66,8 @@
             this.splitContainer1.Panel2.SuspendLayout();
             this.splitContainer1.SuspendLayout();
             this.panelListMain.SuspendLayout();
-            this.tabLinks.SuspendLayout();
+            this.tabRessources.SuspendLayout();
+            this.tabHelp.SuspendLayout();
             this.tabAbout.SuspendLayout();
             this.panelBehindTab.SuspendLayout();
             this.SuspendLayout();
@@ -69,23 +75,26 @@
             // tabControl1
             // 
             this.tabControl1.Controls.Add(this.tabSchematics);
-            this.tabControl1.Controls.Add(this.tabLinks);
+            this.tabControl1.Controls.Add(this.tabRessources);
+            this.tabControl1.Controls.Add(this.tabHelp);
             this.tabControl1.Controls.Add(this.tabAbout);
-            this.tabControl1.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.tabControl1.Location = new System.Drawing.Point(27, 22);
+            this.tabControl1.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.tabControl1.Location = new System.Drawing.Point(30, 26);
+            this.tabControl1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(821, 695);
+            this.tabControl1.Size = new System.Drawing.Size(721, 570);
             this.tabControl1.TabIndex = 0;
             this.tabControl1.SelectedIndexChanged += new System.EventHandler(this.tabControl1_SelectedIndexChanged);
             // 
             // tabSchematics
             // 
             this.tabSchematics.Controls.Add(this.splitContainer1);
-            this.tabSchematics.Location = new System.Drawing.Point(4, 27);
+            this.tabSchematics.Location = new System.Drawing.Point(4, 30);
+            this.tabSchematics.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabSchematics.Name = "tabSchematics";
-            this.tabSchematics.Padding = new System.Windows.Forms.Padding(3);
-            this.tabSchematics.Size = new System.Drawing.Size(813, 664);
+            this.tabSchematics.Padding = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.tabSchematics.Size = new System.Drawing.Size(713, 536);
             this.tabSchematics.TabIndex = 0;
             this.tabSchematics.Text = "Schematics";
             this.tabSchematics.UseVisualStyleBackColor = true;
@@ -93,7 +102,8 @@
             // splitContainer1
             // 
             this.splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.splitContainer1.Location = new System.Drawing.Point(3, 3);
+            this.splitContainer1.Location = new System.Drawing.Point(3, 4);
+            this.splitContainer1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.splitContainer1.Name = "splitContainer1";
             // 
             // splitContainer1.Panel1
@@ -105,9 +115,9 @@
             // 
             this.splitContainer1.Panel2.Controls.Add(this.panelListMain);
             this.splitContainer1.Panel2MinSize = 100;
-            this.splitContainer1.Size = new System.Drawing.Size(807, 658);
-            this.splitContainer1.SplitterDistance = 631;
-            this.splitContainer1.SplitterWidth = 10;
+            this.splitContainer1.Size = new System.Drawing.Size(707, 528);
+            this.splitContainer1.SplitterDistance = 552;
+            this.splitContainer1.SplitterWidth = 11;
             this.splitContainer1.TabIndex = 7;
             this.splitContainer1.SplitterMoved += new System.Windows.Forms.SplitterEventHandler(this.splitContainer1_SplitterMoved);
             // 
@@ -115,8 +125,9 @@
             // 
             this.panelZoom.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelZoom.Location = new System.Drawing.Point(0, 0);
+            this.panelZoom.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.panelZoom.Name = "panelZoom";
-            this.panelZoom.Size = new System.Drawing.Size(631, 658);
+            this.panelZoom.Size = new System.Drawing.Size(552, 528);
             this.panelZoom.TabIndex = 5;
             // 
             // panelListMain
@@ -124,8 +135,9 @@
             this.panelListMain.Controls.Add(this.panelListAutoscroll);
             this.panelListMain.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelListMain.Location = new System.Drawing.Point(0, 0);
+            this.panelListMain.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.panelListMain.Name = "panelListMain";
-            this.panelListMain.Size = new System.Drawing.Size(166, 658);
+            this.panelListMain.Size = new System.Drawing.Size(144, 528);
             this.panelListMain.TabIndex = 6;
             // 
             // panelListAutoscroll
@@ -134,114 +146,155 @@
             this.panelListAutoscroll.BackColor = System.Drawing.Color.Transparent;
             this.panelListAutoscroll.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelListAutoscroll.Location = new System.Drawing.Point(0, 0);
+            this.panelListAutoscroll.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.panelListAutoscroll.Name = "panelListAutoscroll";
-            this.panelListAutoscroll.Size = new System.Drawing.Size(166, 658);
+            this.panelListAutoscroll.Size = new System.Drawing.Size(144, 528);
             this.panelListAutoscroll.TabIndex = 0;
             // 
-            // tabLinks
+            // tabRessources
             // 
-            this.tabLinks.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.tabLinks.Controls.Add(this.webBrowser1);
-            this.tabLinks.Location = new System.Drawing.Point(4, 27);
-            this.tabLinks.Name = "tabLinks";
-            this.tabLinks.Size = new System.Drawing.Size(813, 664);
-            this.tabLinks.TabIndex = 3;
-            this.tabLinks.Text = "Links";
+            this.tabRessources.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.tabRessources.Controls.Add(this.webBrowser1);
+            this.tabRessources.Location = new System.Drawing.Point(4, 30);
+            this.tabRessources.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.tabRessources.Name = "tabRessources";
+            this.tabRessources.Size = new System.Drawing.Size(713, 536);
+            this.tabRessources.TabIndex = 3;
+            this.tabRessources.Text = "Ressources";
             // 
             // webBrowser1
             // 
             this.webBrowser1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.webBrowser1.Location = new System.Drawing.Point(0, 0);
-            this.webBrowser1.MinimumSize = new System.Drawing.Size(20, 22);
+            this.webBrowser1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.webBrowser1.MinimumSize = new System.Drawing.Size(22, 26);
             this.webBrowser1.Name = "webBrowser1";
-            this.webBrowser1.Size = new System.Drawing.Size(813, 664);
+            this.webBrowser1.Size = new System.Drawing.Size(713, 536);
             this.webBrowser1.TabIndex = 0;
             this.webBrowser1.Navigating += new System.Windows.Forms.WebBrowserNavigatingEventHandler(this.webBrowser1_Navigating_1);
             // 
+            // tabHelp
+            // 
+            this.tabHelp.BackColor = System.Drawing.Color.White;
+            this.tabHelp.Controls.Add(this.richTextBox3);
+            this.tabHelp.Location = new System.Drawing.Point(4, 30);
+            this.tabHelp.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.tabHelp.Name = "tabHelp";
+            this.tabHelp.Size = new System.Drawing.Size(713, 536);
+            this.tabHelp.TabIndex = 6;
+            this.tabHelp.Text = "Help";
+            // 
+            // richTextBox3
+            // 
+            this.richTextBox3.BackColor = System.Drawing.Color.White;
+            this.richTextBox3.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.richTextBox3.Location = new System.Drawing.Point(13, 19);
+            this.richTextBox3.Name = "richTextBox3";
+            this.richTextBox3.Size = new System.Drawing.Size(726, 536);
+            this.richTextBox3.TabIndex = 0;
+            this.richTextBox3.Text = "Text set in code ...";
+            this.richTextBox3.LinkClicked += new System.Windows.Forms.LinkClickedEventHandler(this.richTextBox_LinkClicked);
+            // 
             // tabAbout
             // 
-            this.tabAbout.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.tabAbout.Controls.Add(this.textBox1);
+            this.tabAbout.BackColor = System.Drawing.Color.White;
+            this.tabAbout.Controls.Add(this.label3);
+            this.tabAbout.Controls.Add(this.richTextBox1);
             this.tabAbout.Controls.Add(this.label10);
             this.tabAbout.Controls.Add(this.label9);
             this.tabAbout.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
-            this.tabAbout.Location = new System.Drawing.Point(4, 27);
+            this.tabAbout.Location = new System.Drawing.Point(4, 30);
+            this.tabAbout.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabAbout.Name = "tabAbout";
-            this.tabAbout.Size = new System.Drawing.Size(863, 711);
+            this.tabAbout.Size = new System.Drawing.Size(713, 536);
             this.tabAbout.TabIndex = 5;
             this.tabAbout.Text = "About";
             // 
-            // textBox1
+            // label3
             // 
-            this.textBox1.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.textBox1.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.textBox1.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.textBox1.Location = new System.Drawing.Point(36, 137);
-            this.textBox1.Multiline = true;
-            this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(726, 320);
-            this.textBox1.TabIndex = 3;
-            this.textBox1.Text = "All programming done by Dennis Helligsø.\r\n";
+            this.label3.AutoSize = true;
+            this.label3.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label3.Location = new System.Drawing.Point(17, 104);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(138, 21);
+            this.label3.TabIndex = 5;
+            this.label3.Text = "About application:";
+            // 
+            // richTextBox1
+            // 
+            this.richTextBox1.BackColor = System.Drawing.Color.White;
+            this.richTextBox1.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.richTextBox1.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.richTextBox1.Location = new System.Drawing.Point(20, 141);
+            this.richTextBox1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.richTextBox1.Name = "richTextBox1";
+            this.richTextBox1.Size = new System.Drawing.Size(672, 203);
+            this.richTextBox1.TabIndex = 4;
+            this.richTextBox1.Text = "All programming done by Dennis Helligsø.\n\nVisit home page at https://github.com/H" +
+    "ovKlan-DH/Commodore-Repair-Toolbox";
+            this.richTextBox1.LinkClicked += new System.Windows.Forms.LinkClickedEventHandler(this.richTextBox_LinkClicked);
             // 
             // label10
             // 
             this.label10.AutoSize = true;
-            this.label10.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label10.Location = new System.Drawing.Point(24, 68);
+            this.label10.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label10.Location = new System.Drawing.Point(17, 51);
             this.label10.Name = "label10";
-            this.label10.Size = new System.Drawing.Size(174, 18);
+            this.label10.Size = new System.Drawing.Size(166, 21);
             this.label10.TabIndex = 1;
-            this.label10.Text = "Version 2023-October-29";
+            this.label10.Text = "Version 2025-March-8";
             // 
             // label9
             // 
             this.label9.AutoSize = true;
-            this.label9.Font = new System.Drawing.Font("Microsoft Sans Serif", 16.2F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label9.Location = new System.Drawing.Point(21, 27);
+            this.label9.Font = new System.Drawing.Font("Calibri", 16.2F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label9.Location = new System.Drawing.Point(14, 18);
             this.label9.Name = "label9";
-            this.label9.Size = new System.Drawing.Size(393, 32);
+            this.label9.Size = new System.Drawing.Size(339, 35);
             this.label9.TabIndex = 0;
             this.label9.Text = "Commodore Repair Toolbox";
             // 
             // comboBox1
             // 
             this.comboBox1.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.comboBox1.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.comboBox1.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.comboBox1.FormattingEnabled = true;
-            this.comboBox1.Location = new System.Drawing.Point(12, 42);
+            this.comboBox1.Location = new System.Drawing.Point(12, 48);
+            this.comboBox1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.comboBox1.Name = "comboBox1";
-            this.comboBox1.Size = new System.Drawing.Size(243, 26);
+            this.comboBox1.Size = new System.Drawing.Size(273, 29);
             this.comboBox1.TabIndex = 1;
             this.comboBox1.SelectedIndexChanged += new System.EventHandler(this.comboBox1_SelectedIndexChanged);
             // 
             // label1
             // 
             this.label1.AutoSize = true;
-            this.label1.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label1.Location = new System.Drawing.Point(9, 20);
+            this.label1.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.Location = new System.Drawing.Point(9, 23);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(68, 18);
+            this.label1.Size = new System.Drawing.Size(78, 21);
             this.label1.TabIndex = 2;
             this.label1.Text = "Hardware";
             // 
             // label6
             // 
             this.label6.AutoSize = true;
-            this.label6.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label6.Location = new System.Drawing.Point(9, 87);
+            this.label6.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label6.Location = new System.Drawing.Point(9, 98);
             this.label6.Name = "label6";
-            this.label6.Size = new System.Drawing.Size(44, 18);
+            this.label6.Size = new System.Drawing.Size(51, 21);
             this.label6.TabIndex = 4;
             this.label6.Text = "Board";
             // 
             // comboBox2
             // 
             this.comboBox2.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.comboBox2.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.comboBox2.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.comboBox2.FormattingEnabled = true;
-            this.comboBox2.Location = new System.Drawing.Point(12, 108);
+            this.comboBox2.Location = new System.Drawing.Point(12, 122);
+            this.comboBox2.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.comboBox2.Name = "comboBox2";
-            this.comboBox2.Size = new System.Drawing.Size(243, 26);
+            this.comboBox2.Size = new System.Drawing.Size(273, 29);
             this.comboBox2.TabIndex = 3;
             this.comboBox2.SelectedIndexChanged += new System.EventHandler(this.comboBox2_SelectedIndexChanged);
             // 
@@ -249,33 +302,35 @@
             // 
             this.listBox1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left)));
-            this.listBox1.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.listBox1.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.listBox1.FormattingEnabled = true;
-            this.listBox1.ItemHeight = 18;
-            this.listBox1.Location = new System.Drawing.Point(12, 326);
+            this.listBox1.ItemHeight = 21;
+            this.listBox1.Location = new System.Drawing.Point(12, 343);
+            this.listBox1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.listBox1.Name = "listBox1";
             this.listBox1.SelectionMode = System.Windows.Forms.SelectionMode.MultiSimple;
-            this.listBox1.Size = new System.Drawing.Size(243, 400);
+            this.listBox1.Size = new System.Drawing.Size(273, 235);
             this.listBox1.TabIndex = 7;
             this.listBox1.SelectedIndexChanged += new System.EventHandler(this.listBox1_SelectedIndexChanged);
             // 
             // label2
             // 
             this.label2.AutoSize = true;
-            this.label2.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label2.Location = new System.Drawing.Point(12, 305);
+            this.label2.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label2.Location = new System.Drawing.Point(9, 318);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(103, 18);
+            this.label2.Size = new System.Drawing.Size(117, 21);
             this.label2.TabIndex = 8;
             this.label2.Text = "Component list";
             // 
             // button1
             // 
             this.button1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.button1.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.button1.Location = new System.Drawing.Point(12, 752);
+            this.button1.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.button1.Location = new System.Drawing.Point(14, 589);
+            this.button1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.button1.Name = "button1";
-            this.button1.Size = new System.Drawing.Size(76, 26);
+            this.button1.Size = new System.Drawing.Size(62, 30);
             this.button1.TabIndex = 9;
             this.button1.Text = "Clear";
             this.button1.UseVisualStyleBackColor = true;
@@ -305,13 +360,14 @@
             // 
             // listBox2
             // 
-            this.listBox2.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.listBox2.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.listBox2.FormattingEnabled = true;
-            this.listBox2.ItemHeight = 18;
-            this.listBox2.Location = new System.Drawing.Point(12, 179);
+            this.listBox2.ItemHeight = 21;
+            this.listBox2.Location = new System.Drawing.Point(12, 191);
+            this.listBox2.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.listBox2.Name = "listBox2";
             this.listBox2.SelectionMode = System.Windows.Forms.SelectionMode.MultiSimple;
-            this.listBox2.Size = new System.Drawing.Size(243, 94);
+            this.listBox2.Size = new System.Drawing.Size(273, 109);
             this.listBox2.Sorted = true;
             this.listBox2.TabIndex = 10;
             this.listBox2.SelectedIndexChanged += new System.EventHandler(this.listBox2_SelectedIndexChanged);
@@ -319,20 +375,21 @@
             // label8
             // 
             this.label8.AutoSize = true;
-            this.label8.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label8.Location = new System.Drawing.Point(12, 158);
+            this.label8.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label8.Location = new System.Drawing.Point(9, 167);
             this.label8.Name = "label8";
-            this.label8.Size = new System.Drawing.Size(183, 18);
+            this.label8.Size = new System.Drawing.Size(207, 21);
             this.label8.TabIndex = 11;
             this.label8.Text = "Show component categories";
             // 
             // button2
             // 
             this.button2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.button2.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.button2.Location = new System.Drawing.Point(94, 752);
+            this.button2.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.button2.Location = new System.Drawing.Point(82, 589);
+            this.button2.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.button2.Name = "button2";
-            this.button2.Size = new System.Drawing.Size(60, 26);
+            this.button2.Size = new System.Drawing.Size(69, 30);
             this.button2.TabIndex = 12;
             this.button2.Text = "All";
             this.button2.UseVisualStyleBackColor = true;
@@ -341,10 +398,11 @@
             // buttonFullscreen
             // 
             this.buttonFullscreen.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.buttonFullscreen.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonFullscreen.Location = new System.Drawing.Point(160, 752);
+            this.buttonFullscreen.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.buttonFullscreen.Location = new System.Drawing.Point(158, 589);
+            this.buttonFullscreen.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.buttonFullscreen.Name = "buttonFullscreen";
-            this.buttonFullscreen.Size = new System.Drawing.Size(95, 26);
+            this.buttonFullscreen.Size = new System.Drawing.Size(128, 30);
             this.buttonFullscreen.TabIndex = 13;
             this.buttonFullscreen.Text = "Fullscreen";
             this.buttonFullscreen.UseVisualStyleBackColor = true;
@@ -355,17 +413,33 @@
             this.panelBehindTab.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.panelBehindTab.BackColor = System.Drawing.Color.White;
             this.panelBehindTab.Controls.Add(this.tabControl1);
-            this.panelBehindTab.Location = new System.Drawing.Point(283, 20);
+            this.panelBehindTab.Location = new System.Drawing.Point(292, 23);
+            this.panelBehindTab.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.panelBehindTab.Name = "panelBehindTab";
-            this.panelBehindTab.Size = new System.Drawing.Size(887, 758);
+            this.panelBehindTab.Size = new System.Drawing.Size(776, 614);
             this.panelBehindTab.TabIndex = 14;
+            // 
+            // checkBox1
+            // 
+            this.checkBox1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.checkBox1.AutoSize = true;
+            this.checkBox1.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.checkBox1.Location = new System.Drawing.Point(17, 627);
+            this.checkBox1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.checkBox1.Name = "checkBox1";
+            this.checkBox1.Size = new System.Drawing.Size(218, 25);
+            this.checkBox1.TabIndex = 15;
+            this.checkBox1.Text = "Blink selected components";
+            this.checkBox1.UseVisualStyleBackColor = true;
             // 
             // Main
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 18F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 21F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1182, 791);
+            this.ClientSize = new System.Drawing.Size(1082, 653);
+            this.Controls.Add(this.checkBox1);
             this.Controls.Add(this.panelBehindTab);
             this.Controls.Add(this.buttonFullscreen);
             this.Controls.Add(this.button2);
@@ -378,8 +452,10 @@
             this.Controls.Add(this.comboBox2);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.comboBox1);
-            this.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.MinimumSize = new System.Drawing.Size(1200, 838);
+            this.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
+            this.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.MinimumSize = new System.Drawing.Size(1100, 600);
             this.Name = "Main";
             this.Text = "Commodore Repair Toolbox";
             this.tabControl1.ResumeLayout(false);
@@ -389,7 +465,8 @@
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
             this.splitContainer1.ResumeLayout(false);
             this.panelListMain.ResumeLayout(false);
-            this.tabLinks.ResumeLayout(false);
+            this.tabRessources.ResumeLayout(false);
+            this.tabHelp.ResumeLayout(false);
             this.tabAbout.ResumeLayout(false);
             this.tabAbout.PerformLayout();
             this.panelBehindTab.ResumeLayout(false);
@@ -402,7 +479,7 @@
 
         private System.Windows.Forms.TabControl tabControl1;
         private System.Windows.Forms.TabPage tabSchematics;
-        private System.Windows.Forms.TabPage tabLinks;
+        private System.Windows.Forms.TabPage tabRessources;
         private System.Windows.Forms.TabPage tabAbout;
         private System.Windows.Forms.ComboBox comboBox1;
         private System.Windows.Forms.Label label1;
@@ -420,11 +497,15 @@
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.Label label10;
         private System.Windows.Forms.Label label9;
-        private System.Windows.Forms.TextBox textBox1;
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.WebBrowser webBrowser1;
         private System.Windows.Forms.Button buttonFullscreen;
         private System.Windows.Forms.SplitContainer splitContainer1;
         private System.Windows.Forms.Panel panelBehindTab;
+        private System.Windows.Forms.CheckBox checkBox1;
+        private System.Windows.Forms.TabPage tabHelp;
+        private System.Windows.Forms.RichTextBox richTextBox1;
+        private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.RichTextBox richTextBox3;
     }
 }

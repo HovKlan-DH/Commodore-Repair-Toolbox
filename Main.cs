@@ -1,4 +1,4 @@
-﻿using Commodore_Retro_Toolbox;
+﻿using Commodore_Repair_Toolbox;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -20,6 +20,9 @@ namespace Commodore_Repair_Toolbox
 {
     public partial class Main : Form
     {
+
+        private Timer blinkTimer;
+        private bool blinkState = false;
 
         private FormComponent currentPopup = null;
 
@@ -102,7 +105,188 @@ namespace Commodore_Repair_Toolbox
             ApplySavedSettings();
 
             AttachConfigurationSaveEvents();
+
+            // Initialize the blink timer
+            blinkTimer = new Timer();
+            blinkTimer.Interval = 500; // Blink interval in milliseconds
+            blinkTimer.Tick += BlinkTimer_Tick;
+
+            // Attach the checkbox event handler
+            checkBox1.CheckedChanged += CheckBox1_CheckedChanged;
+
+            AdjustComponentCategoriesListBoxHeight();
+
+            richTextBox3.Rtf = @"{\rtf1\ansi
+\i Commodore Repair Toolbox\i0  is not that advanced, so it is quite simple to use.\par
+\par
+Mouse functions:\par
+\pard    \'95  \b Left-click\b0  on a component will show a popup with more information\par
+\pard    \'95  \b Right-click\b0  on a component will highlight it\par
+\pard    \'95  \b Right-click\b0 and \b Hold down\b0  will pan the image\par
+\pard
+\par
+Keyboard functions:\par
+\pard    \'95  \b F11\b0  will toggle fullscreen\par
+\pard    \'95  \b ESCAPE\b0  will exit fullscreen\par
+\pard    \'95  \b SPACE\b0  will toggle blinking for selected components\par
+\pard
+\par
+Configuration saved:\par
+\pard    \'95  Last-viewed schematics\par
+\pard    \'95  Schematics divider/slider position\par
+\pard
+\par
+How-to add or update something yourself:\par
+\pard    \'95  View https://github.com/HovKlan-DH/Commodore-Repair-Toolbox\par
+\pard
+\par
+}";
         }
+
+        private void CheckBox1_CheckedChanged(object sender, EventArgs e)
+        {
+            if (checkBox1.Checked)
+            {
+                BlinkTimer_Tick(null, null); // Perform the first blink immediately
+                blinkTimer.Start();
+            }
+            else
+            {
+                blinkTimer.Stop();
+                EnableSelectedOverlays();
+            }
+        }
+
+        private void EnableSelectedOverlays()
+        {
+            foreach (var overlayPanel in overlayPanelsList.Values)
+            {
+                foreach (var overlay in overlayPanel.Overlays)
+                {
+                    if (listBoxSelectedActualValues.Contains(overlay.ComponentLabel))
+                    {
+                        overlay.Highlighted = true;
+                    }
+                }
+                overlayPanel.Invalidate();
+            }
+
+            if (overlayPanel != null)
+            {
+                foreach (var overlay in overlayPanel.Overlays)
+                {
+                    if (listBoxSelectedActualValues.Contains(overlay.ComponentLabel))
+                    {
+                        overlay.Highlighted = true;
+                    }
+                }
+                overlayPanel.Invalidate();
+            }
+        }
+
+        private void BlinkTimer_Tick(object sender, EventArgs e)
+        {
+            BlinkSelectedOverlays(blinkState);
+            blinkState = !blinkState;
+        }
+
+        private void ResetOverlayVisibility()
+        {
+            foreach (var overlayPanel in overlayPanelsList.Values)
+            {
+                foreach (var overlay in overlayPanel.Overlays)
+                {
+                    overlay.Highlighted = true;
+                }
+                overlayPanel.Invalidate();
+            }
+
+            if (overlayPanel != null)
+            {
+                foreach (var overlay in overlayPanel.Overlays)
+                {
+                    overlay.Highlighted = true;
+                }
+                overlayPanel.Invalidate();
+            }
+        }
+
+        private void BlinkSelectedOverlays(bool state)
+        {
+            foreach (var overlayPanel in overlayPanelsList.Values)
+            {
+                foreach (var overlay in overlayPanel.Overlays)
+                {
+                    if (listBoxSelectedActualValues.Contains(overlay.ComponentLabel))
+                    {
+                        overlay.Highlighted = state;
+                    }
+                }
+                overlayPanel.Invalidate();
+            }
+
+            if (overlayPanel != null)
+            {
+                foreach (var overlay in overlayPanel.Overlays)
+                {
+                    if (listBoxSelectedActualValues.Contains(overlay.ComponentLabel))
+                    {
+                        overlay.Highlighted = state;
+                    }
+                }
+                overlayPanel.Invalidate();
+            }
+        }
+
+        private void AdjustComponentCategoriesListBoxHeight()
+        {
+            int listBoxLocationEnd_org = listBox2.Location.Y + listBox2.Height;
+            int itemHeight = listBox2.ItemHeight;
+            int itemCount = listBox2.Items.Count;
+            int borderHeight = listBox2.Height - listBox2.ClientSize.Height;
+            listBox2.Height = (itemHeight * itemCount) + borderHeight;
+            int listBoxLocationEnd_new = listBox2.Location.Y + listBox2.Height;
+            int diff =  listBoxLocationEnd_org - listBoxLocationEnd_new;
+            if (diff > 0)
+            {
+                label2.Location = new Point(label2.Location.X, label2.Location.Y - diff - 11);
+                listBox1.Location = new Point(listBox1.Location.X, listBox1.Location.Y - diff - 11);
+                listBox1.Height = listBox1.Height + diff + 11;
+            } else
+            {
+                label2.Location = new Point(label2.Location.X, label2.Location.Y + diff);
+            }
+        }
+
+        /*
+        // Call this method after populating listBox2
+        private void InitializeComponentCategoriesListBox()
+        {
+            listBox2.Items.Clear();
+
+            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            if (foundBoard != null)
+            {
+                foreach (ComponentBoard component in foundBoard.Components)
+                {
+                    if (!string.IsNullOrEmpty(component.Type) && !listBox2.Items.Contains(component.Type))
+                    {
+                        listBox2.Items.Add(component.Type);
+                    }
+                }
+            }
+
+            // Auto-select all
+            for (int i = 0; i < listBox2.Items.Count; i++)
+            {
+                listBox2.SetSelected(i, true);
+            }
+
+            // Adjust the height of listBox2 to match the number of elements
+            AdjustComponentCategoriesListBoxHeight();
+        }
+        */
 
         // ---------------------------------------------------------------------
         // Enable double-buffering for smoother UI rendering
@@ -133,6 +317,9 @@ namespace Commodore_Repair_Toolbox
             panelListAutoscroll.Layout += PanelListAutoscroll_Layout;
             this.Load += Form_Loaded;
             tabControl1.Dock = DockStyle.Fill;
+
+            // Subscribe to the Paint event of the SplitContainer
+            splitContainer1.Paint += SplitContainer1_Paint;
         }
 
         // ---------------------------------------------------------------------
@@ -284,7 +471,7 @@ namespace Commodore_Repair_Toolbox
 
             // Set bounds for fullscreen panel
             panelBehindTab.Location = new Point(panelBehindTab.Location.X, 0);
-            panelBehindTab.Width = ClientSize.Width;
+            panelBehindTab.Width = ClientSize.Width - panelBehindTab.Location.X;
             panelBehindTab.Height = ClientSize.Height;
 
             // Determine which tab should be maximized
@@ -618,7 +805,7 @@ namespace Commodore_Repair_Toolbox
                 BackColor = Color.Khaki,
                 ForeColor = Color.Black,
                 BorderStyle = BorderStyle.FixedSingle,
-                Font = new Font("Calibri", 11),
+                Font = new Font("Calibri", 13, FontStyle.Bold),
                 Location = new Point(5, 30),
                 Visible = false,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left
@@ -713,6 +900,7 @@ namespace Commodore_Repair_Toolbox
                     AutoSize = true,
                     BackColor = Color.Khaki,
                     ForeColor = Color.Black,
+                    Font = new Font("Calibri", 9),
                     Padding = new Padding(2),
                     Margin = new Padding(0)
                 };
@@ -763,6 +951,8 @@ namespace Commodore_Repair_Toolbox
         {
             //AdjustImageSizes();
         }
+
+
 
 
 
@@ -1270,7 +1460,19 @@ namespace Commodore_Repair_Toolbox
             if (e.IsHovering)
             {
                 this.Cursor = Cursors.Hand;
-                labelComponent.Text = e.OverlayInfo.ComponentLabel;
+                //labelComponent.Text = e.OverlayInfo.ComponentLabel;
+                var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+                var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+                var comp = bd?.Components.FirstOrDefault(c => c.Label == e.OverlayInfo.ComponentLabel);
+
+                if (comp != null)
+                {
+                    labelComponent.Text = comp.Label + " | " + comp.NameTechnical + " | " + comp.NameFriendly;
+                }
+                else
+                {
+                    labelComponent.Text = e.OverlayInfo.ComponentLabel;
+                }
                 labelComponent.Visible = true;
             }
             else
@@ -1322,7 +1524,6 @@ namespace Commodore_Repair_Toolbox
         // Custom paint event for SplitContainer
         // ---------------------------------------------------------------------------
 
-/*
         private void SplitContainer1_Paint(object sender, PaintEventArgs e)
         {
             SplitContainer splitContainer = sender as SplitContainer;
@@ -1335,13 +1536,32 @@ namespace Commodore_Repair_Toolbox
                 int y1 = splitContainer.Panel1.ClientRectangle.Top;
                 int y2 = splitContainer.Panel1.ClientRectangle.Bottom;
 
-                using (Pen pen = new Pen(Color.DarkGray, 2))
+                using (Pen pen = new Pen(Color.LightGray, 2))
                 {
                     e.Graphics.DrawLine(pen, x, y1, x, y2);
                 }
             }
         }
-*/
+        /*
+                private void SplitContainer1_Paint(object sender, PaintEventArgs e)
+                {
+                    SplitContainer splitContainer = sender as SplitContainer;
+                    if (splitContainer != null)
+                    {
+                        // Draw a custom line in the middle of the splitter
+                        int splitterWidth = splitContainer.SplitterWidth;
+                        int halfWidth = splitterWidth / 2;
+                        int x = splitContainer.SplitterDistance + halfWidth;
+                        int y1 = splitContainer.Panel1.ClientRectangle.Top;
+                        int y2 = splitContainer.Panel1.ClientRectangle.Bottom;
+
+                        using (Pen pen = new Pen(Color.DarkGray, 2))
+                        {
+                            e.Graphics.DrawLine(pen, x, y1, x, y2);
+                        }
+                    }
+                }
+        */
 
         private void buttonFullscreen_Click(object sender, EventArgs e)
         {
@@ -1362,23 +1582,34 @@ namespace Commodore_Repair_Toolbox
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            // Fullscreen mode toggle
-            if (keyData == Keys.F11)
+            if (tabControl1.SelectedTab.Text == "Schematics")
             {
-                buttonFullscreen_Click(null, null);
+                // Fullscreen mode toggle
+                if (keyData == Keys.F11)
+                {
+                    buttonFullscreen_Click(null, null);
+                    return true;
+                }
+                else if (keyData == Keys.Escape && isFullscreen)
+                {
+                    buttonFullscreen_Click(null, null);
+                    return true;
+                }
+            }
+
+            // Toggle checkBox1 with SPACE key
+            if (keyData == Keys.Space)
+            {
+                checkBox1.Checked = !checkBox1.Checked;
                 return true;
             }
-            else if (keyData == Keys.Escape && isFullscreen)
-            {
-                buttonFullscreen_Click(null, null);
-                return true;
-            }
+
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private void tabControl1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (tabControl1.SelectedTab.Text == "Links" || tabControl1.SelectedTab.Text == "About")
+            if (tabControl1.SelectedTab.Text == "Ressources" || tabControl1.SelectedTab.Text == "About")
             {
                 buttonFullscreen.Enabled = false;
             }
@@ -1386,6 +1617,11 @@ namespace Commodore_Repair_Toolbox
             {
                 buttonFullscreen.Enabled = true;
             }
+        }
+
+        private void richTextBox_LinkClicked(object sender, LinkClickedEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
         }
     }
 

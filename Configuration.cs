@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 
-namespace Commodore_Retro_Toolbox
+namespace Commodore_Repair_Toolbox
 {
     class Configuration
     {

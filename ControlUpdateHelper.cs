@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
-namespace Commodore_Retro_Toolbox
+namespace Commodore_Repair_Toolbox
 {
     public static class ControlUpdateHelper
     {

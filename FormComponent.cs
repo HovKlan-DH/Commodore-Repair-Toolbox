@@ -5,7 +5,7 @@ using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 
-namespace Commodore_Retro_Toolbox
+namespace Commodore_Repair_Toolbox
 {
     public partial class FormComponent : Form
     {

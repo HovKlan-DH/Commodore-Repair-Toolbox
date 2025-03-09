@@ -1,4 +1,4 @@
-﻿namespace Commodore_Retro_Toolbox
+﻿namespace Commodore_Repair_Toolbox
 {
     partial class FormComponent
     {

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
-namespace Commodore_Retro_Toolbox
+namespace Commodore_Repair_Toolbox
 {
     public class OverlayInfo
     {

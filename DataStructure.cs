@@ -1,6 +1,7 @@
 ﻿using OfficeOpenXml;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -89,7 +90,11 @@ namespace Commodore_Repair_Toolbox
                     using (var package = new ExcelPackage(new FileInfo(
                         Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
                     {
-                        var worksheet = package.Workbook.Worksheets["Images"];
+                        var worksheet = package.Workbook.Worksheets["Board images"];
+                        if (worksheet == null)
+                        {
+                            throw new Exception("Worksheet [Board images] not found in ["+ hardware.Folder +"\\"+ board.Folder +"\\"+ board.Datafile +"]");
+                        }
                         string searchHeader = "Images in list";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
@@ -142,6 +147,10 @@ namespace Commodore_Repair_Toolbox
                         Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
                     {
                         var worksheet = package.Workbook.Worksheets["Components"];
+                        if (worksheet == null)
+                        {
+                            throw new Exception("Worksheet [Components] not found in [" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile + "]");
+                        }
                         string searchHeader = "Components";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
@@ -193,6 +202,10 @@ namespace Commodore_Repair_Toolbox
                             Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
                         {
                             var worksheet = package.Workbook.Worksheets["Components"];
+                            if (worksheet == null)
+                            {
+                                throw new Exception("Worksheet [Components] not found in [" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile + "]");
+                            }
                             string searchHeader = "Components";
                             int row = 1;
                             while (row <= worksheet.Dimension.End.Row)
@@ -228,6 +241,10 @@ namespace Commodore_Repair_Toolbox
                         Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
                     {
                         var worksheet = package.Workbook.Worksheets["Component local files"];
+                        if (worksheet == null)
+                        {
+                            throw new Exception("Worksheet [Components local files] not found in [" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile + "]");
+                        }
                         string searchHeader = "Component local files";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
@@ -269,6 +286,10 @@ namespace Commodore_Repair_Toolbox
                         Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
                     {
                         var worksheet = package.Workbook.Worksheets["Component links"];
+                        if (worksheet == null)
+                        {
+                            throw new Exception("Worksheet [Component links] not found in [" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile + "]");
+                        }
                         string searchHeader = "COMPONENT LINKS";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
@@ -310,6 +331,10 @@ namespace Commodore_Repair_Toolbox
                         Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
                     {
                         var worksheet = package.Workbook.Worksheets["Component highlights"];
+                        if (worksheet == null)
+                        {
+                            throw new Exception("Worksheet [Component highlights] not found in [" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile + "]");
+                        }
                         string searchHeader = "Image and component highlight bounds";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)

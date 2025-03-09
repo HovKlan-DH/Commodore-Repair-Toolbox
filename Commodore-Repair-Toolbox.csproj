@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{329269BE-8F20-469D-ACEF-40A4F304ADAC}</ProjectGuid>
     <OutputType>WinExe</OutputType>
-    <RootNamespace>Commodore_Retro_Toolbox</RootNamespace>
-    <AssemblyName>Commodore-Retro-Toolbox</AssemblyName>
+    <RootNamespace>Commodore_Repair_Toolbox</RootNamespace>
+    <AssemblyName>Commodore-Repair-Toolbox</AssemblyName>
     <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
