@@ -40,7 +40,6 @@
             this.tabHelp = new System.Windows.Forms.TabPage();
             this.richTextBox3 = new System.Windows.Forms.RichTextBox();
             this.tabAbout = new System.Windows.Forms.TabPage();
-            this.label3 = new System.Windows.Forms.Label();
             this.richTextBox1 = new System.Windows.Forms.RichTextBox();
             this.label10 = new System.Windows.Forms.Label();
             this.label9 = new System.Windows.Forms.Label();
@@ -59,6 +58,10 @@
             this.buttonFullscreen = new System.Windows.Forms.Button();
             this.panelBehindTab = new System.Windows.Forms.Panel();
             this.checkBox1 = new System.Windows.Forms.CheckBox();
+            this.tabChangelog = new System.Windows.Forms.TabPage();
+            this.label3 = new System.Windows.Forms.Label();
+            this.label4 = new System.Windows.Forms.Label();
+            this.richTextBox2 = new System.Windows.Forms.RichTextBox();
             this.tabControl1.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
@@ -70,6 +73,7 @@
             this.tabHelp.SuspendLayout();
             this.tabAbout.SuspendLayout();
             this.panelBehindTab.SuspendLayout();
+            this.tabChangelog.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl1
@@ -77,6 +81,7 @@
             this.tabControl1.Controls.Add(this.tabSchematics);
             this.tabControl1.Controls.Add(this.tabRessources);
             this.tabControl1.Controls.Add(this.tabHelp);
+            this.tabControl1.Controls.Add(this.tabChangelog);
             this.tabControl1.Controls.Add(this.tabAbout);
             this.tabControl1.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.tabControl1.Location = new System.Drawing.Point(30, 26);
@@ -158,7 +163,7 @@
             this.tabRessources.Location = new System.Drawing.Point(4, 30);
             this.tabRessources.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabRessources.Name = "tabRessources";
-            this.tabRessources.Size = new System.Drawing.Size(713, 536);
+            this.tabRessources.Size = new System.Drawing.Size(713, 502);
             this.tabRessources.TabIndex = 3;
             this.tabRessources.Text = "Ressources";
             // 
@@ -169,13 +174,14 @@
             this.webBrowser1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.webBrowser1.MinimumSize = new System.Drawing.Size(22, 26);
             this.webBrowser1.Name = "webBrowser1";
-            this.webBrowser1.Size = new System.Drawing.Size(713, 536);
+            this.webBrowser1.Size = new System.Drawing.Size(713, 502);
             this.webBrowser1.TabIndex = 0;
             this.webBrowser1.Navigating += new System.Windows.Forms.WebBrowserNavigatingEventHandler(this.webBrowser1_Navigating_1);
             // 
             // tabHelp
             // 
             this.tabHelp.BackColor = System.Drawing.Color.White;
+            this.tabHelp.Controls.Add(this.label4);
             this.tabHelp.Controls.Add(this.richTextBox3);
             this.tabHelp.Location = new System.Drawing.Point(4, 30);
             this.tabHelp.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
@@ -188,9 +194,9 @@
             // 
             this.richTextBox3.BackColor = System.Drawing.Color.White;
             this.richTextBox3.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.richTextBox3.Location = new System.Drawing.Point(13, 19);
+            this.richTextBox3.Location = new System.Drawing.Point(17, 57);
             this.richTextBox3.Name = "richTextBox3";
-            this.richTextBox3.Size = new System.Drawing.Size(726, 536);
+            this.richTextBox3.Size = new System.Drawing.Size(682, 463);
             this.richTextBox3.TabIndex = 0;
             this.richTextBox3.Text = "Text set in code ...";
             this.richTextBox3.LinkClicked += new System.Windows.Forms.LinkClickedEventHandler(this.richTextBox_LinkClicked);
@@ -198,7 +204,6 @@
             // tabAbout
             // 
             this.tabAbout.BackColor = System.Drawing.Color.White;
-            this.tabAbout.Controls.Add(this.label3);
             this.tabAbout.Controls.Add(this.richTextBox1);
             this.tabAbout.Controls.Add(this.label10);
             this.tabAbout.Controls.Add(this.label9);
@@ -206,29 +211,19 @@
             this.tabAbout.Location = new System.Drawing.Point(4, 30);
             this.tabAbout.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabAbout.Name = "tabAbout";
-            this.tabAbout.Size = new System.Drawing.Size(713, 536);
+            this.tabAbout.Size = new System.Drawing.Size(713, 502);
             this.tabAbout.TabIndex = 5;
             this.tabAbout.Text = "About";
-            // 
-            // label3
-            // 
-            this.label3.AutoSize = true;
-            this.label3.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label3.Location = new System.Drawing.Point(17, 104);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(138, 21);
-            this.label3.TabIndex = 5;
-            this.label3.Text = "About application:";
             // 
             // richTextBox1
             // 
             this.richTextBox1.BackColor = System.Drawing.Color.White;
             this.richTextBox1.BorderStyle = System.Windows.Forms.BorderStyle.None;
             this.richTextBox1.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.richTextBox1.Location = new System.Drawing.Point(20, 141);
+            this.richTextBox1.Location = new System.Drawing.Point(20, 112);
             this.richTextBox1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.richTextBox1.Name = "richTextBox1";
-            this.richTextBox1.Size = new System.Drawing.Size(672, 203);
+            this.richTextBox1.Size = new System.Drawing.Size(672, 256);
             this.richTextBox1.TabIndex = 4;
             this.richTextBox1.Text = "All programming done by Dennis Helligsø.\n\nVisit home page at https://github.com/H" +
     "ovKlan-DH/Commodore-Repair-Toolbox";
@@ -434,10 +429,52 @@
             this.checkBox1.Text = "Blink selected components";
             this.checkBox1.UseVisualStyleBackColor = true;
             // 
+            // tabChangelog
+            // 
+            this.tabChangelog.Controls.Add(this.richTextBox2);
+            this.tabChangelog.Controls.Add(this.label3);
+            this.tabChangelog.Location = new System.Drawing.Point(4, 30);
+            this.tabChangelog.Name = "tabChangelog";
+            this.tabChangelog.Size = new System.Drawing.Size(713, 536);
+            this.tabChangelog.TabIndex = 7;
+            this.tabChangelog.Text = "Changelog";
+            this.tabChangelog.UseVisualStyleBackColor = true;
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label3.Location = new System.Drawing.Point(12, 19);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(83, 21);
+            this.label3.TabIndex = 0;
+            this.label3.Text = "Changelog";
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label4.Location = new System.Drawing.Point(13, 19);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(43, 21);
+            this.label4.TabIndex = 1;
+            this.label4.Text = "Help";
+            // 
+            // richTextBox2
+            // 
+            this.richTextBox2.BackColor = System.Drawing.Color.White;
+            this.richTextBox2.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.richTextBox2.Location = new System.Drawing.Point(17, 57);
+            this.richTextBox2.Name = "richTextBox2";
+            this.richTextBox2.Size = new System.Drawing.Size(682, 463);
+            this.richTextBox2.TabIndex = 1;
+            this.richTextBox2.Text = "Text set in code ...";
+            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 21F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.White;
             this.ClientSize = new System.Drawing.Size(1082, 653);
             this.Controls.Add(this.checkBox1);
             this.Controls.Add(this.panelBehindTab);
@@ -467,9 +504,12 @@
             this.panelListMain.ResumeLayout(false);
             this.tabRessources.ResumeLayout(false);
             this.tabHelp.ResumeLayout(false);
+            this.tabHelp.PerformLayout();
             this.tabAbout.ResumeLayout(false);
             this.tabAbout.PerformLayout();
             this.panelBehindTab.ResumeLayout(false);
+            this.tabChangelog.ResumeLayout(false);
+            this.tabChangelog.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -505,7 +545,10 @@
         private System.Windows.Forms.CheckBox checkBox1;
         private System.Windows.Forms.TabPage tabHelp;
         private System.Windows.Forms.RichTextBox richTextBox1;
-        private System.Windows.Forms.Label label3;
         private System.Windows.Forms.RichTextBox richTextBox3;
+        private System.Windows.Forms.TabPage tabChangelog;
+        private System.Windows.Forms.Label label4;
+        private System.Windows.Forms.RichTextBox richTextBox2;
+        private System.Windows.Forms.Label label3;
     }
 }

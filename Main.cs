@@ -127,7 +127,7 @@ Mouse functions:\par
 \par
 Keyboard functions:\par
 \pard    \'95  \b F11\b0  will toggle fullscreen\par
-\pard    \'95  \b ESCAPE\b0  will exit fullscreen\par
+\pard    \'95  \b ESCAPE\b0  will exit fullscreen or close popup info\par
 \pard    \'95  \b SPACE\b0  will toggle blinking for selected components\par
 \pard
 \par
