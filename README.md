@@ -43,7 +43,7 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 - Add data for Commodore 64 (Breadbin) schematics 250407 and 250425
 - Add data for Commodore 64C schematics 250466
 
-# Roadmap and ideas
+# Future roadmap and ideas
 
 For now you should probably see this more as _ideas_ and _wishes_, as nothing has been set in stone yet. Some of it will be done for sure, where other parts are bigger changes, and I am not sure I want to go down that road - depends very much on usage.
 
