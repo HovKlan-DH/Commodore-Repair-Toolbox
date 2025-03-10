@@ -2,7 +2,10 @@
 
 This is the official home page for _Commodore Repair Toolbox_ (_CRT_ hence forward) - a Windows helper tool for repairing vintage computers or peripherals.
 
-![image](https://github.com/user-attachments/assets/6baf7728-b9a0-4242-ae21-c0e6a64c7120)
+![Main screen](https://github.com/user-attachments/assets/6baf7728-b9a0-4242-ae21-c0e6a64c7120)
+
+![Popup info](https://github.com/user-attachments/assets/b9ba1c39-3c8d-48fb-94fb-a7d96d8ea50b)
+
 
 **What is it?**
 
