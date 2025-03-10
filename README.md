@@ -29,7 +29,6 @@ You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Tool
 - Label in thumnail should not float above image (show label first, then image)
 - Pack EXE into one executuable file only
 - Populate "Changelog" tab
-- Setup a "Donate" link
 
 
 **Roadmap and ideas** (potential only - no guarantee at all!)
