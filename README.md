@@ -34,7 +34,7 @@ Inside the "Data" folders I have placed the JSON source files for labelling.
 
 I have chosen Excel as the data format, as this is easy for the most people to navigate in. I am actually not sure, but I do believe there is a [free online Excel available from Microsoft](https://www.office.com/launch/excel), if you do not already have one installed.
 
-# Nearby TODO
+# Near-term TODO
 
 - Fix clicking in thumbnail cannot activate image, if clicked at component location
 - Fix "Ressources" tab should be taken from Excel file instead via web
