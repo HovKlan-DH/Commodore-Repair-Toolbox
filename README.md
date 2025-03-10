@@ -64,7 +64,7 @@ I have taken data from many places, but I have a few recurring _go-to_ places I 
 - [Zimmers](https://www.zimmers.net/anonftp/pub/cbm/schematics/computers/)
 - [Ray Carlsen](https://portcommodore.com/rcarlsen/cbm/)
 
-In some cases I though also provided the data myself, which is why some double-checking of facts would be appreciated :-)
+In some cases I provided or modified the data myself, which is why some expert double-checking of facts would be very much appreciated :-)
 
 # Inspiration for creating this project
 
