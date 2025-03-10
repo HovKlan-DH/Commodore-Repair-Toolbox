@@ -3,9 +3,11 @@
 This is the official home page for _Commodore Repair Toolbox_ (_CRT_ hence forward) - a Windows helper tool for repairing vintage computers or peripherals.
 
 
+
 **What is it?**
 
 With _CRT_ you can view or add schematics, labels, pinouts, datasheets, ressources and various other information, for helping diagnosing and repairing old and vintage hardware. It is primarily dedicated to Commodore, but it does support any kind of hardware - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simnple" and have good documentation available, where you then can add this information yourself and then use for easy referene for future projects.
+
 
 
 **Installation and usage**
