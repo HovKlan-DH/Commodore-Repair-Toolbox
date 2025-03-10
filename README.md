@@ -11,7 +11,7 @@ With _CRT_ you can view or add schematics, labels, pinouts, datasheets, ressourc
 **How can you help?**
 
 I really would appreciate that some experienced persons would take a look, and let me know of factual errors or things I missed.
-You can create a new [Issue]([url](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues)) in the project or write an email to **crt** at **mailscan** dot **dk**
+You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) in the project or write an email to **crt** at **mailscan** dot **dk**
 
 
 **TODO**
@@ -31,5 +31,5 @@ You can create a new [Issue]([url](https://github.com/HovKlan-DH/Commodore-Repai
 
 **Inspiration for creating this project?**
 
-I have been repairing Commodore 64 and C128 for some years, and I am by far still a "noob" for this. I kind of forget where and what to check, so I find it difficult to find again all the relevant ressources and schematics to check. I did often refer to the "Mainboards" section of [My Old Computer]([url](https://myoldcomputer.nl/technical-info/mainboards/)), and I noticed that Jeroen did have a prototype of an aapplication named "Repair Help", and it did have the easy layout I was looking for. However, it was never finalized, so I took upon me to create something similar, and a couple of years later I did come up with a very similar looking application, also utilizing a lot of data directly from [My Old Computer]([url](https://myoldcomputer.nl/)) (with permission from Jeroen, of course).
+I have been repairing Commodore 64 and C128 for some years, and I am by far still a "noob" for this. I kind of forget where and what to check, so I find it difficult to find again all the relevant ressources and schematics to check. I did often refer to the "Mainboards" section of [My Old Computer](https://myoldcomputer.nl/technical-info/mainboards/), and I noticed that Jeroen did have a prototype of an aapplication named "Repair Help", and it did have the easy layout I was looking for. However, it was never finalized, so I took upon me to create something similar, and a couple of years later I did come up with a very similar looking application, also utilizing a lot of data directly from [My Old Computer](https://myoldcomputer.nl/) (with permission from Jeroen, of course).
 
