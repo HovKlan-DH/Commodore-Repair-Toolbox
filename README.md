@@ -1,6 +1,6 @@
 # Commodore Repair Toolbox
 
-This is the official home page for _Commodore Repair Toolbox_ (CRT) - a helper tool for repairing vintage hardware.
+This is the official home page for _Commodore Repair Toolbox_ (_CRT_ hence forward) - a Windows helper tool for repairing vintage computers or peripherals.
 
 
 **What is it?**
@@ -8,9 +8,16 @@ This is the official home page for _Commodore Repair Toolbox_ (CRT) - a helper t
 With _CRT_ you can view or add schematics, labels, pinouts, datasheets, ressources and various other information, for helping diagnosing and repairing old and vintage hardware. It is primarily dedicated to Commodore, but it does support any kind of hardware - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simnple" and have good documentation available, where you then can add this information yourself and then use for easy referene for future projects.
 
 
+**Installation and usage**
+
+_CRT_ does not require any installation - just download the newest ZIP file from Releases, extract it and run the executable file.
+It does require Windows .NET Framework 4.8.1, but this should be a part of any Windows Operating System.
+
+
 **How can you help?**
 
 I really would appreciate that some experienced persons would take a look, and let me know of factual errors or things I missed.
+I also would appreciate if you have higher quality images, as the original schematics sometimes can be impossible to interpret due to handwriting and poor quality scanning.
 You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) in the project or write an email to **crt** at **mailscan** dot **dk**
 
 
@@ -25,8 +32,9 @@ You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Tool
 - Setup a "Donate" link
 
 
-**Roadmap/ideas** (potential only - no guarantee at all!)
+**Roadmap and ideas** (potential only - no guarantee at all!)
 - Have people download and upload new schematics or updates directly from tool
+- Rating system of user uploaded schematics
 
 
 **Inspiration for creating this project?**
