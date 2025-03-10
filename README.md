@@ -21,8 +21,8 @@ It does require _Windows .NET Framework 4.8.1_, but this should be part of any W
 
 # Your help would be really appreciated
 
-I really would appreciate if some experienced Commodore experts would take a look, and let me know of factual errors or things I obviously have missed.\
-Additionally, if you have higher-quality images of the schematics, please let me know, as the original schematics can sometimes be difficult to interpret due to handwriting or poor scanning quality.\
+I really would appreciate if some experienced Commodore experts would take a look, and let me know of factual errors or things I obviously have missed.
+Additionally, if you have higher-quality images of the schematics, please let me know, as the original schematics can sometimes be difficult to interpret due to handwriting or poor scanning quality.
 You can also contribute by adding new data or improving existing information and send the Excel files and "label files" to me (see below for the software used for labeling).
 
 # Contact
