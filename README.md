@@ -25,7 +25,9 @@ It will run on any _Windows 10_ or newer (both 32-bit and 64-bit). It does requi
 # Your help would be really appreciated
 
 I really would appreciate if some Commodore experts would take a look, and let me know of factual errors or things I obviously have missed.
+
 Additionally, if you have higher-quality images of the schematics, please let me know, as the original schematics can sometimes be difficult to interpret due to handwriting or poor scanning quality.
+
 You can also contribute by adding new data or improving existing information and send the Excel files and "label files" to me (see below for the software used for labeling).
 
 # Contact
