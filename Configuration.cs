@@ -9,7 +9,7 @@ namespace Commodore_Repair_Toolbox
 {
     class Configuration
     {
-        private static readonly string filePath = Path.Combine(Application.StartupPath, "config.txt");
+        private static readonly string filePath = Path.Combine(Application.StartupPath, "Commodore-Repair-Toolbox.cfg");
         private static Dictionary<string, string> settings = new Dictionary<string, string>();
 
         public static void LoadConfig()
