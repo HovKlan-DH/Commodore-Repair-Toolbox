@@ -57,6 +57,15 @@ For now you should probably see this more as _ideas_ and _wishes_, as nothing ha
 - Have people download and upload new schematics or updates directly from tool
 - Rating system of user uploaded schematics
 
+# Data sources used for data configurations
+
+I have taken data from many places, but I have a few recurring _go-to_ places I frequently visit:
+- [My Old Computer](https://myoldcomputer.nl/technical-info/mainboards/) (view below also)
+- [Zimmers](https://www.zimmers.net/anonftp/pub/cbm/schematics/computers/)
+- [Ray Carlsen](https://portcommodore.com/rcarlsen/cbm/)
+
+In some cases I though also provided the data myself, which is why some double-checking of facts would be appreciated :-)
+
 # Inspiration for creating this project
 
 I have been repairing Commodore 64/128 for some years, but I am by far still a "noob" for this. I often forget where and what to check, so I find it hard to find again all the relevant ressources and schematics to check, not to mention how to find the components in the schematics. I did often refer to the "Mainboards" section of [My Old Computer](https://myoldcomputer.nl/technical-info/mainboards/), and I noticed that Jeroen did have a prototype of an application named _Repair Help_, and it did have the easy layout I was looking for (I did get a copy of it). However, it was never finalized, so I took upon myself to create something similar, and a couple of years later I did come up with a very similar looking application, also utilizing a lot of data directly from Jeroen's page, [My Old Computer](https://myoldcomputer.nl/) (with permission from him, of course).
