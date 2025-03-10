@@ -14,11 +14,15 @@ _CRT_ does not require any installation - just download the newest ZIP file from
 It does require Windows .NET Framework 4.8.1, but this should be a part of any Windows Operating System.
 
 
-**How can you help?**
+**I really would appreciate your help**
+I really would appreciate that some experienced persons would take a look, and let me know of factual errors or things I have missed. Also, if you have higher quality images of the schematics then please let me know, as the original schematics sometimes can be impossible to interpret due to handwriting or poor quality scanning.
+You can help adding additional data or enhancing existing data and send the Excel and "label files" to me (view below).
 
-I really would appreciate that some experienced persons would take a look, and let me know of factual errors or things I missed.
-I also would appreciate if you have higher quality images, as the original schematics sometimes can be impossible to interpret due to handwriting and poor quality scanning.
 You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) in the project or write an email to **crt** at **mailscan** dot **dk**
+
+
+**Software used**
+For labelling I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/). It is quite handy and easy to use, once you learn its way of working. It will output a JSON file, which I then convert into an Excel format - this JSON file + the image file used I both need, if you have any updates.
 
 
 **TODO**
