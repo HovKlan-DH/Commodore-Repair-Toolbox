@@ -12,9 +12,9 @@ _CRT_ does not require any installation - just download the newest ZIP file from
 It does require Windows .NET Framework 4.8.1, but this should be a part of any Windows Operating System.
 
 **I really would appreciate your help**
-I really would appreciate that some experienced persons would take a look, and let me know of factual errors or things I have missed.  
-Also, if you have higher quality images of the schematics then please let me know, as the original schematics sometimes can be impossible to interpret due to handwriting or poor quality scanning.  
-You can help adding additional data or enhancing existing data and send the Excel and "label files" to me (view below).  
+I really would appreciate that some experienced persons would take a look, and let me know of factual errors or things I have missed.\
+Also, if you have higher quality images of the schematics then please let me know, as the original schematics sometimes can be impossible to interpret due to handwriting or poor quality scanning.\
+You can help adding additional data or enhancing existing data and send the Excel and "label files" to me (view below).\
 You can create a new [Issue](/issues) in the project or write an email to **crt** at **mailscan** dot **dk**
 
 <a name="labelling-software"></a>
