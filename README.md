@@ -20,7 +20,7 @@ It probably works the best, if the hardware is "simple" and have good documentat
 
 _CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file.
 
-It does require _Windows .NET Framework 4.8.1_, but this should be part of any Windows 10 or newer OS by default.
+It will run on any _Windows 10_ or newer (both 32-bit and 64-bit). It does require _.NET Framework 4.8.1_, but this is an integrated part of the operating system.
 
 # Your help would be really appreciated
 
