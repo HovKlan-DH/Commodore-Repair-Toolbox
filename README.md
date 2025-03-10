@@ -25,7 +25,7 @@ I really would appreciate if some experienced Commodore repair-gurus would take 
 Also, if you have higher quality images of the schematics then please let me know, as the original schematics sometimes can be impossible to interpret due to handwriting or poor scanning quality.\
 You can help adding additional data or enhancing existing, and send the Excel and "label files" to me (view below for software used for labelling).
 
-You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) in the project or write an email to **crt** at **mailscan** dot **dk** if you have any changes or comments.
+You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) in the project or write an email to **crt** at **mailscan** dot **dk**, if you have any changes or comments.
 
 # Software used
 For labelling I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and easy to use, once you learn its way of working. It will output a JSON file, which I then convert into an Excel format - this JSON file + the image file used I both need, if you have any updates.
