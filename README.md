@@ -56,7 +56,7 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 
 # Future roadmap and ideas
 
-For now you should probably see this more as _ideas_ and _wishes_, as nothing has been set in stone yet. There are bigger changes here, and I am not sure I want to go down that road - it will depend very much on usage.
+There are bigger changes here, and I am not sure I want to go down that road - it will for sure depend on usage, as I personally do not have any use for it, if this is primarily used only by myself :-)
 
 - Ideally make fullscreen mode less "flickering"
 - "New version available" or "Data has been updated" information
@@ -65,12 +65,12 @@ For now you should probably see this more as _ideas_ and _wishes_, as nothing ha
 
 # Data sources used for data configurations
 
-I have taken data from many places, but I have a few recurring _go-to_ places I frequently visit:
+I have taken data from many places, but I do have a few _go-to_ places I frequently visit:
 - [My Old Computer](https://myoldcomputer.nl/technical-info/mainboards/) (view below also)
 - [Zimmers](https://www.zimmers.net/anonftp/pub/cbm/schematics/computers/)
 - [Ray Carlsen](https://portcommodore.com/rcarlsen/cbm/)
 
-In some cases I provided or modified the data myself, which is why some expert double-checking of facts would be very much appreciated :-)
+In some cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated :-)
 
 # Inspiration for creating this project
 
