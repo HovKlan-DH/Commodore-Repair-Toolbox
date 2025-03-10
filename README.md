@@ -39,17 +39,17 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 - Change component list is a little easier to look at (remove questionmark)
 - Show asterisk (*) in thumbnail label, when chosen component is visible in thumbnail image
 - Label in thumnail should not float above image (show label first, then image below)
+- Configuration file - refactor it and save more configuration:
+  - Selected component categories per board
+  - Start in same size as last (maximized or window)
 - Add more data for Commodore 128 (datasheets and pinouts)
 - Add data for Commodore 64 (Breadbin) schematics 250407 and 250425
 - Add data for Commodore 64C schematics 250466
 
 # Future roadmap and ideas
 
-For now you should probably see this more as _ideas_ and _wishes_, as nothing has been set in stone yet. Some of it will be done for sure, where other parts are bigger changes, and I am not sure I want to go down that road - depends very much on usage.
+For now you should probably see this more as _ideas_ and _wishes_, as nothing has been set in stone yet. There are bigger changes here, and I am not sure I want to go down that road - it will depend very much on usage.
 
-- Configuration file - refactor it and save more configuration:
-  - Selected component categories per board
-  - Start in same size as last (maximized or window)
 - Ideally make fullscreen mode less "flickering"
 - "New version available" or "Data has been updated" information
 - Have people download and upload new schematics or updates directly from tool
