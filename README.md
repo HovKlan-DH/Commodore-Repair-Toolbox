@@ -1,6 +1,6 @@
 # Commodore Repair Toolbox
 
-This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ hence forward) - a Windows helper tool for repairing vintage computers or peripherals.
+This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ hence forward) - a Windows utility tool for repairing vintage computers or peripherals.
 
 # Screenshots
 
