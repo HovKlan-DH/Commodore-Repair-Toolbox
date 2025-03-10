@@ -5,7 +5,7 @@ This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ he
 # Screenshots
 
 Main screen:\
-![Main screen](https://github.com/user-attachments/assets/3990df8a-5c9b-41e5-9ac8-7699e59fc7f8)
+![Main](https://github.com/user-attachments/assets/3167f6cc-619c-4f7a-82b7-b0ae7b058484)
 
 Popup component info:\
 ![iPopup info](https://github.com/user-attachments/assets/4950cf74-7c5f-4a6f-89fd-4a698301c64d)
