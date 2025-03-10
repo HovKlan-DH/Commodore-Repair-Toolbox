@@ -18,15 +18,16 @@ It does require Windows .NET Framework 4.8.1, but this should be a part of any W
 I really would appreciate that some experienced persons would take a look, and let me know of factual errors or things I have missed. Also, if you have higher quality images of the schematics then please let me know, as the original schematics sometimes can be impossible to interpret due to handwriting or poor quality scanning.
 You can help adding additional data or enhancing existing data and send the Excel and "label files" to me (view below).
 
-You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) in the project or write an email to **crt** at **mailscan** dot **dk**
+You can create a new [Issue](/issues) in the project or write an email to **crt** at **mailscan** dot **dk**
 
-
+<a name="labelling-software"></a>
 **Software used**
-For labelling I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/). It is quite handy and easy to use, once you learn its way of working. It will output a JSON file, which I then convert into an Excel format - this JSON file + the image file used I both need, if you have any updates.
+For labelling I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and easy to use, once you learn its way of working. It will output a JSON file, which I then convert into an Excel format - this JSON file + the image file used I both need, if you have any updates.
 
 
 **TODO**
 - Fix clicking in thumbnail cannot activate image, if clicked at component location
+- Fix "Ressources" tab should be taken from Excel file instead of via web
 - Add data for Commodore 64 (Breadbin) schematics 250407 and 250425
 - Add data for Commodore 64C schematics 250466
 - Show asterisk (*) in thumbnail label when chosen component is visible in image
@@ -36,6 +37,11 @@ For labelling I have discovered the Windows open source application [VGG Image A
 
 
 **Roadmap and ideas** (potential only - no guarantee at all!)
+- Configuration file - refactor it and save more configuration
+  - Selected component categories per board
+  - Start in same size as last (maximized or window)
+- Ideally make fullscreen mode less "flickering"
+- "New version available" or "Data has been updated" information
 - Have people download and upload new schematics or updates directly from tool
 - Rating system of user uploaded schematics
 
