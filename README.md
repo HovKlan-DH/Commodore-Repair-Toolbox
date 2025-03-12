@@ -55,7 +55,7 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 - ~~Configuration file - refactor it and save more configuration:~~ (fixed in next release)
   - ~~Selected component categories per board~~
   - ~~Start in same size as last (maximized or window)~~
-- Add more data for Commodore 128 (datasheets and pinouts)
+- ~~Add more data for Commodore 128 (datasheets and pinouts)~~ (fixed in next release)
 - Add data for Commodore 64 (Breadbin) schematics 250407 and 250425
 - Add data for Commodore 64C schematics 250466
 
