@@ -28,11 +28,15 @@ It will run on any _Windows 10_ or newer (both 32-bit and 64-bit). It does requi
 
 # Your help would be really appreciated
 
-I really would appreciate if some Commodore experts would take a look, and let me know of factual errors or things I obviously have missed.
+I would really appreciate if some Commodore experts would take a look, and let me know of factual errors or things I obviously have missed.
 
-Additionally, if you have higher-quality images of the schematics, please let me know, as the original schematics can sometimes be difficult to interpret due to handwriting or poor scanning quality.
+You can help specifically with these topics:
+- Do you have higher-quality images of the schematics?
+- Do you have datasheets for any of the components?
+- Do you see missing components in either the component list or as a highlight?
+- Can you fill in more technical details anywhere?
 
-You can also contribute by adding new data or improving existing information and send the Excel files and "label files" to me (view below for the software used for labeling).
+You can also contribute by adding new data and send the Excel file and "label file" to me (view below for the software used for labeling).
 
 # Contact
 You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) in the project or write an email to **crt** at **mailscan** dot **dk**, if you have any changes or comments.
@@ -41,6 +45,7 @@ You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Tool
 For labelling the components in the schematics  I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and easy to use, once you learn its way of working. It will output a JSON file, which I then convert into an Excel format - you must send both this JSON file and its image file, if you have any updates.
 
 Inside the "Data" folders I have placed the JSON source files for labelling.
+Inside the "Tools" folder I have placed the VGG application - just load the `via.html` into your local browser.
 
 I have chosen Excel as the data format, as this is easy for the most people to navigate in. I am actually not sure, but I do believe there is a [free online Excel available from Microsoft](https://www.office.com/launch/excel), if you do not already have one installed.
 
