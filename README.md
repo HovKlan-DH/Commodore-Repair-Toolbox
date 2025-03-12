@@ -52,9 +52,10 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 - ~~Change component list is a little easier to look at (remove questionmark)~~ (fixed in next release)
 - ~~Show asterisk (*) in thumbnail label, when chosen component is visible in thumbnail image~~ (fixed in next release)
 - ~~Label in thumnail should not float above image (show label first, then image below)~~ (fixed in next release)
-- Configuration file - refactor it and save more configuration:
-  - Selected component categories per board
-  - Start in same size as last (maximized or window)
+- ~~Configuration file - refactor it and save more configuration:~~
+  - ~~Selected component categories per board~~
+  - ~~Start in same size as last (maximized or window)~~
+  - (fixed in next release)
 - Add more data for Commodore 128 (datasheets and pinouts)
 - Add data for Commodore 64 (Breadbin) schematics 250407 and 250425
 - Add data for Commodore 64C schematics 250466
