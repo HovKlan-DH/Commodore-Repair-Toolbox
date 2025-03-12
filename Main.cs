@@ -1,6 +1,7 @@
 ﻿using Commodore_Repair_Toolbox;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -56,7 +57,7 @@ namespace Commodore_Repair_Toolbox
         private bool isResizing = false;
 
         // Main panel (left side) + image
-        private CustomPanel panelMain;
+        private CustomPanel panelZoom;
         private Panel panelImage;
         private Image image;
 
@@ -96,15 +97,6 @@ namespace Commodore_Repair_Toolbox
         {
             InitializeComponent();
             EnableDoubleBuffering();
-            AttachEventHandlers();
-
-            LoadData();
-            PopulateComboBoxes();
-            LoadSettings();
-
-            ApplySavedSettings();
-
-            AttachConfigurationSaveEvents();
 
             // Initialize the blink timer
             blinkTimer = new Timer();
@@ -112,17 +104,17 @@ namespace Commodore_Repair_Toolbox
             blinkTimer.Tick += BlinkTimer_Tick;
 
             // Attach the checkbox event handler
-            checkBox1.CheckedChanged += CheckBox1_CheckedChanged;
+            checkBoxBlink.CheckedChanged += CheckBox1_CheckedChanged;
 
-            AdjustComponentCategoriesListBoxHeight();
-
-            richTextBox3.Rtf = @"{\rtf1\ansi
-\i Commodore Repair Toolbox\i0  is not that advanced, so it is quite simple to use.\par
+            
+            richTextBoxHelp.Rtf = @"{\rtf1\ansi
+\i Commodore Repair Toolbox\i0  is not so advanced, and it is quite simple to use, but some basic help is always nice to have.\par
 \par
 Mouse functions:\par
-\pard    \'95  \b Left-click\b0  on a component will show a popup with more information\par
-\pard    \'95  \b Right-click\b0  on a component will highlight it\par
-\pard    \'95  \b Right-click\b0 and \b Hold down\b0  will pan the image\par
+\pard    \'95  \b Left-click\b0  on a component will show a information popup\par
+\pard    \'95  \b Right-click\b0  on a component will toggle highlight\par
+\pard    \'95  \b Right-click\b0  and \b Hold\b0  will pan the image\par
+\pard    \'95  \b Scrollwheel\b0  will zoom in/out\par
 \pard
 \par
 Keyboard functions:\par
@@ -131,9 +123,16 @@ Keyboard functions:\par
 \pard    \'95  \b SPACE\b0  will toggle blinking for selected components\par
 \pard
 \par
+Component selection:\par
+\pard    \'95  When a component is selected, then it will visualize if component is part of image in list-view:\par
+\pard    \pard    \pard    \'95  Appending an asterisk/* as first character in label\par
+\pard    \pard    \pard    \'95  Background color of label changes to red\par
+\pard    \'95  You cannot highlight a component in image, if its component category is unselected\par
+\par
 Configuration saved:\par
 \pard    \'95  Last-viewed schematics\par
 \pard    \'95  Schematics divider/slider position\par
+\pard    \'95  Component categories saved per board\par
 \pard
 \par
 How-to add or update something yourself:\par
@@ -141,12 +140,46 @@ How-to add or update something yourself:\par
 \pard
 \par
 }";
+
+
+            LoadExcelData();
+
+            LoadSettings();
+            PopulateComboBoxes();
+            Debug.WriteLine(splitContainerSchematics.SplitterDistance);
+
+            AttachEventHandlers();
+
         }
+
+        /*
+        * --------------------------
+        * CHANGELOG FOR NEXT RELEASE
+        * --------------------------
+        * 
+        * Application:
+            * Fixed highlights in thumbnails were misaligned
+            * Fixed clicking in thumbnail and directly at a component would not switch to this main image
+            * Fixed dynamic resizing of list-boxes depending on selected board
+            * Fixed "About" and "Help" textboxes have been set to read-only
+            * Fixed "Help" should not be accessible to fullscreen mode
+            * Added show of asterisk/coloring in thumbnail label, when chosen component is visible in thumbnail
+            * Added more text in "Help" tab 
+            * Changed label in thumbnail so it no longer floats above the image, but is added before the image
+            * Changed component list to now provide a simpler overview
+        * Data:
+            * Hardware: Commodore 128 or 128D
+                * Board: 310378
+                    * Added pinout for more components
+                    * Refined highlights for multiple components
+
+       
+        */
 
 
         private void CheckBox1_CheckedChanged(object sender, EventArgs e)
         {
-            if (checkBox1.Checked)
+            if (checkBoxBlink.Checked)
             {
                 BlinkTimer_Tick(null, null); // Perform the first blink immediately
                 blinkTimer.Start();
@@ -191,27 +224,6 @@ How-to add or update something yourself:\par
             blinkState = !blinkState;
         }
 
-        private void ResetOverlayVisibility()
-        {
-            foreach (var overlayPanel in overlayPanelsList.Values)
-            {
-                foreach (var overlay in overlayPanel.Overlays)
-                {
-                    overlay.Highlighted = true;
-                }
-                overlayPanel.Invalidate();
-            }
-
-            if (overlayPanel != null)
-            {
-                foreach (var overlay in overlayPanel.Overlays)
-                {
-                    overlay.Highlighted = true;
-                }
-                overlayPanel.Invalidate();
-            }
-        }
-
         private void BlinkSelectedOverlays(bool state)
         {
             foreach (var overlayPanel in overlayPanelsList.Values)
@@ -241,53 +253,26 @@ How-to add or update something yourself:\par
 
         private void AdjustComponentCategoriesListBoxHeight()
         {
-            int listBoxLocationEnd_org = listBox2.Location.Y + listBox2.Height;
-            int itemHeight = listBox2.ItemHeight;
-            int itemCount = listBox2.Items.Count;
-            int borderHeight = listBox2.Height - listBox2.ClientSize.Height;
-            listBox2.Height = (itemHeight * itemCount) + borderHeight;
-            int listBoxLocationEnd_new = listBox2.Location.Y + listBox2.Height;
+            int listBoxLocationEnd_org = listBoxCategories.Location.Y + listBoxCategories.Height;
+            int itemHeight = listBoxCategories.ItemHeight;
+            int itemCount = listBoxCategories.Items.Count;
+            int borderHeight = listBoxCategories.Height - listBoxCategories.ClientSize.Height;
+            listBoxCategories.Height = (itemHeight * itemCount) + borderHeight;
+            int listBoxLocationEnd_new = listBoxCategories.Location.Y + listBoxCategories.Height;
             int diff =  listBoxLocationEnd_org - listBoxLocationEnd_new;
             if (diff > 0)
             {
-                label2.Location = new Point(label2.Location.X, label2.Location.Y - diff - 11);
-                listBox1.Location = new Point(listBox1.Location.X, listBox1.Location.Y - diff - 11);
-                listBox1.Height = listBox1.Height + diff + 11;
+                labelComponents.Location = new Point(labelComponents.Location.X, listBoxLocationEnd_new + 11);
+                listBoxComponents.Location = new Point(listBoxComponents.Location.X, listBoxLocationEnd_new + 11 + 20);
+                listBoxComponents.Height = listBoxComponents.Height + diff + 15;
             } else
             {
-                label2.Location = new Point(label2.Location.X, label2.Location.Y + diff);
+                diff = Math.Abs(diff); // reverse the negative to a positive integer
+                labelComponents.Location = new Point(labelComponents.Location.X, listBoxLocationEnd_new + 11);
+                listBoxComponents.Location = new Point(listBoxComponents.Location.X, listBoxLocationEnd_new + 11 + 20);
+                listBoxComponents.Height = listBoxComponents.Height - diff + 15;
             }
-        }
-
-        /*
-        // Call this method after populating listBox2
-        private void InitializeComponentCategoriesListBox()
-        {
-            listBox2.Items.Clear();
-
-            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            if (foundBoard != null)
-            {
-                foreach (ComponentBoard component in foundBoard.Components)
-                {
-                    if (!string.IsNullOrEmpty(component.Type) && !listBox2.Items.Contains(component.Type))
-                    {
-                        listBox2.Items.Add(component.Type);
-                    }
-                }
-            }
-
-            // Auto-select all
-            for (int i = 0; i < listBox2.Items.Count; i++)
-            {
-                listBox2.SetSelected(i, true);
-            }
-
-            // Adjust the height of listBox2 to match the number of elements
-            AdjustComponentCategoriesListBoxHeight();
-        }
-        */
+        }     
 
         // ---------------------------------------------------------------------
         // Enable double-buffering for smoother UI rendering
@@ -301,7 +286,7 @@ How-to add or update something yourself:\par
             );
             this.UpdateStyles();
 
-            panelZoom.DoubleBuffered(true);
+            panelMain.DoubleBuffered(true);
             panelListMain.DoubleBuffered(true);
             panelListAutoscroll.DoubleBuffered(true);
         }
@@ -316,19 +301,22 @@ How-to add or update something yourself:\par
             Shown += Main_Shown;
             panelListAutoscroll.Resize += panelListAutoscroll_Resize;
             panelListAutoscroll.Layout += PanelListAutoscroll_Layout;
-            this.Load += Form_Loaded;
-            tabControl1.Dock = DockStyle.Fill;
+            this.Load += Form_Load;
+            tabControl.Dock = DockStyle.Fill;
+
+            this.FormClosing += Main_FormClosing;
 
             // Subscribe to the Paint event of the SplitContainer
-            splitContainer1.Paint += SplitContainer1_Paint;
+            splitContainerSchematics.Paint += SplitContainer1_Paint;
         }
 
         // ---------------------------------------------------------------------
         // Load hardware data from Excel
-        private void LoadData()
+        private void LoadExcelData()
         {
             DataStructure.GetAllData(classHardware);
 
+/*
             // Debug print loaded data
             foreach (Hardware hw2 in classHardware)
             {
@@ -342,6 +330,7 @@ How-to add or update something yourself:\par
                     }
                 }
             }
+*/
         }
 
         // ---------------------------------------------------------------------
@@ -350,10 +339,10 @@ How-to add or update something yourself:\par
         {
             foreach (Hardware hardware in classHardware)
             {
-                comboBox1.Items.Add(hardware.Name);
+                comboBoxHardware.Items.Add(hardware.Name);
             }
-            comboBox1.SelectedIndex = 0;
-            hardwareSelectedName = comboBox1.SelectedItem.ToString();
+            comboBoxHardware.SelectedIndex = 0;
+            hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
         }
 
         // ---------------------------------------------------------------------
@@ -376,26 +365,26 @@ How-to add or update something yourself:\par
             // Apply splitter position
             if (int.TryParse(splitterPosVal, out int splitterPosition) && splitterPosition > 0)
             {
-                splitContainer1.SplitterDistance = splitterPosition;
+                splitContainerSchematics.SplitterDistance = splitterPosition;
             }
 
             // Apply combo box selections
-            if (int.TryParse(comboBox1Val, out int comboBox1Index) && comboBox1Index >= 0 && comboBox1Index < comboBox1.Items.Count)
+            if (int.TryParse(comboBox1Val, out int comboBox1Index) && comboBox1Index >= 0 && comboBox1Index < comboBoxHardware.Items.Count)
             {
-                comboBox1.SelectedIndex = comboBox1Index;
+                comboBoxHardware.SelectedIndex = comboBox1Index;
             }
             else
             {
-                comboBox1.SelectedIndex = 0;
+                comboBoxHardware.SelectedIndex = 0;
             }
 
-            if (int.TryParse(comboBox2Val, out int comboBox2Index) && comboBox2Index >= 0 && comboBox2Index < comboBox2.Items.Count)
+            if (int.TryParse(comboBox2Val, out int comboBox2Index) && comboBox2Index >= 0 && comboBox2Index < comboBoxBoard.Items.Count)
             {
-                comboBox2.SelectedIndex = comboBox2Index;
+                comboBoxBoard.SelectedIndex = comboBox2Index;
             }
             else
             {
-                comboBox2.SelectedIndex = 0;
+                comboBoxBoard.SelectedIndex = 0;
             }
 
             // Apply selected image if exists
@@ -428,20 +417,20 @@ How-to add or update something yourself:\par
         private void AttachConfigurationSaveEvents()
         {
             // Save combo box selections
-            comboBox1.SelectedIndexChanged += (s, e) =>
+            comboBoxHardware.SelectedIndexChanged += (s, e) =>
             {
-                Configuration.SaveSetting("ComboBox1Index", comboBox1.SelectedIndex.ToString());
+                Configuration.SaveSetting("ComboBox1Index", comboBoxHardware.SelectedIndex.ToString());
             };
 
-            comboBox2.SelectedIndexChanged += (s, e) =>
+            comboBoxBoard.SelectedIndexChanged += (s, e) =>
             {
-                Configuration.SaveSetting("ComboBox2Index", comboBox2.SelectedIndex.ToString());
+                Configuration.SaveSetting("ComboBox2Index", comboBoxBoard.SelectedIndex.ToString());
             };
 
             // Save splitter position
-            splitContainer1.SplitterMoved += (s, e) =>
+            splitContainerSchematics.SplitterMoved += (s, e) =>
             {
-                Configuration.SaveSetting("SplitterPosition", splitContainer1.SplitterDistance.ToString());
+                Configuration.SaveSetting("SplitterPosition", splitContainerSchematics.SplitterDistance.ToString());
             };
 
             // Save selected image when changed
@@ -476,11 +465,11 @@ How-to add or update something yourself:\par
             panelBehindTab.Height = ClientSize.Height;
 
             // Determine which tab should be maximized
-            panelBehindTab.Controls.Remove(panelZoom);
-            panelBehindTab.Controls.Add(panelZoom);
+            panelBehindTab.Controls.Remove(panelMain);
+            panelBehindTab.Controls.Add(panelMain);
 
             // Hide tabs, and show fullscreen panel
-            tabControl1.Visible = false;
+            tabControl.Visible = false;
             buttonFullscreen.Text = "Exit fullscreen";
             isFullscreen = true;
         }
@@ -498,11 +487,11 @@ How-to add or update something yourself:\par
             panelBehindTab.Bounds = previousBoundsPanelBehindTab;
 
             // Determine which tab should be repopulated with the previous maximized panel
-            panelBehindTab.Controls.Remove(panelZoom);
-            splitContainer1.Panel1.Controls.Add(panelZoom);
+            panelBehindTab.Controls.Remove(panelMain);
+            splitContainerSchematics.Panel1.Controls.Add(panelMain);
 
             // Show again the tabs, and hide the fullscreen panel
-            tabControl1.Visible = true;
+            tabControl.Visible = true;
             //            AdjustPanelSchematicPanelsWidth();
             buttonFullscreen.Text = "Fullscreen";
             isFullscreen = false;
@@ -512,12 +501,27 @@ How-to add or update something yourself:\par
         // Event - form initialized, but not yet shown
         // ---------------------------------------------------------------------------
 
-        private void Form_Loaded(object sender, EventArgs e)
+        private void Form_Load(object sender, EventArgs e)
         {
-//            panelBehindTab.Location = new Point(panelBehindTab.Location.X, 0);
-//            InitializeList();
+            //            panelBehindTab.Location = new Point(panelBehindTab.Location.X, 0);
+            //            InitializeList();
+
+            string savedState = Configuration.GetSetting("WindowState", "Maximized");
+            if (Enum.TryParse(savedState, out FormWindowState state) && state != FormWindowState.Minimized)
+            {
+                this.WindowState = state;
+            }
+
+            ApplySavedSettings();
+
+
+
+
+            AttachConfigurationSaveEvents();
+
 
         }
+
 
         private void AttachClosePopupOnClick(Control parent)
         {
@@ -564,7 +568,8 @@ How-to add or update something yourself:\par
 
         private void SetupNewBoard()
         {
-            boardSelectedName = comboBox2.SelectedItem.ToString();
+
+            boardSelectedName = comboBoxBoard.SelectedItem.ToString();
 
             var selectedHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var selectedBoard = selectedHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
@@ -579,49 +584,26 @@ How-to add or update something yourself:\par
 
             // Initialize UI
             InitializeComponentCategories();
+
+
+            // If no config was found (or empty):
+            bool loaded = LoadSelectedCategories(); // attempt to select from config
+            if (!loaded && listBoxCategories.Items.Count > 0)
+            {
+                // fallback: auto-select everything
+                for (int i = 0; i < listBoxCategories.Items.Count; i++)
+                {
+                    listBoxCategories.SetSelected(i, true);
+                }
+            }
+
             InitializeComponentList();
+
+            AdjustComponentCategoriesListBoxHeight();
+
             InitializeList();
             InitializeTabMain();
-
-            // Attempt to load a URL in webBrowser
-            NavigateWithPreCheck(initialUrl);
-        }
-
-        // ---------------------------------------------------------------------
-        // Web browser logic
-
-        private async void NavigateWithPreCheck(string url)
-        {
-            using (HttpClient httpClient = new HttpClient())
-            {
-                try
-                {
-                    HttpResponseMessage response = await httpClient.GetAsync(url);
-                    if (response.IsSuccessStatusCode)
-                    {
-                        webBrowser1.Navigate(url);
-                    }
-                    else
-                    {
-                        webBrowser1.DocumentText = $"Failed to load content: HTTP error {response.StatusCode} - {response.ReasonPhrase}";
-                    }
-                }
-                catch (HttpRequestException ex)
-                {
-                    webBrowser1.DocumentText = $"Failed to load content: Network error - {ex.Message}";
-                }
-            }
-        }
-
-        private void webBrowser1_Navigating_1(object sender, WebBrowserNavigatingEventArgs e)
-        {
-            // Force external links to open in external browser
-            if (e.Url.ToString() != initialUrl)
-            {
-                e.Cancel = true;
-                Process.Start("explorer.exe", e.Url.ToString());
-            }
-        }
+        }        
 
         // ---------------------------------------------------------------------
         // Form events
@@ -653,11 +635,11 @@ How-to add or update something yourself:\par
         }
 
         // ---------------------------------------------------------------------
-        // Lists of components (left side listBox2 -> listBox1)
+        // Lists of components
 
         private void InitializeComponentCategories()
         {
-            listBox2.Items.Clear();
+            listBoxCategories.Items.Clear();
 
             var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
@@ -665,29 +647,31 @@ How-to add or update something yourself:\par
             {
                 foreach (ComponentBoard component in foundBoard.Components)
                 {
-                    if (!string.IsNullOrEmpty(component.Type) && !listBox2.Items.Contains(component.Type))
+                    if (!string.IsNullOrEmpty(component.Type) && !listBoxCategories.Items.Contains(component.Type))
                     {
-                        listBox2.Items.Add(component.Type);
+                        listBoxCategories.Items.Add(component.Type);
                     }
                 }
             }
 
+            /*
             // Auto-select all
             for (int i = 0; i < listBox2.Items.Count; i++)
             {
                 listBox2.SetSelected(i, true);
             }
+            */
         }
 
         private void InitializeComponentList(bool clearList = true)
         {
             // Keep track of currently selected items
-            foreach (var item in listBox1.SelectedItems)
+            foreach (var item in listBoxComponents.SelectedItems)
             {
                 selectedItems.Add(listBoxNameValueMapping[item.ToString()]);
             }
 
-            listBox1.Items.Clear();
+            listBoxComponents.Items.Clear();
             listBoxNameValueMapping.Clear();
 
             var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
@@ -696,16 +680,18 @@ How-to add or update something yourself:\par
             {
                 foreach (ComponentBoard comp in foundBoard.Components)
                 {
-                    if (listBox2.SelectedItems.Contains(comp.Type))
+                    if (listBoxCategories.SelectedItems.Contains(comp.Type))
                     {
-                        string displayText = comp.Label + "   " + comp.NameTechnical + "   " + comp.NameFriendly;
-                        listBox1.Items.Add(displayText);
+                        string displayText = comp.Label;
+                        displayText += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
+                        displayText += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
+                        listBoxComponents.Items.Add(displayText);
                         listBoxNameValueMapping[displayText] = comp.Label;
 
                         if (selectedItems.Contains(comp.Label))
                         {
-                            int idx = listBox1.Items.IndexOf(displayText);
-                            listBox1.SetSelected(idx, true);
+                            int idx = listBoxComponents.Items.IndexOf(displayText);
+                            listBoxComponents.SetSelected(idx, true);
                         }
                     }
                 }
@@ -737,7 +723,7 @@ How-to add or update something yourself:\par
             );
 
             // Clear old controls
-            panelZoom.Controls.Clear();
+            panelMain.Controls.Clear();
             overlayComponentsTab.Clear();
             overlayComponentsTabOriginalSizes.Clear();
             overlayComponentsTabOriginalLocations.Clear();
@@ -746,14 +732,14 @@ How-to add or update something yourself:\par
             CreateOverlayArraysToTab();
 
             // Create scrolling container
-            panelMain = new CustomPanel
+            panelZoom = new CustomPanel
             {
-                Size = new Size(panelZoom.Width - panelListMain.Width - 25, panelZoom.Height),
+                Size = new Size(panelMain.Width - panelListMain.Width - 25, panelMain.Height),
                 AutoScroll = true,
                 Dock = DockStyle.Fill
             };
-            panelMain.DoubleBuffered(true);
-            panelZoom.Controls.Add(panelMain);
+            panelZoom.DoubleBuffered(true);
+            panelMain.Controls.Add(panelZoom);
 
             // Create panelImage for the main picture
             panelImage = new Panel
@@ -764,7 +750,7 @@ How-to add or update something yourself:\par
                 Dock = DockStyle.None
             };
             panelImage.DoubleBuffered(true);
-            panelMain.Controls.Add(panelImage);
+            panelZoom.Controls.Add(panelImage);
 
             // Create overlay panel on top
             overlayPanel = new OverlayPanel
@@ -795,7 +781,7 @@ How-to add or update something yourself:\par
                 Anchor = AnchorStyles.Top | AnchorStyles.Left
             };
             labelFile.DoubleBuffered(true);
-            panelZoom.Controls.Add(labelFile);
+            panelMain.Controls.Add(labelFile);
             labelFile.BringToFront();
 
             // Top-left label: hovered component name
@@ -812,13 +798,13 @@ How-to add or update something yourself:\par
                 Anchor = AnchorStyles.Top | AnchorStyles.Left
             };
             labelComponent.DoubleBuffered(true);
-            panelZoom.Controls.Add(labelComponent);
+            panelMain.Controls.Add(labelComponent);
             labelComponent.BringToFront();
 
             // Finish up
             ResizeTabImage();
-            panelMain.CustomMouseWheel += PanelMain_MouseWheel;
-            panelMain.Resize += PanelMain_Resize;
+            panelZoom.CustomMouseWheel += panelZoom_MouseWheel;
+            panelZoom.Resize += panelZoom_Resize;
 
             // THEN re-run the attach method:
             AttachClosePopupOnClick(this);
@@ -832,46 +818,79 @@ How-to add or update something yourself:\par
             AdjustImageSizes();
         }
 
+
+
+
         private void InitializeList()
         {
             panelListAutoscroll.Controls.Clear();
             overlayPanelsList.Clear();
             overlayListZoomFactors.Clear();
 
-            int yPosition = 5;
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (bd == null) return;
 
+            int yPosition = 5;
+            int availableWidth = panelListAutoscroll.ClientSize.Width;
+
             foreach (BoardFile file in bd.Files)
             {
-                // Load background image
                 string path = Path.Combine(Application.StartupPath, "Data", hardwareSelectedFolder, boardSelectedFolder, file.FileName);
                 Image image2 = Image.FromFile(path);
 
+                // Create a container panel for the label and image.
+                Panel thumbnailContainer = new Panel
+                {
+                    Name = file.Name + "_container",
+//                    BorderStyle = BorderStyle.FixedSingle,
+                    BorderStyle = BorderStyle.None,
+                    Location = new Point(0, yPosition),
+                    Padding = new Padding(0),
+                    Margin = new Padding(0)
+                };
+                thumbnailContainer.DoubleBuffered(true);
+
+                // Create the label (shown on top).
+                Label labelListFile = new Label
+                {
+                    Text = file.Name,
+                    AutoSize = false,
+                    Dock = DockStyle.Top,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    BackColor = Color.Khaki,
+                    ForeColor = Color.Black,
+                    Font = new Font("Calibri", 9),
+                    Padding = new Padding(2),
+                    Margin = new Padding(0),
+                    Location = new Point(0, 0)
+                };
+                labelListFile.Height = TextRenderer.MeasureText(labelListFile.Text, labelListFile.Font).Height + labelListFile.Padding.Top + labelListFile.Padding.Bottom + 2;
+                labelListFile.DoubleBuffered(true);
+                thumbnailContainer.Controls.Add(labelListFile);
+
+                // Create the image panel (shown below the label).
                 Panel panelList2 = new Panel
                 {
                     Name = file.Name,
                     BackgroundImage = image2,
                     BackgroundImageLayout = ImageLayout.Zoom,
-                    Location = new Point(0, yPosition),
-                    Dock = DockStyle.None,
                     Padding = new Padding(0),
                     Margin = new Padding(0)
                 };
                 panelList2.DoubleBuffered(true);
+                // Temporary size; final size will be set in AdjustImageSizes()
+                panelList2.Size = new Size(200, 150);
+                panelList2.Location = new Point(0, labelListFile.Height);
 
-                // Initial size calculation
-                float xZoomFactor = (float)panelListAutoscroll.ClientSize.Width / image2.Width;
-                float yZoomFactor = (float)panelListAutoscroll.ClientSize.Height / image2.Height;
-                float zoomFactor = Math.Min(xZoomFactor, yZoomFactor);
-
+                int margin = 3;
+                panelList2.Location = new Point(margin, labelListFile.Height + margin);
                 panelList2.Size = new Size(
-                    (int)(image2.Width * zoomFactor),
-                    (int)(image2.Height * zoomFactor)
+                    availableWidth - margin * 2,
+                    150 - margin * 2
                 );
 
-                // Overlay panel on top
+                // Create and add the overlay panel to the image panel.
                 OverlayPanel overlayPanelList = new OverlayPanel
                 {
                     Bounds = panelList2.ClientRectangle
@@ -879,69 +898,128 @@ How-to add or update something yourself:\par
                 panelList2.Controls.Add(overlayPanelList);
                 overlayPanelList.BringToFront();
 
-                // Left-click empty space => pick main image
                 overlayPanelList.OverlayPanelMouseDown += (s, e2) =>
                 {
                     if (e2.Button == MouseButtons.Left)
-                    {
                         OnListImageLeftClicked(panelList2);
-                    }
                 };
-
-                // Store references for overlay drawing
-                overlayPanelsList[file.Name] = overlayPanelList;
-                overlayListZoomFactors[file.Name] = zoomFactor;
-
-                // Label for file name
-                Label labelListFile = new Label
+                overlayPanelList.OverlayClicked += (s, e2) =>
                 {
-                    Text = file.Name,
-                    Location = new Point(0, 0),
-                    BorderStyle = BorderStyle.FixedSingle,
-                    AutoSize = true,
-                    BackColor = Color.Khaki,
-                    ForeColor = Color.Black,
-                    Font = new Font("Calibri", 9),
-                    Padding = new Padding(2),
-                    Margin = new Padding(0)
+                    if (e2.MouseArgs.Button == MouseButtons.Left)
+                        OnListImageLeftClicked(panelList2);
                 };
-                labelListFile.DoubleBuffered(true);
-                labelListFile.Parent = panelList2;
-                labelListFile.BringToFront();
 
-                panelListAutoscroll.Controls.Add(panelList2);
-                yPosition += panelList2.Height + 3;
+                overlayPanelsList[file.Name] = overlayPanelList;
+                overlayListZoomFactors[file.Name] = 1.0f;
+
+                // Add the image panel to the container.
+                thumbnailContainer.Controls.Add(panelList2);
+
+                // Set the container's size based on its children.
+                thumbnailContainer.Size = new Size(availableWidth, labelListFile.Height + panelList2.Height);
+                thumbnailContainer.Location = new Point(0, yPosition);
+                panelListAutoscroll.Controls.Add(thumbnailContainer);
+
+                panelListAutoscroll.AutoScroll = true;
+                panelListAutoscroll.HorizontalScroll.Enabled = false;
+                panelListAutoscroll.HorizontalScroll.Visible = false;
+
+//                yPosition += thumbnailContainer.Height + 5;
+                yPosition += thumbnailContainer.Height + 10;
             }
 
-            // Adjust the height of the panelListAutoscroll to fit the thumbnails
-            panelListAutoscroll.AutoScrollMinSize = new Size(0, yPosition + 5);
-
+            AdjustImageSizes();
             DrawBorderInList();
             HighlightOverlays("list");
         }
 
+        private void RefreshThumbnailLabels()
+        {
+            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            if (bd == null) return;
+
+            foreach (var file in bd.Files)
+            {
+                // Now search for the container panel (instead of panel with file.Name)
+                var container = panelListAutoscroll.Controls
+                    .OfType<Panel>()
+                    .FirstOrDefault(p => p.Name == file.Name + "_container");
+                if (container == null) continue;
+
+                // Find the label inside the container panel.
+                var labelListFile = container.Controls.OfType<Label>().FirstOrDefault();
+                if (labelListFile == null) continue;
+
+                bool hasSelectedComponent = listBoxSelectedActualValues.Any(selectedLabel =>
+                {
+                    var compBounds = file.Components.FirstOrDefault(c => c.Label == selectedLabel);
+                    return compBounds != null && compBounds.Overlays != null && compBounds.Overlays.Count > 0;
+                });
+
+                if (hasSelectedComponent)
+                {
+                    labelListFile.Text = "* " + file.Name;
+                    labelListFile.BackColor = Color.IndianRed;
+                    labelListFile.ForeColor = Color.White;
+                }
+                else
+                {
+                    labelListFile.Text = file.Name;
+                    labelListFile.BackColor = Color.Khaki;
+                    labelListFile.ForeColor = Color.Black;
+                }
+            }
+        }
+
+        // 2) Call this new method at the end of your UpdateHighlights() method:
+
         private void AdjustImageSizes()
         {
-            int scrollbarWidth = panelListAutoscroll.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth - 14: 0;
-            int availableWidth = panelListAutoscroll.ClientSize.Width - scrollbarWidth;
 
+            // Right before resizing
+            Debug.WriteLine($"[AdjustImageSizes] Before resizing: " +
+                            $"splitterDistance={splitContainerSchematics.SplitterDistance}");
+
+            int scrollbarWidth = panelListAutoscroll.VerticalScroll.Visible
+                ? SystemInformation.VerticalScrollBarWidth - 14
+                : 0;
+            int availableWidth = panelListAutoscroll.ClientSize.Width - scrollbarWidth;
             int yPosition = 5;
 
-            foreach (Panel panelList2 in panelListAutoscroll.Controls.OfType<Panel>())
+            foreach (Panel container in panelListAutoscroll.Controls.OfType<Panel>())
             {
-                if (panelList2.BackgroundImage != null)
+                if (container.Controls.Count < 2) continue;
+                Label lbl = container.Controls[0] as Label;
+                Panel imagePanel = container.Controls[1] as Panel;
+                if (imagePanel?.BackgroundImage == null) continue;
+
+                float aspectRatio = (float)imagePanel.BackgroundImage.Height / imagePanel.BackgroundImage.Width;
+                int newImageHeight = (int)(availableWidth * aspectRatio);
+
+                imagePanel.Bounds = new Rectangle(0, lbl.Height, availableWidth, newImageHeight);
+                container.Size = new Size(availableWidth, lbl.Height + newImageHeight);
+                container.Location = new Point(0, yPosition);
+
+//                yPosition += container.Height + 5;
+                yPosition += container.Height + 10;
+
+                float scaleFactor = (float)availableWidth / imagePanel.BackgroundImage.Width;
+                string key = container.Name.Replace("_container", "");
+                overlayListZoomFactors[key] = scaleFactor;
+                if (overlayPanelsList.ContainsKey(key))
                 {
-                    float aspectRatio = (float)panelList2.BackgroundImage.Height / panelList2.BackgroundImage.Width;
-                    int newHeight = (int)(availableWidth * aspectRatio);
-
-                    panelList2.Bounds = new Rectangle(0, yPosition, availableWidth, newHeight);
-
-                    yPosition += newHeight + 5; // 5px spacing between panels
+                    overlayPanelsList[key].Bounds = imagePanel.ClientRectangle;
                 }
             }
 
-            // Adjust the height of the panelListAutoscroll to fit the thumbnails
-            panelListAutoscroll.AutoScrollMinSize = new Size(0, yPosition + 5);
+//            panelListAutoscroll.AutoScrollMinSize = new Size(0, yPosition + 5);
+            panelListAutoscroll.AutoScrollMinSize = new Size(0, yPosition + 10);
+            HighlightOverlays("list");
+
+            // Right after resizing
+            Debug.WriteLine($"[AdjustImageSizes] After resizing: " +
+                            $"splitterDistance={splitContainerSchematics.SplitterDistance}");
         }
 
 
@@ -988,12 +1066,14 @@ How-to add or update something yourself:\par
 
         private void DrawBorderInList()
         {
+            string selectedContainer = imageSelectedName + "_container";
+
             foreach (Panel panel in panelListAutoscroll.Controls.OfType<Panel>())
             {
                 panel.Paint -= Panel_Paint_Standard;
                 panel.Paint -= Panel_Paint_Special;
 
-                if (panel.Name == imageSelectedName)
+                if (panel.Name == selectedContainer)
                 {
                     panel.Paint += Panel_Paint_Special;
                 }
@@ -1050,22 +1130,23 @@ How-to add or update something yourself:\par
         private void listBox2_SelectedIndexChanged(object sender, EventArgs e)
         {
             InitializeComponentList(false);
+            SaveSelectedCategories(); // Save the user’s chosen categories
             UpdateHighlights();
         }
 
         // "Clear Selection" button
         private void button1_Click(object sender, EventArgs e)
         {
-            listBox1.SelectedIndex = -1;
+            listBoxComponents.SelectedIndex = -1;
             UpdateHighlights();
         }
 
         // "Select All" button
         private void button2_Click(object sender, EventArgs e)
         {
-            for (int i = 0; i < listBox1.Items.Count; i++)
+            for (int i = 0; i < listBoxComponents.Items.Count; i++)
             {
-                listBox1.SetSelected(i, true);
+                listBoxComponents.SetSelected(i, true);
             }
             UpdateHighlights();
         }
@@ -1075,17 +1156,17 @@ How-to add or update something yourself:\par
 
         private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            comboBox2.Items.Clear();
-            hardwareSelectedName = comboBox1.SelectedItem.ToString();
+            comboBoxBoard.Items.Clear();
+            hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
 
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             if (hw != null)
             {
                 foreach (var board in hw.Boards)
                 {
-                    comboBox2.Items.Add(board.Name);
+                    comboBoxBoard.Items.Add(board.Name);
                 }
-                comboBox2.SelectedIndex = 0;
+                comboBoxBoard.SelectedIndex = 0;
             }
         }
 
@@ -1102,8 +1183,8 @@ How-to add or update something yourself:\par
         {
             if (image == null) return;
 
-            float xZoomFactor = (float)panelMain.Width / image.Width;
-            float yZoomFactor = (float)panelMain.Height / image.Height;
+            float xZoomFactor = (float)panelZoom.Width / image.Width;
+            float yZoomFactor = (float)panelZoom.Height / image.Height;
             zoomFactor = Math.Min(xZoomFactor, yZoomFactor);
 
             panelImage.Size = new Size(
@@ -1113,7 +1194,7 @@ How-to add or update something yourself:\par
             HighlightOverlays("tab");
         }
 
-        private void PanelMain_Resize(object sender, EventArgs e)
+        private void panelZoom_Resize(object sender, EventArgs e)
         {
             if (!isResizedByMouseWheel)
             {
@@ -1122,9 +1203,9 @@ How-to add or update something yourself:\par
             isResizedByMouseWheel = false;
         }
 
-        private void PanelMain_MouseWheel(object sender, MouseEventArgs e)
+        private void panelZoom_MouseWheel(object sender, MouseEventArgs e)
         {
-            ControlUpdateHelper.BeginControlUpdate(panelMain);
+            ControlUpdateHelper.BeginControlUpdate(panelZoom);
 
             Debug.WriteLine("MouseWheel event");
 
@@ -1144,7 +1225,7 @@ How-to add or update something yourself:\par
                 else // scrolling down => zoom out
                 {
                     // Only zoom out if the image is bigger than the container
-                    if (panelImage.Width > panelMain.Width || panelImage.Height > panelMain.Height)
+                    if (panelImage.Width > panelZoom.Width || panelImage.Height > panelZoom.Height)
                     {
                         zoomFactor /= 1.5f;
                         hasZoomChanged = true;
@@ -1163,8 +1244,8 @@ How-to add or update something yourself:\par
 
                     // 3) Figure out how to keep the same "point under mouse"
                     Point mousePosition = new Point(
-                        e.X - panelMain.AutoScrollPosition.X,
-                        e.Y - panelMain.AutoScrollPosition.Y
+                        e.X - panelZoom.AutoScrollPosition.X,
+                        e.Y - panelZoom.AutoScrollPosition.Y
                     );
 
                     Point newScrollPosition = new Point(
@@ -1176,7 +1257,7 @@ How-to add or update something yourself:\par
                     panelImage.Size = newSize;
 
                     // 5) Update the scroll position
-                    panelMain.AutoScrollPosition = new Point(
+                    panelZoom.AutoScrollPosition = new Point(
                         newScrollPosition.X - e.X,
                         newScrollPosition.Y - e.Y
                     );
@@ -1187,7 +1268,7 @@ How-to add or update something yourself:\par
             }
             finally
             {
-                ControlUpdateHelper.EndControlUpdate(panelMain);
+                ControlUpdateHelper.EndControlUpdate(panelZoom);
             }
         }
 
@@ -1228,6 +1309,7 @@ How-to add or update something yourself:\par
             }
         }
 
+/*
         private void CreateOverlayArraysToList()
         {
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
@@ -1261,6 +1343,7 @@ How-to add or update something yourself:\par
                 }
             }
         }
+*/
 
         // ---------------------------------------------------------------------
         // Handling highlight overlays
@@ -1356,7 +1439,7 @@ How-to add or update something yourself:\par
             listBoxSelectedActualValues.Clear();
 
             // Build a list of actual component labels from selected items
-            foreach (var selectedItem in listBox1.SelectedItems)
+            foreach (var selectedItem in listBoxComponents.SelectedItems)
             {
                 string displayText = selectedItem.ToString();
                 if (listBoxNameValueMapping.TryGetValue(displayText, out string actualValue))
@@ -1367,6 +1450,9 @@ How-to add or update something yourself:\par
 
             HighlightOverlays("tab");
             HighlightOverlays("list");
+
+            // Refresh the thumbnail labels to show asterisks
+            RefreshThumbnailLabels();
         }
 
         // ---------------------------------------------------------------------
@@ -1384,13 +1470,13 @@ How-to add or update something yourself:\par
                 string key = listBoxNameValueMapping
                     .FirstOrDefault(x => x.Value == labelClicked)
                     .Key; // e.g. "R12   74LS257   DataBusChip"
-                int index = listBox1.FindString(key);
+                int index = listBoxComponents.FindString(key);
                 if (index >= 0)
                 {
                     // Make sure it's selected (force highlight)
-                    if (!listBox1.GetSelected(index))
+                    if (!listBoxComponents.GetSelected(index))
                     {
-                        listBox1.SetSelected(index, true);
+                        listBoxComponents.SetSelected(index, true);
                     }
                 }
                 else
@@ -1428,12 +1514,12 @@ How-to add or update something yourself:\par
                 string key = listBoxNameValueMapping
                     .FirstOrDefault(x => x.Value == labelClicked)
                     .Key;
-                int index = listBox1.FindString(key);
+                int index = listBoxComponents.FindString(key);
 
                 if (index >= 0)
                 {
-                    bool currentlySelected = listBox1.GetSelected(index);
-                    listBox1.SetSelected(index, !currentlySelected);
+                    bool currentlySelected = listBoxComponents.GetSelected(index);
+                    listBoxComponents.SetSelected(index, !currentlySelected);
                 }
                 else
                 {
@@ -1442,9 +1528,9 @@ How-to add or update something yourself:\par
                     {
                         if (item.Value == labelClicked)
                         {
-                            listBox1.Items.Add(item.Key);
-                            int newIndex = listBox1.FindString(item.Key);
-                            listBox1.SetSelected(newIndex, true);
+                            listBoxComponents.Items.Add(item.Key);
+                            int newIndex = listBoxComponents.FindString(item.Key);
+                            listBoxComponents.SetSelected(newIndex, true);
                             break;
                         }
                     }
@@ -1468,7 +1554,9 @@ How-to add or update something yourself:\par
 
                 if (comp != null)
                 {
-                    labelComponent.Text = comp.Label + " | " + comp.NameTechnical + " | " + comp.NameFriendly;
+                    labelComponent.Text = comp.Label;
+                    labelComponent.Text += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
+                    labelComponent.Text += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
                 }
                 else
                 {
@@ -1500,9 +1588,9 @@ How-to add or update something yourself:\par
             {
                 int dx = e.X - overlayPanelLastMousePos.X;
                 int dy = e.Y - overlayPanelLastMousePos.Y;
-                panelMain.AutoScrollPosition = new Point(
-                    -panelMain.AutoScrollPosition.X - dx,
-                    -panelMain.AutoScrollPosition.Y - dy
+                panelZoom.AutoScrollPosition = new Point(
+                    -panelZoom.AutoScrollPosition.X - dx,
+                    -panelZoom.AutoScrollPosition.Y - dy
                 );
             }
         }
@@ -1518,6 +1606,7 @@ How-to add or update something yourself:\par
 
         private void splitContainer1_SplitterMoved(object sender, SplitterEventArgs e)
         {
+            Debug.WriteLine(splitContainerSchematics.SplitterDistance);
             InitializeList();
         }
 
@@ -1583,7 +1672,7 @@ How-to add or update something yourself:\par
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            if (tabControl1.SelectedTab.Text == "Schematics")
+            if (tabControl.SelectedTab.Text == "Schematics")
             {
                 // Fullscreen mode toggle
                 if (keyData == Keys.F11)
@@ -1601,7 +1690,7 @@ How-to add or update something yourself:\par
             // Toggle checkBox1 with SPACE key
             if (keyData == Keys.Space)
             {
-                checkBox1.Checked = !checkBox1.Checked;
+                checkBoxBlink.Checked = !checkBoxBlink.Checked;
                 return true;
             }
 
@@ -1610,13 +1699,13 @@ How-to add or update something yourself:\par
 
         private void tabControl1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (tabControl1.SelectedTab.Text == "Ressources" || tabControl1.SelectedTab.Text == "About")
+            if (tabControl.SelectedTab.Text == "Schematics")
             {
-                buttonFullscreen.Enabled = false;
+                buttonFullscreen.Enabled = true;
             }
             else
             {
-                buttonFullscreen.Enabled = true;
+                buttonFullscreen.Enabled = false;
             }
         }
 
@@ -1624,6 +1713,60 @@ How-to add or update something yourself:\par
         {
             Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
         }
+
+        private void SaveSelectedCategories()
+        {
+            // 1) Build a unique config key from hardware and board
+            string configKey = $"SelectedCategories|{hardwareSelectedName}|{boardSelectedName}";
+
+            // 2) Gather selected categories from listBox2
+            var selectedCategories = listBoxCategories.SelectedItems
+                .Cast<object>()
+                .Select(item => item.ToString());
+
+            // 3) Join them into a single string (e.g. CSV)
+            string joined = string.Join(";", selectedCategories);
+
+            // 4) Save to config
+            Configuration.SaveSetting(configKey, joined);
+        }
+
+
+        private bool LoadSelectedCategories()
+        {
+
+            Debug.WriteLine($"Hardware name = '{hardwareSelectedName}' (length={hardwareSelectedName.Length})");
+            Debug.WriteLine($"Board name    = '{boardSelectedName}'   (length={boardSelectedName.Length})");
+
+            // e.g. "SelectedCategories|C128|310378"
+            string configKey = $"SelectedCategories|{hardwareSelectedName}|{boardSelectedName}";
+            Debug.WriteLine($"Looking for configKey = '{configKey}'");
+            string joined = Configuration.GetSetting(configKey, "");
+
+            if (string.IsNullOrEmpty(joined))
+            {
+                // No saved categories => return false so we can fallback
+                return false;
+            }
+
+            listBoxCategories.ClearSelected();
+            string[] categories = joined.Split(';');
+            foreach (string cat in categories)
+            {
+                int idx = listBoxCategories.Items.IndexOf(cat);
+                if (idx >= 0)
+                {
+                    listBoxCategories.SetSelected(idx, true);
+                }
+            }
+            return true;
+        }
+
+        private void Main_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            Configuration.SaveSetting("WindowState", this.WindowState.ToString());
+        }
+
     }
 
 

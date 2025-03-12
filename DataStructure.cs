@@ -170,8 +170,9 @@ namespace Commodore_Repair_Toolbox
                             string filePinout = worksheet.Cells[row, 5].Value?.ToString() ?? "";
                             string oneliner = worksheet.Cells[row, 6].Value?.ToString() ?? "";
                             string description = worksheet.Cells[row, 7].Text;
-                            description = description.Replace(((char)10).ToString(), Environment.NewLine);
-                            description = description.Replace(((char)13).ToString(), Environment.NewLine);
+//                            description = description.Replace(((char)10).ToString(), Environment.NewLine);
+//                            description = description.Replace(((char)13).ToString(), Environment.NewLine);
+                            description = description.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", Environment.NewLine);
 
                             ComponentBoard comp = new ComponentBoard
                             {
@@ -369,6 +370,8 @@ namespace Commodore_Repair_Toolbox
                     }
                 }
             }
+
+
         }
     }
 }

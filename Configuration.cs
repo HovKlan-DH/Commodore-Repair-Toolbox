@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -17,10 +18,20 @@ namespace Commodore_Repair_Toolbox
             if (File.Exists(filePath))
             {
                 settings = File.ReadAllLines(filePath)
-                    .Select(line => line.Split('='))
+                    .Select(line => line.Split(new[] { '=' }, 2))
                     .Where(parts => parts.Length == 2)
-                    .ToDictionary(parts => parts[0], parts => parts[1]);
+                    .ToDictionary(
+                        parts => parts[0].Trim(),  // remove trailing space
+                        parts => parts[1].Trim()
+                    );
             }
+
+            Debug.WriteLine("=== Config keys loaded ===");
+            foreach (var kv in settings)
+            {
+                Debug.WriteLine($"'{kv.Key}' => '{kv.Value}'");
+            }
+            Debug.WriteLine("==========================");
         }
 
         public static void SaveConfig()
