@@ -51,7 +51,7 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 - Fix "Ressources" tab should be taken from Excel file instead via web
 - ~~Change component list is a little easier to look at (remove questionmark)~~ (fixed in next release)
 - ~~Show asterisk (*) in thumbnail label, when chosen component is visible in thumbnail image~~ (fixed in next release)
-- Label in thumnail should not float above image (show label first, then image below)
+- ~~Label in thumnail should not float above image (show label first, then image below)~~ (fixed in next release)
 - Configuration file - refactor it and save more configuration:
   - Selected component categories per board
   - Start in same size as last (maximized or window)
