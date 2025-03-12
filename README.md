@@ -47,7 +47,7 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 # Near-term TODO
 
 - Fix highlights in thumbnail images have gone rogue
-- Fix clicking in thumbnail cannot activate image, if clicked at component location
+- Fix clicking in thumbnail image cannot activate image, if clicked at component location
 - Fix "Ressources" tab should be taken from Excel file instead via web
 - Change component list is a little easier to look at (remove questionmark)
 - Show asterisk (*) in thumbnail label, when chosen component is visible in thumbnail image
