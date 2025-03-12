@@ -49,7 +49,7 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 - ~~Fix highlights in thumbnail images have gone rogue~~ (fixed in next release)
 - ~~Fix clicking in thumbnail image cannot activate image, if clicked at component location~~ (fixed in next release)
 - Fix "Ressources" tab should be taken from Excel file instead via web
-- Change component list is a little easier to look at (remove questionmark)
+- ~~Change component list is a little easier to look at (remove questionmark)~~ (fixed in next release)
 - ~~Show asterisk (*) in thumbnail label, when chosen component is visible in thumbnail image~~ (fixed in next release)
 - Label in thumnail should not float above image (show label first, then image below)
 - Configuration file - refactor it and save more configuration:
