@@ -36,11 +36,12 @@
             this.panelListMain = new System.Windows.Forms.Panel();
             this.panelListAutoscroll = new System.Windows.Forms.Panel();
             this.tabRessources = new System.Windows.Forms.TabPage();
+            this.richTextBoxRessources = new System.Windows.Forms.RichTextBox();
+            this.label1 = new System.Windows.Forms.Label();
             this.tabHelp = new System.Windows.Forms.TabPage();
             this.labelHelp = new System.Windows.Forms.Label();
             this.richTextBoxHelp = new System.Windows.Forms.RichTextBox();
             this.tabAbout = new System.Windows.Forms.TabPage();
-            this.label3 = new System.Windows.Forms.Label();
             this.richTextBoxAbout = new System.Windows.Forms.RichTextBox();
             this.labelAboutVersion = new System.Windows.Forms.Label();
             this.labelAboutHeadline = new System.Windows.Forms.Label();
@@ -58,9 +59,8 @@
             this.buttonAll = new System.Windows.Forms.Button();
             this.buttonFullscreen = new System.Windows.Forms.Button();
             this.panelBehindTab = new System.Windows.Forms.Panel();
+            this.textBox1 = new System.Windows.Forms.TextBox();
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
-            this.label1 = new System.Windows.Forms.Label();
-            this.richTextBoxRessources = new System.Windows.Forms.RichTextBox();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -165,6 +165,27 @@
             this.tabRessources.TabIndex = 3;
             this.tabRessources.Text = "Ressources";
             // 
+            // richTextBoxRessources
+            // 
+            this.richTextBoxRessources.BackColor = System.Drawing.Color.White;
+            this.richTextBoxRessources.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.richTextBoxRessources.Location = new System.Drawing.Point(17, 57);
+            this.richTextBoxRessources.Name = "richTextBoxRessources";
+            this.richTextBoxRessources.ReadOnly = true;
+            this.richTextBoxRessources.Size = new System.Drawing.Size(682, 463);
+            this.richTextBoxRessources.TabIndex = 3;
+            this.richTextBoxRessources.Text = "Text set in code ...";
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.Location = new System.Drawing.Point(13, 19);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(348, 21);
+            this.label1.TabIndex = 2;
+            this.label1.Text = "Ressources for troubleshooting and information";
+            // 
             // tabHelp
             // 
             this.tabHelp.BackColor = System.Drawing.Color.White;
@@ -202,7 +223,6 @@
             // tabAbout
             // 
             this.tabAbout.BackColor = System.Drawing.Color.White;
-            this.tabAbout.Controls.Add(this.label3);
             this.tabAbout.Controls.Add(this.richTextBoxAbout);
             this.tabAbout.Controls.Add(this.labelAboutVersion);
             this.tabAbout.Controls.Add(this.labelAboutHeadline);
@@ -213,17 +233,6 @@
             this.tabAbout.Size = new System.Drawing.Size(713, 536);
             this.tabAbout.TabIndex = 5;
             this.tabAbout.Text = "About";
-            // 
-            // label3
-            // 
-            this.label3.AutoSize = true;
-            this.label3.Font = new System.Drawing.Font("Calibri", 90F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label3.ForeColor = System.Drawing.Color.IndianRed;
-            this.label3.Location = new System.Drawing.Point(168, 240);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(380, 183);
-            this.label3.TabIndex = 5;
-            this.label3.Text = "BETA";
             // 
             // richTextBoxAbout
             // 
@@ -317,7 +326,7 @@
             this.listBoxComponents.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.listBoxComponents.Name = "listBoxComponents";
             this.listBoxComponents.SelectionMode = System.Windows.Forms.SelectionMode.MultiSimple;
-            this.listBoxComponents.Size = new System.Drawing.Size(273, 277);
+            this.listBoxComponents.Size = new System.Drawing.Size(273, 235);
             this.listBoxComponents.TabIndex = 7;
             this.listBoxComponents.SelectedIndexChanged += new System.EventHandler(this.listBox1_SelectedIndexChanged);
             // 
@@ -429,6 +438,14 @@
             this.panelBehindTab.Size = new System.Drawing.Size(771, 627);
             this.panelBehindTab.TabIndex = 14;
             // 
+            // textBox1
+            // 
+            this.textBox1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.textBox1.Location = new System.Drawing.Point(12, 544);
+            this.textBox1.Name = "textBox1";
+            this.textBox1.Size = new System.Drawing.Size(273, 28);
+            this.textBox1.TabIndex = 1;
+            // 
             // checkBoxBlink
             // 
             this.checkBoxBlink.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
@@ -442,33 +459,13 @@
             this.checkBoxBlink.Text = "Blink selected components";
             this.checkBoxBlink.UseVisualStyleBackColor = true;
             // 
-            // label1
-            // 
-            this.label1.AutoSize = true;
-            this.label1.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label1.Location = new System.Drawing.Point(13, 19);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(348, 21);
-            this.label1.TabIndex = 2;
-            this.label1.Text = "Ressources for troubleshooting and information";
-            // 
-            // richTextBoxRessources
-            // 
-            this.richTextBoxRessources.BackColor = System.Drawing.Color.White;
-            this.richTextBoxRessources.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.richTextBoxRessources.Location = new System.Drawing.Point(17, 57);
-            this.richTextBoxRessources.Name = "richTextBoxRessources";
-            this.richTextBoxRessources.ReadOnly = true;
-            this.richTextBoxRessources.Size = new System.Drawing.Size(682, 463);
-            this.richTextBoxRessources.TabIndex = 3;
-            this.richTextBoxRessources.Text = "Text set in code ...";
-            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 21F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.WhiteSmoke;
             this.ClientSize = new System.Drawing.Size(1082, 653);
+            this.Controls.Add(this.textBox1);
             this.Controls.Add(this.checkBoxBlink);
             this.Controls.Add(this.panelBehindTab);
             this.Controls.Add(this.buttonFullscreen);
@@ -539,8 +536,8 @@
         private System.Windows.Forms.RichTextBox richTextBoxAbout;
         private System.Windows.Forms.RichTextBox richTextBoxHelp;
         private System.Windows.Forms.Label labelHelp;
-        private System.Windows.Forms.Label label3;
         private System.Windows.Forms.RichTextBox richTextBoxRessources;
         private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.TextBox textBox1;
     }
 }

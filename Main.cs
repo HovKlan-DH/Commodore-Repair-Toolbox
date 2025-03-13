@@ -1,21 +1,14 @@
-﻿using Commodore_Repair_Toolbox;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
+using System.Net;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Forms;
-
-/*
-
-VGG Image Annotator
-https://www.robots.ox.ac.uk/~vgg/software/via/
-
-*/
 
 namespace Commodore_Repair_Toolbox
 {
@@ -88,7 +81,12 @@ namespace Commodore_Repair_Toolbox
         private Point overlayPanelLastMousePos = Point.Empty;
 
         // URL for webBrowser pre-check
-        private string initialUrl = "https://commodore-repair-toolbox.dk/hest1";
+//        private string initialUrl = "https://commodore-repair-toolbox.dk/hest1";
+
+        private static string buildType = ""; // Debug, Release
+        private static string appVer = "";
+        private static string onlineAvailableVersion = "";
+        private static string urlCheckOnlineVersion = "https://dennis.dk/crt/";
 
         // ---------------------------------------------------------------------
         // Constructor
@@ -150,6 +148,130 @@ How-to add or update something yourself:\par
 
             AttachEventHandlers();
 
+
+
+
+
+            // Get build type
+#if DEBUG
+            buildType = "Debug";
+#else
+            buildType = "Release";
+#endif
+
+            // Get application file version from assembly
+            Assembly assemblyInfo = Assembly.GetExecutingAssembly();
+            string assemblyVersion = FileVersionInfo.GetVersionInfo(assemblyInfo.Location).FileVersion;
+            string year = assemblyVersion.Substring(0, 4);
+            string month = assemblyVersion.Substring(5, 2);
+            string day = assemblyVersion.Substring(8, 2);
+            string rev = assemblyVersion.Substring(11); // will be ignored in RELEASE builds
+            switch (month)
+            {
+                case "01": month = "January"; break;
+                case "02": month = "February"; break;
+                case "03": month = "March"; break;
+                case "04": month = "April"; break;
+                case "05": month = "May"; break;
+                case "06": month = "June"; break;
+                case "07": month = "July"; break;
+                case "08": month = "August"; break;
+                case "09": month = "September"; break;
+                case "10": month = "October"; break;
+                case "11": month = "November"; break;
+                case "12": month = "December"; break;
+                default: month = "Unknown"; break;
+            }
+            day = day.TrimStart(new Char[] { '0' }); // remove leading zero
+            day = day.TrimEnd(new Char[] { '.' }); // remove last dot
+            string date = year + "-" + month + "-" + day;
+
+            // Beautify revision and build-type 
+            rev = "(rev. " + rev + ")";
+            rev = buildType == "Debug" ? rev : "";
+            string buildTypeTmp = buildType == "Debug" ? "# DEVELOPMENT " : "";
+
+            // Set the application version
+            appVer = (date + " " + buildTypeTmp + rev).Trim();
+            labelAboutVersion.Text = "Version: " + appVer;
+
+            CheckForUpdate();
+
+            // Attach the TextChanged event handler for textBox1
+            textBox1.TextChanged += TextBox1_TextChanged;
+
+
+            // Attach the Click event handler for the form and its child controls
+            AttachClickEventHandlers(this);
+
+            comboBoxHardware.DropDownClosed += ComboBox_DropDownClosed;
+            comboBoxBoard.DropDownClosed += ComboBox_DropDownClosed;
+
+            // Attach the SelectedIndexChanged event handler for listBoxCategories
+            listBoxCategories.SelectedIndexChanged += ListBoxCategories_SelectedIndexChanged;
+
+
+        }
+
+        private void AttachClickEventHandlers(Control parent)
+        {
+            if (!(parent is ComboBox))
+                parent.Click += (s, e) => textBox1.Focus();
+            foreach (Control child in parent.Controls)
+            {
+                AttachClickEventHandlers(child);
+            }
+        }
+
+
+        private void ComboBox_DropDownClosed(object sender, EventArgs e)
+        {
+            textBox1.Text = "";
+        }
+
+
+        private void ComboBoxHardware_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            Debug.WriteLine("ComboBoxHardware_SelectedIndexChanged called");
+            comboBoxBoard.SelectedIndexChanged -= ComboBoxBoard_SelectedIndexChanged; // Temporarily detach event handler
+            comboBoxBoard.Items.Clear();
+            hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
+
+            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            if (hw != null)
+            {
+                foreach (var board in hw.Boards)
+                {
+                    comboBoxBoard.Items.Add(board.Name);
+                }
+                comboBoxBoard.SelectedIndex = 0;
+            }
+
+            comboBoxBoard.SelectedIndexChanged += ComboBoxBoard_SelectedIndexChanged; // Reattach event handler
+
+            // Call FilterListBoxComponents to apply the filter after changing the ComboBox
+            FilterListBoxComponents();
+        }
+
+
+        private void ComboBoxBoard_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            Debug.WriteLine("ComboBoxBoard_SelectedIndexChanged called");
+            SetupNewBoard();
+            UpdateHighlights(); // Clear old highlights
+            FilterListBoxComponents(); // Apply filter after setting up new board
+        }
+
+        private void TextBox1_TextChanged(object sender, EventArgs e)
+        {
+            Debug.WriteLine("TextBox1_TextChanged called");
+            FilterListBoxComponents();
+        }
+
+        private void ListBoxCategories_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            Debug.WriteLine("ListBoxCategories_SelectedIndexChanged called");
+            FilterListBoxComponents();
         }
 
         /*
@@ -165,6 +287,8 @@ How-to add or update something yourself:\par
             * Fixed "Help" should not be accessible to fullscreen mode
             * Added show of asterisk/coloring in thumbnail label, when chosen component is visible in thumbnail
             * Added more text in "Help" tab 
+            * Added check for newer version online (info in "About" tab)
+            * Added filtering for components
             * Changed label in thumbnail so it no longer floats above the image, but is added before the image
             * Changed component list to now provide a simpler overview
         * Data:
@@ -176,6 +300,151 @@ How-to add or update something yourself:\par
        
         */
 
+
+        private int c = 0;
+        private bool isFiltering = false;
+
+
+        private void FilterListBoxComponents()
+        {
+            if (isFiltering) return;
+            isFiltering = true;
+
+            try
+            {
+                Debug.WriteLine("FilterListBoxComponents called");
+
+                string filterText = textBox1.Text.ToLower();
+                listBoxComponents.Items.Clear();
+                listBoxNameValueMapping.Clear();
+
+                var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+                var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+                if (foundBoard != null)
+                {
+                    c++;
+
+                    foreach (ComponentBoard comp in foundBoard.Components)
+                    {
+                        Debug.WriteLine("COUNTER: " + c);
+                        if (listBoxCategories.SelectedItems.Contains(comp.Type))
+                        {
+                            string displayText = comp.Label;
+                            displayText += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
+                            displayText += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
+
+                            if (string.IsNullOrEmpty(filterText) || displayText.ToLower().Contains(filterText))
+                            {
+                                Debug.WriteLine(displayText);
+                                listBoxComponents.Items.Add(displayText);
+                                listBoxNameValueMapping[displayText] = comp.Label;
+                            }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                isFiltering = false;
+            }
+        }
+
+
+        // ###########################################################################################
+        // Check for HovText updates online.
+        // Stable versions will be notified via popup.
+        // Development versions will be shown in "Advanced" tab only.
+        // ###########################################################################################
+
+        private void CheckForUpdate()
+        {
+            // Check for a new stable version
+            try
+            {
+                WebClient webClient = new WebClient();
+                ServicePointManager.Expect100Continue = true;
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+                webClient.Headers.Add("user-agent", ("CRT " + appVer).Trim());
+                
+                // Prepare the POST data
+                var postData = new System.Collections.Specialized.NameValueCollection
+                {
+                    { "control", "CRT" }
+                };
+
+                // Send the POST data to the server
+                byte[] responseBytes = webClient.UploadValues(urlCheckOnlineVersion, postData);
+
+                // Convert the response bytes to a string
+                onlineAvailableVersion = Encoding.UTF8.GetString(responseBytes);
+
+                // Download the new stable version
+                if (onlineAvailableVersion.Substring(0, 7) == "Version")
+                {
+                    onlineAvailableVersion = onlineAvailableVersion.Substring(9);
+                    Debug.WriteLine(appVer);
+                    Debug.WriteLine(onlineAvailableVersion);
+                    if (onlineAvailableVersion != appVer)
+                    {
+
+                        // Save existing RTF content
+                        string existingRtf = richTextBoxAbout.Rtf;
+
+                        // Define desired font size (e.g., 16pt = fs32)
+                        int desiredFontSize = 32; // 16pt
+
+                        // Ensure proper formatting with IndianRed color (RGB: 205, 92, 92)
+                        string indianRedRtf = @"\par\par\par \cf1 \fs" + desiredFontSize + @" There is a newer version available online: \b " + onlineAvailableVersion + @"\b0 \cf0 \fs0 \par";
+
+                        // Check for existing color table
+                        int colorTableIndex = existingRtf.IndexOf(@"\colortbl");
+                        if (colorTableIndex != -1)
+                        {
+                            // Find if IndianRed is already in the color table
+                            string colorTableEnd = existingRtf.Substring(colorTableIndex).Split('}')[0];
+
+                            if (!colorTableEnd.Contains(@"\red205\green92\blue92"))
+                            {
+                                // Append IndianRed to the color table
+                                int insertPos = existingRtf.IndexOf('}', colorTableIndex);
+                                if (insertPos != -1)
+                                {
+                                    existingRtf = existingRtf.Insert(insertPos, @"\red205\green92\blue92;");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // No color table exists, so add a new one
+                            existingRtf = @"{\rtf1\ansi{\colortbl ;\red205\green92\blue92;}" + existingRtf.Insert(existingRtf.LastIndexOf('}'), indianRedRtf);
+                        }
+
+                        // Ensure proper color index (If IndianRed is the second color in the table, use \cf2)
+                        int colorIndex = existingRtf.IndexOf(@"\red205\green92\blue92") > -1 ? 2 : 1;
+
+                        // Update the new text with the correct color index
+                        indianRedRtf = indianRedRtf.Replace(@"\cf1", @"\cf" + colorIndex);
+
+                        // Append the new text before the last closing brace
+                        int lastBraceIndex = existingRtf.LastIndexOf('}');
+                        if (lastBraceIndex > 0)
+                        {
+                            existingRtf = existingRtf.Insert(lastBraceIndex, indianRedRtf);
+                        }
+
+                        // Assign the updated RTF back to the RichTextBox
+                        richTextBoxAbout.Rtf = existingRtf;
+
+
+                        
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+            }
+        }
 
         private void CheckBox1_CheckedChanged(object sender, EventArgs e)
         {
@@ -665,6 +934,8 @@ How-to add or update something yourself:\par
 
         private void InitializeComponentList(bool clearList = true)
         {
+//            SuspendLayout();
+
             // Keep track of currently selected items
             foreach (var item in listBoxComponents.SelectedItems)
             {
@@ -710,6 +981,11 @@ How-to add or update something yourself:\par
             {
                 selectedItems.Remove(rem);
             }
+
+            // Apply filter after initializing the component list
+            FilterListBoxComponents();
+
+//            ResumeLayout();
         }
 
         // ---------------------------------------------------------------------
@@ -978,8 +1254,8 @@ How-to add or update something yourself:\par
         {
 
             // Right before resizing
-            Debug.WriteLine($"[AdjustImageSizes] Before resizing: " +
-                            $"splitterDistance={splitContainerSchematics.SplitterDistance}");
+//            Debug.WriteLine($"[AdjustImageSizes] Before resizing: " +
+//                            $"splitterDistance={splitContainerSchematics.SplitterDistance}");
 
             int scrollbarWidth = panelListAutoscroll.VerticalScroll.Visible
                 ? SystemInformation.VerticalScrollBarWidth - 14
@@ -1018,8 +1294,8 @@ How-to add or update something yourself:\par
             HighlightOverlays("list");
 
             // Right after resizing
-            Debug.WriteLine($"[AdjustImageSizes] After resizing: " +
-                            $"splitterDistance={splitContainerSchematics.SplitterDistance}");
+//            Debug.WriteLine($"[AdjustImageSizes] After resizing: " +
+//                            $"splitterDistance={splitContainerSchematics.SplitterDistance}");
         }
 
 
@@ -1137,7 +1413,13 @@ How-to add or update something yourself:\par
         // "Clear Selection" button
         private void button1_Click(object sender, EventArgs e)
         {
-            listBoxComponents.SelectedIndex = -1;
+            clearSelection();
+        }
+
+        private void clearSelection()
+        {
+            listBoxComponents.ClearSelected();
+            listBoxSelectedActualValues.Clear();
             UpdateHighlights();
         }
 
@@ -1693,6 +1975,9 @@ How-to add or update something yourself:\par
                 checkBoxBlink.Checked = !checkBoxBlink.Checked;
                 return true;
             }
+
+            
+            
 
             return base.ProcessCmdKey(ref msg, keyData);
         }
