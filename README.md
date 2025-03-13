@@ -70,7 +70,7 @@ There are bigger changes here, and I am not sure I want to go down that road - i
 
 - Search input field to filter component list
 - Ideally make fullscreen mode less "flickering"
-- "New version available" or "Data has been updated" information
+- ~~"New version available"~~ or "Data has been updated" information
 - Have people download and upload new schematics or updates directly from tool
 - Rating system of user uploaded schematics
 
