@@ -68,7 +68,7 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 
 There are bigger changes here, and I am not sure I want to go down that road - it will for sure depend on usage, as I personally do not have any use for it, if this is primarily used only by myself :-)
 
-- Search input field to filter component list
+- ~~Search input field to filter component list~~ (fixed in next release)
 - Ideally make fullscreen mode less "flickering"
 - ~~"New version available"~~ or "Data has been updated" information
 - Have people download and upload new schematics or updates directly from tool
