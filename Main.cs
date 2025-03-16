@@ -1,4 +1,5 @@
-﻿using Microsoft.Web.WebView2.Core;
+﻿using Microsoft.Web.WebView2.WinForms;
+using Microsoft.Web.WebView2.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,6 +10,7 @@ using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 
@@ -208,27 +210,6 @@ How-to add or update something yourself:\par
             // Attach the SelectedIndexChanged event handler for listBoxCategories
             listBoxCategories.SelectedIndexChanged += ListBoxCategories_SelectedIndexChanged;
 
-
-
-            
-            richTextBoxRessources.LinkClicked += richTextBoxRessources_LinkClicked;
-
-//            richTextBoxRessources.MouseDown += RichTextBoxRessources_MouseDown;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         }
 
         private void AttachClickEventHandlers(Control parent)
@@ -310,13 +291,13 @@ How-to add or update something yourself:\par
             * Added filtering for components
             * Changed label in thumbnail so it no longer floats above the image, but is added before the image
             * Changed component list to now provide a simpler overview
+            * Changed application will only support 64-bit Windows 10 or newer
         * Data:
             * Hardware: Commodore 128 or 128D
                 * Board: 310378
                     * Added pinout for most components
                     * Refined highlights for multiple components
-
-       
+               
         */
 
 
@@ -808,7 +789,7 @@ How-to add or update something yourself:\par
 
             InitializeList();
             InitializeTabMain();
-            PopulateRichTextBoxRessources(selectedBoard);
+            InitializeTabRessources();
         }
 
         // ---------------------------------------------------------------------
@@ -1795,167 +1776,64 @@ How-to add or update something yourself:\par
         {
             Configuration.SaveSetting("WindowState", this.WindowState.ToString());
         }
-
-        private void PopulateRichTextBoxRessources(Board selectedBoard)
-        {
-            if (selectedBoard.BoardLinks == null || !selectedBoard.BoardLinks.Any())
-            {
-                richTextBoxRessources.Clear();
-                return;
-            }
-
-            // Get the two datasets
-            var groupedLinks = selectedBoard.BoardLinks.GroupBy(link => link.Category);
-            var groupedLocalFiles = selectedBoard.BoardLocalFiles.GroupBy(file => file.Category);
-
-            StringBuilder rtfBuilder = new StringBuilder();
-
-            rtfBuilder.Append(@"{\rtf1\ansi\ansicpg1252");
-
-            // Local files
-            rtfBuilder.Append(@"\b Local files:\b0");
-            rtfBuilder.Append(@"\par\par");
-            foreach (var group in groupedLocalFiles)
-            {
-                rtfBuilder.Append(@"\b ");
-                rtfBuilder.Append(group.Key);
-                rtfBuilder.Append(@":\b0\par");
-                foreach (var file in group)
-                {
-                    string filePath = Path.Combine(Application.StartupPath, "Data", hardwareSelectedFolder, boardSelectedFolder, file.Datafile);
-                    rtfBuilder.Append(@"\pard    \'95 ");
-                    rtfBuilder.Append($@"{{\field{{\*\fldinst HYPERLINK ""file:///{filePath.Replace(@"\", @"\\")}""}}{{\fldrslt {file.Name}}}}}");
-                    rtfBuilder.Append(@"\par");
-                }
-                rtfBuilder.Append(@"\par");
-            }
-
-            // Links
-            rtfBuilder.Append(@"\b Links:\b0");
-            rtfBuilder.Append(@"\par\par");
-
-            foreach (var group in groupedLinks)
-            {
-                rtfBuilder.Append(@"\b ");
-                rtfBuilder.Append(group.Key);
-                rtfBuilder.Append(@":\b0\par");
-
-                foreach (var link in group)
-                {
-                    rtfBuilder.Append(@"\pard    \'95 ");
-                    //rtfBuilder.Append($@"{{\field{{\*\fldinst HYPERLINK ""{link.Url}""}}{{\fldrslt {link.Name}}}}}");
-                    //rtfBuilder.Append($@"{{\field{{\*\fldinst{{ HYPERLINK ""{link.Url}"" }}}}{{\fldrslt {link.Name}}}}}");
-                    //rtfBuilder.Append($@"{{\field{{\*\fldinst{{ HYPERLINK ""{link.Url}"" }}}}{{\fldrslt {{{link.Name}}}}}}}");
-                    //rtfBuilder.Append($@"{{\field{{\*\fldinst{{HYPERLINK ""{link.Url}""}}}}{{\fldrslt{{\ul\cf1 {link.Name}}}}}}}");
-                    //rtfBuilder.Append($@"{{\field{{\*\fldinst{{ HYPERLINK ""{link.Url}"" }}}}{{\fldrslt{{{link.Name}}}}}}}");
-                    //rtfBuilder.Append($@"{{\field{{\*\fldinst{{ HYPERLINK ""{link.Url}"" }}}}{{\fldrslt{{\ul {link.Name}}}}}}}");
-                    //                    rtfBuilder.Append($@"{{\field{{\*\fldinst{{ HYPERLINK ""{link.Url}"" }}}}{{\fldrslt{{{link.Name}}}}}}}");
-//                    rtfBuilder.Append("{\\rtf1\\ansi\\ansicpg1252\\cocoartf1038\\cocoasubrtf350\r\n{\\fonttbl\\f0\\fnil\\fcharset0 Calibri;}\r\n{\\colortbl;\\red255\\green255\\blue255;}\r\n\\paperw11900\\paperh16840\\vieww12000\\viewh13860\\viewkind0\r\n\\pard\\tx560\\tx1120\\tx1680\\tx2240\\tx2800\\tx3360\\tx3920\\tx4480\\tx5040\\tx5600\\tx6160\\tx6720\\ql\\qnatural\\pardirnatural\r\n\r\n\\f0\\fs22 \\cf0 ");
-                    rtfBuilder.Append("{\\field{\\*\\fldinst{HYPERLINK \"" + link.Url + "\"}}{\\fldrslt " + link.Name + "}}");
-                    rtfBuilder.Append(@"\par");
-                }
-
-                rtfBuilder.Append(@"\par");
-            }
-
-            rtfBuilder.Append("}");
-            richTextBoxRessources.Rtf = rtfBuilder.ToString();
-
-            /*
-            string link2 = "https://whatever.dk";
-            string name2 = "My Link";
-            StringBuilder rtf = new StringBuilder();
-            rtf.Append(@"{\rtf1\ansi");
-            rtf.Append(@"{\fonttbl\f0\fnil\fcharset0 Calibri;}");
-            rtf.Append(@"{\colortbl ;\red0\green0\blue255;}");
-            rtf.Append(@"\viewkind4\uc1\pard\f0\fs20 ");
-            rtf.Append($@"{{\field{{\*\fldinst HYPERLINK ""{link2}""}}{{\fldrslt{{\ul\cf1 {name2}}}}}}}");
-            rtf.Append(@"\par}");
-            */
-
-            /*
-            string link3 = "https://dennis.dk";
-            string name3 = "My Link";
-            StringBuilder rtf = new StringBuilder();
-            rtf.Append("{\\rtf1\\ansi\\ansicpg1252\\cocoartf1038\\cocoasubrtf350\r\n{\\fonttbl\\f0\\fnil\\fcharset0 Calibri;}\r\n{\\colortbl;\\red255\\green255\\blue255;}\r\n\\paperw11900\\paperh16840\\vieww12000\\viewh13860\\viewkind0\r\n\\pard\\tx560\\tx1120\\tx1680\\tx2240\\tx2800\\tx3360\\tx3920\\tx4480\\tx5040\\tx5600\\tx6160\\tx6720\\ql\\qnatural\\pardirnatural\r\n\r\n\\f0\\fs22 \\cf0 ");
-            rtf.Append("Here are some start text, ");
-            rtf.Append("{\\field{\\*\\fldinst{HYPERLINK \""+ link3 +"\"}}{\\fldrslt "+ name3 +"}}");
-            rtf.Append(". Here are some final text\\\r\n}");
-            richTextBoxRessources.Rtf = rtf.ToString();
-            */
-
-            /*
-            string link1 = "https://dennis.dk";
-            string name1 = "My Link 1";
-            string link2 = "https://example.com";
-            string name2 = "My Link 2";
-
-            StringBuilder rtf = new StringBuilder();
-            rtf.Append("{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Helvetica;}}");
-            rtf.Append("{\\colortbl ;\\red0\\green0\\blue255;}"); // Define hyperlink color
-
-            rtf.Append("\\viewkind4\\uc1\\pard\\fs20 Here are some start text, ");
-
-            rtf.Append(" {\\field{\\*\\fldinst { HYPERLINK \"" + link1 + "\" }}{\\fldrslt \\ul\\cf1 " + name1 + "}} ");
-            rtf.Append(" and ");
-            rtf.Append(" {\\field{\\*\\fldinst { HYPERLINK \"" + link2 + "\" }}{\\fldrslt \\ul\\cf1 " + name2 + "}} ");
-
-            rtf.Append(". Here are some final text\\par}");
-            */
-
-            StringBuilder rtf = new StringBuilder();
-
-            rtf.Append("{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang1033{\\fonttbl{\\f0\\fswiss\\fprq2\\fcharset0 Calibri; } {\\f1\\fnil\\fcharset0 Calibri; } {\\f2\\fnil\\fcharset2 Symbol; } }");
-            rtf.Append("{\\colortbl;\\red0\\green0\\blue255;\\red5\\green99\\blue193; }");
-            rtf.Append("{\\*\\generator Riched20 10.0.19041}\\viewkind4\\uc1");
-            rtf.Append("\\pard\\widctlpar\\sa160\\sl252\\slmult1\\kerning2\\f0\\fs22\\lang1030 Header 1:\\par");
-            rtf.Append("");
-            rtf.Append("\\pard{\\pntext\\f2\\'B7\\tab}{\\*\\pn\\pnlvlblt\\pnf2\\pnindent0{\\pntxtb\\'B7}}\\widctlpar\\fi-360\\li720\\sa160\\sl252\\slmult1 {{\\field{\\*\\fldinst{HYPERLINK \"https://link1\"}}{\\fldrslt{\\ul\\cf1\\cf2\\ul Link 1}}}}\\f0\\fs22\\par");
-            rtf.Append("{\\pntext\\f2\\'B7\\tab}{{\\field{\\*\\fldinst{HYPERLINK \"https://link2\"}}{\\fldrslt{\\ul\\cf1\\cf2\\ul Link 2}}}}\\f0\\fs22\\par");
-            rtf.Append("");
-            rtf.Append("\\pard\\widctlpar\\sa160\\sl252\\slmult1 Header 2:\\par");
-            rtf.Append("");
-            rtf.Append("\\pard{\\pntext\\f2\\'B7\\tab}{\\*\\pn\\pnlvlblt\\pnf2\\pnindent0{\\pntxtb\\'B7}}\\widctlpar\\fi-360\\li720\\sa160\\sl252\\slmult1 {{\\field{\\*\\fldinst{HYPERLINK \"https://link3\"}}{\\fldrslt{\\ul\\cf1\\cf2\\ul Link 3}}}}\\f0\\fs22\\par");
-            rtf.Append("");
-            rtf.Append("\\pard\\sa200\\sl276\\slmult1\\kerning0\\f1\\lang6\\par");
-            rtf.Append("}");
-
-            richTextBoxRessources.Rtf = rtf.ToString();
-            InitializeWebView();
-        }
-
-        private async void InitializeWebView()
+                
+        private async void InitializeTabRessources()
         {
             await webView21.EnsureCoreWebView2Async(null);
 
-            // Handle navigation events
-            webView21.CoreWebView2.NavigationStarting += (sender, args) =>
+            webView21.CoreWebView2.WebMessageReceived += (sender, args) =>
             {
-                Debug.WriteLine("NavigationStarting: " + args.Uri);
-                if (args.Uri.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+                string message = args.TryGetWebMessageAsString();
+                if (message.StartsWith("openFile:"))
                 {
-                    args.Cancel = true;
-                    string localPath = new Uri(args.Uri).LocalPath;
-                    Process.Start(new ProcessStartInfo(localPath) { UseShellExecute = true });
+                    string fileUrl = message.Substring("openFile:".Length);
+                    Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
                 }
             };
 
-            // HTML
+            webView21.CoreWebView2.NewWindowRequested += (sender, args) =>
+            {
+                args.Handled = true; // Prevent the default behavior
+
+                // Open the URL in the default web browser
+                Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
+            };
+
             string htmlContent = @"
                 <html>
                 <head>
                 <meta charset='UTF-8'>
-                <title>Local File Test</title>
+                <title>External and Local Links</title>
+                <script>
+                document.addEventListener('click', function(e) {
+                var target = e.target;
+                if (target.tagName.toLowerCase() === 'a' && target.href.startsWith('file://')) {
+                    e.preventDefault();
+                    window.chrome.webview.postMessage('openFile:' + target.href);
+                }
+                });
+                </script>
                 </head>
                 <body>
-                <h1>Try opening local files:</h1>
+                <h1>Links</h1>
+                <h2>Troubleshooting</h2>
                 <ul>
-                <li><a href='file:///C:\\GlDifxCmd.log'>Open local log file</a></li>
-                <li><a href='https://www.google.com'>Google</a></li>
+                <li><a href='https://www.google.com' target='_blank'>Web link 1</a></li>
+                <li><a href='https://www.microsoft.com' target='_blank'>Web link 2</a></li>
+                </ul>
+                <h2>Documentation</h2>
+                <ul>
+                <li><a href='https://www.google.com' target='_blank'>Web link 3</a></li>
+                <li><a href='https://www.microsoft.com' target='_blank'>Web link 4</a></li>
+                </ul>
+                <h1>Local files</h1>
+                <h2>Troubleshooting</h2>
+                <ul>
+                <li><a href='file:///C:/GlDifxCmd.log' target='_blank'>Local File 1</a></li>
                 </ul>
                 </body>
-                </html>";
-
+                </html>
+            ";
             webView21.NavigateToString(htmlContent);
         }
 

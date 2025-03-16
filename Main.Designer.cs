@@ -36,7 +36,7 @@
             this.panelListMain = new System.Windows.Forms.Panel();
             this.panelListAutoscroll = new System.Windows.Forms.Panel();
             this.tabRessources = new System.Windows.Forms.TabPage();
-            this.richTextBoxRessources = new System.Windows.Forms.RichTextBox();
+            this.webView21 = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.label1 = new System.Windows.Forms.Label();
             this.tabHelp = new System.Windows.Forms.TabPage();
             this.labelHelp = new System.Windows.Forms.Label();
@@ -61,9 +61,6 @@
             this.panelBehindTab = new System.Windows.Forms.Panel();
             this.textBox1 = new System.Windows.Forms.TextBox();
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
-            this.label2 = new System.Windows.Forms.Label();
-            this.webView21 = new Microsoft.Web.WebView2.WinForms.WebView2();
-            this.richTextBox1 = new System.Windows.Forms.RichTextBox();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -72,10 +69,10 @@
             this.splitContainerSchematics.SuspendLayout();
             this.panelListMain.SuspendLayout();
             this.tabRessources.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.webView21)).BeginInit();
             this.tabHelp.SuspendLayout();
             this.tabAbout.SuspendLayout();
             this.panelBehindTab.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.webView21)).BeginInit();
             this.SuspendLayout();
             // 
             // tabControl
@@ -160,10 +157,7 @@
             // tabRessources
             // 
             this.tabRessources.BackColor = System.Drawing.Color.White;
-            this.tabRessources.Controls.Add(this.richTextBox1);
             this.tabRessources.Controls.Add(this.webView21);
-            this.tabRessources.Controls.Add(this.label2);
-            this.tabRessources.Controls.Add(this.richTextBoxRessources);
             this.tabRessources.Controls.Add(this.label1);
             this.tabRessources.Location = new System.Drawing.Point(4, 30);
             this.tabRessources.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
@@ -172,16 +166,19 @@
             this.tabRessources.TabIndex = 3;
             this.tabRessources.Text = "Ressources";
             // 
-            // richTextBoxRessources
+            // webView21
             // 
-            this.richTextBoxRessources.BackColor = System.Drawing.Color.White;
-            this.richTextBoxRessources.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.richTextBoxRessources.Location = new System.Drawing.Point(17, 57);
-            this.richTextBoxRessources.Name = "richTextBoxRessources";
-            this.richTextBoxRessources.ReadOnly = true;
-            this.richTextBoxRessources.Size = new System.Drawing.Size(682, 253);
-            this.richTextBoxRessources.TabIndex = 3;
-            this.richTextBoxRessources.Text = "Text set in code ...";
+            this.webView21.AllowExternalDrop = true;
+            this.webView21.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.webView21.CreationProperties = null;
+            this.webView21.DefaultBackgroundColor = System.Drawing.Color.White;
+            this.webView21.Location = new System.Drawing.Point(0, 53);
+            this.webView21.Name = "webView21";
+            this.webView21.Size = new System.Drawing.Size(710, 480);
+            this.webView21.TabIndex = 5;
+            this.webView21.ZoomFactor = 1D;
             // 
             // label1
             // 
@@ -466,37 +463,6 @@
             this.checkBoxBlink.Text = "Blink selected components";
             this.checkBoxBlink.UseVisualStyleBackColor = true;
             // 
-            // label2
-            // 
-            this.label2.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.label2.Font = new System.Drawing.Font("Calibri", 13.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label2.ForeColor = System.Drawing.Color.IndianRed;
-            this.label2.Location = new System.Drawing.Point(280, 174);
-            this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(391, 93);
-            this.label2.TabIndex = 4;
-            this.label2.Text = "This currently does not work - anyone know how RTF code works, as this RTF comple" +
-    "xity blows my mind!?";
-            // 
-            // webView21
-            // 
-            this.webView21.AllowExternalDrop = true;
-            this.webView21.CreationProperties = null;
-            this.webView21.DefaultBackgroundColor = System.Drawing.Color.White;
-            this.webView21.Location = new System.Drawing.Point(17, 270);
-            this.webView21.Name = "webView21";
-            this.webView21.Size = new System.Drawing.Size(344, 233);
-            this.webView21.TabIndex = 5;
-            this.webView21.ZoomFactor = 1D;
-            // 
-            // richTextBox1
-            // 
-            this.richTextBox1.Location = new System.Drawing.Point(368, 271);
-            this.richTextBox1.Name = "richTextBox1";
-            this.richTextBox1.Size = new System.Drawing.Size(331, 241);
-            this.richTextBox1.TabIndex = 6;
-            this.richTextBox1.Text = "";
-            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 21F);
@@ -533,12 +499,12 @@
             this.panelListMain.ResumeLayout(false);
             this.tabRessources.ResumeLayout(false);
             this.tabRessources.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.webView21)).EndInit();
             this.tabHelp.ResumeLayout(false);
             this.tabHelp.PerformLayout();
             this.tabAbout.ResumeLayout(false);
             this.tabAbout.PerformLayout();
             this.panelBehindTab.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.webView21)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -575,11 +541,8 @@
         private System.Windows.Forms.RichTextBox richTextBoxAbout;
         private System.Windows.Forms.RichTextBox richTextBoxHelp;
         private System.Windows.Forms.Label labelHelp;
-        private System.Windows.Forms.RichTextBox richTextBoxRessources;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.TextBox textBox1;
-        private System.Windows.Forms.Label label2;
         private Microsoft.Web.WebView2.WinForms.WebView2 webView21;
-        private System.Windows.Forms.RichTextBox richTextBox1;
     }
 }
