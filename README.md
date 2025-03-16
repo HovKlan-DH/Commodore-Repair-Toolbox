@@ -65,7 +65,7 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 There are bigger changes here, and I am not sure I want to go down this road - it will for sure depend on usage, as I personally do not have any use for it, if this is primarily used only by myself :-)
 
 - Ideally make fullscreen mode less "flickering"
-- Embed `WebView2Loader.dll` in executable file (already packed with `ILRepack`)
+- Embed `WebView2Loader.dll` in executable file (which is already packed with `ILRepack`)
 - "Data has been updated" information
 - Have people download and upload new schematics or updates directly from tool
 - Rating system of user uploaded schematics
