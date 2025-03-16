@@ -12,6 +12,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static System.Windows.Forms.LinkLabel;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.Tab;
 
 
 
@@ -789,7 +791,7 @@ How-to add or update something yourself:\par
 
             InitializeList();
             InitializeTabMain();
-            InitializeTabRessources();
+            InitializeTabRessources(selectedBoard);
         }
 
         // ---------------------------------------------------------------------
@@ -1777,10 +1779,17 @@ How-to add or update something yourself:\par
             Configuration.SaveSetting("WindowState", this.WindowState.ToString());
         }
                 
-        private async void InitializeTabRessources()
+        private async void InitializeTabRessources(Board selectedBoard)
         {
             await webView21.EnsureCoreWebView2Async(null);
 
+            // Do not update anything, if board info is empty
+            if (selectedBoard.BoardLinks == null || !selectedBoard.BoardLinks.Any())
+            {
+                return;
+            }
+
+            // Open file URL in default application
             webView21.CoreWebView2.WebMessageReceived += (sender, args) =>
             {
                 string message = args.TryGetWebMessageAsString();
@@ -1791,14 +1800,14 @@ How-to add or update something yourself:\par
                 }
             };
 
+            // Open web URL in default web browser
             webView21.CoreWebView2.NewWindowRequested += (sender, args) =>
             {
                 args.Handled = true; // Prevent the default behavior
-
-                // Open the URL in the default web browser
                 Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
             };
 
+            // Start on HTML content
             string htmlContent = @"
                 <html>
                 <head>
@@ -1815,12 +1824,10 @@ How-to add or update something yourself:\par
                 </script>
                 </head>
                 <body>
-                <h1>Links</h1>
-                <h2>Troubleshooting</h2>
-                <ul>
-                <li><a href='https://www.google.com' target='_blank'>Web link 1</a></li>
-                <li><a href='https://www.microsoft.com' target='_blank'>Web link 2</a></li>
-                </ul>
+            ";
+
+            /*
+
                 <h2>Documentation</h2>
                 <ul>
                 <li><a href='https://www.google.com' target='_blank'>Web link 3</a></li>
@@ -1831,9 +1838,54 @@ How-to add or update something yourself:\par
                 <ul>
                 <li><a href='file:///C:/GlDifxCmd.log' target='_blank'>Local File 1</a></li>
                 </ul>
-                </body>
-                </html>
-            ";
+                ";
+            */
+
+            // Get the two datasets
+            var groupedLocalFiles = selectedBoard.BoardLocalFiles.GroupBy(file => file.Category);
+            var groupedLinks = selectedBoard.BoardLinks.GroupBy(link => link.Category);
+
+            // Local files
+            if (groupedLocalFiles.Any())
+            {
+                htmlContent += "<h1>Local files</h1>";
+                foreach (var group in groupedLocalFiles)
+                {
+                    htmlContent += "<h2>"+ group.Key +"</h2>";
+                    htmlContent += "<ul>";
+
+                    foreach (var file in group)
+                    {
+                        string filePath = Path.Combine(Application.StartupPath, "Data", hardwareSelectedFolder, boardSelectedFolder, file.Datafile);
+                        htmlContent += "<li><a href='file:///" + filePath.Replace(@"\", @"\\") + "' target='_blank'>"+ file.Name +"</a></li>";
+                    }
+                    htmlContent += "</ul>";
+                }
+            }
+
+            // Wen links
+            if (groupedLinks.Any())
+            {
+                htmlContent += "<h1>Links</h1>";
+                foreach (var group in groupedLinks)
+                {
+                    htmlContent += "<h2>" + group.Key + "</h2>";
+                    htmlContent += "<ul>";
+
+                    foreach (var link in group)
+                    {
+                        htmlContent += "<li><a href='" + link.Url + "' target='_blank'>" + link.Name + "</a></li>";
+                    }
+                    htmlContent += "</ul>";
+                }
+            }
+
+            htmlContent += "</body>";
+            htmlContent += "</html >";
+
+
+
+
             webView21.NavigateToString(htmlContent);
         }
 

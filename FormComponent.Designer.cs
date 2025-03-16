@@ -159,9 +159,9 @@
             this.label6.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label6.Location = new System.Drawing.Point(459, 160);
             this.label6.Name = "label6";
-            this.label6.Size = new System.Drawing.Size(88, 21);
+            this.label6.Size = new System.Drawing.Size(246, 21);
             this.label6.TabIndex = 10;
-            this.label6.Text = "Description";
+            this.label6.Text = "Component description and notes";
             // 
             // label7
             // 
@@ -170,9 +170,9 @@
             this.label7.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label7.Location = new System.Drawing.Point(459, 310);
             this.label7.Name = "label7";
-            this.label7.Size = new System.Drawing.Size(77, 21);
+            this.label7.Size = new System.Drawing.Size(160, 21);
             this.label7.TabIndex = 11;
-            this.label7.Text = "Local files";
+            this.label7.Text = "Component local files";
             // 
             // label8
             // 
@@ -181,9 +181,9 @@
             this.label8.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label8.Location = new System.Drawing.Point(459, 444);
             this.label8.Name = "label8";
-            this.label8.Size = new System.Drawing.Size(45, 21);
+            this.label8.Size = new System.Drawing.Size(128, 21);
             this.label8.TabIndex = 12;
-            this.label8.Text = "Links";
+            this.label8.Text = "Component links";
             // 
             // contextMenuStrip1
             // 

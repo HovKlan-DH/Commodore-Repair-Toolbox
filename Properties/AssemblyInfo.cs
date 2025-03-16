@@ -6,11 +6,11 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("Commodore Repair Toolbox")]
-[assembly: AssemblyDescription("Repairing Commodore hardware")]
+[assembly: AssemblyDescription("Repairing vintage Commodore hardware")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("Commodore Repair Toolbox")]
-[assembly: AssemblyCopyright("Copyright ©  2025")]
+[assembly: AssemblyCopyright("Dennis Helligsø ©  2025")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -32,5 +32,5 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("2025.03.10.1")]
-[assembly: AssemblyFileVersion("2025.03.10.1")]
+[assembly: AssemblyVersion("2025.03.16.1")]
+[assembly: AssemblyFileVersion("2025.03.16.1")]
