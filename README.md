@@ -22,7 +22,7 @@ _CRT_ does not require any installation - just download the newest ZIP file from
 
 It will run on any 64-bit _Windows 10_ or newer. It does require _.NET Framework 4.8.1_, but this is an integrated part of the operating system.
 
-# Built-in schematics
+# Built-in hardware / schematics
 
 - Commodore 128 and 128D, schematics 310378
 - Soon to come (just need the time to input the data):
