@@ -37,7 +37,7 @@ You can help specifically with these topics:
 - Do you have higher-quality images of the schematics?
 - Do you have datasheets for any of the components?
 - Do you see missing components in either the component list or as a highlight?
-- Can you fill in more technical details anywhere?
+- Can you improve any data or fill in more technical details anywhere?
 
 You can also contribute by adding new data and send the Excel file and "label file" to me (view below for the software used for labeling).
 
