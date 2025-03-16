@@ -51,6 +51,7 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 
 # Near-term TODO
 
+- Reduce default width of panel with thumbnails
 - Handle missing/bad data errors gracefully
 - Heavy refactoring of code base
 - Add data for Commodore 64 (Breadbin) schematics 250407 and 250425
