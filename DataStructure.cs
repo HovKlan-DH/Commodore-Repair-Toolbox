@@ -121,7 +121,7 @@ namespace Commodore_Repair_Toolbox
                             int opacityList = (int)(double.Parse(cellValue) * 100);
                             opacityList = (int)((opacityList / 100.0) * 255);
 
-                            BoardFile bf = new BoardFile
+                            BoardFileOverlays bf = new BoardFileOverlays
                             {
                                 Name = name,
                                 FileName = fileName,
@@ -130,7 +130,7 @@ namespace Commodore_Repair_Toolbox
                                 HighlightOpacityTab = opacityZoom,
                                 HighlightOpacityList = opacityList
                             };
-                            if (board.Files == null) board.Files = new List<BoardFile>();
+                            if (board.Files == null) board.Files = new List<BoardFileOverlays>();
                             board.Files.Add(bf);
                             row++;
                         }
@@ -197,7 +197,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    foreach (BoardFile bf in board.Files)
+                    foreach (BoardFileOverlays bf in board.Files)
                     {
                         using (var package = new ExcelPackage(new FileInfo(
                             Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
@@ -265,8 +265,8 @@ namespace Commodore_Repair_Toolbox
                             var classComponent = board.Components.FirstOrDefault(c => c.Label == componentName);
                             if (classComponent != null)
                             {
-                                if (classComponent.LocalFiles == null) classComponent.LocalFiles = new List<LocalFiles>();
-                                classComponent.LocalFiles.Add(new LocalFiles
+                                if (classComponent.LocalFiles == null) classComponent.LocalFiles = new List<ComponentLocalFiles>();
+                                classComponent.LocalFiles.Add(new ComponentLocalFiles
                                 {
                                     Name = name,
                                     FileName = fileName
@@ -291,7 +291,7 @@ namespace Commodore_Repair_Toolbox
                         {
                             throw new Exception("Worksheet [Component links] not found in [" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile + "]");
                         }
-                        string searchHeader = "COMPONENT LINKS";
+                        string searchHeader = "Component links";
                         int row = 1;
                         while (row <= worksheet.Dimension.End.Row)
                         {
@@ -371,6 +371,105 @@ namespace Commodore_Repair_Toolbox
                 }
             }
 
+            // 9) Load "board links"
+            foreach (Hardware hardware in classHardware)
+            {
+                foreach (Board board in hardware.Boards)
+                {
+                    using (var package = new ExcelPackage(new FileInfo(
+                        Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
+                    {
+                        var worksheet = package.Workbook.Worksheets["Board links"];
+                        if (worksheet == null)
+                        {
+                            throw new Exception("Worksheet [Board links] not found in [" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile + "]");
+                        }
+                        string searchHeader = "Board links";
+                        int row = 1;
+                        while (row <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                            row++;
+                        }
+                        row++;
+                        row++;
+
+                        // Initialize the BoardLinks list if it's null
+                        if (board.BoardLinks == null)
+                        {
+                            board.BoardLinks = new List<BoardLink>();
+                        }
+
+                        while (worksheet.Cells[row, 1].Value != null)
+                        {
+                            string category = worksheet.Cells[row, 1].Value.ToString();
+                            string linkName = worksheet.Cells[row, 2].Value.ToString();
+                            string linkUrl = worksheet.Cells[row, 3].Value.ToString();
+
+                            // Create a new BoardLink instance and add it to the BoardLinks list
+                            BoardLink boardLink = new BoardLink
+                            {
+                                Category = category,
+                                Name = linkName,
+                                Url = linkUrl
+                            };
+                            board.BoardLinks.Add(boardLink);
+
+                            row++;
+                        }
+                    }
+                }
+            }
+
+            // 10) Load "Board local files"
+            foreach (Hardware hardware in classHardware)
+            {
+                foreach (Board board in hardware.Boards)
+                {
+                    using (var package = new ExcelPackage(new FileInfo(
+                        Path.Combine(Application.StartupPath, "Data", hardware.Folder, board.Folder, board.Datafile))))
+                    {
+                        var worksheet = package.Workbook.Worksheets["Board local files"];
+                        if (worksheet == null)
+                        {
+                            throw new Exception("Worksheet [Board local files] not found in [" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile + "]");
+                        }
+                        string searchHeader = "Board local files";
+                        int row = 1;
+                        while (row <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                            row++;
+                        }
+                        row++;
+                        row++;
+
+                        // Initialize the BoardLinks list if it's null
+                        if (board.BoardLocalFiles == null)
+                        {
+                            board.BoardLocalFiles = new List<BoardLocalFiles>();
+                        }
+
+                        while (worksheet.Cells[row, 1].Value != null)
+                        {
+                            string category = worksheet.Cells[row, 1].Value.ToString();
+                            string fileName = worksheet.Cells[row, 2].Value.ToString();
+                            string fileLocation = worksheet.Cells[row, 3].Value.ToString();
+
+                            // Create a new BoardLocalFiles instance and add it to the BoardLocalFiles list
+                            BoardLocalFiles boardLocalFile = new BoardLocalFiles
+                            {
+                                Category = category,
+                                Name = fileName,
+                                Datafile = fileLocation
+                            };
+                            board.BoardLocalFiles.Add(boardLocalFile);
+
+                            row++;
+                        }
+                    }
+                }
+            }
 
         }
     }

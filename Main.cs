@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Web.WebView2.Core;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -10,49 +11,46 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 
+
+
+
 namespace Commodore_Repair_Toolbox
 {
     public partial class Main : Form
     {
+        // Reference to the popup/info form
+        private FormComponent currentPopup = null;
 
+        // Blinking of components
         private Timer blinkTimer;
         private bool blinkState = false;
 
-        private FormComponent currentPopup = null;
-
-        // Fullscreen
+        // Fullscreen mode
         private bool isFullscreen = false;
         private FormWindowState formPreviousWindowState;
         private FormBorderStyle formPreviousFormBorderStyle;
         private Rectangle previousBoundsForm;
         private Rectangle previousBoundsPanelBehindTab;
 
-        // ---------------------------------------------------------------------
-        // UI labels
-        private Label labelFile;
-        private Label labelComponent;
-
-        // Overlay caching (optional optimization)
-        private Dictionary<PictureBox, Bitmap> cachedHighlightImages = new Dictionary<PictureBox, Bitmap>();
-        private Dictionary<PictureBox, Bitmap> cachedTransparentImages = new Dictionary<PictureBox, Bitmap>();
-
-        // Overlays for the right-side list
-        private Dictionary<string, OverlayPanel> overlayPanelsList = new Dictionary<string, OverlayPanel>();
-        private Dictionary<string, float> overlayListZoomFactors = new Dictionary<string, float>();
-
-        // Main overlay panel
-        private OverlayPanel overlayPanel;
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
-
-        private bool isResizedByMouseWheel = false;
-        private bool isResizing = false;
-
         // Main panel (left side) + image
         private CustomPanel panelZoom;
         private Panel panelImage;
         private Image image;
+        
+        // "Main" schematics (left-side of SplitContainer)
+        private Label labelFile;
+        private Label labelComponent;
+        private OverlayPanel overlayPanel;
+
+        // Thumbnails (right-side of SplitContainer)
+        private Dictionary<string, OverlayPanel> overlayPanelsList = new Dictionary<string, OverlayPanel>();
+        private Dictionary<string, float> overlayListZoomFactors = new Dictionary<string, float>();
+
+        // Resizing of window/schematic
+        private bool isResizedByMouseWheel = false;
+        private bool isResizing = false;
+
+        
 
         // Data loaded from Excel
         public List<Hardware> classHardware = new List<Hardware>();
@@ -63,11 +61,10 @@ namespace Commodore_Repair_Toolbox
         private Dictionary<int, Size> overlayComponentsTabOriginalSizes = new Dictionary<int, Size>();
 
         // Old references
-        private List<string> selectedItems = new List<string>();
-        private Dictionary<string, List<PictureBox>> overlayComponentsList = new Dictionary<string, List<PictureBox>>();
-        private List<PictureBox> visiblePictureBoxes = new List<PictureBox>();
+        //private List<string> alistBoxComponentsSelectedItems = new List<string>();
+        private List<string> listBoxComponentsSelectedLabels = new List<string>();
         private Dictionary<string, string> listBoxNameValueMapping = new Dictionary<string, string>();
-        private List<string> listBoxSelectedActualValues = new List<string>();
+
 
         // Current user selection
         public string hardwareSelectedName;
@@ -80,13 +77,13 @@ namespace Commodore_Repair_Toolbox
         private float zoomFactor = 1.0f;
         private Point overlayPanelLastMousePos = Point.Empty;
 
-        // URL for webBrowser pre-check
-//        private string initialUrl = "https://commodore-repair-toolbox.dk/hest1";
-
         private static string buildType = ""; // Debug, Release
         private static string appVer = "";
         private static string onlineAvailableVersion = "";
         private static string urlCheckOnlineVersion = "https://dennis.dk/crt/";
+
+        // Add a field to track the current cursor state
+//        private bool isCursorHand = false;
 
         // ---------------------------------------------------------------------
         // Constructor
@@ -143,6 +140,7 @@ How-to add or update something yourself:\par
             LoadExcelData();
 
             LoadSettings();
+            //isFiltering = true;
             PopulateComboBoxes();
             Debug.WriteLine(splitContainerSchematics.SplitterDistance);
 
@@ -209,6 +207,26 @@ How-to add or update something yourself:\par
 
             // Attach the SelectedIndexChanged event handler for listBoxCategories
             listBoxCategories.SelectedIndexChanged += ListBoxCategories_SelectedIndexChanged;
+
+
+
+            
+            richTextBoxRessources.LinkClicked += richTextBoxRessources_LinkClicked;
+
+//            richTextBoxRessources.MouseDown += RichTextBoxRessources_MouseDown;
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
         }
@@ -283,6 +301,7 @@ How-to add or update something yourself:\par
             * Fixed highlights in thumbnails were misaligned
             * Fixed clicking in thumbnail and directly at a component would not switch to this main image
             * Fixed dynamic resizing of list-boxes depending on selected board
+            * Fixed "Component links" did not show
             * Fixed "About" and "Help" textboxes have been set to read-only
             * Fixed "Help" should not be accessible to fullscreen mode
             * Added show of asterisk/coloring in thumbnail label, when chosen component is visible in thumbnail
@@ -294,71 +313,50 @@ How-to add or update something yourself:\par
         * Data:
             * Hardware: Commodore 128 or 128D
                 * Board: 310378
-                    * Added pinout for more components
+                    * Added pinout for most components
                     * Refined highlights for multiple components
 
        
         */
 
 
-        private int c = 0;
-        private bool isFiltering = false;
-
-
         private void FilterListBoxComponents()
         {
-            if (isFiltering) return;
-            isFiltering = true;
+            string filterText = textBox1.Text.ToLower();
+            listBoxComponents.Items.Clear();
+            listBoxNameValueMapping.Clear();
 
-            try
+            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            if (foundBoard != null)
             {
-                Debug.WriteLine("FilterListBoxComponents called");
-
-                string filterText = textBox1.Text.ToLower();
-                listBoxComponents.Items.Clear();
-                listBoxNameValueMapping.Clear();
-
-                var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-                var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-                if (foundBoard != null)
+                foreach (ComponentBoard comp in foundBoard.Components)
                 {
-                    c++;
-
-                    foreach (ComponentBoard comp in foundBoard.Components)
+                    if (listBoxCategories.SelectedItems.Contains(comp.Type))
                     {
-                        Debug.WriteLine("COUNTER: " + c);
-                        if (listBoxCategories.SelectedItems.Contains(comp.Type))
-                        {
-                            string displayText = comp.Label;
-                            displayText += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
-                            displayText += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
+                        string displayText = comp.Label;
+                        displayText += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
+                        displayText += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
 
-                            if (string.IsNullOrEmpty(filterText) || displayText.ToLower().Contains(filterText))
-                            {
-                                Debug.WriteLine(displayText);
-                                listBoxComponents.Items.Add(displayText);
-                                listBoxNameValueMapping[displayText] = comp.Label;
-                            }
+                        if (string.IsNullOrEmpty(filterText) || displayText.ToLower().Contains(filterText))
+                        {
+                            Debug.WriteLine(displayText);
+                            listBoxComponents.Items.Add(displayText);
+                            listBoxNameValueMapping[displayText] = comp.Label;
                         }
                     }
                 }
-            }
-            finally
-            {
-                isFiltering = false;
             }
         }
 
 
         // ###########################################################################################
-        // Check for HovText updates online.
-        // Stable versions will be notified via popup.
-        // Development versions will be shown in "Advanced" tab only.
+        // Check for a newer version online.
+        // If newer version exists, then show this in "About" tab.
         // ###########################################################################################
 
         private void CheckForUpdate()
         {
-            // Check for a new stable version
             try
             {
                 WebClient webClient = new WebClient();
@@ -366,7 +364,7 @@ How-to add or update something yourself:\par
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
                 webClient.Headers.Add("user-agent", ("CRT " + appVer).Trim());
                 
-                // Prepare the POST data
+                // Have some control POST data
                 var postData = new System.Collections.Specialized.NameValueCollection
                 {
                     { "control", "CRT" }
@@ -378,65 +376,36 @@ How-to add or update something yourself:\par
                 // Convert the response bytes to a string
                 onlineAvailableVersion = Encoding.UTF8.GetString(responseBytes);
 
-                // Download the new stable version
                 if (onlineAvailableVersion.Substring(0, 7) == "Version")
                 {
                     onlineAvailableVersion = onlineAvailableVersion.Substring(9);
-                    Debug.WriteLine(appVer);
-                    Debug.WriteLine(onlineAvailableVersion);
+
+                    // Inform of new version
                     if (onlineAvailableVersion != appVer)
                     {
-
-                        // Save existing RTF content
                         string existingRtf = richTextBoxAbout.Rtf;
+                        int desiredFontSize = 32;
+                        string newVersionRtf = @"\par\par\par \cf1 \fs" + desiredFontSize + @" There is a newer version available online: \b " + onlineAvailableVersion + @"\b0 \cf0 \fs0 \par";
 
-                        // Define desired font size (e.g., 16pt = fs32)
-                        int desiredFontSize = 32; // 16pt
-
-                        // Ensure proper formatting with IndianRed color (RGB: 205, 92, 92)
-                        string indianRedRtf = @"\par\par\par \cf1 \fs" + desiredFontSize + @" There is a newer version available online: \b " + onlineAvailableVersion + @"\b0 \cf0 \fs0 \par";
-
-                        // Check for existing color table
+                        // Insert new version info into existing RTF
                         int colorTableIndex = existingRtf.IndexOf(@"\colortbl");
-                        if (colorTableIndex != -1)
+                        int insertPos = existingRtf.IndexOf('}', colorTableIndex);
+                        if (insertPos != -1)
                         {
-                            // Find if IndianRed is already in the color table
-                            string colorTableEnd = existingRtf.Substring(colorTableIndex).Split('}')[0];
-
-                            if (!colorTableEnd.Contains(@"\red205\green92\blue92"))
-                            {
-                                // Append IndianRed to the color table
-                                int insertPos = existingRtf.IndexOf('}', colorTableIndex);
-                                if (insertPos != -1)
-                                {
-                                    existingRtf = existingRtf.Insert(insertPos, @"\red205\green92\blue92;");
-                                }
-                            }
-                        }
-                        else
-                        {
-                            // No color table exists, so add a new one
-                            existingRtf = @"{\rtf1\ansi{\colortbl ;\red205\green92\blue92;}" + existingRtf.Insert(existingRtf.LastIndexOf('}'), indianRedRtf);
+                            existingRtf = existingRtf.Insert(insertPos, @"\red205\green92\blue92;");
                         }
 
-                        // Ensure proper color index (If IndianRed is the second color in the table, use \cf2)
-                        int colorIndex = existingRtf.IndexOf(@"\red205\green92\blue92") > -1 ? 2 : 1;
+                        // Change the color of the new version info
+                        newVersionRtf = newVersionRtf.Replace(@"\cf1", @"\cf2");
 
-                        // Update the new text with the correct color index
-                        indianRedRtf = indianRedRtf.Replace(@"\cf1", @"\cf" + colorIndex);
-
-                        // Append the new text before the last closing brace
+                        // Append the new version info before the last closing brace
                         int lastBraceIndex = existingRtf.LastIndexOf('}');
                         if (lastBraceIndex > 0)
                         {
-                            existingRtf = existingRtf.Insert(lastBraceIndex, indianRedRtf);
+                            existingRtf = existingRtf.Insert(lastBraceIndex, newVersionRtf);
                         }
 
-                        // Assign the updated RTF back to the RichTextBox
                         richTextBoxAbout.Rtf = existingRtf;
-
-
-                        
                     }
                 }
             }
@@ -466,7 +435,7 @@ How-to add or update something yourself:\par
             {
                 foreach (var overlay in overlayPanel.Overlays)
                 {
-                    if (listBoxSelectedActualValues.Contains(overlay.ComponentLabel))
+                    if (listBoxComponentsSelectedLabels.Contains(overlay.ComponentLabel))
                     {
                         overlay.Highlighted = true;
                     }
@@ -478,7 +447,7 @@ How-to add or update something yourself:\par
             {
                 foreach (var overlay in overlayPanel.Overlays)
                 {
-                    if (listBoxSelectedActualValues.Contains(overlay.ComponentLabel))
+                    if (listBoxComponentsSelectedLabels.Contains(overlay.ComponentLabel))
                     {
                         overlay.Highlighted = true;
                     }
@@ -499,7 +468,7 @@ How-to add or update something yourself:\par
             {
                 foreach (var overlay in overlayPanel.Overlays)
                 {
-                    if (listBoxSelectedActualValues.Contains(overlay.ComponentLabel))
+                    if (listBoxComponentsSelectedLabels.Contains(overlay.ComponentLabel))
                     {
                         overlay.Highlighted = state;
                     }
@@ -511,7 +480,7 @@ How-to add or update something yourself:\par
             {
                 foreach (var overlay in overlayPanel.Overlays)
                 {
-                    if (listBoxSelectedActualValues.Contains(overlay.ComponentLabel))
+                    if (listBoxComponentsSelectedLabels.Contains(overlay.ComponentLabel))
                     {
                         overlay.Highlighted = state;
                     }
@@ -567,8 +536,6 @@ How-to add or update something yourself:\par
             ResizeBegin += Form_ResizeBegin;
             ResizeEnd += Form_ResizeEnd;
             Resize += Form_Resize;
-            Shown += Main_Shown;
-            panelListAutoscroll.Resize += panelListAutoscroll_Resize;
             panelListAutoscroll.Layout += PanelListAutoscroll_Layout;
             this.Load += Form_Load;
             tabControl.Dock = DockStyle.Fill;
@@ -584,22 +551,6 @@ How-to add or update something yourself:\par
         private void LoadExcelData()
         {
             DataStructure.GetAllData(classHardware);
-
-/*
-            // Debug print loaded data
-            foreach (Hardware hw2 in classHardware)
-            {
-                Debug.WriteLine($"[Hardware: {hw2.Name}] Folder={hw2.Folder}");
-                foreach (Board bd in hw2.Boards)
-                {
-                    Debug.WriteLine($"   [Board: {bd.Name}] Folder={bd.Folder}");
-                    foreach (BoardFile bf in bd.Files)
-                    {
-                        Debug.WriteLine($"      [BoardFile: {bf.Name}] => {bf.FileName}");
-                    }
-                }
-            }
-*/
         }
 
         // ---------------------------------------------------------------------
@@ -772,9 +723,6 @@ How-to add or update something yourself:\par
 
         private void Form_Load(object sender, EventArgs e)
         {
-            //            panelBehindTab.Location = new Point(panelBehindTab.Location.X, 0);
-            //            InitializeList();
-
             string savedState = Configuration.GetSetting("WindowState", "Maximized");
             if (Enum.TryParse(savedState, out FormWindowState state) && state != FormWindowState.Minimized)
             {
@@ -782,15 +730,8 @@ How-to add or update something yourself:\par
             }
 
             ApplySavedSettings();
-
-
-
-
             AttachConfigurationSaveEvents();
-
-
         }
-
 
         private void AttachClosePopupOnClick(Control parent)
         {
@@ -805,14 +746,9 @@ How-to add or update something yourself:\par
                 }
             };
 
-
-
             // Recurse to child controls
             foreach (Control child in parent.Controls)
             {
-                // If you want to SKIP certain controls (text boxes?), you can do:
-                // if (child is TextBox) continue;
-                // or similar.
                 AttachClosePopupOnClick(child);
             }
         }
@@ -866,26 +802,25 @@ How-to add or update something yourself:\par
                 }
             }
 
-            InitializeComponentList();
+            InitializeComponentList(true);
 
             AdjustComponentCategoriesListBoxHeight();
 
             InitializeList();
             InitializeTabMain();
-        }        
+            PopulateRichTextBoxRessources(selectedBoard);
+        }
 
         // ---------------------------------------------------------------------
         // Form events
 
         private void Form_ResizeBegin(object sender, EventArgs e)
         {
-            Debug.WriteLine("Form_ResizeBegin");
             isResizing = true;
         }
 
         private void Form_ResizeEnd(object sender, EventArgs e)
         {
-            Debug.WriteLine("Form_ResizeEnd");
             isResizing = false;
             ResizeTabImage();
             HighlightOverlays("tab");
@@ -896,11 +831,6 @@ How-to add or update something yourself:\par
         {
             Debug.WriteLine("Form_Resized");
             InitializeList();
-        }
-
-        private void Main_Shown(object sender, EventArgs e)
-        {
-            // Optionally do something when form is first shown
         }
 
         // ---------------------------------------------------------------------
@@ -922,26 +852,10 @@ How-to add or update something yourself:\par
                     }
                 }
             }
-
-            /*
-            // Auto-select all
-            for (int i = 0; i < listBox2.Items.Count; i++)
-            {
-                listBox2.SetSelected(i, true);
-            }
-            */
         }
 
         private void InitializeComponentList(bool clearList = true)
         {
-//            SuspendLayout();
-
-            // Keep track of currently selected items
-            foreach (var item in listBoxComponents.SelectedItems)
-            {
-                selectedItems.Add(listBoxNameValueMapping[item.ToString()]);
-            }
-
             listBoxComponents.Items.Clear();
             listBoxNameValueMapping.Clear();
 
@@ -959,7 +873,7 @@ How-to add or update something yourself:\par
                         listBoxComponents.Items.Add(displayText);
                         listBoxNameValueMapping[displayText] = comp.Label;
 
-                        if (selectedItems.Contains(comp.Label))
+                        if (listBoxComponentsSelectedLabels.Contains(comp.Label))
                         {
                             int idx = listBoxComponents.Items.IndexOf(displayText);
                             listBoxComponents.SetSelected(idx, true);
@@ -968,24 +882,8 @@ How-to add or update something yourself:\par
                 }
             }
 
-            // Remove items that are no longer visible
-            List<string> itemsToRemove = new List<string>();
-            foreach (string sel in selectedItems)
-            {
-                if (!listBoxNameValueMapping.Values.Contains(sel))
-                {
-                    itemsToRemove.Add(sel);
-                }
-            }
-            foreach (string rem in itemsToRemove)
-            {
-                selectedItems.Remove(rem);
-            }
-
             // Apply filter after initializing the component list
             FilterListBoxComponents();
-
-//            ResumeLayout();
         }
 
         // ---------------------------------------------------------------------
@@ -1094,9 +992,6 @@ How-to add or update something yourself:\par
             AdjustImageSizes();
         }
 
-
-
-
         private void InitializeList()
         {
             panelListAutoscroll.Controls.Clear();
@@ -1108,26 +1003,25 @@ How-to add or update something yourself:\par
             if (bd == null) return;
 
             int yPosition = 5;
-            int availableWidth = panelListAutoscroll.ClientSize.Width;
+            int availableWidth = panelListAutoscroll.ClientSize.Width - SystemInformation.VerticalScrollBarWidth;
 
-            foreach (BoardFile file in bd.Files)
+            foreach (BoardFileOverlays file in bd.Files)
             {
                 string path = Path.Combine(Application.StartupPath, "Data", hardwareSelectedFolder, boardSelectedFolder, file.FileName);
                 Image image2 = Image.FromFile(path);
 
-                // Create a container panel for the label and image.
                 Panel thumbnailContainer = new Panel
                 {
                     Name = file.Name + "_container",
-//                    BorderStyle = BorderStyle.FixedSingle,
                     BorderStyle = BorderStyle.None,
                     Location = new Point(0, yPosition),
-                    Padding = new Padding(0),
-                    Margin = new Padding(0)
+                    Padding = new Padding(3),
+                    Margin = new Padding(0),
+                    Width = availableWidth,
+                    Height = 150
                 };
                 thumbnailContainer.DoubleBuffered(true);
 
-                // Create the label (shown on top).
                 Label labelListFile = new Label
                 {
                     Text = file.Name,
@@ -1138,71 +1032,54 @@ How-to add or update something yourself:\par
                     ForeColor = Color.Black,
                     Font = new Font("Calibri", 9),
                     Padding = new Padding(2),
-                    Margin = new Padding(0),
-                    Location = new Point(0, 0)
+                    Height = 20
                 };
-                labelListFile.Height = TextRenderer.MeasureText(labelListFile.Text, labelListFile.Font).Height + labelListFile.Padding.Top + labelListFile.Padding.Bottom + 2;
                 labelListFile.DoubleBuffered(true);
                 thumbnailContainer.Controls.Add(labelListFile);
 
-                // Create the image panel (shown below the label).
                 Panel panelList2 = new Panel
                 {
                     Name = file.Name,
-                    BackgroundImage = image2,
+                    BackgroundImage = Image.FromFile(path),
                     BackgroundImageLayout = ImageLayout.Zoom,
-                    Padding = new Padding(0),
+                    Dock = DockStyle.Fill,
                     Margin = new Padding(0)
                 };
                 panelList2.DoubleBuffered(true);
-                // Temporary size; final size will be set in AdjustImageSizes()
-                panelList2.Size = new Size(200, 150);
-                panelList2.Location = new Point(0, labelListFile.Height);
 
-                int margin = 3;
-                panelList2.Location = new Point(margin, labelListFile.Height + margin);
-                panelList2.Size = new Size(
-                    availableWidth - margin * 2,
-                    150 - margin * 2
-                );
-
-                // Create and add the overlay panel to the image panel.
                 OverlayPanel overlayPanelList = new OverlayPanel
                 {
-                    Bounds = panelList2.ClientRectangle
+                    Dock = DockStyle.Fill
                 };
-                panelList2.Controls.Add(overlayPanelList);
-                overlayPanelList.BringToFront();
 
                 overlayPanelList.OverlayPanelMouseDown += (s, e2) =>
                 {
                     if (e2.Button == MouseButtons.Left)
                         OnListImageLeftClicked(panelList2);
                 };
+
                 overlayPanelList.OverlayClicked += (s, e2) =>
                 {
                     if (e2.MouseArgs.Button == MouseButtons.Left)
                         OnListImageLeftClicked(panelList2);
                 };
 
+                panelList2.Controls.Add(overlayPanelList);
                 overlayPanelsList[file.Name] = overlayPanelList;
                 overlayListZoomFactors[file.Name] = 1.0f;
 
-                // Add the image panel to the container.
-                thumbnailContainer.Controls.Add(panelList2);
+                panelList2.BackgroundImage = Image.FromFile(path);
+                panelList2.BackgroundImageLayout = ImageLayout.Zoom;
 
-                // Set the container's size based on its children.
-                thumbnailContainer.Size = new Size(availableWidth, labelListFile.Height + panelList2.Height);
-                thumbnailContainer.Location = new Point(0, yPosition);
+                thumbnailContainer.Controls.Add(panelList2);
                 panelListAutoscroll.Controls.Add(thumbnailContainer);
 
-                panelListAutoscroll.AutoScroll = true;
-                panelListAutoscroll.HorizontalScroll.Enabled = false;
-                panelListAutoscroll.HorizontalScroll.Visible = false;
-
-//                yPosition += thumbnailContainer.Height + 5;
                 yPosition += thumbnailContainer.Height + 10;
             }
+
+            panelListAutoscroll.AutoScroll = true;
+            panelListAutoscroll.HorizontalScroll.Enabled = false;
+            panelListAutoscroll.HorizontalScroll.Visible = false;
 
             AdjustImageSizes();
             DrawBorderInList();
@@ -1227,7 +1104,7 @@ How-to add or update something yourself:\par
                 var labelListFile = container.Controls.OfType<Label>().FirstOrDefault();
                 if (labelListFile == null) continue;
 
-                bool hasSelectedComponent = listBoxSelectedActualValues.Any(selectedLabel =>
+                bool hasSelectedComponent = listBoxComponentsSelectedLabels.Any(selectedLabel =>
                 {
                     var compBounds = file.Components.FirstOrDefault(c => c.Label == selectedLabel);
                     return compBounds != null && compBounds.Overlays != null && compBounds.Overlays.Count > 0;
@@ -1252,11 +1129,6 @@ How-to add or update something yourself:\par
 
         private void AdjustImageSizes()
         {
-
-            // Right before resizing
-//            Debug.WriteLine($"[AdjustImageSizes] Before resizing: " +
-//                            $"splitterDistance={splitContainerSchematics.SplitterDistance}");
-
             int scrollbarWidth = panelListAutoscroll.VerticalScroll.Visible
                 ? SystemInformation.VerticalScrollBarWidth - 14
                 : 0;
@@ -1277,7 +1149,6 @@ How-to add or update something yourself:\par
                 container.Size = new Size(availableWidth, lbl.Height + newImageHeight);
                 container.Location = new Point(0, yPosition);
 
-//                yPosition += container.Height + 5;
                 yPosition += container.Height + 10;
 
                 float scaleFactor = (float)availableWidth / imagePanel.BackgroundImage.Width;
@@ -1289,32 +1160,9 @@ How-to add or update something yourself:\par
                 }
             }
 
-//            panelListAutoscroll.AutoScrollMinSize = new Size(0, yPosition + 5);
             panelListAutoscroll.AutoScrollMinSize = new Size(0, yPosition + 10);
             HighlightOverlays("list");
-
-            // Right after resizing
-//            Debug.WriteLine($"[AdjustImageSizes] After resizing: " +
-//                            $"splitterDistance={splitContainerSchematics.SplitterDistance}");
         }
-
-
-
-
-
-        private void panelListAutoscroll_Resize(object sender, EventArgs e)
-        {
-            //AdjustImageSizes();
-        }
-
-
-
-
-
-
-
-
-
 
         private void OnListImageLeftClicked(Panel pan)
         {
@@ -1337,61 +1185,36 @@ How-to add or update something yourself:\par
             DrawBorderInList();  // Ensure border is updated
         }
 
-
-
-
         private void DrawBorderInList()
         {
-            string selectedContainer = imageSelectedName + "_container";
-
-            foreach (Panel panel in panelListAutoscroll.Controls.OfType<Panel>())
+            foreach (Panel container in panelListAutoscroll.Controls.OfType<Panel>())
             {
-                panel.Paint -= Panel_Paint_Standard;
-                panel.Paint -= Panel_Paint_Special;
-
-                if (panel.Name == selectedContainer)
-                {
-                    panel.Paint += Panel_Paint_Special;
-                }
-                else
-                {
-                    panel.Paint += Panel_Paint_Standard;
-                }
-                panel.Invalidate();
-            }
-        }
-
-        private void Panel_Paint_Standard(object sender, PaintEventArgs e)
-        {
-            float penWidth = 1;
-            using (Pen pen = new Pen(Color.Black, penWidth))
-            {
-                float halfPenWidth = penWidth / 2;
-                e.Graphics.DrawRectangle(
-                    pen,
-                    halfPenWidth,
-                    halfPenWidth,
-                    ((Panel)sender).Width - penWidth,
-                    ((Panel)sender).Height - penWidth
-                );
+                container.Paint -= Panel_Paint_Special;
+                container.Paint += Panel_Paint_Special;
+                container.Invalidate();
             }
         }
 
         private void Panel_Paint_Special(object sender, PaintEventArgs e)
         {
-            float penWidth = 2;
-            using (Pen pen = new Pen(Color.Red, penWidth))
+            Panel panel = (Panel)sender;
+            string selectedContainer = imageSelectedName + "_container";
+            if (panel.Name == selectedContainer)
             {
-                pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Custom;
-                pen.DashPattern = new float[] { 4, 2 };
-                float halfPenWidth = penWidth / 2;
-                e.Graphics.DrawRectangle(
-                    pen,
-                    halfPenWidth,
-                    halfPenWidth,
-                    ((Panel)sender).Width - penWidth,
-                    ((Panel)sender).Height - penWidth
-                );
+                float penWidth = 2;
+                using (Pen pen = new Pen(Color.Red, penWidth))
+                {
+                    pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Dash;
+                    float offset = penWidth / 2;
+
+                    e.Graphics.DrawRectangle(
+                        pen,
+                        offset,
+                        offset,
+                        panel.ClientSize.Width - penWidth,
+                        panel.ClientSize.Height - penWidth
+                    );
+                }
             }
         }
 
@@ -1414,12 +1237,13 @@ How-to add or update something yourself:\par
         private void button1_Click(object sender, EventArgs e)
         {
             clearSelection();
+            textBox1.Text = "";
         }
 
         private void clearSelection()
         {
             listBoxComponents.ClearSelected();
-            listBoxSelectedActualValues.Clear();
+            listBoxComponentsSelectedLabels.Clear();
             UpdateHighlights();
         }
 
@@ -1488,8 +1312,6 @@ How-to add or update something yourself:\par
         private void panelZoom_MouseWheel(object sender, MouseEventArgs e)
         {
             ControlUpdateHelper.BeginControlUpdate(panelZoom);
-
-            Debug.WriteLine("MouseWheel event");
 
             try
             {
@@ -1564,7 +1386,7 @@ How-to add or update something yourself:\par
             if (bd == null) return;
 
             // Only for the currently selected image
-            foreach (BoardFile bf in bd.Files)
+            foreach (BoardFileOverlays bf in bd.Files)
             {
                 if (bf.Name != imageSelectedName) continue;
 
@@ -1590,42 +1412,6 @@ How-to add or update something yourself:\par
                 }
             }
         }
-
-/*
-        private void CreateOverlayArraysToList()
-        {
-            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            if (bd == null) return;
-
-            foreach (BoardFile bf in bd.Files)
-            {
-                foreach (var comp in bf.Components)
-                {
-                    if (comp.Overlays == null) continue;
-
-                    foreach (var ov in comp.Overlays)
-                    {
-                        PictureBox overlayPictureBox = new PictureBox
-                        {
-                            Name = comp.Label,
-                            Location = new Point(ov.Bounds.X, ov.Bounds.Y),
-                            Size = new Size(ov.Bounds.Width, ov.Bounds.Height),
-                            Tag = bf.Name
-                        };
-
-                        if (!overlayComponentsList.ContainsKey(bf.Name))
-                        {
-                            overlayComponentsList[bf.Name] = new List<PictureBox>();
-                        }
-                        overlayComponentsList[bf.Name].Add(overlayPictureBox);
-
-                        Debug.WriteLine($"Created PictureBox in LIST [{bf.Name}] with hash [{overlayPictureBox.GetHashCode()}] - Overlay Name: {comp.Label}, X:{ov.Bounds.X}, Y:{ov.Bounds.Y}, W:{ov.Bounds.Width}, H:{ov.Bounds.Height}");
-                    }
-                }
-            }
-        }
-*/
 
         // ---------------------------------------------------------------------
         // Handling highlight overlays
@@ -1660,7 +1446,7 @@ How-to add or update something yourself:\par
                         (int)(overlayComponentsTabOriginalSizes[i].Height * zoomFactor)
                     );
 
-                    bool highlighted = listBoxSelectedActualValues.Contains(overlayComponentsTab[i].Name);
+                    bool highlighted = listBoxComponentsSelectedLabels.Contains(overlayComponentsTab[i].Name);
 
                     overlayPanel.Overlays.Add(new OverlayInfo
                     {
@@ -1676,7 +1462,7 @@ How-to add or update something yourself:\par
             else if (scope == "list")
             {
                 // Draw overlays on each thumbnail
-                foreach (BoardFile bf in bd.Files)
+                foreach (BoardFileOverlays bf in bd.Files)
                 {
                     if (!overlayPanelsList.ContainsKey(bf.Name)) continue;
 
@@ -1691,7 +1477,7 @@ How-to add or update something yourself:\par
                     {
                         if (comp.Overlays == null) continue;
 
-                        bool highlighted = listBoxSelectedActualValues.Contains(comp.Label);
+                        bool highlighted = listBoxComponentsSelectedLabels.Contains(comp.Label);
 
                         foreach (var ov in comp.Overlays)
                         {
@@ -1718,7 +1504,7 @@ How-to add or update something yourself:\par
 
         private void UpdateHighlights()
         {
-            listBoxSelectedActualValues.Clear();
+            listBoxComponentsSelectedLabels.Clear();
 
             // Build a list of actual component labels from selected items
             foreach (var selectedItem in listBoxComponents.SelectedItems)
@@ -1726,7 +1512,7 @@ How-to add or update something yourself:\par
                 string displayText = selectedItem.ToString();
                 if (listBoxNameValueMapping.TryGetValue(displayText, out string actualValue))
                 {
-                    listBoxSelectedActualValues.Add(actualValue);
+                    listBoxComponentsSelectedLabels.Add(actualValue);
                 }
             }
 
@@ -1761,15 +1547,6 @@ How-to add or update something yourself:\par
                         listBoxComponents.SetSelected(index, true);
                     }
                 }
-                else
-                {
-                    // If not found in the list, optionally re-add
-                    // (Many prefer ignoring if not found.)
-                    // e.g.:
-                    // listBox1.Items.Add(key);
-                    // int newIndex = listBox1.FindString(key);
-                    // listBox1.SetSelected(newIndex, true);
-                }
 
                 // Refresh the highlight overlays
                 UpdateHighlights();
@@ -1780,10 +1557,6 @@ How-to add or update something yourself:\par
                 var comp = board?.Components.FirstOrDefault(c => c.Label == labelClicked);
                 if (comp != null)
                 {
-                    Debug.WriteLine("Left-click on " + comp.Label);
-                    //FormComponent formComponent = new FormComponent(comp, hardwareSelectedFolder, boardSelectedFolder);
-                    //formComponent.ShowDialog();
-                    // hest
                     ShowComponentPopup(comp);
                 }
             }
@@ -1829,7 +1602,6 @@ How-to add or update something yourself:\par
             if (e.IsHovering)
             {
                 this.Cursor = Cursors.Hand;
-                //labelComponent.Text = e.OverlayInfo.ComponentLabel;
                 var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
                 var comp = bd?.Components.FirstOrDefault(c => c.Label == e.OverlayInfo.ComponentLabel);
@@ -1914,26 +1686,6 @@ How-to add or update something yourself:\par
                 }
             }
         }
-        /*
-                private void SplitContainer1_Paint(object sender, PaintEventArgs e)
-                {
-                    SplitContainer splitContainer = sender as SplitContainer;
-                    if (splitContainer != null)
-                    {
-                        // Draw a custom line in the middle of the splitter
-                        int splitterWidth = splitContainer.SplitterWidth;
-                        int halfWidth = splitterWidth / 2;
-                        int x = splitContainer.SplitterDistance + halfWidth;
-                        int y1 = splitContainer.Panel1.ClientRectangle.Top;
-                        int y2 = splitContainer.Panel1.ClientRectangle.Bottom;
-
-                        using (Pen pen = new Pen(Color.DarkGray, 2))
-                        {
-                            e.Graphics.DrawLine(pen, x, y1, x, y2);
-                        }
-                    }
-                }
-        */
 
         private void buttonFullscreen_Click(object sender, EventArgs e)
         {
@@ -1976,9 +1728,6 @@ How-to add or update something yourself:\par
                 return true;
             }
 
-            
-            
-
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
@@ -2016,13 +1765,8 @@ How-to add or update something yourself:\par
             Configuration.SaveSetting(configKey, joined);
         }
 
-
         private bool LoadSelectedCategories()
         {
-
-            Debug.WriteLine($"Hardware name = '{hardwareSelectedName}' (length={hardwareSelectedName.Length})");
-            Debug.WriteLine($"Board name    = '{boardSelectedName}'   (length={boardSelectedName.Length})");
-
             // e.g. "SelectedCategories|C128|310378"
             string configKey = $"SelectedCategories|{hardwareSelectedName}|{boardSelectedName}";
             Debug.WriteLine($"Looking for configKey = '{configKey}'");
@@ -2052,23 +1796,204 @@ How-to add or update something yourself:\par
             Configuration.SaveSetting("WindowState", this.WindowState.ToString());
         }
 
+        private void PopulateRichTextBoxRessources(Board selectedBoard)
+        {
+            if (selectedBoard.BoardLinks == null || !selectedBoard.BoardLinks.Any())
+            {
+                richTextBoxRessources.Clear();
+                return;
+            }
+
+            // Get the two datasets
+            var groupedLinks = selectedBoard.BoardLinks.GroupBy(link => link.Category);
+            var groupedLocalFiles = selectedBoard.BoardLocalFiles.GroupBy(file => file.Category);
+
+            StringBuilder rtfBuilder = new StringBuilder();
+
+            rtfBuilder.Append(@"{\rtf1\ansi\ansicpg1252");
+
+            // Local files
+            rtfBuilder.Append(@"\b Local files:\b0");
+            rtfBuilder.Append(@"\par\par");
+            foreach (var group in groupedLocalFiles)
+            {
+                rtfBuilder.Append(@"\b ");
+                rtfBuilder.Append(group.Key);
+                rtfBuilder.Append(@":\b0\par");
+                foreach (var file in group)
+                {
+                    string filePath = Path.Combine(Application.StartupPath, "Data", hardwareSelectedFolder, boardSelectedFolder, file.Datafile);
+                    rtfBuilder.Append(@"\pard    \'95 ");
+                    rtfBuilder.Append($@"{{\field{{\*\fldinst HYPERLINK ""file:///{filePath.Replace(@"\", @"\\")}""}}{{\fldrslt {file.Name}}}}}");
+                    rtfBuilder.Append(@"\par");
+                }
+                rtfBuilder.Append(@"\par");
+            }
+
+            // Links
+            rtfBuilder.Append(@"\b Links:\b0");
+            rtfBuilder.Append(@"\par\par");
+
+            foreach (var group in groupedLinks)
+            {
+                rtfBuilder.Append(@"\b ");
+                rtfBuilder.Append(group.Key);
+                rtfBuilder.Append(@":\b0\par");
+
+                foreach (var link in group)
+                {
+                    rtfBuilder.Append(@"\pard    \'95 ");
+                    //rtfBuilder.Append($@"{{\field{{\*\fldinst HYPERLINK ""{link.Url}""}}{{\fldrslt {link.Name}}}}}");
+                    //rtfBuilder.Append($@"{{\field{{\*\fldinst{{ HYPERLINK ""{link.Url}"" }}}}{{\fldrslt {link.Name}}}}}");
+                    //rtfBuilder.Append($@"{{\field{{\*\fldinst{{ HYPERLINK ""{link.Url}"" }}}}{{\fldrslt {{{link.Name}}}}}}}");
+                    //rtfBuilder.Append($@"{{\field{{\*\fldinst{{HYPERLINK ""{link.Url}""}}}}{{\fldrslt{{\ul\cf1 {link.Name}}}}}}}");
+                    //rtfBuilder.Append($@"{{\field{{\*\fldinst{{ HYPERLINK ""{link.Url}"" }}}}{{\fldrslt{{{link.Name}}}}}}}");
+                    //rtfBuilder.Append($@"{{\field{{\*\fldinst{{ HYPERLINK ""{link.Url}"" }}}}{{\fldrslt{{\ul {link.Name}}}}}}}");
+                    //                    rtfBuilder.Append($@"{{\field{{\*\fldinst{{ HYPERLINK ""{link.Url}"" }}}}{{\fldrslt{{{link.Name}}}}}}}");
+//                    rtfBuilder.Append("{\\rtf1\\ansi\\ansicpg1252\\cocoartf1038\\cocoasubrtf350\r\n{\\fonttbl\\f0\\fnil\\fcharset0 Calibri;}\r\n{\\colortbl;\\red255\\green255\\blue255;}\r\n\\paperw11900\\paperh16840\\vieww12000\\viewh13860\\viewkind0\r\n\\pard\\tx560\\tx1120\\tx1680\\tx2240\\tx2800\\tx3360\\tx3920\\tx4480\\tx5040\\tx5600\\tx6160\\tx6720\\ql\\qnatural\\pardirnatural\r\n\r\n\\f0\\fs22 \\cf0 ");
+                    rtfBuilder.Append("{\\field{\\*\\fldinst{HYPERLINK \"" + link.Url + "\"}}{\\fldrslt " + link.Name + "}}");
+                    rtfBuilder.Append(@"\par");
+                }
+
+                rtfBuilder.Append(@"\par");
+            }
+
+            rtfBuilder.Append("}");
+            richTextBoxRessources.Rtf = rtfBuilder.ToString();
+
+            /*
+            string link2 = "https://whatever.dk";
+            string name2 = "My Link";
+            StringBuilder rtf = new StringBuilder();
+            rtf.Append(@"{\rtf1\ansi");
+            rtf.Append(@"{\fonttbl\f0\fnil\fcharset0 Calibri;}");
+            rtf.Append(@"{\colortbl ;\red0\green0\blue255;}");
+            rtf.Append(@"\viewkind4\uc1\pard\f0\fs20 ");
+            rtf.Append($@"{{\field{{\*\fldinst HYPERLINK ""{link2}""}}{{\fldrslt{{\ul\cf1 {name2}}}}}}}");
+            rtf.Append(@"\par}");
+            */
+
+            /*
+            string link3 = "https://dennis.dk";
+            string name3 = "My Link";
+            StringBuilder rtf = new StringBuilder();
+            rtf.Append("{\\rtf1\\ansi\\ansicpg1252\\cocoartf1038\\cocoasubrtf350\r\n{\\fonttbl\\f0\\fnil\\fcharset0 Calibri;}\r\n{\\colortbl;\\red255\\green255\\blue255;}\r\n\\paperw11900\\paperh16840\\vieww12000\\viewh13860\\viewkind0\r\n\\pard\\tx560\\tx1120\\tx1680\\tx2240\\tx2800\\tx3360\\tx3920\\tx4480\\tx5040\\tx5600\\tx6160\\tx6720\\ql\\qnatural\\pardirnatural\r\n\r\n\\f0\\fs22 \\cf0 ");
+            rtf.Append("Here are some start text, ");
+            rtf.Append("{\\field{\\*\\fldinst{HYPERLINK \""+ link3 +"\"}}{\\fldrslt "+ name3 +"}}");
+            rtf.Append(". Here are some final text\\\r\n}");
+            richTextBoxRessources.Rtf = rtf.ToString();
+            */
+
+            /*
+            string link1 = "https://dennis.dk";
+            string name1 = "My Link 1";
+            string link2 = "https://example.com";
+            string name2 = "My Link 2";
+
+            StringBuilder rtf = new StringBuilder();
+            rtf.Append("{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Helvetica;}}");
+            rtf.Append("{\\colortbl ;\\red0\\green0\\blue255;}"); // Define hyperlink color
+
+            rtf.Append("\\viewkind4\\uc1\\pard\\fs20 Here are some start text, ");
+
+            rtf.Append(" {\\field{\\*\\fldinst { HYPERLINK \"" + link1 + "\" }}{\\fldrslt \\ul\\cf1 " + name1 + "}} ");
+            rtf.Append(" and ");
+            rtf.Append(" {\\field{\\*\\fldinst { HYPERLINK \"" + link2 + "\" }}{\\fldrslt \\ul\\cf1 " + name2 + "}} ");
+
+            rtf.Append(". Here are some final text\\par}");
+            */
+
+            StringBuilder rtf = new StringBuilder();
+
+            rtf.Append("{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang1033{\\fonttbl{\\f0\\fswiss\\fprq2\\fcharset0 Calibri; } {\\f1\\fnil\\fcharset0 Calibri; } {\\f2\\fnil\\fcharset2 Symbol; } }");
+            rtf.Append("{\\colortbl;\\red0\\green0\\blue255;\\red5\\green99\\blue193; }");
+            rtf.Append("{\\*\\generator Riched20 10.0.19041}\\viewkind4\\uc1");
+            rtf.Append("\\pard\\widctlpar\\sa160\\sl252\\slmult1\\kerning2\\f0\\fs22\\lang1030 Header 1:\\par");
+            rtf.Append("");
+            rtf.Append("\\pard{\\pntext\\f2\\'B7\\tab}{\\*\\pn\\pnlvlblt\\pnf2\\pnindent0{\\pntxtb\\'B7}}\\widctlpar\\fi-360\\li720\\sa160\\sl252\\slmult1 {{\\field{\\*\\fldinst{HYPERLINK \"https://link1\"}}{\\fldrslt{\\ul\\cf1\\cf2\\ul Link 1}}}}\\f0\\fs22\\par");
+            rtf.Append("{\\pntext\\f2\\'B7\\tab}{{\\field{\\*\\fldinst{HYPERLINK \"https://link2\"}}{\\fldrslt{\\ul\\cf1\\cf2\\ul Link 2}}}}\\f0\\fs22\\par");
+            rtf.Append("");
+            rtf.Append("\\pard\\widctlpar\\sa160\\sl252\\slmult1 Header 2:\\par");
+            rtf.Append("");
+            rtf.Append("\\pard{\\pntext\\f2\\'B7\\tab}{\\*\\pn\\pnlvlblt\\pnf2\\pnindent0{\\pntxtb\\'B7}}\\widctlpar\\fi-360\\li720\\sa160\\sl252\\slmult1 {{\\field{\\*\\fldinst{HYPERLINK \"https://link3\"}}{\\fldrslt{\\ul\\cf1\\cf2\\ul Link 3}}}}\\f0\\fs22\\par");
+            rtf.Append("");
+            rtf.Append("\\pard\\sa200\\sl276\\slmult1\\kerning0\\f1\\lang6\\par");
+            rtf.Append("}");
+
+            richTextBoxRessources.Rtf = rtf.ToString();
+            InitializeWebView();
+        }
+
+        private async void InitializeWebView()
+        {
+            await webView21.EnsureCoreWebView2Async(null);
+
+            // Handle navigation events
+            webView21.CoreWebView2.NavigationStarting += (sender, args) =>
+            {
+                Debug.WriteLine("NavigationStarting: " + args.Uri);
+                if (args.Uri.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+                {
+                    args.Cancel = true;
+                    string localPath = new Uri(args.Uri).LocalPath;
+                    Process.Start(new ProcessStartInfo(localPath) { UseShellExecute = true });
+                }
+            };
+
+            // HTML
+            string htmlContent = @"
+                <html>
+                <head>
+                <meta charset='UTF-8'>
+                <title>Local File Test</title>
+                </head>
+                <body>
+                <h1>Try opening local files:</h1>
+                <ul>
+                <li><a href='file:///C:\\GlDifxCmd.log'>Open local log file</a></li>
+                <li><a href='https://www.google.com'>Google</a></li>
+                </ul>
+                </body>
+                </html>";
+
+            webView21.NavigateToString(htmlContent);
+        }
+
+        private void richTextBoxRessources_LinkClicked(object sender, LinkClickedEventArgs e)
+        {
+            try
+            {
+                if (e.LinkText.StartsWith("http://") || e.LinkText.StartsWith("https://"))
+                {
+                    Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
+                }
+                else if (e.LinkText.StartsWith("file:///"))
+                {
+                    string localPath = e.LinkText.Replace("file:///", "").Replace("/", "\\");
+                    Process.Start(new ProcessStartInfo(localPath) { UseShellExecute = true });
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to open link: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void richTextBoxEx1_LinkClicked(object sender, LinkClickedEventArgs e)
+        {
+            Debug.WriteLine("Link clicked: " + e.LinkText);
+        }
+
+        // What is this?
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
     }
-
-
 
     // -------------------------------------------------------------------------
-    // Support classes: renamed "File" -> "BoardFile" to avoid System.IO.File conflict
+    // Class definitions
 
-    public class CustomPanel : Panel
-    {
-        public event MouseEventHandler CustomMouseWheel;
-
-        protected override void OnMouseWheel(MouseEventArgs e)
-        {
-            CustomMouseWheel?.Invoke(this, e);
-        }
-    }
-
+    // "Hardware" is read from the very first "Data.xlsx" Excel file (level 1).
+    // It contains a list of all associated boards and their respective data files.
     public class Hardware
     {
         public string Name { get; set; }
@@ -2077,20 +2002,20 @@ How-to add or update something yourself:\par
         public List<Board> Boards { get; set; }
     }
 
+    // "Board" is read from level 2 of the Excel data files
     public class Board
     {
         public string Name { get; set; }
         public string Folder { get; set; }
         public string Datafile { get; set; }
-
-        // Use "BoardFile" instead of "File"
-        public List<BoardFile> Files { get; set; }
-
+        public List<BoardFileOverlays> Files { get; set; }
         public List<ComponentBoard> Components { get; set; }
+        public List<BoardLink> BoardLinks { get; set; }
+        public List<BoardLocalFiles> BoardLocalFiles { get; set; }
     }
 
-    // Renamed "File" => "BoardFile"
-    public class BoardFile
+    // "BoardFileOverlays" contains all overlay info and bounds per image
+    public class BoardFileOverlays
     {
         public string Name { get; set; }
         public string FileName { get; set; }
@@ -2101,6 +2026,24 @@ How-to add or update something yourself:\par
         public List<ComponentBounds> Components { get; set; }
     }
 
+    // "BoardLink" contains all web links per board
+    public class BoardLink
+    {
+        public string Category { get; set; }
+        public string Name { get; set; }
+        public string Url { get; set; }
+    }
+
+    // "BoardLocalFiles" contains all local file links per board
+    public class BoardLocalFiles
+    {
+        public string Category { get; set; }
+        public string Name { get; set; }
+        public string Datafile { get; set; }
+    }
+
+    // Helper-classes
+    
     public class ComponentBoard
     {
         public string Label { get; set; }
@@ -2110,7 +2053,7 @@ How-to add or update something yourself:\par
         public string ImagePinout { get; set; }
         public string OneLiner { get; set; }
         public string Description { get; set; }
-        public List<LocalFiles> LocalFiles { get; set; }
+        public List<ComponentLocalFiles> LocalFiles { get; set; }
         public List<ComponentLinks> ComponentLinks { get; set; }
     }
 
@@ -2125,7 +2068,7 @@ How-to add or update something yourself:\par
         public Rectangle Bounds { get; set; }
     }
 
-    public class LocalFiles
+    public class ComponentLocalFiles
     {
         public string Name { get; set; }
         public string FileName { get; set; }
@@ -2135,5 +2078,14 @@ How-to add or update something yourself:\par
     {
         public string Name { get; set; }
         public string Url { get; set; }
+    }
+
+    public class CustomPanel : Panel
+    {
+        public event MouseEventHandler CustomMouseWheel;
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            CustomMouseWheel?.Invoke(this, e);
+        }
     }
 }
