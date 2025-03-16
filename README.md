@@ -52,7 +52,7 @@ Inside the "Tools" folder I have placed the VGG application - you should load th
 
 I have chosen Excel as the data format, as this is easy for the most people to navigate in. I am actually not sure, but I do believe there is a [free online Excel available from Microsoft](https://www.office.com/launch/excel), if you do not already have one installed.
 
-# Near-term TODO
+# Near-term TODO (will be done)
 
 - Reduce default width of panel with thumbnails
 - Handle missing/bad data errors gracefully
@@ -60,9 +60,9 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 - Add data for Commodore 64 (Breadbin) schematics 250407 and 250425
 - Add data for Commodore 64C schematics 250466
 
-# Future roadmap and ideas
+# Future ideas / wishlist
 
-There are bigger changes here, and I am not sure I want to go down that road - it will for sure depend on usage, as I personally do not have any use for it, if this is primarily used only by myself :-)
+There are bigger changes here, and I am not sure I want to go down this road - it will for sure depend on usage, as I personally do not have any use for it, if this is primarily used only by myself :-)
 
 - Ideally make fullscreen mode less "flickering"
 - "Data has been updated" information
