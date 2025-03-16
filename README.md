@@ -18,9 +18,9 @@ It probably works the best, if the hardware is "simple" and have good documentat
 
 # Installation and usage
 
-_CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file.
+_CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file, `Commodore-Repair-Toolbox.exe`.
 
-It will run on any _Windows 10_ or newer (both 32-bit and 64-bit). It does require _.NET Framework 4.8.1_, but this is an integrated part of the operating system.
+It will run on any 64-bit _Windows 10_ or newer. It does require _.NET Framework 4.8.1_, but this is an integrated part of the operating system.
 
 # Built-in schematics
 
@@ -51,16 +51,6 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 
 # Near-term TODO
 
-- ~~Fix highlights in thumbnail images have gone rogue~~ (fixed in next release)
-- ~~Fix clicking in thumbnail image cannot activate image, if clicked at component location~~ (fixed in next release)
-- Fix "Ressources" tab should be taken from Excel file instead via web
-- ~~Change component list is a little easier to look at (remove questionmark)~~ (fixed in next release)
-- ~~Show asterisk (*) in thumbnail label, when chosen component is visible in thumbnail image~~ (fixed in next release)
-- ~~Label in thumnail should not float above image (show label first, then image below)~~ (fixed in next release)
-- ~~Configuration file - refactor it and save more configuration:~~ (fixed in next release)
-  - ~~Selected component categories per board~~
-  - ~~Start in same size as last (maximized or window)~~
-- ~~Add more data for Commodore 128 (datasheets and pinouts)~~ (fixed in next release)
 - Add data for Commodore 64 (Breadbin) schematics 250407 and 250425
 - Add data for Commodore 64C schematics 250466
 
@@ -68,9 +58,8 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 
 There are bigger changes here, and I am not sure I want to go down that road - it will for sure depend on usage, as I personally do not have any use for it, if this is primarily used only by myself :-)
 
-- ~~Search input field to filter component list~~ (fixed in next release)
 - Ideally make fullscreen mode less "flickering"
-- ~~"New version available"~~ or "Data has been updated" information
+- "Data has been updated" information
 - Have people download and upload new schematics or updates directly from tool
 - Rating system of user uploaded schematics
 
