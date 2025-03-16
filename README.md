@@ -79,6 +79,8 @@ I have taken data from many places, but I do have a few _go-to_ places I frequen
 
 In some cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated :-)
 
+If you want to contribute with a major new or updated dataset, then please let me know, as I happily will show credits here for joint efforts. There is a huge Commodore community, and I wish for collaboration into making this the best data and reference for Commodore reparing.
+
 # Inspiration for creating this project
 
 I have been repairing Commodore 64/128 for some years, but I still consider myself as a _beginner_ in this world of hardware (I am more a software person). I often forget where and what to check, and I struggle to find again all the relevant ressources and schematics to check, not to mention how to find the components in the schematics. I did often refer to the "Mainboards" section of [My Old Computer](https://myoldcomputer.nl/technical-info/mainboards/), and I noticed that Jeroen did have a prototype of an application named _Repair Help_, and it did have the easy layout I was looking for (I did get a copy of it). However, it was never finalized from him, so I took upon myself to create something similar, and a couple of years later I did come up with a very similar looking application, also utilizing a lot of data directly from Jeroen's page (with permission from him, of course).
