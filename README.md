@@ -25,7 +25,7 @@ It will run on any 64-bit _Windows 10_ or newer. It does require _.NET Framework
 # Built-in schematics
 
 - Commodore 128 and 128D
-- (soon to come)
+- Soon to come (just need the time to input the data):
     - Commodore 64 (Breadbin) schematics 250407 and 250425
     - Commodore 64C schematics 250466
 
