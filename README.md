@@ -60,22 +60,13 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 
 # Near-term TODO (will be done)
 
-- ~~Polish the UI so its elements are proper aligned~~ (fixed in next release)
-- ~~Reduce default width of panel with thumbnails~~ (fixed in next release)
-- ~~Have icon for executable file~~ (fixed in next release)
-- Remember which monitor last used
-- Handle missing/bad data errors gracefully
-- Heavy refactoring of code base
-- Add data for Commodore 64 (Breadbin), schematics 250407 and 250425
-- Add data for Commodore 64C, schematics 250466
+View [issues](issues) and [milestones](milestones) for upcoming and evaluated enhancements or bugs.
 
 # Future ideas / wishlist
 
 There are bigger changes here, and I am not sure I want to go down this road - it will for sure depend on usage, as I personally do not have any use for the collaboration topics, if this is primarily used only by myself :grin:
 
 - More pictures in popup component info
-- Ideally make changing to fullscreen mode less "flickering"
-- Embed `WebView2Loader.dll` in executable file (which is already packed with `ILRepack`)
 - "Data has been updated" information
 - Have people download and upload new schematics or updates directly from tool
 - Rating system of user uploaded schematics
