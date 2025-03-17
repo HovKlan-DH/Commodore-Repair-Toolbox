@@ -55,6 +55,9 @@ Inside the `Tools` folder I have placed the VGG application - you should load th
 
 I have chosen Excel as the data format, as this is easy for the most people to navigate in. I am actually not sure, but I do believe there is a [free online Excel available from Microsoft](https://www.office.com/launch/excel), if you do not already have one installed.
 
+> [!CAUTION]
+> Please do note that the data files have not yet reached its final maturity level, and by then its format most likely will change in a nearby future release!
+
 # Near-term TODO (will be done)
 
 - Polish the UI so its elements are proper aligned
