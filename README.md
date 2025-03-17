@@ -34,7 +34,7 @@ It will run on any 64-bit _Windows 10_ or newer. It does require _.NET Framework
 
 # Your help would be really appreciated
 
-I would really appreciate if some Commodore experts would take a look, and let me know of factual errors or things I obviously have missed.
+I would really appreciate if some Commodore experts would take a look, and let me know of factual errors or things I obviously have missed :pray:
 
 You can help specifically with these topics:
 - Do you have higher-quality images of the schematics?
@@ -82,7 +82,7 @@ I have taken data from many places, but I do have a few _go-to_ places I frequen
 - [Zimmers](https://www.zimmers.net/anonftp/pub/cbm/schematics/computers/)
 - [Ray Carlsen](https://portcommodore.com/rcarlsen/cbm/)
 
-In some cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated :pray:
+In some cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated.
 
 If you want to contribute with a major new or updated dataset, then please let me know, as I happily will show credits here for joint efforts. There is a large Commodore community, and I wish for collaboration into making this the best data and reference for Commodore reparing (well, on the Windows platform at least).
 
