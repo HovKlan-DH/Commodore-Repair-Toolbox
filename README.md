@@ -2,6 +2,9 @@
 
 This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ hence forward) - a Windows utility tool for repairing vintage computers or peripherals.
 
+> [!CAUTION]
+> Please do note that the data files have not yet reached its final maturity level, and by then its format most likely will change in a nearby future release!
+
 # Screenshots
 
 Main screen:\
@@ -35,7 +38,7 @@ I would really appreciate if some Commodore experts would take a look, and let m
 
 You can help specifically with these topics:
 - Do you have higher-quality images of the schematics?
-- Do you have datasheets for any of the components?
+- Do you have (better) datasheets or pinouts for any of the components?
 - Do you see missing components in either the component list or as a highlight?
 - Can you improve any data or fill in more technical details anywhere?
 
