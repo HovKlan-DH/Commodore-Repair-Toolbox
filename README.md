@@ -58,9 +58,9 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 > [!CAUTION]
 > Please do note that the data files have not yet reached its final maturity level, and by then its format most likely will change in a nearby future release!
 
-# Near-term TODO (will be done)
+# Near-term TODO
 
-View [issues](issues) and [milestones](milestones) for upcoming and evaluated enhancements or bugs.
+View [issues](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) and [milestones](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/milestones) for upcoming bugfixes and enhancements.
 
 # Future ideas / wishlist
 
