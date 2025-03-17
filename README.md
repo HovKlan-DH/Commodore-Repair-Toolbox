@@ -60,8 +60,8 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 
 # Near-term TODO (will be done)
 
-- Polish the UI so its elements are proper aligned
-- Reduce default width of panel with thumbnails
+- ~~Polish the UI so its elements are proper aligned~~ (fixed in next release)
+- ~~Reduce default width of panel with thumbnails~~ (fixed in next release)
 - Have icon for executable file
 - Handle missing/bad data errors gracefully
 - Heavy refactoring of code base
