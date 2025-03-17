@@ -80,7 +80,7 @@ I have taken data from many places, but I do have a few _go-to_ places I frequen
 
 In some cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated :-)
 
-If you want to contribute with a major new or updated dataset, then please let me know, as I happily will show credits here for joint efforts. There is a huge Commodore community, and I wish for collaboration into making this the best data and reference for Commodore reparing (well, on the Windows platform at least).
+If you want to contribute with a major new or updated dataset, then please let me know, as I happily will show credits here for joint efforts. There is a large Commodore community, and I wish for collaboration into making this the best data and reference for Commodore reparing (well, on the Windows platform at least).
 
 # Inspiration for creating this project
 
