@@ -66,7 +66,7 @@ I have chosen Excel as the data format, as this is easy for the most people to n
 
 # Future ideas / wishlist
 
-There are bigger changes here, and I am not sure I want to go down this road - it will for sure depend on usage, as I personally do not have any use for the collaboration topics, if this is primarily used only by myself :-)
+There are bigger changes here, and I am not sure I want to go down this road - it will for sure depend on usage, as I personally do not have any use for the collaboration topics, if this is primarily used only by myself :grin:
 
 - More pictures in popup component info
 - Ideally make fullscreen mode less "flickering"
@@ -82,7 +82,7 @@ I have taken data from many places, but I do have a few _go-to_ places I frequen
 - [Zimmers](https://www.zimmers.net/anonftp/pub/cbm/schematics/computers/)
 - [Ray Carlsen](https://portcommodore.com/rcarlsen/cbm/)
 
-In some cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated :-)
+In some cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated :pray:
 
 If you want to contribute with a major new or updated dataset, then please let me know, as I happily will show credits here for joint efforts. There is a large Commodore community, and I wish for collaboration into making this the best data and reference for Commodore reparing (well, on the Windows platform at least).
 
