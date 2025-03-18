@@ -58,6 +58,9 @@
     <ErrorReport>prompt</ErrorReport>
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>Commodore icon.ico</ApplicationIcon>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="EPPlus, Version=7.6.1.0, Culture=neutral, PublicKeyToken=ea159fdaa78159a1, processorArchitecture=MSIL">
       <HintPath>packages\EPPlus.7.6.1\lib\net462\EPPlus.dll</HintPath>
@@ -175,9 +178,14 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="Commodore icon.ico" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>REM -------------------------
+    <PostBuildEvent>if "$(ConfigurationName)" == "Release" (
+
+REM -------------------------
 REM Pack EXE with ILRepack
 REM -------------------------
 
@@ -189,8 +197,8 @@ if exist "runtimes\win-x64\native\WebView2Loader.dll" (
 
 REM -------------------------
 
-if "$(ConfigurationName)" == "Release" (
-    signtool.exe sign /fd sha256 /tr http://ts.ssl.com /td sha256 /n "Dennis Helligsø" "$(TargetPath)"
+signtool.exe sign /fd sha256 /tr http://ts.ssl.com /td sha256 /n "Dennis Helligsø" "$(TargetPath)"
+
 )
 </PostBuildEvent>
   </PropertyGroup>

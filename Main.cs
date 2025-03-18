@@ -1,6 +1,4 @@
-﻿using Microsoft.Web.WebView2.WinForms;
-using Microsoft.Web.WebView2.Core;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -10,20 +8,31 @@ using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using static System.Windows.Forms.LinkLabel;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.Tab;
-
-
-
 
 namespace Commodore_Repair_Toolbox
 {
     public partial class Main : Form
     {
+        // Default values
+        private string defaultConfigurationSplitterPosition = "1000"; // this is actually determined in "Form_Load" as UI needs to be initialized first
+        private string buildType = ""; // Debug|Release
+        private string onlineAvailableVersion = ""; // will be empty, if no newer version available
+        private string urlCheckOnlineVersion = "https://dennis.dk/crt/";
+
+        // HTML code for all tabs using "WebView2" component for content
+        private string htmlForTabs = @"
+            <style>
+            body { padding: 10px; font-family: Calibri, sans-serif; font-size: 11pt; }
+            h1 { font-size: 14pt; }
+            h2 { font-size: 11pt; padding: 0px; margin: 0px; }
+            ul { margin: 0px; }
+            a { color: #5181d0; }
+            </style>
+        ";
+
         // Reference to the popup/info form
-        private FormComponent currentPopup = null;
+        private FormComponent componentInfoPopup = null;
 
         // Blinking of components
         private Timer blinkTimer;
@@ -52,9 +61,7 @@ namespace Commodore_Repair_Toolbox
 
         // Resizing of window/schematic
         private bool isResizedByMouseWheel = false;
-        private bool isResizing = false;
-
-        
+        private bool isResizing = false;       
 
         // Data loaded from Excel
         public List<Hardware> classHardware = new List<Hardware>();
@@ -64,11 +71,13 @@ namespace Commodore_Repair_Toolbox
         private Dictionary<int, Point> overlayComponentsTabOriginalLocations = new Dictionary<int, Point>();
         private Dictionary<int, Size> overlayComponentsTabOriginalSizes = new Dictionary<int, Size>();
 
-        // Old references
-        //private List<string> alistBoxComponentsSelectedItems = new List<string>();
+        // Selected entries in the components list
         private List<string> listBoxComponentsSelectedLabels = new List<string>();
         private Dictionary<string, string> listBoxNameValueMapping = new Dictionary<string, string>();
 
+        // Version information
+        private string versionThis = "";
+        private string versionOnline = "";
 
         // Current user selection
         public string hardwareSelectedName;
@@ -77,235 +86,584 @@ namespace Commodore_Repair_Toolbox
         private string boardSelectedFolder;
         private string imageSelectedName;
         private string imageSelectedFile;
-
         private float zoomFactor = 1.0f;
         private Point overlayPanelLastMousePos = Point.Empty;
 
-        private static string buildType = ""; // Debug, Release
-        private static string appVer = "";
-        private static string onlineAvailableVersion = "";
-        private static string urlCheckOnlineVersion = "https://dennis.dk/crt/";
 
-        // Add a field to track the current cursor state
-//        private bool isCursorHand = false;
-
-        // ---------------------------------------------------------------------
-        // Constructor
+        // ###########################################################################################
+        // Main form constructor.
+        // ###########################################################################################
 
         public Main()
         {
             InitializeComponent();
-            EnableDoubleBuffering();
-
-            // Initialize the blink timer
-            blinkTimer = new Timer();
-            blinkTimer.Interval = 500; // Blink interval in milliseconds
-            blinkTimer.Tick += BlinkTimer_Tick;
-
-            // Attach the checkbox event handler
-            checkBoxBlink.CheckedChanged += CheckBox1_CheckedChanged;
-
-            
-            richTextBoxHelp.Rtf = @"{\rtf1\ansi
-\i Commodore Repair Toolbox\i0  is not so advanced, and it is quite simple to use, but some basic help is always nice to have.\par
-\par
-Mouse functions:\par
-\pard    \'95  \b Left-click\b0  on a component will show a information popup\par
-\pard    \'95  \b Right-click\b0  on a component will toggle highlight\par
-\pard    \'95  \b Right-click\b0  and \b Hold\b0  will pan the image\par
-\pard    \'95  \b Scrollwheel\b0  will zoom in/out\par
-\pard
-\par
-Keyboard functions:\par
-\pard    \'95  \b F11\b0  will toggle fullscreen\par
-\pard    \'95  \b ESCAPE\b0  will exit fullscreen or close popup info\par
-\pard    \'95  \b SPACE\b0  will toggle blinking for selected components\par
-\pard
-\par
-Component selection:\par
-\pard    \'95  When a component is selected, then it will visualize if component is part of image in list-view:\par
-\pard    \pard    \pard    \'95  Appending an asterisk/* as first character in label\par
-\pard    \pard    \pard    \'95  Background color of label changes to red\par
-\pard    \'95  You cannot highlight a component in image, if its component category is unselected\par
-\par
-Configuration saved:\par
-\pard    \'95  Last-viewed schematics\par
-\pard    \'95  Schematics divider/slider position\par
-\pard    \'95  Component categories saved per board\par
-\pard
-\par
-How-to add or update something yourself:\par
-\pard    \'95  View https://github.com/HovKlan-DH/Commodore-Repair-Toolbox\par
-\pard
-\par
-}";
-
-
-            LoadExcelData();
-
-            LoadSettings();
-            //isFiltering = true;
-            PopulateComboBoxes();
-            Debug.WriteLine(splitContainerSchematics.SplitterDistance);
-
-            AttachEventHandlers();
-
-
-
-
 
             // Get build type
-#if DEBUG
-            buildType = "Debug";
-#else
-            buildType = "Release";
-#endif
+            #if DEBUG
+                buildType = "Debug";
+            #else
+                buildType = "Release";
+            #endif
 
-            // Get application file version from assembly
-            Assembly assemblyInfo = Assembly.GetExecutingAssembly();
-            string assemblyVersion = FileVersionInfo.GetVersionInfo(assemblyInfo.Location).FileVersion;
-            string year = assemblyVersion.Substring(0, 4);
-            string month = assemblyVersion.Substring(5, 2);
-            string day = assemblyVersion.Substring(8, 2);
-            string rev = assemblyVersion.Substring(11); // will be ignored in RELEASE builds
-            switch (month)
+            // Enable double-buffering for smoother UI rendering
+            EnableDoubleBuffering();
+
+            // Get application versions - both this one and the one online
+            GetAssemblyVersion();
+            GetOnlineVersion();
+
+            // Initialize relevant "WebView2" components (used in tab pages)
+            InitializeTabHelp();
+            InitializeTabAbout();
+
+            // Load all files (Excel and configuration)
+            LoadExcelData();
+            LoadConfigFile();
+
+            // Populate the "Hardware" combobox with data from Excel
+            PopulateHardwareCombobox();
+
+            // Attach various event handles
+            AttachEventHandlers();
+        }
+
+
+        // ###########################################################################################
+        // Event: Form load.
+        // Triggered just before form is shown
+        // ###########################################################################################
+
+        private void Form_Load(object sender, EventArgs e)
+        {
+            string savedState = Configuration.GetSetting("WindowState", "Maximized");
+            if (Enum.TryParse(savedState, out FormWindowState state) && state != FormWindowState.Minimized)
             {
-                case "01": month = "January"; break;
-                case "02": month = "February"; break;
-                case "03": month = "March"; break;
-                case "04": month = "April"; break;
-                case "05": month = "May"; break;
-                case "06": month = "June"; break;
-                case "07": month = "July"; break;
-                case "08": month = "August"; break;
-                case "09": month = "September"; break;
-                case "10": month = "October"; break;
-                case "11": month = "November"; break;
-                case "12": month = "December"; break;
-                default: month = "Unknown"; break;
+                this.WindowState = state;
             }
-            day = day.TrimStart(new Char[] { '0' }); // remove leading zero
-            day = day.TrimEnd(new Char[] { '.' }); // remove last dot
-            string date = year + "-" + month + "-" + day;
 
-            // Beautify revision and build-type 
-            rev = "(rev. " + rev + ")";
-            rev = buildType == "Debug" ? rev : "";
-            string buildTypeTmp = buildType == "Debug" ? "# DEVELOPMENT " : "";
+            // Set default value for the splitter (need the UI to be initialized before I really can set it)
+            defaultConfigurationSplitterPosition = (splitContainerSchematics.Width * 0.9).ToString();
 
-            // Set the application version
-            appVer = (date + " " + buildTypeTmp + rev).Trim();
-            labelAboutVersion.Text = "Version: " + appVer;
+            ApplySavedSettings();
+            AttachConfigurationSaveEvents();
 
-            CheckForUpdate();
+            tabControl.Dock = DockStyle.Fill;
 
-            // Attach the TextChanged event handler for textBox1
-            textBox1.TextChanged += TextBox1_TextChanged;
+            // Set initial focus to textBoxFilterComponents
+            textBoxFilterComponents.Focus();
+
+            // Initialize the blink timer
+            InitializeBlinkTimer();
+        }
 
 
-            // Attach the Click event handler for the form and its child controls
-            AttachClickEventHandlers(this);
+        // ###########################################################################################
+        // Get the assembly version.
+        // Will transform assembly information into a text string.
+        // ###########################################################################################
 
+        private void GetAssemblyVersion()
+        {
+            try
+            {
+                Assembly assemblyInfo = Assembly.GetExecutingAssembly();
+                string assemblyVersion = FileVersionInfo.GetVersionInfo(assemblyInfo.Location).FileVersion;
+                string year = assemblyVersion.Substring(0, 4);
+                string month = assemblyVersion.Substring(5, 2);
+                string day = assemblyVersion.Substring(8, 2);
+                string rev = assemblyVersion.Substring(11); // will be ignored in RELEASE builds
+                switch (month)
+                {
+                    case "01": month = "January"; break;
+                    case "02": month = "February"; break;
+                    case "03": month = "March"; break;
+                    case "04": month = "April"; break;
+                    case "05": month = "May"; break;
+                    case "06": month = "June"; break;
+                    case "07": month = "July"; break;
+                    case "08": month = "August"; break;
+                    case "09": month = "September"; break;
+                    case "10": month = "October"; break;
+                    case "11": month = "November"; break;
+                    case "12": month = "December"; break;
+                    default: month = "Unknown"; break;
+                }
+                day = day.TrimStart(new Char[] { '0' }); // remove leading zero
+                day = day.TrimEnd(new Char[] { '.' }); // remove last dot
+                string date = year + "-" + month + "-" + day;
+
+                // Beautify revision and build-type 
+                rev = "(rev. " + rev + ")";
+                rev = buildType == "Debug" ? rev : "";
+                string buildTypeTmp = buildType == "Debug" ? "# DEVELOPMENT " : "";
+
+                // Set the application version
+                versionThis = (date + " " + buildTypeTmp + rev).Trim();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("EXCEPTION in \"GetAssemblyVersion()\":");
+                Debug.WriteLine(ex);
+            }
+        }
+
+
+        // ###########################################################################################
+        // Get the version available online (newest version).
+        // ###########################################################################################
+
+        private void GetOnlineVersion()
+        {
+            try
+            {
+                WebClient webClient = new WebClient();
+                ServicePointManager.Expect100Continue = true;
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+                webClient.Headers.Add("user-agent", ("CRT " + versionThis).Trim());
+
+                // Have some control POST data
+                var postData = new System.Collections.Specialized.NameValueCollection
+                {
+                    { "control", "CRT" }
+                };
+
+                // Send the POST data to the server
+                byte[] responseBytes = webClient.UploadValues(urlCheckOnlineVersion, postData);
+
+                // Convert the response bytes to a string
+                onlineAvailableVersion = Encoding.UTF8.GetString(responseBytes);
+
+                if (onlineAvailableVersion.Substring(0, 7) == "Version")
+                {
+                    onlineAvailableVersion = onlineAvailableVersion.Substring(9);
+                    if (onlineAvailableVersion != versionThis)
+                    {
+                        tabAbout.Text = "About*";
+                        versionOnline = onlineAvailableVersion;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("EXCEPTION in \"GetOnlineVersion()\":");
+                Debug.WriteLine(ex);
+            }
+        }
+                
+
+        // ###########################################################################################
+        // Load all Excel data, and have it ready for usage.
+        // ###########################################################################################
+
+        private void LoadExcelData()
+        {
+            try
+            {
+                DataStructure.GetAllData(classHardware);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("EXCEPTION in \"LoadExcelData()\":");
+                Debug.WriteLine(ex);
+            }
+        }
+
+
+        // ###########################################################################################
+        // Load the saved settings from the configuration file (if any).
+        // ###########################################################################################
+
+        private void LoadConfigFile()
+        {
+            try
+            {
+                Configuration.LoadConfig();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("EXCEPTION in \"LoadConfigFile()\":");
+                Debug.WriteLine(ex);
+            }
+        }
+
+
+        // ###########################################################################################
+        // Populate the "Hardware" combobox with data from Excel.
+        // ###########################################################################################
+
+        private void PopulateHardwareCombobox()
+        {
+            foreach (Hardware hardware in classHardware)
+            {
+                comboBoxHardware.Items.Add(hardware.Name);
+            }
+            comboBoxHardware.SelectedIndex = 0;
+            hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
+        }
+
+
+        // ###########################################################################################
+        // Attach necessary event handlers.
+        // ###########################################################################################
+
+        private void AttachEventHandlers()
+        {
+            Load += Form_Load;
+            FormClosing += Main_FormClosing;
+            ResizeBegin += Form_ResizeBegin;
+            ResizeEnd += Form_ResizeEnd;
+            checkBoxBlink.CheckedChanged += CheckBoxBlink_CheckedChanged;
+            textBoxFilterComponents.TextChanged += TextBoxFilterComponents_TextChanged;
+            panelListAutoscroll.Layout += PanelListAutoscroll_Layout;
+            splitContainerSchematics.Paint += SplitContainer1_Paint;
             comboBoxHardware.DropDownClosed += ComboBox_DropDownClosed;
             comboBoxBoard.DropDownClosed += ComboBox_DropDownClosed;
-
-            // Attach the SelectedIndexChanged event handler for listBoxCategories
             listBoxCategories.SelectedIndexChanged += ListBoxCategories_SelectedIndexChanged;
-
+            AttachClickEventsToFocusFilterComponents(this);
         }
 
-        private void AttachClickEventHandlers(Control parent)
+
+        // ###########################################################################################
+        // Attach a click event to all controls with a name, and have them focus
+        // "textBoxFilterComponents" so it is ready for text input for filtering.
+        // ###########################################################################################
+
+        private void AttachClickEventsToFocusFilterComponents(Control parent)
         {
             if (!(parent is ComboBox))
-                parent.Click += (s, e) => textBox1.Focus();
+            {
+//                if (!string.IsNullOrEmpty(parent.Name)) // do not attach components without any name
+//                {           
+//                    Debug.WriteLine("AttachClickEventHandlers: " + (string.IsNullOrEmpty(parent.Name) ? "[Unnamed " + parent.GetType().Name + "]" : parent.Name));
+                    parent.Click += (s, e) => textBoxFilterComponents.Focus();
+//                }
+            }
             foreach (Control child in parent.Controls)
             {
-                AttachClickEventHandlers(child);
+                if (child != null)
+                {
+                    AttachClickEventsToFocusFilterComponents(child);
+                }
             }
         }
 
+
+        // ###########################################################################################
+        // Events: Resize.
+        // ###########################################################################################
+
+        private void Form_ResizeBegin(object sender, EventArgs e)
+        {
+            Debug.WriteLine("Form_ResizeBegin called");
+            isResizing = true;
+        }
+
+        private void Form_ResizeEnd(object sender, EventArgs e)
+        {
+            Debug.WriteLine("Form_ResizeEnd called");
+            InitializeList();
+
+            isResizing = false;
+            ResizeTabImage();
+            HighlightOverlays("tab");
+            HighlightOverlays("list");
+        }
+
+
+        // ###########################################################################################
+        // Initialize and update the tab for "Ressources.
+        // Will load new content from board data file.
+        // ###########################################################################################
+
+        private async void UpdateTabRessources(Board selectedBoard)
+        {
+            // Do not update anything, if board info is empty
+            if (selectedBoard.BoardLinks == null || !selectedBoard.BoardLinks.Any())
+            {
+                return;
+            }
+
+            if (webView21.CoreWebView2 == null)
+            {
+                await webView21.EnsureCoreWebView2Async(null);
+            }
+            
+            string htmlContent = @"
+                <html>
+                <head>
+                <meta charset='UTF-8'>
+                <title>Ressources</title>
+                <script>
+                document.addEventListener('click', function(e) {
+                var target = e.target;
+                if (target.tagName.toLowerCase() === 'a' && target.href.startsWith('file://')) {
+                e.preventDefault();
+                window.chrome.webview.postMessage('openFile:' + target.href);
+                }
+                });
+                </script>
+                </head>
+                <body>
+                "+ htmlForTabs +@"
+                <h1>Ressources for troubleshooting and information</h1><br />
+            ";
+
+            // Get the two datasets
+            var groupedLocalFiles = selectedBoard.BoardLocalFiles.GroupBy(file => file.Category);
+            var groupedLinks = selectedBoard.BoardLinks.GroupBy(link => link.Category);
+
+            // Local files
+            if (groupedLocalFiles.Any())
+            {
+                htmlContent += "<h1>Local files</h1>";
+                foreach (var group in groupedLocalFiles)
+                {
+                    htmlContent += "<h2>" + group.Key + "</h2>";
+                    htmlContent += "<ul>";
+
+                    foreach (var file in group)
+                    {
+                        string filePath = Path.Combine(Application.StartupPath, "Data", hardwareSelectedFolder, boardSelectedFolder, file.Datafile);
+                        htmlContent += "<li><a href='file:///" + filePath.Replace(@"\", @"\\") + "' target='_blank'>" + file.Name + "</a></li>";
+                    }
+                    htmlContent += "</ul>";
+                    htmlContent += "<br />";
+                }
+            }
+
+            // Web links
+            if (groupedLinks.Any())
+            {
+                htmlContent += "<h1>Links</h1>";
+                foreach (var group in groupedLinks)
+                {
+                    htmlContent += "<h2>" + group.Key + "</h2>";
+                    htmlContent += "<ul>";
+
+                    foreach (var link in group)
+                    {
+                        htmlContent += "<li><a href='" + link.Url + "' target='_blank'>" + link.Name + "</a></li>";
+                    }
+                    htmlContent += "</ul>";
+                    htmlContent += "<br />";
+                }
+            }
+
+            htmlContent += "</body>";
+            htmlContent += "</html >";
+
+            // Open file URL in default application
+            webView21.CoreWebView2.WebMessageReceived += (sender, args) =>
+            {
+                string message = args.TryGetWebMessageAsString();
+                if (message.StartsWith("openFile:"))
+                {
+                    string fileUrl = message.Substring("openFile:".Length);
+                    Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
+                }
+            };
+
+            // Open web URL in default web browser
+            webView21.CoreWebView2.NewWindowRequested += (sender, args) =>
+            {
+                args.Handled = true; // prevent the default behavior
+                Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
+            };
+
+            webView21.NavigateToString(htmlContent);
+        }
+
+        // ###########################################################################################
+        // Initialize the tab for "Help".
+        // ###########################################################################################
+
+        private async void InitializeTabHelp()
+        {
+            if (webView22.CoreWebView2 == null)
+            {
+                await webView22.EnsureCoreWebView2Async(null);
+            }
+
+            string htmlContent = @"
+                <html>
+                <head>
+                <meta charset='UTF-8'>
+                <title>Help</title>
+                </head>
+                <body>
+                "+ htmlForTabs +@"
+                <h1>Help for application usage</h1><br />
+
+                <i>Commodore Repair Toolbox</i> is fairly simple, but some basic help is always nice to have.<br />
+                <br />
+
+                Mouse functions:<br />
+                <ul>
+                <li><b>Left-click</b> on a component will show a information popup</li>
+                <li><b>Right-click</b> on a component will toggle highlight</li>
+                <li><b>Right-click</b> and <b>Hold</b> will pan the image</li>
+                <li><b>Scrollwheel</b> will zoom in/out</li>
+                </ul>
+                <br />
+
+                Keyboard functions:<br />
+                <ul>
+                <li><b>F11</b> will toggle fullscreen</li>
+                <li><b>ESCAPE</b> will exit fullscreen or close popup info</li>
+                <li><b>SPACE</b> will toggle blinking for selected components</li>
+                <li>Focus cursor in input field, and type, to filter component list</li>
+                </ul>
+                <br />
+
+                Component selection:<br />
+                <ul>
+                <li>When a component is selected, then it will visualize if component is part of image in list-view:</li>
+                <ul>
+                <li>Appending an asterisk/* as first character in label</li>
+                <li>Background color of label changes to red</li>
+                </ul>
+                <li>You cannot highlight a component in image, if its component category is unselected</li>
+                </ul>
+                <br />
+                
+                Configuration saved:<br />
+                <ul>
+                <li>Last viewed schematic</li>
+                <li>Schematic/thumbnails slider position</li>
+                <li>Shown component categories saved per board</li>
+                </ul>
+                <br />
+
+                How-to add or update your own data:<br />
+                <ul>
+                <li>View <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox?tab=readme-ov-file#software-used' target='_blank'>GitHub Documentation</a></li>
+                </ul>
+                <br />
+
+                How-to report a problem or comment something:<br />
+                <ul>
+                <li>View <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues' target='_blank'>GitHub Issues</a></li>
+                </ul>
+                <br />
+                
+                When there is a newer version available online, it will be marked with an asterisk (*) in the ""About"" tab.<br />
+                Then navigate to the tab and view or download the new version.<br />
+
+                </body>
+                </html>
+            ";
+
+            // Open URLs in default web browser
+            webView22.CoreWebView2.NewWindowRequested += (sender, args) =>
+            {
+                args.Handled = true; // do not render in internal browser mode
+                Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
+            };
+
+            webView22.NavigateToString(htmlContent);
+        }
+
+
+        // ###########################################################################################
+        // Initialize the tab for "About".
+        // ###########################################################################################
+
+        private async void InitializeTabAbout()
+        {
+            if (webView23.CoreWebView2 == null)
+            {
+                await webView23.EnsureCoreWebView2Async(null);
+            }
+
+            string versionOnlineTxt = "";
+            if (versionOnline != "")
+            {
+                versionOnlineTxt = @"
+                    <font color='IndianRed'>
+                    There is a newer version available online: <b>" + versionOnline + @"</b><br />
+                    </font>
+                    View Changelog and download the new version from here, <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases' target='_blank'>https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases</a><br />
+                    <br />
+                ";
+            }
+
+            string htmlContent = @"
+                <html>
+                <head>
+                <meta charset='UTF-8'>
+                <title>About</title>
+                </head>
+                <body>
+                "+ htmlForTabs + @"
+                <h1>Commodore Repair Toolbox</h1><br />
+
+                You are running version: <b>"+ versionThis + @"</b><br />
+                <br />
+
+                " + versionOnlineTxt + @"
+
+                All programming done by Dennis Helligsø (crt@mailscan.dk).<br />
+                <br />
+
+                Visit project home page at <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox' target='_blank'>https://github.com/HovKlan-DH/Commodore-Repair-Toolbox</a><br />
+                <br />
+                
+                </body>
+                </html>
+            ";
+
+            // Open URLs in default web browser
+            webView23.CoreWebView2.NewWindowRequested += (sender, args) =>
+            {
+                args.Handled = true; // do not render in internal browser mode
+                Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
+            };
+
+            webView23.NavigateToString(htmlContent);
+        }
+
+
+        // ###########################################################################################
+        // Initialize the tab for "About".
+        // ###########################################################################################
+
+        private void InitializeBlinkTimer()
+        {
+            blinkTimer = new Timer();
+            blinkTimer.Interval = 500;
+            blinkTimer.Tick += BlinkTimer_Tick;
+        }
+
+
+        // ###########################################################################################
+        // What happens when a combobox is closed.
+        // Applicable for "Hardware" or "Board" comboboxes.
+        // ###########################################################################################
 
         private void ComboBox_DropDownClosed(object sender, EventArgs e)
         {
-            textBox1.Text = "";
+            textBoxFilterComponents.Text = "";
+            textBoxFilterComponents.Focus();
         }
 
 
-        private void ComboBoxHardware_SelectedIndexChanged(object sender, EventArgs e)
+        // ###########################################################################################
+        // Filtering of components.
+        // ###########################################################################################
+
+        private void TextBoxFilterComponents_TextChanged(object sender, EventArgs e)
         {
-            Debug.WriteLine("ComboBoxHardware_SelectedIndexChanged called");
-            comboBoxBoard.SelectedIndexChanged -= ComboBoxBoard_SelectedIndexChanged; // Temporarily detach event handler
-            comboBoxBoard.Items.Clear();
-            hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
-
-            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            if (hw != null)
-            {
-                foreach (var board in hw.Boards)
-                {
-                    comboBoxBoard.Items.Add(board.Name);
-                }
-                comboBoxBoard.SelectedIndex = 0;
-            }
-
-            comboBoxBoard.SelectedIndexChanged += ComboBoxBoard_SelectedIndexChanged; // Reattach event handler
-
-            // Call FilterListBoxComponents to apply the filter after changing the ComboBox
-            FilterListBoxComponents();
-        }
-
-
-        private void ComboBoxBoard_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            Debug.WriteLine("ComboBoxBoard_SelectedIndexChanged called");
-            SetupNewBoard();
-            UpdateHighlights(); // Clear old highlights
-            FilterListBoxComponents(); // Apply filter after setting up new board
-        }
-
-        private void TextBox1_TextChanged(object sender, EventArgs e)
-        {
-            Debug.WriteLine("TextBox1_TextChanged called");
             FilterListBoxComponents();
         }
 
         private void ListBoxCategories_SelectedIndexChanged(object sender, EventArgs e)
         {
-            Debug.WriteLine("ListBoxCategories_SelectedIndexChanged called");
             FilterListBoxComponents();
         }
 
-        /*
-        * --------------------------
-        * CHANGELOG FOR NEXT RELEASE
-        * --------------------------
-        * 
-        * Application:
-            * Fixed highlights in thumbnails were misaligned
-            * Fixed clicking in thumbnail and directly at a component would not switch to this main image
-            * Fixed dynamic resizing of list-boxes depending on selected board
-            * Fixed "Component links" did not show
-            * Fixed "About" and "Help" textboxes have been set to read-only
-            * Fixed "Help" should not be accessible to fullscreen mode
-            * Added show of asterisk/coloring in thumbnail label, when chosen component is visible in thumbnail
-            * Added more text in "Help" tab 
-            * Added check for newer version online (info in "About" tab)
-            * Added filtering for components
-            * Changed label in thumbnail so it no longer floats above the image, but is added before the image
-            * Changed component list to now provide a simpler overview
-            * Changed application will only support 64-bit Windows 10 or newer
-        * Data:
-            * Hardware: Commodore 128 or 128D
-                * Board: 310378
-                    * Added pinout for most components
-                    * Refined highlights for multiple components
-               
-        */
-
-
         private void FilterListBoxComponents()
         {
-            string filterText = textBox1.Text.ToLower();
+            string filterText = textBoxFilterComponents.Text.ToLower();
             listBoxComponents.Items.Clear();
             listBoxNameValueMapping.Clear();
 
@@ -323,7 +681,6 @@ How-to add or update something yourself:\par
 
                         if (string.IsNullOrEmpty(filterText) || displayText.ToLower().Contains(filterText))
                         {
-                            Debug.WriteLine(displayText);
                             listBoxComponents.Items.Add(displayText);
                             listBoxNameValueMapping[displayText] = comp.Label;
                         }
@@ -334,108 +691,20 @@ How-to add or update something yourself:\par
 
 
         // ###########################################################################################
-        // Check for a newer version online.
-        // If newer version exists, then show this in "About" tab.
+        // Blink handling
         // ###########################################################################################
 
-        private void CheckForUpdate()
-        {
-            try
-            {
-                WebClient webClient = new WebClient();
-                ServicePointManager.Expect100Continue = true;
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
-                webClient.Headers.Add("user-agent", ("CRT " + appVer).Trim());
-                
-                // Have some control POST data
-                var postData = new System.Collections.Specialized.NameValueCollection
-                {
-                    { "control", "CRT" }
-                };
-
-                // Send the POST data to the server
-                byte[] responseBytes = webClient.UploadValues(urlCheckOnlineVersion, postData);
-
-                // Convert the response bytes to a string
-                onlineAvailableVersion = Encoding.UTF8.GetString(responseBytes);
-
-                if (onlineAvailableVersion.Substring(0, 7) == "Version")
-                {
-                    onlineAvailableVersion = onlineAvailableVersion.Substring(9);
-
-                    // Inform of new version
-                    if (onlineAvailableVersion != appVer)
-                    {
-                        string existingRtf = richTextBoxAbout.Rtf;
-                        int desiredFontSize = 32;
-                        string newVersionRtf = @"\par\par\par \cf1 \fs" + desiredFontSize + @" There is a newer version available online: \b " + onlineAvailableVersion + @"\b0 \cf0 \fs0 \par";
-
-                        // Insert new version info into existing RTF
-                        int colorTableIndex = existingRtf.IndexOf(@"\colortbl");
-                        int insertPos = existingRtf.IndexOf('}', colorTableIndex);
-                        if (insertPos != -1)
-                        {
-                            existingRtf = existingRtf.Insert(insertPos, @"\red205\green92\blue92;");
-                        }
-
-                        // Change the color of the new version info
-                        newVersionRtf = newVersionRtf.Replace(@"\cf1", @"\cf2");
-
-                        // Append the new version info before the last closing brace
-                        int lastBraceIndex = existingRtf.LastIndexOf('}');
-                        if (lastBraceIndex > 0)
-                        {
-                            existingRtf = existingRtf.Insert(lastBraceIndex, newVersionRtf);
-                        }
-
-                        richTextBoxAbout.Rtf = existingRtf;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex);
-            }
-        }
-
-        private void CheckBox1_CheckedChanged(object sender, EventArgs e)
+        private void CheckBoxBlink_CheckedChanged(object sender, EventArgs e)
         {
             if (checkBoxBlink.Checked)
             {
-                BlinkTimer_Tick(null, null); // Perform the first blink immediately
+                BlinkTimer_Tick(null, null); // perform the first blink immediately
                 blinkTimer.Start();
             }
             else
             {
                 blinkTimer.Stop();
                 EnableSelectedOverlays();
-            }
-        }
-
-        private void EnableSelectedOverlays()
-        {
-            foreach (var overlayPanel in overlayPanelsList.Values)
-            {
-                foreach (var overlay in overlayPanel.Overlays)
-                {
-                    if (listBoxComponentsSelectedLabels.Contains(overlay.ComponentLabel))
-                    {
-                        overlay.Highlighted = true;
-                    }
-                }
-                overlayPanel.Invalidate();
-            }
-
-            if (overlayPanel != null)
-            {
-                foreach (var overlay in overlayPanel.Overlays)
-                {
-                    if (listBoxComponentsSelectedLabels.Contains(overlay.ComponentLabel))
-                    {
-                        overlay.Highlighted = true;
-                    }
-                }
-                overlayPanel.Invalidate();
             }
         }
 
@@ -472,6 +741,49 @@ How-to add or update something yourself:\par
             }
         }
 
+        private void EnableSelectedOverlays()
+        {
+            foreach (var overlayPanel in overlayPanelsList.Values)
+            {
+                foreach (var overlay in overlayPanel.Overlays)
+                {
+                    if (listBoxComponentsSelectedLabels.Contains(overlay.ComponentLabel))
+                    {
+                        overlay.Highlighted = true;
+                    }
+                }
+                overlayPanel.Invalidate();
+            }
+
+            if (overlayPanel != null)
+            {
+                foreach (var overlay in overlayPanel.Overlays)
+                {
+                    if (listBoxComponentsSelectedLabels.Contains(overlay.ComponentLabel))
+                    {
+                        overlay.Highlighted = true;
+                    }
+                }
+                overlayPanel.Invalidate();
+            }
+        }
+
+        
+
+
+
+        // HERTIL
+
+
+
+
+
+
+
+
+
+
+
         private void AdjustComponentCategoriesListBoxHeight()
         {
             int listBoxLocationEnd_org = listBoxCategories.Location.Y + listBoxCategories.Height;
@@ -499,7 +811,7 @@ How-to add or update something yourself:\par
         // Enable double-buffering for smoother UI rendering
         private void EnableDoubleBuffering()
         {
-            this.SetStyle(
+            SetStyle(
                 ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer |
                 ControlStyles.UserPaint,
@@ -512,55 +824,16 @@ How-to add or update something yourself:\par
             panelListAutoscroll.DoubleBuffered(true);
         }
 
-        // ---------------------------------------------------------------------
-        // Attach necessary event handlers
-        private void AttachEventHandlers()
-        {
-            ResizeBegin += Form_ResizeBegin;
-            ResizeEnd += Form_ResizeEnd;
-            Resize += Form_Resize;
-            panelListAutoscroll.Layout += PanelListAutoscroll_Layout;
-            this.Load += Form_Load;
-            tabControl.Dock = DockStyle.Fill;
 
-            this.FormClosing += Main_FormClosing;
 
-            // Subscribe to the Paint event of the SplitContainer
-            splitContainerSchematics.Paint += SplitContainer1_Paint;
-        }
 
-        // ---------------------------------------------------------------------
-        // Load hardware data from Excel
-        private void LoadExcelData()
-        {
-            DataStructure.GetAllData(classHardware);
-        }
-
-        // ---------------------------------------------------------------------
-        // Populate combo boxes with loaded data
-        private void PopulateComboBoxes()
-        {
-            foreach (Hardware hardware in classHardware)
-            {
-                comboBoxHardware.Items.Add(hardware.Name);
-            }
-            comboBoxHardware.SelectedIndex = 0;
-            hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
-        }
-
-        // ---------------------------------------------------------------------
-        // Load settings from configuration file
-        private void LoadSettings()
-        {
-            Configuration.LoadConfig();
-        }
 
         // ---------------------------------------------------------------------
         // Apply saved settings to controls
         private void ApplySavedSettings()
         {
             // Load saved settings for combo boxes, splitter, and selected image
-            string splitterPosVal = Configuration.GetSetting("SplitterPosition", "250");
+            string splitterPosVal = Configuration.GetSetting("SplitterPosition", defaultConfigurationSplitterPosition);
             string comboBox1Val = Configuration.GetSetting("ComboBox1Index", "0");
             string comboBox2Val = Configuration.GetSetting("ComboBox2Index", "0");
             string selectedImageVal = Configuration.GetSetting("SelectedImage", "");
@@ -700,21 +973,7 @@ How-to add or update something yourself:\par
             isFullscreen = false;
         }
 
-        // ---------------------------------------------------------------------------
-        // Event - form initialized, but not yet shown
-        // ---------------------------------------------------------------------------
-
-        private void Form_Load(object sender, EventArgs e)
-        {
-            string savedState = Configuration.GetSetting("WindowState", "Maximized");
-            if (Enum.TryParse(savedState, out FormWindowState state) && state != FormWindowState.Minimized)
-            {
-                this.WindowState = state;
-            }
-
-            ApplySavedSettings();
-            AttachConfigurationSaveEvents();
-        }
+       
 
         private void AttachClosePopupOnClick(Control parent)
         {
@@ -722,10 +981,10 @@ How-to add or update something yourself:\par
             parent.MouseDown += (s, e) =>
             {
                 // Only if we click in the main form and a popup is open
-                if (currentPopup != null && currentPopup.Visible)
+                if (componentInfoPopup != null && componentInfoPopup.Visible)
                 {
-                    currentPopup.Close();
-                    currentPopup = null;
+                    componentInfoPopup.Close();
+                    componentInfoPopup = null;
                 }
             };
 
@@ -739,16 +998,22 @@ How-to add or update something yourself:\par
         private void ShowComponentPopup(ComponentBoard comp)
         {
             // If an old popup is still open, close it
-            if (currentPopup != null && !currentPopup.IsDisposed)
+            if (componentInfoPopup != null && !componentInfoPopup.IsDisposed)
             {
-                currentPopup.Close();
+                componentInfoPopup.Close();
             }
 
             // Create new popup
-            currentPopup = new FormComponent(comp, hardwareSelectedFolder, boardSelectedFolder);
+            componentInfoPopup = new FormComponent(comp, hardwareSelectedFolder, boardSelectedFolder);
 
             // Show it modeless (non-blocking)
-            currentPopup.Show();
+            string title = "";
+            title = comp.Label;
+            title += comp.NameTechnical != "?" ? " | "+comp.NameTechnical : "";
+            title += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
+
+            componentInfoPopup.Text = title;
+            componentInfoPopup.Show();
         }
 
         // ---------------------------------------------------------------------
@@ -791,30 +1056,9 @@ How-to add or update something yourself:\par
 
             InitializeList();
             InitializeTabMain();
-            InitializeTabRessources(selectedBoard);
+            UpdateTabRessources(selectedBoard);
         }
 
-        // ---------------------------------------------------------------------
-        // Form events
-
-        private void Form_ResizeBegin(object sender, EventArgs e)
-        {
-            isResizing = true;
-        }
-
-        private void Form_ResizeEnd(object sender, EventArgs e)
-        {
-            isResizing = false;
-            ResizeTabImage();
-            HighlightOverlays("tab");
-            HighlightOverlays("list");
-        }
-
-        private void Form_Resize(object sender, EventArgs e)
-        {
-            Debug.WriteLine("Form_Resized");
-            InitializeList();
-        }
 
         // ---------------------------------------------------------------------
         // Lists of components
@@ -996,7 +1240,7 @@ How-to add or update something yourself:\par
                 Panel thumbnailContainer = new Panel
                 {
                     Name = file.Name + "_container",
-                    BorderStyle = BorderStyle.None,
+                    BorderStyle = BorderStyle.FixedSingle,
                     Location = new Point(0, yPosition),
                     Padding = new Padding(3),
                     Margin = new Padding(0),
@@ -1220,7 +1464,7 @@ How-to add or update something yourself:\par
         private void button1_Click(object sender, EventArgs e)
         {
             clearSelection();
-            textBox1.Text = "";
+            textBoxFilterComponents.Text = "";
         }
 
         private void clearSelection()
@@ -1401,7 +1645,10 @@ How-to add or update something yourself:\par
 
         private void HighlightOverlays(string scope)
         {
-            if (this.WindowState == FormWindowState.Minimized || isResizing) return;
+            if (this.WindowState == FormWindowState.Minimized || isResizing)
+            {
+                return;
+            }
 
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
@@ -1778,116 +2025,10 @@ How-to add or update something yourself:\par
         {
             Configuration.SaveSetting("WindowState", this.WindowState.ToString());
         }
-                
-        private async void InitializeTabRessources(Board selectedBoard)
-        {
-            await webView21.EnsureCoreWebView2Async(null);
-
-            // Do not update anything, if board info is empty
-            if (selectedBoard.BoardLinks == null || !selectedBoard.BoardLinks.Any())
-            {
-                return;
-            }
-
-            // Open file URL in default application
-            webView21.CoreWebView2.WebMessageReceived += (sender, args) =>
-            {
-                string message = args.TryGetWebMessageAsString();
-                if (message.StartsWith("openFile:"))
-                {
-                    string fileUrl = message.Substring("openFile:".Length);
-                    Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
-                }
-            };
-
-            // Open web URL in default web browser
-            webView21.CoreWebView2.NewWindowRequested += (sender, args) =>
-            {
-                args.Handled = true; // Prevent the default behavior
-                Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
-            };
-
-            // Start on HTML content
-            string htmlContent = @"
-                <html>
-                <head>
-                <meta charset='UTF-8'>
-                <title>External and Local Links</title>
-                <script>
-                document.addEventListener('click', function(e) {
-                var target = e.target;
-                if (target.tagName.toLowerCase() === 'a' && target.href.startsWith('file://')) {
-                    e.preventDefault();
-                    window.chrome.webview.postMessage('openFile:' + target.href);
-                }
-                });
-                </script>
-                </head>
-                <body>
-            ";
-
-            /*
-
-                <h2>Documentation</h2>
-                <ul>
-                <li><a href='https://www.google.com' target='_blank'>Web link 3</a></li>
-                <li><a href='https://www.microsoft.com' target='_blank'>Web link 4</a></li>
-                </ul>
-                <h1>Local files</h1>
-                <h2>Troubleshooting</h2>
-                <ul>
-                <li><a href='file:///C:/GlDifxCmd.log' target='_blank'>Local File 1</a></li>
-                </ul>
-                ";
-            */
-
-            // Get the two datasets
-            var groupedLocalFiles = selectedBoard.BoardLocalFiles.GroupBy(file => file.Category);
-            var groupedLinks = selectedBoard.BoardLinks.GroupBy(link => link.Category);
-
-            // Local files
-            if (groupedLocalFiles.Any())
-            {
-                htmlContent += "<h1>Local files</h1>";
-                foreach (var group in groupedLocalFiles)
-                {
-                    htmlContent += "<h2>"+ group.Key +"</h2>";
-                    htmlContent += "<ul>";
-
-                    foreach (var file in group)
-                    {
-                        string filePath = Path.Combine(Application.StartupPath, "Data", hardwareSelectedFolder, boardSelectedFolder, file.Datafile);
-                        htmlContent += "<li><a href='file:///" + filePath.Replace(@"\", @"\\") + "' target='_blank'>"+ file.Name +"</a></li>";
-                    }
-                    htmlContent += "</ul>";
-                }
-            }
-
-            // Wen links
-            if (groupedLinks.Any())
-            {
-                htmlContent += "<h1>Links</h1>";
-                foreach (var group in groupedLinks)
-                {
-                    htmlContent += "<h2>" + group.Key + "</h2>";
-                    htmlContent += "<ul>";
-
-                    foreach (var link in group)
-                    {
-                        htmlContent += "<li><a href='" + link.Url + "' target='_blank'>" + link.Name + "</a></li>";
-                    }
-                    htmlContent += "</ul>";
-                }
-            }
-
-            htmlContent += "</body>";
-            htmlContent += "</html >";
 
 
+        
 
-
-            webView21.NavigateToString(htmlContent);
-        }
 
         private void richTextBoxRessources_LinkClicked(object sender, LinkClickedEventArgs e)
         {
