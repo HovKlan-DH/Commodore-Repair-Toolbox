@@ -67,9 +67,9 @@ View [issues](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) and
 There are bigger changes here, and I am not sure I want to go down this road - it will for sure depend on usage, as I personally do not have any use for the collaboration topics, if this is primarily used only by myself :grin:
 
 - More pictures in popup component info
-- "Data has been updated" information
 - Have people download and upload new schematics or updates directly from tool
-- Rating system of user uploaded schematics
+    - "Data has been updated" information
+    - Rating system of user uploaded schematics
 
 # Data sources used for data configurations
 
