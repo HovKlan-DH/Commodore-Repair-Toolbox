@@ -2,6 +2,9 @@
 
 This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ hence forward) - a Windows utility tool for repairing vintage computers or peripherals.
 
+> [!CAUTION]
+> Please do note that the data files have not yet reached its final maturity level, and by then its format most likely will change in a nearby future release!
+
 # Screenshots
 
 Main screen:\
@@ -18,61 +21,55 @@ It probably works the best, if the hardware is "simple" and have good documentat
 
 # Installation and usage
 
-_CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file.
+_CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file, `Commodore-Repair-Toolbox.exe`
 
-It will run on any _Windows 10_ or newer (both 32-bit and 64-bit). It does require _.NET Framework 4.8.1_, but this is an integrated part of the operating system.
+It will run on any 64-bit _Windows 10_ or newer. It does require _.NET Framework 4.8.1_, but this is an integrated part of the operating system.
 
-# Built-in schematics
+# Built-in hardware / schematics
 
-- Commodore 128 and 128D
+- Commodore 128 and 128D, schematics 310378
+- Soon to come (just need the time to input the data):
+    - Commodore 64 (Breadbin), schematics 250407 and 250425
+    - Commodore 64C, schematics 250466
 
 # Your help would be really appreciated
 
-I would really appreciate if some Commodore experts would take a look, and let me know of factual errors or things I obviously have missed.
+I would really appreciate if some Commodore experts would take a look, and let me know of factual errors or things I obviously have missed :pray:
 
 You can help specifically with these topics:
 - Do you have higher-quality images of the schematics?
-- Do you have datasheets for any of the components?
+- Do you have (better) datasheets or pinouts for any of the components?
 - Do you see missing components in either the component list or as a highlight?
-- Can you fill in more technical details anywhere?
+- Can you improve any data or fill in more technical details anywhere?
 
 You can also contribute by adding new data and send the Excel file and "label file" to me (view below for the software used for labeling).
 
 # Contact
-You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) in the project or write an email to **crt** at **mailscan** dot **dk**, if you have any changes or comments.
+You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) in the project or write an email to **crt** at **mailscan** dot **dk**, if you want to raise an issue, suggest any changes or just have a comment.
 
 # Software used
 For labelling the components in the schematics  I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and easy to use, once you learn its way of working. It will output a JSON file, which I then convert into an Excel format - you must send both this JSON file and its image file, if you have any updates.
 
-Inside the "Data" folders I have placed the JSON source files for labelling.\
-Inside the "Tools" folder I have placed the VGG application - just load the `via.html` into your local browser.
+Inside the `Data` folders I have placed the JSON source files used for labelling.\
+Inside the `Tools` folder I have placed the VGG application - you should load the `via.html` into your local browser.
 
 I have chosen Excel as the data format, as this is easy for the most people to navigate in. I am actually not sure, but I do believe there is a [free online Excel available from Microsoft](https://www.office.com/launch/excel), if you do not already have one installed.
 
+> [!CAUTION]
+> Please do note that the data files have not yet reached its final maturity level, and by then its format most likely will change in a nearby future release!
+
 # Near-term TODO
 
-- ~~Fix highlights in thumbnail images have gone rogue~~ (fixed in next release)
-- ~~Fix clicking in thumbnail image cannot activate image, if clicked at component location~~ (fixed in next release)
-- Fix "Ressources" tab should be taken from Excel file instead via web
-- ~~Change component list is a little easier to look at (remove questionmark)~~ (fixed in next release)
-- ~~Show asterisk (*) in thumbnail label, when chosen component is visible in thumbnail image~~ (fixed in next release)
-- ~~Label in thumnail should not float above image (show label first, then image below)~~ (fixed in next release)
-- ~~Configuration file - refactor it and save more configuration:~~ (fixed in next release)
-  - ~~Selected component categories per board~~
-  - ~~Start in same size as last (maximized or window)~~
-- ~~Add more data for Commodore 128 (datasheets and pinouts)~~ (fixed in next release)
-- Add data for Commodore 64 (Breadbin) schematics 250407 and 250425
-- Add data for Commodore 64C schematics 250466
+View [issues](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) and [milestones](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/milestones) for upcoming bugfixes and enhancements.
 
-# Future roadmap and ideas
+# Future ideas / wishlist
 
-There are bigger changes here, and I am not sure I want to go down that road - it will for sure depend on usage, as I personally do not have any use for it, if this is primarily used only by myself :-)
+There are bigger changes here, and I am not sure I want to go down this road - it will for sure depend on usage, as I personally do not have any use for the collaboration topics, if this is primarily used only by myself :grin:
 
-- ~~Search input field to filter component list~~ (fixed in next release)
-- Ideally make fullscreen mode less "flickering"
-- ~~"New version available"~~ or "Data has been updated" information
+- More pictures in popup component info
 - Have people download and upload new schematics or updates directly from tool
-- Rating system of user uploaded schematics
+    - "Data has been updated" information
+    - Rating system of user uploaded schematics
 
 # Data sources used for data configurations
 
@@ -81,7 +78,9 @@ I have taken data from many places, but I do have a few _go-to_ places I frequen
 - [Zimmers](https://www.zimmers.net/anonftp/pub/cbm/schematics/computers/)
 - [Ray Carlsen](https://portcommodore.com/rcarlsen/cbm/)
 
-In some cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated :-)
+In some cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated.
+
+If you want to contribute with a major new or updated dataset, then please let me know, as I happily will show credits here for joint efforts. There is a large Commodore community, and I wish for collaboration into making this the best data and reference for Commodore reparing (well, on the Windows platform at least).
 
 # Inspiration for creating this project
 
