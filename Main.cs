@@ -98,6 +98,9 @@ namespace Commodore_Repair_Toolbox
         {
             InitializeComponent();
 
+            // Create or overwrite the debug output file
+            CreateDebugOutputFile();
+
             // Get build type
             #if DEBUG
                 buildType = "Debug";
@@ -202,8 +205,8 @@ namespace Commodore_Repair_Toolbox
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("EXCEPTION in \"GetAssemblyVersion()\":");
-                Debug.WriteLine(ex);
+                DebugOutput("EXCEPTION in \"GetAssemblyVersion()\":");
+                DebugOutput(ex.ToString());
             }
         }
 
@@ -245,8 +248,8 @@ namespace Commodore_Repair_Toolbox
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("EXCEPTION in \"GetOnlineVersion()\":");
-                Debug.WriteLine(ex);
+                DebugOutput("EXCEPTION in \"GetOnlineVersion()\":");
+                DebugOutput(ex.ToString());
             }
         }
                 
@@ -257,15 +260,7 @@ namespace Commodore_Repair_Toolbox
 
         private void LoadExcelData()
         {
-            try
-            {
-                DataStructure.GetAllData(classHardware);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("EXCEPTION in \"LoadExcelData()\":");
-                Debug.WriteLine(ex);
-            }
+            DataStructure.GetAllData(classHardware);
         }
 
 
@@ -281,8 +276,32 @@ namespace Commodore_Repair_Toolbox
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("EXCEPTION in \"LoadConfigFile()\":");
-                Debug.WriteLine(ex);
+                DebugOutput("EXCEPTION in \"LoadConfigFile()\":");
+                DebugOutput(ex.ToString());
+            }
+        }
+
+
+        // ###########################################################################################
+        // Create/overwrite the debug output logfile
+        // ###########################################################################################
+
+        private void CreateDebugOutputFile()
+        {
+            string filePath = Path.Combine(Application.StartupPath, "Commodore-Repair-Toolbox.log");
+            using (StreamWriter writer = new StreamWriter(filePath, false))
+            {
+                writer.WriteLine("Debug output file created [" + DateTime.Now +"]");
+            }
+        }
+
+        public static void DebugOutput(string text)
+        {
+            string filePath = Path.Combine(Application.StartupPath, "Commodore-Repair-Toolbox.log");
+            using (StreamWriter writer = new StreamWriter(filePath, true))
+            {
+                writer.WriteLine(text);
+                Debug.WriteLine(text);
             }
         }
 
@@ -354,13 +373,11 @@ namespace Commodore_Repair_Toolbox
 
         private void Form_ResizeBegin(object sender, EventArgs e)
         {
-            Debug.WriteLine("Form_ResizeBegin called");
             isResizing = true;
         }
 
         private void Form_ResizeEnd(object sender, EventArgs e)
         {
-            Debug.WriteLine("Form_ResizeEnd called");
             InitializeList();
 
             isResizing = false;
@@ -377,11 +394,11 @@ namespace Commodore_Repair_Toolbox
 
         private async void UpdateTabRessources(Board selectedBoard)
         {
-            // Do not update anything, if board info is empty
-            if (selectedBoard.BoardLinks == null || !selectedBoard.BoardLinks.Any())
-            {
-                return;
-            }
+//            // Do not update anything, if board info is empty
+//            if (selectedBoard.BoardLinks == null || !selectedBoard.BoardLinks.Any())
+//            {
+//                return;
+//            }
 
             if (webView21.CoreWebView2 == null)
             {
@@ -408,12 +425,14 @@ namespace Commodore_Repair_Toolbox
                 <h1>Ressources for troubleshooting and information</h1><br />
             ";
 
-            // Get the two datasets
-            var groupedLocalFiles = selectedBoard.BoardLocalFiles.GroupBy(file => file.Category);
-            var groupedLinks = selectedBoard.BoardLinks.GroupBy(link => link.Category);
+            // Get the two datasets, or "null"
+//            var groupedLocalFiles = selectedBoard.BoardLocalFiles.GroupBy(file => file.Category);
+//            var groupedLinks = selectedBoard.BoardLinks.GroupBy(link => link.Category);
+            var groupedLocalFiles = selectedBoard.BoardLocalFiles?.GroupBy(file => file.Category);
+            var groupedLinks = selectedBoard.BoardLinks?.GroupBy(link => link.Category);
 
             // Local files
-            if (groupedLocalFiles.Any())
+            if (groupedLocalFiles != null && groupedLocalFiles.Any())
             {
                 htmlContent += "<h1>Local files</h1>";
                 foreach (var group in groupedLocalFiles)
@@ -423,16 +442,19 @@ namespace Commodore_Repair_Toolbox
 
                     foreach (var file in group)
                     {
-                        string filePath = Path.Combine(Application.StartupPath, "Data", hardwareSelectedFolder, boardSelectedFolder, file.Datafile);
+                        string filePath = Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.Datafile);
                         htmlContent += "<li><a href='file:///" + filePath.Replace(@"\", @"\\") + "' target='_blank'>" + file.Name + "</a></li>";
                     }
                     htmlContent += "</ul>";
                     htmlContent += "<br />";
                 }
+            } else
+            {
+                htmlContent += "<font color='IndianRed'>Could not read [Board local files] data from data file!</a></font><br />";
             }
 
             // Web links
-            if (groupedLinks.Any())
+            if (groupedLinks != null && groupedLinks.Any())
             {
                 htmlContent += "<h1>Links</h1>";
                 foreach (var group in groupedLinks)
@@ -447,6 +469,10 @@ namespace Commodore_Repair_Toolbox
                     htmlContent += "</ul>";
                     htmlContent += "<br />";
                 }
+            }
+            else
+            {
+                htmlContent += "<font color='IndianRed'>Could not read [Board links] data from data file!</a></font><br />";
             }
 
             htmlContent += "</body>";
@@ -671,18 +697,21 @@ namespace Commodore_Repair_Toolbox
             var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (foundBoard != null)
             {
-                foreach (ComponentBoard comp in foundBoard.Components)
+                if (foundBoard?.Components != null)
                 {
-                    if (listBoxCategories.SelectedItems.Contains(comp.Type))
+                    foreach (ComponentBoard comp in foundBoard.Components)
                     {
-                        string displayText = comp.Label;
-                        displayText += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
-                        displayText += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
-
-                        if (string.IsNullOrEmpty(filterText) || displayText.ToLower().Contains(filterText))
+                        if (listBoxCategories.SelectedItems.Contains(comp.Type))
                         {
-                            listBoxComponents.Items.Add(displayText);
-                            listBoxNameValueMapping[displayText] = comp.Label;
+                            string displayText = comp.Label;
+                            displayText += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
+                            displayText += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
+
+                            if (string.IsNullOrEmpty(filterText) || displayText.ToLower().Contains(filterText))
+                            {
+                                listBoxComponents.Items.Add(displayText);
+                                listBoxNameValueMapping[displayText] = comp.Label;
+                            }
                         }
                     }
                 }
@@ -837,6 +866,19 @@ namespace Commodore_Repair_Toolbox
             string comboBox1Val = Configuration.GetSetting("ComboBox1Index", "0");
             string comboBox2Val = Configuration.GetSetting("ComboBox2Index", "0");
             string selectedImageVal = Configuration.GetSetting("SelectedImage", "");
+
+            // Check if last viewed schematic is still available in data - if not
+            // then select the first available schematic
+            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            if (bd != null)
+            {
+                var file = bd.Files.FirstOrDefault(f => f.Name == selectedImageVal) ?? bd.Files.FirstOrDefault();
+                if (file != null)
+                {
+                    selectedImageVal = file.Name;
+                }
+            }
 
             // Apply splitter position
             if (int.TryParse(splitterPosVal, out int splitterPosition) && splitterPosition > 0)
@@ -1071,11 +1113,14 @@ namespace Commodore_Repair_Toolbox
             var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (foundBoard != null)
             {
-                foreach (ComponentBoard component in foundBoard.Components)
+                if (foundBoard?.Components != null)
                 {
-                    if (!string.IsNullOrEmpty(component.Type) && !listBoxCategories.Items.Contains(component.Type))
+                    foreach (ComponentBoard component in foundBoard.Components)
                     {
-                        listBoxCategories.Items.Add(component.Type);
+                        if (!string.IsNullOrEmpty(component.Type) && !listBoxCategories.Items.Contains(component.Type))
+                        {
+                            listBoxCategories.Items.Add(component.Type);
+                        }
                     }
                 }
             }
@@ -1090,20 +1135,23 @@ namespace Commodore_Repair_Toolbox
             var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (foundBoard != null)
             {
-                foreach (ComponentBoard comp in foundBoard.Components)
+                if (foundBoard?.Components != null)
                 {
-                    if (listBoxCategories.SelectedItems.Contains(comp.Type))
+                    foreach (ComponentBoard comp in foundBoard.Components)
                     {
-                        string displayText = comp.Label;
-                        displayText += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
-                        displayText += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
-                        listBoxComponents.Items.Add(displayText);
-                        listBoxNameValueMapping[displayText] = comp.Label;
-
-                        if (listBoxComponentsSelectedLabels.Contains(comp.Label))
+                        if (listBoxCategories.SelectedItems.Contains(comp.Type))
                         {
-                            int idx = listBoxComponents.Items.IndexOf(displayText);
-                            listBoxComponents.SetSelected(idx, true);
+                            string displayText = comp.Label;
+                            displayText += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
+                            displayText += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
+                            listBoxComponents.Items.Add(displayText);
+                            listBoxNameValueMapping[displayText] = comp.Label;
+
+                            if (listBoxComponentsSelectedLabels.Contains(comp.Label))
+                            {
+                                int idx = listBoxComponents.Items.IndexOf(displayText);
+                                listBoxComponents.SetSelected(idx, true);
+                            }
                         }
                     }
                 }
@@ -1120,7 +1168,7 @@ namespace Commodore_Repair_Toolbox
         {
             // Load main image
             image = Image.FromFile(
-                Path.Combine(Application.StartupPath, "Data", hardwareSelectedFolder, boardSelectedFolder, imageSelectedFile)
+                Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, imageSelectedFile)
             );
 
             // Clear old controls
@@ -1234,7 +1282,7 @@ namespace Commodore_Repair_Toolbox
 
             foreach (BoardFileOverlays file in bd.Files)
             {
-                string path = Path.Combine(Application.StartupPath, "Data", hardwareSelectedFolder, boardSelectedFolder, file.FileName);
+                string path = Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.FileName);
                 Image image2 = Image.FromFile(path);
 
                 Panel thumbnailContainer = new Panel
@@ -1395,7 +1443,6 @@ namespace Commodore_Repair_Toolbox
         {
             imageSelectedName = pan.Name;
             Configuration.SaveSetting("SelectedImage", imageSelectedName);  // Save selected image
-            Debug.WriteLine("User clicked thumbnail: " + imageSelectedName);
 
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
@@ -1617,24 +1664,27 @@ namespace Commodore_Repair_Toolbox
             {
                 if (bf.Name != imageSelectedName) continue;
 
-                foreach (var comp in bf.Components)
+                if (bf?.Components != null)
                 {
-                    if (comp.Overlays == null) continue;
-
-                    foreach (var ov in comp.Overlays)
+                    foreach (var comp in bf.Components)
                     {
-                        PictureBox overlayPictureBox = new PictureBox
-                        {
-                            Name = comp.Label,
-                            Location = new Point(ov.Bounds.X, ov.Bounds.Y),
-                            Size = new Size(ov.Bounds.Width, ov.Bounds.Height),
-                            Tag = bf.Name
-                        };
+                        if (comp.Overlays == null) continue;
 
-                        overlayComponentsTab.Add(overlayPictureBox);
-                        int idx = overlayComponentsTab.Count - 1;
-                        overlayComponentsTabOriginalSizes[idx] = overlayPictureBox.Size;
-                        overlayComponentsTabOriginalLocations[idx] = overlayPictureBox.Location;
+                        foreach (var ov in comp.Overlays)
+                        {
+                            PictureBox overlayPictureBox = new PictureBox
+                            {
+                                Name = comp.Label,
+                                Location = new Point(ov.Bounds.X, ov.Bounds.Y),
+                                Size = new Size(ov.Bounds.Width, ov.Bounds.Height),
+                                Tag = bf.Name
+                            };
+
+                            overlayComponentsTab.Add(overlayPictureBox);
+                            int idx = overlayComponentsTab.Count - 1;
+                            overlayComponentsTabOriginalSizes[idx] = overlayPictureBox.Size;
+                            overlayComponentsTabOriginalLocations[idx] = overlayPictureBox.Location;
+                        }
                     }
                 }
             }
@@ -1703,28 +1753,31 @@ namespace Commodore_Repair_Toolbox
                     int opacityList = bf.HighlightOpacityList;
                     float listZoom = overlayListZoomFactors[bf.Name];
 
-                    foreach (var comp in bf.Components)
+                    if (bf?.Components != null)
                     {
-                        if (comp.Overlays == null) continue;
-
-                        bool highlighted = listBoxComponentsSelectedLabels.Contains(comp.Label);
-
-                        foreach (var ov in comp.Overlays)
+                        foreach (var comp in bf.Components)
                         {
-                            Rectangle rect = new Rectangle(
-                                (int)(ov.Bounds.X * listZoom),
-                                (int)(ov.Bounds.Y * listZoom),
-                                (int)(ov.Bounds.Width * listZoom),
-                                (int)(ov.Bounds.Height * listZoom)
-                            );
-                            listPanel.Overlays.Add(new OverlayInfo
+                            if (comp.Overlays == null) continue;
+
+                            bool highlighted = listBoxComponentsSelectedLabels.Contains(comp.Label);
+
+                            foreach (var ov in comp.Overlays)
                             {
-                                Bounds = rect,
-                                Color = colorList,
-                                Opacity = opacityList,
-                                Highlighted = highlighted,
-                                ComponentLabel = comp.Label
-                            });
+                                Rectangle rect = new Rectangle(
+                                    (int)(ov.Bounds.X * listZoom),
+                                    (int)(ov.Bounds.Y * listZoom),
+                                    (int)(ov.Bounds.Width * listZoom),
+                                    (int)(ov.Bounds.Height * listZoom)
+                                );
+                                listPanel.Overlays.Add(new OverlayInfo
+                                {
+                                    Bounds = rect,
+                                    Color = colorList,
+                                    Opacity = opacityList,
+                                    Highlighted = highlighted,
+                                    ComponentLabel = comp.Label
+                                });
+                            }
                         }
                     }
                     listPanel.Invalidate();
@@ -1792,9 +1845,6 @@ namespace Commodore_Repair_Toolbox
             }
             else if (e.MouseArgs.Button == MouseButtons.Right)
             {
-                // Existing RIGHT-CLICK toggle logic:
-                Debug.WriteLine("Right-click on " + labelClicked);
-
                 // Find item in listBox1 that has Value == labelClicked
                 string key = listBoxNameValueMapping
                     .FirstOrDefault(x => x.Value == labelClicked)
@@ -1860,7 +1910,6 @@ namespace Commodore_Repair_Toolbox
             // Right-click drag on empty space
             if (e.Button == MouseButtons.Right)
             {
-                Debug.WriteLine("Right-click drag start");
                 overlayPanelLastMousePos = e.Location;
             }
         }
@@ -1883,14 +1932,12 @@ namespace Commodore_Repair_Toolbox
         {
             if (e.Button == MouseButtons.Right)
             {
-                Debug.WriteLine("Right-click drag end");
                 overlayPanelLastMousePos = Point.Empty;
             }
         }
 
         private void splitContainer1_SplitterMoved(object sender, SplitterEventArgs e)
         {
-            Debug.WriteLine(splitContainerSchematics.SplitterDistance);
             InitializeList();
         }
 
@@ -1999,7 +2046,6 @@ namespace Commodore_Repair_Toolbox
         {
             // e.g. "SelectedCategories|C128|310378"
             string configKey = $"SelectedCategories|{hardwareSelectedName}|{boardSelectedName}";
-            Debug.WriteLine($"Looking for configKey = '{configKey}'");
             string joined = Configuration.GetSetting(configKey, "");
 
             if (string.IsNullOrEmpty(joined))
@@ -2050,11 +2096,6 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        private void richTextBoxEx1_LinkClicked(object sender, LinkClickedEventArgs e)
-        {
-            Debug.WriteLine("Link clicked: " + e.LinkText);
-        }
-
         // What is this?
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
@@ -2063,7 +2104,7 @@ namespace Commodore_Repair_Toolbox
     // -------------------------------------------------------------------------
     // Class definitions
 
-    // "Hardware" is read from the very first "Data.xlsx" Excel file (level 1).
+    // "Hardware" is read from the very first Excel file (Commodore-Repair-Toolbox.xlsx).
     // It contains a list of all associated boards and their respective data files.
     public class Hardware
     {
@@ -2121,7 +2162,7 @@ namespace Commodore_Repair_Toolbox
         public string NameTechnical { get; set; }
         public string NameFriendly { get; set; }
         public string Type { get; set; }
-        public string ImagePinout { get; set; }
+        public string ImagePinout { get; set; } // hest - must be deleted once replaced!
         public string OneLiner { get; set; }
         public string Description { get; set; }
         public List<ComponentLocalFiles> LocalFiles { get; set; }
