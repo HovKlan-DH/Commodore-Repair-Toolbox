@@ -8,16 +8,16 @@ This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ he
 # Screenshots
 
 Main screen:\
-![Main](https://github.com/user-attachments/assets/3167f6cc-619c-4f7a-82b7-b0ae7b058484)
+![Main screen](https://github.com/user-attachments/assets/cd6767e9-8b9a-4ff9-af3a-ef977a79f20a)
 
 Popup component info:\
-![iPopup info](https://github.com/user-attachments/assets/4950cf74-7c5f-4a6f-89fd-4a698301c64d)
+![Component popup information](https://github.com/user-attachments/assets/b3ded206-6b5d-49d8-a011-ca532bc953e4)
 
 # Can you explain what it is?
 
 With _CRT_ you can easily view schematics, zoom in/out, identify components, see chip pinouts, study datasheets, ressources and various other information, helping you diagnosing and repairing good old vintage hardware. It is primarily dedicated to Commodore, and have a few built-in configurations for Commodore computers, but it does support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine.
 
-It probably works the best, if the hardware is "simple" and have good documentation available, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
+It probably works the best, if the hardware is "simple" and have good documentation available, like schematics, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
 
 # Installation and usage
 
@@ -34,9 +34,9 @@ It will run on any 64-bit _Windows 10_ or newer. It does require _.NET Framework
 
 # Your help would be really appreciated
 
-I would really appreciate if some Commodore experts would take a look, and let me know of factual errors or things I obviously have missed :pray:
+I would really appreciate if some Commodore experts would take a look, and let me know of obvious factual errors or things I have missed :pray:
 
-You can help specifically with these topics:
+You can also help specifically with these topics:
 - Do you have higher-quality images of the schematics?
 - Do you have (better) datasheets or pinouts for any of the components?
 - Do you see missing components in either the component list or as a highlight?
@@ -50,10 +50,11 @@ You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Tool
 # Software used
 For labelling the components in the schematics  I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and easy to use, once you learn its way of working. It will output a JSON file, which I then convert into an Excel format - you must send both this JSON file and its image file, if you have any updates.
 
+The initial Excel data file is placed in same folder as executable file and is named `Commodore-Repair-Toolbox.xlsx`
 Inside the `Data` folders I have placed the JSON source files used for labelling.\
-Inside the `Tools` folder I have placed the VGG application - you should load the `via.html` into your local browser.
+Inside the `Tools` folder I have placed the VGG web application - you should load the `via.html` into your local browser.
 
-I have chosen Excel as the data format, as this is easy for the most people to navigate in. I am actually not sure, but I do believe there is a [free online Excel available from Microsoft](https://www.office.com/launch/excel), if you do not already have one installed.
+I have chosen Excel as the data format, as this should be known to the most, and it is fairly straightforward how to use. I am actually not sure, but I do believe there is a [free online Excel available from Microsoft](https://www.office.com/launch/excel), if you do not already have one installed.
 
 > [!CAUTION]
 > Please do note that the data files have not yet reached its final maturity level, and by then its format most likely will change in a nearby future release!
@@ -66,7 +67,7 @@ View [issues](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) and
 
 There are bigger changes here, and I am not sure I want to go down this road - it will for sure depend on usage, as I personally do not have any use for the collaboration topics, if this is primarily used only by myself :grin:
 
-- More pictures in popup component info
+- More pictures in popup component info (data model is ready for it)
 - Have people download and upload new schematics or updates directly from tool
     - "Data has been updated" information
     - Rating system of user uploaded schematics
