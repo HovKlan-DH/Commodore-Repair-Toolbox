@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Web.WebView2.Core;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -392,14 +393,11 @@ namespace Commodore_Repair_Toolbox
         // Will load new content from board data file.
         // ###########################################################################################
 
+        private EventHandler<CoreWebView2WebMessageReceivedEventArgs> _fileOpenHandler;
+        private EventHandler<CoreWebView2NewWindowRequestedEventArgs> _urlHandler;
+
         private async void UpdateTabRessources(Board selectedBoard)
         {
-//            // Do not update anything, if board info is empty
-//            if (selectedBoard.BoardLinks == null || !selectedBoard.BoardLinks.Any())
-//            {
-//                return;
-//            }
-
             if (webView21.CoreWebView2 == null)
             {
                 await webView21.EnsureCoreWebView2Async(null);
@@ -426,8 +424,6 @@ namespace Commodore_Repair_Toolbox
             ";
 
             // Get the two datasets, or "null"
-//            var groupedLocalFiles = selectedBoard.BoardLocalFiles.GroupBy(file => file.Category);
-//            var groupedLinks = selectedBoard.BoardLinks.GroupBy(link => link.Category);
             var groupedLocalFiles = selectedBoard.BoardLocalFiles?.GroupBy(file => file.Category);
             var groupedLinks = selectedBoard.BoardLinks?.GroupBy(link => link.Category);
 
@@ -478,8 +474,16 @@ namespace Commodore_Repair_Toolbox
             htmlContent += "</body>";
             htmlContent += "</html >";
 
-            // Open file URL in default application
-            webView21.CoreWebView2.WebMessageReceived += (sender, args) =>
+            // ---
+            // Make sure we only have one handler for the "openFile" message (seems
+            // to be an issue where it can trigger an event multiple times!?
+
+            // Handle the "file" handler
+            if (_fileOpenHandler != null)
+            {
+                webView21.CoreWebView2.WebMessageReceived -= _fileOpenHandler;
+            }
+            _fileOpenHandler = (sender, args) =>
             {
                 string message = args.TryGetWebMessageAsString();
                 if (message.StartsWith("openFile:"))
@@ -488,13 +492,21 @@ namespace Commodore_Repair_Toolbox
                     Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
                 }
             };
+            webView21.CoreWebView2.WebMessageReceived += _fileOpenHandler;
 
-            // Open web URL in default web browser
-            webView21.CoreWebView2.NewWindowRequested += (sender, args) =>
+            // Handle the "URL" handler
+            if (_urlHandler != null)
+            {
+                webView21.CoreWebView2.NewWindowRequested -= _urlHandler;
+            }
+            _urlHandler = (sender, args) =>
             {
                 args.Handled = true; // prevent the default behavior
                 Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
             };
+            webView21.CoreWebView2.NewWindowRequested += _urlHandler;
+
+            // ---
 
             webView21.NavigateToString(htmlContent);
         }
@@ -863,9 +875,9 @@ namespace Commodore_Repair_Toolbox
         {
             // Load saved settings for combo boxes, splitter, and selected image
             string splitterPosVal = Configuration.GetSetting("SplitterPosition", defaultConfigurationSplitterPosition);
-            string comboBox1Val = Configuration.GetSetting("ComboBox1Index", "0");
-            string comboBox2Val = Configuration.GetSetting("ComboBox2Index", "0");
-            string selectedImageVal = Configuration.GetSetting("SelectedImage", "");
+            string comboBox1Val = Configuration.GetSetting("HardwareSelected", "0");
+            string comboBox2Val = Configuration.GetSetting("BoardSelected", "0");
+            string selectedImageVal = Configuration.GetSetting("SelectedThumbnail", "");
 
             // Check if last viewed schematic is still available in data - if not
             // then select the first available schematic
@@ -886,7 +898,7 @@ namespace Commodore_Repair_Toolbox
                 splitContainerSchematics.SplitterDistance = splitterPosition;
             }
 
-            // Apply combo box selections
+            // Apply combobox selections
             if (int.TryParse(comboBox1Val, out int comboBox1Index) && comboBox1Index >= 0 && comboBox1Index < comboBoxHardware.Items.Count)
             {
                 comboBoxHardware.SelectedIndex = comboBox1Index;
@@ -937,12 +949,12 @@ namespace Commodore_Repair_Toolbox
             // Save combo box selections
             comboBoxHardware.SelectedIndexChanged += (s, e) =>
             {
-                Configuration.SaveSetting("ComboBox1Index", comboBoxHardware.SelectedIndex.ToString());
+                Configuration.SaveSetting("HardwareSelected", comboBoxHardware.SelectedIndex.ToString());
             };
 
             comboBoxBoard.SelectedIndexChanged += (s, e) =>
             {
-                Configuration.SaveSetting("ComboBox2Index", comboBoxBoard.SelectedIndex.ToString());
+                Configuration.SaveSetting("BoardSelected", comboBoxBoard.SelectedIndex.ToString());
             };
 
             // Save splitter position
@@ -956,7 +968,7 @@ namespace Commodore_Repair_Toolbox
             {
                 if (e.Control is Panel panel && panel.Name == imageSelectedName)
                 {
-                    Configuration.SaveSetting("SelectedImage", imageSelectedName);
+                    Configuration.SaveSetting("ThumbnailImage", imageSelectedName);
                 }
             };
         }
@@ -1442,7 +1454,7 @@ namespace Commodore_Repair_Toolbox
         private void OnListImageLeftClicked(Panel pan)
         {
             imageSelectedName = pan.Name;
-            Configuration.SaveSetting("SelectedImage", imageSelectedName);  // Save selected image
+            Configuration.SaveSetting("SelectedThumbnail", imageSelectedName);  // Save selected image
 
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
@@ -2162,11 +2174,12 @@ namespace Commodore_Repair_Toolbox
         public string NameTechnical { get; set; }
         public string NameFriendly { get; set; }
         public string Type { get; set; }
-        public string ImagePinout { get; set; } // hest - must be deleted once replaced!
+        //public string ImagePinout { get; set; } // hest - must be deleted once replaced!
         public string OneLiner { get; set; }
         public string Description { get; set; }
         public List<ComponentLocalFiles> LocalFiles { get; set; }
         public List<ComponentLinks> ComponentLinks { get; set; }
+        public List<ComponentImages> ComponentImages { get; set; }
     }
 
     public class ComponentBounds
@@ -2190,6 +2203,12 @@ namespace Commodore_Repair_Toolbox
     {
         public string Name { get; set; }
         public string Url { get; set; }
+    }
+
+    public class ComponentImages
+    {
+        public string Name { get; set; }
+        public string FileName { get; set; }
     }
 
     public class CustomPanel : Panel

@@ -38,12 +38,12 @@ namespace Commodore_Repair_Toolbox
             textBox1.ScrollBars = ScrollBars.Vertical;
 
             // Pinout image
-            if (!string.IsNullOrEmpty(component.ImagePinout))
+            if (component.ComponentImages != null && component.ComponentImages.Count > 0)
             {
                 var imagePath = Path.Combine(
-                    Application.StartupPath, "Data",
+                    //Application.StartupPath, "Data",
                     hardwareSelectedFolder, boardSelectedFolder,
-                    component.ImagePinout
+                    component.ComponentImages[0].FileName // Assuming the first image is the pinout image
                 );
                 if (File.Exists(imagePath))
                 {

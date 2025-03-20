@@ -1,10 +1,8 @@
 ﻿using OfficeOpenXml;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.IO.Packaging;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -147,7 +145,7 @@ namespace Commodore_Repair_Toolbox
                     // Exit check
                     if (!File.Exists(filePath))
                     {
-                        string error = "File [Data\\" + hardware.Folder + "\\" + hardware.Datafile + "\\" + board.Folder + "\\" + board.Datafile + "] does not exists";
+                        string error = "File [" + hardware.Folder + "\\" + hardware.Datafile + "\\" + board.Folder + "\\" + board.Datafile + "] does not exists";
                         Main.DebugOutput(error);
                         MessageBox.Show(error, "Critical Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         Environment.Exit(-1);
@@ -365,6 +363,7 @@ namespace Commodore_Repair_Toolbox
                             row++;
                         }
                         row++; // skip headers
+                        row++;
 
                         while (worksheet.Cells[row, 1].Value != null)
                         {
@@ -372,15 +371,26 @@ namespace Commodore_Repair_Toolbox
                             string name = worksheet.Cells[row, 2].Value.ToString();
                             string fileName = worksheet.Cells[row, 3].Value.ToString();
 
-                            var classComponent = board.Components.FirstOrDefault(c => c.Label == componentName);
-                            if (classComponent != null)
+                            // Log if file does not exists
+                            filePath = Path.Combine(Application.StartupPath, hardware.Folder, board.Folder, fileName);
+                            if (!File.Exists(filePath))
                             {
-                                if (classComponent.LocalFiles == null) classComponent.LocalFiles = new List<ComponentLocalFiles>();
-                                classComponent.LocalFiles.Add(new ComponentLocalFiles
+                                string error = "File [" + hardware.Folder + "\\" + board.Folder + "\\" + fileName + "] does not exists";
+                                Main.DebugOutput(error);
+                            }
+                            else
+                            {
+                                // Add file to class
+                                var classComponent = board.Components.FirstOrDefault(c => c.Label == componentName);
+                                if (classComponent != null)
                                 {
-                                    Name = name,
-                                    FileName = fileName
-                                });
+                                    if (classComponent.LocalFiles == null) classComponent.LocalFiles = new List<ComponentLocalFiles>();
+                                    classComponent.LocalFiles.Add(new ComponentLocalFiles
+                                    {
+                                        Name = name,
+                                        FileName = fileName
+                                    });
+                                }
                             }
                             row++;
                         }
@@ -414,6 +424,7 @@ namespace Commodore_Repair_Toolbox
                             row++;
                         }
                         row++; // skip headers
+                        row++;
 
                         while (worksheet.Cells[row, 1].Value != null)
                         {
@@ -516,6 +527,7 @@ namespace Commodore_Repair_Toolbox
                             row++;
                         }
                         row++; // skip headers
+                        row++;
 
                         // Initialize the BoardLinks list if it's null
                         if (board.BoardLinks == null)
@@ -570,6 +582,7 @@ namespace Commodore_Repair_Toolbox
                             row++;
                         }
                         row++; // skip headers
+                        row++;
 
                         // Initialize the BoardLinks list if it's null
                         if (board.BoardLocalFiles == null)
@@ -580,23 +593,94 @@ namespace Commodore_Repair_Toolbox
                         while (worksheet.Cells[row, 1].Value != null)
                         {
                             string category = worksheet.Cells[row, 1].Value.ToString();
-                            string fileName = worksheet.Cells[row, 2].Value.ToString();
-                            string fileLocation = worksheet.Cells[row, 3].Value.ToString();
+                            string name = worksheet.Cells[row, 2].Value.ToString();
+                            string fileName = worksheet.Cells[row, 3].Value.ToString();
 
-                            // Create a new BoardLocalFiles instance and add it to the BoardLocalFiles list
-                            BoardLocalFiles boardLocalFile = new BoardLocalFiles
+                            // Log if file does not exists
+                            filePath = Path.Combine(Application.StartupPath, hardware.Folder, board.Folder, fileName);
+                            if (!File.Exists(filePath))
                             {
-                                Category = category,
-                                Name = fileName,
-                                Datafile = fileLocation
-                            };
-                            board.BoardLocalFiles.Add(boardLocalFile);
+                                string error = "File [" + hardware.Folder + "\\" + board.Folder + "\\" + fileName + "] does not exists";
+                                Main.DebugOutput(error);
+                            }
+                            else
+                            {
+                                // Add file to class
+                                BoardLocalFiles boardLocalFile = new BoardLocalFiles
+                                {
+                                    Category = category,
+                                    Name = name,
+                                    Datafile = fileName
+                                };
+                                board.BoardLocalFiles.Add(boardLocalFile);
+                            }
 
                             row++;
                         }
                     }
                 }
             }
+
+            // 11) Load "component images" (datasheets)
+            foreach (Hardware hardware in classHardware)
+            {
+                foreach (Board board in hardware.Boards)
+                {
+                    using (var package = new ExcelPackage(new FileInfo(
+                        Path.Combine(Application.StartupPath, hardware.Folder, board.Datafile))))
+                    {
+                        string sheet = "Component images";
+                        var worksheet = package.Workbook.Worksheets[sheet];
+
+                        // Break check
+                        if (worksheet == null)
+                        {
+                            Main.DebugOutput("Worksheet [" + sheet + "] cannot be found in [" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile + "]");
+                            break;
+                        }
+
+                        string searchHeader = "Component images";
+                        int row = 1;
+                        while (row <= worksheet.Dimension.End.Row)
+                        {
+                            if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                            row++;
+                        }
+                        row++; // skip headers
+                        row++;
+
+                        while (worksheet.Cells[row, 1].Value != null)
+                        {
+                            string componentName = worksheet.Cells[row, 1].Value.ToString();
+                            string name = worksheet.Cells[row, 2].Value.ToString();
+                            string fileName = worksheet.Cells[row, 3].Value.ToString();
+
+                            // Log if file does not exists
+                            filePath = Path.Combine(Application.StartupPath, hardware.Folder, board.Folder, fileName);
+                            if (!File.Exists(filePath))
+                            {
+                                string error = "File [" + hardware.Folder + "\\" + board.Folder + "\\" + fileName + "] does not exists";
+                                Main.DebugOutput(error);
+                            } else
+                            {
+                                // Add file to class
+                                var classComponent = board.Components.FirstOrDefault(c => c.Label == componentName);
+                                if (classComponent != null)
+                                {
+                                    if (classComponent.ComponentImages == null) classComponent.ComponentImages = new List<ComponentImages>();
+                                    classComponent.ComponentImages.Add(new ComponentImages
+                                    {
+                                        Name = name,
+                                        FileName = fileName
+                                    });
+                                }
+                            }
+                            row++;
+                        }
+                    }
+                }
+            } // 11) Load "component images" (datasheets)
+
         }
     }
 }
