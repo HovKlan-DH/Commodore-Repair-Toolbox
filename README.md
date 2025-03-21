@@ -50,9 +50,9 @@ You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Tool
 # Software used
 For labelling the components in the schematics  I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and easy to use, once you learn its way of working. It will output a JSON file, which I then convert into an Excel format - you must send both this JSON file and its image file, if you have any updates.
 
-The initial Excel data file is placed in same folder as executable file and is named `Commodore-Repair-Toolbox.xlsx`
-Inside the `Data` folders I have placed the JSON source files used for labelling.\
-Inside the `Tools` folder I have placed the VGG web application - you should load the `via.html` into your local browser.
+* The initial Excel data file is placed in same folder as executable file and is named `Commodore-Repair-Toolbox.xlsx`
+* Inside the `Data` folders I have placed the JSON source files used for labelling.
+* Inside the `Tools` folder I have placed the VGG web application - you should load the `via.html` into your local browser.
 
 I have chosen Excel as the data format, as this should be known to the most, and it is fairly straightforward how to use. I am actually not sure, but I do believe there is a [free online Excel available from Microsoft](https://www.office.com/launch/excel), if you do not already have one installed.
 
