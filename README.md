@@ -61,7 +61,7 @@ I have chosen Excel as the data format, as this should be known to the most, and
 
 # Near-term TODO
 
-View [issues](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) and [milestones](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/milestones) for upcoming bugfixes and enhancements.
+View [issues](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) for reported bugs and upcoming enhancements.
 
 # Future ideas / wishlist
 
