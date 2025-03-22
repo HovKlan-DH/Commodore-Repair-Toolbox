@@ -483,17 +483,32 @@ namespace Commodore_Repair_Toolbox
                             int x = (int)(double)worksheet.Cells[row, 3].Value;
                             int y = (int)(double)worksheet.Cells[row, 4].Value;
                             int w = (int)(double)worksheet.Cells[row, 5].Value;
-                            int h = (int)(double)worksheet.Cells[row, 6].Value;
+                            int h = (int)(double)worksheet.Cells[row, 6].Value;                          
 
                             var bf = board.Files?.FirstOrDefault(f => f.Name == imageName);
-                            var compBounds = bf?.Components.FirstOrDefault(c => c.Label == componentName);
-                            if (compBounds != null)
+
+                            // Break check
+                            if (bf == null)
                             {
-                                if (compBounds.Overlays == null) compBounds.Overlays = new List<Overlay>();
-                                compBounds.Overlays.Add(new Overlay
+                                Main.DebugOutput("No schematics name [" + imageName + "] can be found for component ["+ componentName +"] in worksheet [Board schematics] in [" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile + "]");
+                            } else
+                            {
+                                // Break check
+                                if (bf.Components == null)
                                 {
-                                    Bounds = new Rectangle(x, y, w, h)
-                                });
+                                    Main.DebugOutput("No components can be found in worksheet [Components] in [" + hardware.Folder + "\\" + board.Folder + "\\" + board.Datafile + "]");
+                                    break;
+                                }
+
+                                var compBounds = bf?.Components.FirstOrDefault(c => c.Label == componentName);
+                                if (compBounds != null)
+                                {
+                                    if (compBounds.Overlays == null) compBounds.Overlays = new List<Overlay>();
+                                    compBounds.Overlays.Add(new Overlay
+                                    {
+                                        Bounds = new Rectangle(x, y, w, h)
+                                    });
+                                }
                             }
                             row++;
                         }

@@ -41,8 +41,7 @@ namespace Commodore_Repair_Toolbox
             if (component.ComponentImages != null && component.ComponentImages.Count > 0)
             {
                 var imagePath = Path.Combine(
-                    //Application.StartupPath, "Data",
-                    hardwareSelectedFolder, boardSelectedFolder,
+                    Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder,
                     component.ComponentImages[0].FileName // Assuming the first image is the pinout image
                 );
                 if (File.Exists(imagePath))
@@ -98,11 +97,8 @@ namespace Commodore_Repair_Toolbox
             string selectedName = listBox1.SelectedItem.ToString();
             if (!localFiles.ContainsKey(selectedName)) return;
 
-            var filePath = Path.Combine(
-                Application.StartupPath, "Data",
-                hardwareSelectedFolder, boardSelectedFolder,
-                localFiles[selectedName]
-            );
+            var filePath = Path.Combine(Application.StartupPath, hardwareSelectedFolder, 
+                boardSelectedFolder, localFiles[selectedName]);
 
             if (File.Exists(filePath))
             {

@@ -407,7 +407,6 @@ namespace Commodore_Repair_Toolbox
                 <html>
                 <head>
                 <meta charset='UTF-8'>
-                <title>Ressources</title>
                 <script>
                 document.addEventListener('click', function(e) {
                 var target = e.target;
@@ -526,7 +525,6 @@ namespace Commodore_Repair_Toolbox
                 <html>
                 <head>
                 <meta charset='UTF-8'>
-                <title>Help</title>
                 </head>
                 <body>
                 "+ htmlForTabs +@"
@@ -547,7 +545,7 @@ namespace Commodore_Repair_Toolbox
                 Keyboard functions:<br />
                 <ul>
                 <li><b>F11</b> will toggle fullscreen</li>
-                <li><b>ESCAPE</b> will exit fullscreen or close popup info</li>
+                <li><b>ESCAPE</b> will exit fullscreen or close popup component information</li>
                 <li><b>SPACE</b> will toggle blinking for selected components</li>
                 <li>Focus cursor in input field, and type, to filter component list</li>
                 </ul>
@@ -555,10 +553,10 @@ namespace Commodore_Repair_Toolbox
 
                 Component selection:<br />
                 <ul>
-                <li>When a component is selected, then it will visualize if component is part of image in list-view:</li>
+                <li>When a component is selected, then it will visualize if component is part of thumbnail in list-view:</li>
                 <ul>
-                <li>Appending an asterisk/* as first character in label</li>
-                <li>Background color of label changes to red</li>
+                <li>Appending an asterisk/* as first character in thumbnail label</li>
+                <li>Background color of thumbnail label changes to red</li>
                 </ul>
                 <li>You cannot highlight a component in image, if its component category is unselected</li>
                 </ul>
@@ -574,7 +572,7 @@ namespace Commodore_Repair_Toolbox
 
                 How-to add or update your own data:<br />
                 <ul>
-                <li>View <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox?tab=readme-ov-file#software-used' target='_blank'>GitHub Documentation</a></li>
+                < li>View <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox?tab=readme-ov-file#software-used' target='_blank'>GitHub Documentation</a></li>
                 </ul>
                 <br />
 
@@ -629,7 +627,6 @@ namespace Commodore_Repair_Toolbox
                 <html>
                 <head>
                 <meta charset='UTF-8'>
-                <title>About</title>
                 </head>
                 <body>
                 "+ htmlForTabs + @"
