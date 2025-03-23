@@ -19,7 +19,7 @@ namespace Commodore_Repair_Toolbox
         private string defaultConfigurationSplitterPosition = "1000"; // this is actually determined in "Form_Load" as UI needs to be initialized first
         private string buildType = ""; // Debug|Release
         private string onlineAvailableVersion = ""; // will be empty, if no newer version available
-        private string urlCheckOnlineVersion = "https://dennis.dk/crt/";
+        private string urlCheckOnlineVersion = "https://commodore-repair-toolbox.dk/auto-update/";
 
         // HTML code for all tabs using "WebView2" component for content
         private string htmlForTabs = @"
@@ -234,7 +234,7 @@ namespace Commodore_Repair_Toolbox
                 // Send the POST data to the server
                 byte[] responseBytes = webClient.UploadValues(urlCheckOnlineVersion, postData);
 
-                // Convert the response bytes to a string
+                // Convert the "response bytes" to a human readable string
                 onlineAvailableVersion = Encoding.UTF8.GetString(responseBytes);
 
                 if (onlineAvailableVersion.Substring(0, 7) == "Version")
@@ -572,7 +572,7 @@ namespace Commodore_Repair_Toolbox
 
                 How-to add or update your own data:<br />
                 <ul>
-                < li>View <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox?tab=readme-ov-file#software-used' target='_blank'>GitHub Documentation</a></li>
+                <li>View <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox?tab=readme-ov-file#software-used' target='_blank'>GitHub Documentation</a></li>
                 </ul>
                 <br />
 
@@ -637,7 +637,7 @@ namespace Commodore_Repair_Toolbox
 
                 " + versionOnlineTxt + @"
 
-                All programming done by Dennis Helligsø (crt@mailscan.dk).<br />
+                All programming done by Dennis Helligsø (dennis@commodore-repair-toolbox.dk).<br />
                 <br />
 
                 Visit project home page at <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox' target='_blank'>https://github.com/HovKlan-DH/Commodore-Repair-Toolbox</a><br />
