@@ -3,7 +3,7 @@
 This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ hence forward) - a Windows utility tool for repairing vintage computers or peripherals.
 
 > [!CAUTION]
-> Please do note that the data files have not yet reached its final maturity level, and by then its format most likely will change in a nearby future release!
+> Please do note that the data files have not yet reached its final maturity level, and by then its format _could_ likely change in a nearby future release!
 
 # Screenshots
 
@@ -60,7 +60,7 @@ For labelling the components in the schematics  I have discovered the Windows op
 I have chosen Excel as the data format, as this should be known to the most, and it is fairly straightforward how to use. I am actually not sure, but I do believe there is a [free online Excel available from Microsoft](https://www.office.com/launch/excel), if you do not already have one installed.
 
 > [!CAUTION]
-> Please do note that the data files have not yet reached its final maturity level, and by then its format most likely will change in a nearby future release!
+> Please do note that the data files have not yet reached its final maturity level, and by then its format _could_ likely change in a nearby future release!
 
 # Near-term TODO
 
