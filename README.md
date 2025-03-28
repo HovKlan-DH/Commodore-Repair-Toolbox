@@ -28,12 +28,12 @@ It will run on any 64-bit _Windows 10_ or newer. It does require _.NET Framework
 # Built-in hardware / schematics
 
 - **Commodore 128 and 128D**
-  - Schematics **310378**
+  - Schematics 310378
 - **Commodore 64 (Breadbin)**
-  - Schematics **250407**
-  - Schematics **250425**
+  - Schematics 250407
+  - Schematics 250425
 - **Commodore 64C**
-  - Schematics **250466**
+  - Schematics 250466
 
 # Your help would be really appreciated
 
