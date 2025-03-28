@@ -1,6 +1,7 @@
 ﻿using Microsoft.Web.WebView2.Core;
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -9,17 +10,20 @@ using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
+
 
 namespace Commodore_Repair_Toolbox
 {
     public partial class Main : Form
     {
         // Default values
-        private string defaultConfigurationSplitterPosition = "1000"; // this is actually determined in "Form_Load" as UI needs to be initialized first
         private string buildType = ""; // Debug|Release
         private string onlineAvailableVersion = ""; // will be empty, if no newer version available
-        private string urlCheckOnlineVersion = "https://commodore-repair-toolbox.dk/auto-update/";
+        private string crtPage = "https://commodore-repair-toolbox.dk";
+        private string crtPageAutoUpdate = "/auto-update/";
+        private string crtPageFeedback = "/feedback-app/";
 
         // HTML code for all tabs using "WebView2" component for content
         private string htmlForTabs = @"
@@ -79,16 +83,22 @@ namespace Commodore_Repair_Toolbox
         // Version information
         private string versionThis = "";
         private string versionOnline = "";
+        private string versionOnlineTxt = "";
 
         // Current user selection
         public string hardwareSelectedName;
         private string hardwareSelectedFolder;
         private string boardSelectedName;
         private string boardSelectedFolder;
-        private string imageSelectedName;
-        private string imageSelectedFile;
+        private string boardSelectedFilename;
+        private string schematicSelectedName;
+        private string schematicSelectedFile;
         private float zoomFactor = 1.0f;
         private Point overlayPanelLastMousePos = Point.Empty;
+
+        // Misc
+        private Dictionary<Control, EventHandler> clickEventHandlers = new Dictionary<Control, EventHandler>();
+        private TabPage previousTab;
 
 
         // ###########################################################################################
@@ -124,11 +134,8 @@ namespace Commodore_Repair_Toolbox
             LoadExcelData();
             LoadConfigFile();
 
-            // Populate the "Hardware" combobox with data from Excel
-            PopulateHardwareCombobox();
-
-            // Attach various event handles
-            AttachEventHandlers();
+            // Attach "form load" event, which is triggered just before form is shown
+            Load += Form_Load;
         }
 
 
@@ -144,11 +151,9 @@ namespace Commodore_Repair_Toolbox
             {
                 this.WindowState = state;
             }
+                        
+            ApplyConfigSettings();
 
-            // Set default value for the splitter (need the UI to be initialized before I really can set it)
-            defaultConfigurationSplitterPosition = (splitContainerSchematics.Width * 0.9).ToString();
-
-            ApplySavedSettings();
             AttachConfigurationSaveEvents();
 
             tabControl.Dock = DockStyle.Fill;
@@ -158,6 +163,14 @@ namespace Commodore_Repair_Toolbox
 
             // Initialize the blink timer
             InitializeBlinkTimer();
+
+            // Attach various event handles
+            AttachEventHandlers();
+        }
+
+        private void Form_Shown(object sender, EventArgs e)
+        {
+            ReadaptThumbnails();
         }
 
 
@@ -223,7 +236,7 @@ namespace Commodore_Repair_Toolbox
                 WebClient webClient = new WebClient();
                 ServicePointManager.Expect100Continue = true;
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
-                webClient.Headers.Add("user-agent", ("CRT " + versionThis).Trim());
+                webClient.Headers.Add("user-agent", "CRT "+ versionThis);
 
                 // Have some control POST data
                 var postData = new System.Collections.Specialized.NameValueCollection
@@ -232,7 +245,7 @@ namespace Commodore_Repair_Toolbox
                 };
 
                 // Send the POST data to the server
-                byte[] responseBytes = webClient.UploadValues(urlCheckOnlineVersion, postData);
+                byte[] responseBytes = webClient.UploadValues(crtPage + crtPageAutoUpdate, postData);
 
                 // Convert the "response bytes" to a human readable string
                 onlineAvailableVersion = Encoding.UTF8.GetString(responseBytes);
@@ -244,13 +257,39 @@ namespace Commodore_Repair_Toolbox
                     {
                         tabAbout.Text = "About*";
                         versionOnline = onlineAvailableVersion;
+                        versionOnlineTxt = "<font color='IndianRed'>";
+                        versionOnlineTxt += $"There is a newer version available online: <b>" + versionOnline + @"</b ><br />";
+                        versionOnlineTxt += "View the <i>Changelog</i> and download the new version from here, <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases' target='_blank'> https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases</a><br />";
+                        versionOnlineTxt += "<br />";
+                        versionOnlineTxt += "</font>";
+                    } else
+                    {
+                        versionOnline = "";
                     }
+                } else
+                {
+                    tabAbout.Text = "About*";
+                    versionOnlineTxt = "<font color='IndianRed'>";
+                    versionOnlineTxt += "<hr>";
+                    versionOnlineTxt += "ERROR:<br />";
+                    versionOnlineTxt += $"It was not possible to check for a newer version, as the server connection to <a href='https://commodore-repair-toolbox.dk' target='_blank'>https://commodore-repair-toolbox.dk</a> cannot be established - please check your connectivity.<br />The exact recieved HTTP error is:<br /><br /><b>{onlineAvailableVersion}</b>";
+                    versionOnlineTxt += "<hr>";
+                    versionOnlineTxt += "<br />";
+                    versionOnlineTxt += "</font>";
                 }
             }
             catch (Exception ex)
             {
                 DebugOutput("EXCEPTION in \"GetOnlineVersion()\":");
                 DebugOutput(ex.ToString());
+                tabAbout.Text = "About*";
+                versionOnlineTxt = "<font color='IndianRed'>";
+                versionOnlineTxt += "<hr>";
+                versionOnlineTxt += "ERROR:<br />";
+                versionOnlineTxt += $"It was not possible to check for a newer version, as the server connection to <a href='https://commodore-repair-toolbox.dk' target='_blank'>https://commodore-repair-toolbox.dk</a> cannot be established - please check your connectivity.<br />The exact recieved HTTP error is:<br /><br /><b>{ex.Message}</b>";
+                versionOnlineTxt += "<hr>";
+                versionOnlineTxt += "<br />";
+                versionOnlineTxt += "</font>";
             }
         }
                 
@@ -308,38 +347,27 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
-        // Populate the "Hardware" combobox with data from Excel.
-        // ###########################################################################################
-
-        private void PopulateHardwareCombobox()
-        {
-            foreach (Hardware hardware in classHardware)
-            {
-                comboBoxHardware.Items.Add(hardware.Name);
-            }
-            comboBoxHardware.SelectedIndex = 0;
-            hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
-        }
-
-
-        // ###########################################################################################
         // Attach necessary event handlers.
         // ###########################################################################################
 
         private void AttachEventHandlers()
         {
-            Load += Form_Load;
+//            Load += Form_Load;
             FormClosing += Main_FormClosing;
             ResizeBegin += Form_ResizeBegin;
             ResizeEnd += Form_ResizeEnd;
             checkBoxBlink.CheckedChanged += CheckBoxBlink_CheckedChanged;
             textBoxFilterComponents.TextChanged += TextBoxFilterComponents_TextChanged;
-            panelListAutoscroll.Layout += PanelListAutoscroll_Layout;
+//            panelListAutoscroll.Layout += PanelListAutoscroll_Layout;
             splitContainerSchematics.Paint += SplitContainer1_Paint;
             comboBoxHardware.DropDownClosed += ComboBox_DropDownClosed;
             comboBoxBoard.DropDownClosed += ComboBox_DropDownClosed;
             listBoxCategories.SelectedIndexChanged += ListBoxCategories_SelectedIndexChanged;
             AttachClickEventsToFocusFilterComponents(this);
+            textBox3.TextChanged += TextBox3_TextChanged;
+            tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
+            splitContainerSchematics.SplitterMoved += SplitContainer1_SplitterMoved;
+            this.Shown += new EventHandler(Form_Shown);
         }
 
 
@@ -352,11 +380,14 @@ namespace Commodore_Repair_Toolbox
         {
             if (!(parent is ComboBox))
             {
-//                if (!string.IsNullOrEmpty(parent.Name)) // do not attach components without any name
-//                {           
-//                    Debug.WriteLine("AttachClickEventHandlers: " + (string.IsNullOrEmpty(parent.Name) ? "[Unnamed " + parent.GetType().Name + "]" : parent.Name));
-                    parent.Click += (s, e) => textBoxFilterComponents.Focus();
-//                }
+                //                if (!string.IsNullOrEmpty(parent.Name)) // do not attach components without any name
+                //                {           
+                //                    Debug.WriteLine("AttachClickEventHandlers: " + (string.IsNullOrEmpty(parent.Name) ? "[Unnamed " + parent.GetType().Name + "]" : parent.Name));
+                //parent.Click += (s, e) => textBoxFilterComponents.Focus();
+                EventHandler handler = (s, e) => textBoxFilterComponents.Focus();
+                parent.Click += handler;
+                clickEventHandlers[parent] = handler;
+                //                }
             }
             foreach (Control child in parent.Controls)
             {
@@ -365,6 +396,15 @@ namespace Commodore_Repair_Toolbox
                     AttachClickEventsToFocusFilterComponents(child);
                 }
             }
+        }
+
+        private void RemoveClickEventsToFocusFilterComponents()
+        {
+            foreach (var kvp in clickEventHandlers)
+            {
+                kvp.Key.Click -= kvp.Value;
+            }
+            clickEventHandlers.Clear();
         }
 
 
@@ -389,18 +429,245 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
-        // Initialize and update the tab for "Ressources.
+        // Initialize and update the tab for "Overview".
         // Will load new content from board data file.
         // ###########################################################################################
 
-        private EventHandler<CoreWebView2WebMessageReceivedEventArgs> _fileOpenHandler;
-        private EventHandler<CoreWebView2NewWindowRequestedEventArgs> _urlHandler;
+        private EventHandler<CoreWebView2WebMessageReceivedEventArgs> _componentHandlerOverview;
+        private EventHandler<CoreWebView2WebMessageReceivedEventArgs> _fileOpenHandlerOverview;
+        private EventHandler<CoreWebView2NewWindowRequestedEventArgs> _urlHandlerOverview;
+
+        private async void UpdateTabOverview(Board selectedBoard)
+        {
+            if (webView2Overview.CoreWebView2 == null)
+            {
+                await webView2Overview.EnsureCoreWebView2Async(null);
+            }
+
+            string htmlContent = @"
+                <html>
+                <head>
+                <meta charset='UTF-8'>
+                <script>
+                    document.addEventListener('click', function(e) {
+                    var target = e.target;
+                    if (target.tagName.toLowerCase() === 'a' && target.href.startsWith('file://')) {
+                        e.preventDefault();
+                        window.chrome.webview.postMessage('openFile:' + target.href);
+                    }
+                    if (target.matches('[data-compLabel]')) {
+                        var compLabel = target.getAttribute('data-compLabel');
+                        window.chrome.webview.postMessage('openComp:' + compLabel);
+                    }
+                    });
+                </script>
+                <style>
+                body { overflow-x: hidden; }
+                table { border-collapse: collapse; }
+                thead {
+                    position: sticky;
+                    top: 0;
+                    background-color: #DDD;
+                    z-index: 20;
+                }
+                tbody tr:hover { background-color: #f2f2f2; }
+                th { 
+                    text-align: left; 
+                    color: black;
+                }
+                th, td { 
+                    padding: 4px 10px; 
+                    font-size: 11pt;
+                }
+                td[data-compLabel] {
+                    color: #0645AD;
+                    cursor: pointer;
+                }
+                td[data-compLabel]:hover { color: #0B0080; }
+                .tooltip-link {
+                    position: relative;
+                    cursor: pointer;
+                    text-decoration: none;
+                }
+                .tooltip-link::after {
+                    content: attr(data-title);
+                    position: absolute;
+                    bottom: 100%;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: black;
+                    color: white;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    white-space: nowrap;
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity 0.1s ease-in-out;
+                    font-size: 15px;
+                    z-index: 10;
+                }
+                .tooltip-link:hover::after { opacity: 1; }
+                </style>
+                </head>
+                <body>
+                " + htmlForTabs + @"
+                <h1>Overview of components</h1><br />
+            ";
+
+            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            if (foundBoard != null)
+            {
+                if (foundBoard?.Components != null)
+                {
+                    htmlContent += "<table width='100%' border='1'>";
+                    htmlContent += "<thead>";
+                    htmlContent += "<tr>";
+                    htmlContent += "<th>Type</th>";
+                    htmlContent += "<th>Component</th>";
+                    htmlContent += "<th>Technical name</th>";
+                    htmlContent += "<th>Friendly name</th>";
+                    htmlContent += "<th>Short descr.</th>";
+                    htmlContent += "<th>Long descr.</th>";
+                    htmlContent += "<th>Local files</th>";
+                    htmlContent += "<th>Web links</th>";
+                    htmlContent += "</tr>";
+                    htmlContent += "</thead>";
+                    htmlContent += "<tbody>";
+
+                    foreach (ComponentBoard comp in foundBoard.Components)
+                    {
+
+                        string compType = comp.Type;
+                        string compLabel = comp.Label;
+                        string compNameTechnical = comp.NameTechnical;
+                        string compNameFriendly = comp.NameFriendly;
+                        string compDescrShort = comp.OneLiner;
+                        string compDescrLong = comp.Description;
+                        compDescrLong = compDescrLong.Replace("\n", "<br />");
+
+                        compNameFriendly = compNameFriendly.Replace("?", "");
+
+                        htmlContent += "<tr>";
+
+                        htmlContent += $"<td valign='top'>{compType}</td>";
+                        htmlContent += $"<td valign='top' data-compLabel='{compLabel}'>{compLabel}</td>";
+                        htmlContent += $"<td valign='top'>{compNameTechnical}</td>";
+                        htmlContent += $"<td valign='top'>{compNameFriendly}</td>";
+                        htmlContent += $"<td valign='top'>{compDescrShort}</td>";
+                        htmlContent += $"<td valign='top'>{compDescrLong}</td>";
+
+                        // Include component local files
+                        htmlContent += "<td valign='top'>";
+                        if (comp.LocalFiles != null && comp.LocalFiles.Count > 0)
+                        {
+                            int counter = 1;
+                            foreach (ComponentLocalFiles file in comp.LocalFiles)
+                            {
+                                string filePath = Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.FileName);
+                                htmlContent += "<a href='file:///" + filePath.Replace(@"\", @"\\") + "' class='tooltip-link' data-title='" + file.Name + "' target='_blank'>#" + counter + "</a> ";
+                                counter++;
+                            }
+                        }
+                        htmlContent += "</td>";
+
+                        // Include component links
+                        htmlContent += "<td valign='top'>";
+                        if (comp.ComponentLinks != null && comp.ComponentLinks.Count > 0)
+                        {
+                            int counter = 1;
+                            foreach (ComponentLinks link in comp.ComponentLinks)
+                            {
+                                htmlContent += "<a href='" + link.Url + "' target='_blank' class='tooltip-link' data-title='"+ link.Name + "'>#" + counter + "</a> ";
+                                counter++;
+                            }
+                        }
+                        htmlContent += "</td>";
+
+                        htmlContent += "</tr>";
+                    }
+
+                    htmlContent += "</tbody>";
+                    htmlContent += "</table>";
+                }
+            }
+
+            htmlContent += "<br />";
+            htmlContent += "</body>";
+            htmlContent += "</html >";
+
+            // ---
+            // Make sure we only have one handler for the "open*" message (seems
+            // to be an issue where it can trigger an event multiple times!?
+
+            if (_componentHandlerOverview != null)
+            {
+                webView2Overview.CoreWebView2.WebMessageReceived -= _componentHandlerOverview;
+            }
+            _componentHandlerOverview = (sender, args) =>
+            {
+                string message = args.TryGetWebMessageAsString();
+                if (message.StartsWith("openComp:"))
+                {
+                    string compName = message.Substring("openComp:".Length);
+                    ComponentBoard selectedComp = foundBoard.Components.FirstOrDefault(c => c.Label == compName);
+                    if (selectedComp != null)
+                    {
+                        FormComponent componentInfoPopup = new FormComponent(selectedComp, hardwareSelectedFolder, boardSelectedFolder);
+                        componentInfoPopup.Show(this);
+                        componentInfoPopup.TopMost = true;
+                    }
+                }
+            };
+            webView2Overview.CoreWebView2.WebMessageReceived += _componentHandlerOverview;
+
+            // Handle the "file" handler
+            if (_fileOpenHandlerOverview != null)
+            {
+                webView2Overview.CoreWebView2.WebMessageReceived -= _fileOpenHandlerOverview;
+            }
+            _fileOpenHandlerOverview = (sender, args) =>
+            {
+                string message = args.TryGetWebMessageAsString();
+                if (message.StartsWith("openFile:"))
+                {
+                    string fileUrl = message.Substring("openFile:".Length);
+                    Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
+                }
+            };
+            webView2Overview.CoreWebView2.WebMessageReceived += _fileOpenHandlerOverview;
+
+            // Handle the "URL" handler
+            if (_urlHandlerOverview != null)
+            {
+                webView2Overview.CoreWebView2.NewWindowRequested -= _urlHandlerOverview;
+            }
+            _urlHandlerOverview = (sender, args) =>
+            {
+                args.Handled = true; // prevent the default behavior
+                Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
+            };
+            webView2Overview.CoreWebView2.NewWindowRequested += _urlHandlerOverview;
+
+            // ---
+
+            webView2Overview.NavigateToString(htmlContent);
+        }
+
+
+        // ###########################################################################################
+        // Initialize and update the tab for "Ressources".
+        // Will load new content from board data file.
+        // ###########################################################################################
+
+        private EventHandler<CoreWebView2WebMessageReceivedEventArgs> _fileOpenHandlerRessources;
+        private EventHandler<CoreWebView2NewWindowRequestedEventArgs> _urlHandlerRessources;
 
         private async void UpdateTabRessources(Board selectedBoard)
         {
-            if (webView21.CoreWebView2 == null)
+            if (webView2Ressources.CoreWebView2 == null)
             {
-                await webView21.EnsureCoreWebView2Async(null);
+                await webView2Ressources.EnsureCoreWebView2Async(null);
             }
             
             string htmlContent = @"
@@ -478,11 +745,11 @@ namespace Commodore_Repair_Toolbox
             // to be an issue where it can trigger an event multiple times!?
 
             // Handle the "file" handler
-            if (_fileOpenHandler != null)
+            if (_fileOpenHandlerRessources != null)
             {
-                webView21.CoreWebView2.WebMessageReceived -= _fileOpenHandler;
+                webView2Ressources.CoreWebView2.WebMessageReceived -= _fileOpenHandlerRessources;
             }
-            _fileOpenHandler = (sender, args) =>
+            _fileOpenHandlerRessources = (sender, args) =>
             {
                 string message = args.TryGetWebMessageAsString();
                 if (message.StartsWith("openFile:"))
@@ -491,23 +758,23 @@ namespace Commodore_Repair_Toolbox
                     Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
                 }
             };
-            webView21.CoreWebView2.WebMessageReceived += _fileOpenHandler;
+            webView2Ressources.CoreWebView2.WebMessageReceived += _fileOpenHandlerRessources;
 
             // Handle the "URL" handler
-            if (_urlHandler != null)
+            if (_urlHandlerRessources != null)
             {
-                webView21.CoreWebView2.NewWindowRequested -= _urlHandler;
+                webView2Ressources.CoreWebView2.NewWindowRequested -= _urlHandlerRessources;
             }
-            _urlHandler = (sender, args) =>
+            _urlHandlerRessources = (sender, args) =>
             {
                 args.Handled = true; // prevent the default behavior
                 Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
             };
-            webView21.CoreWebView2.NewWindowRequested += _urlHandler;
+            webView2Ressources.CoreWebView2.NewWindowRequested += _urlHandlerRessources;
 
             // ---
 
-            webView21.NavigateToString(htmlContent);
+            webView2Ressources.NavigateToString(htmlContent);
         }
 
         // ###########################################################################################
@@ -516,9 +783,9 @@ namespace Commodore_Repair_Toolbox
 
         private async void InitializeTabHelp()
         {
-            if (webView22.CoreWebView2 == null)
+            if (webView2Help.CoreWebView2 == null)
             {
-                await webView22.EnsureCoreWebView2Async(null);
+                await webView2Help.EnsureCoreWebView2Async(null);
             }
 
             string htmlContent = @"
@@ -546,7 +813,7 @@ namespace Commodore_Repair_Toolbox
                 <ul>
                 <li><b>F11</b> will toggle fullscreen</li>
                 <li><b>ESCAPE</b> will exit fullscreen or close popup component information</li>
-                <li><b>SPACE</b> will toggle blinking for selected components</li>
+                <li><b>SPACE</b> will toggle blinking for selected components (does not apply in ""Feedback"" tab)</li>
                 <li>Focus cursor in input field, and type, to filter component list</li>
                 </ul>
                 <br />
@@ -590,13 +857,13 @@ namespace Commodore_Repair_Toolbox
             ";
 
             // Open URLs in default web browser
-            webView22.CoreWebView2.NewWindowRequested += (sender, args) =>
+            webView2Help.CoreWebView2.NewWindowRequested += (sender, args) =>
             {
                 args.Handled = true; // do not render in internal browser mode
                 Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
             };
 
-            webView22.NavigateToString(htmlContent);
+            webView2Help.NavigateToString(htmlContent);
         }
 
 
@@ -606,13 +873,13 @@ namespace Commodore_Repair_Toolbox
 
         private async void InitializeTabAbout()
         {
-            if (webView23.CoreWebView2 == null)
+            if (webView2About.CoreWebView2 == null)
             {
-                await webView23.EnsureCoreWebView2Async(null);
+                await webView2About.EnsureCoreWebView2Async(null);
             }
 
-            string versionOnlineTxt = "";
-            if (versionOnline != "")
+            /*
+            if (versionOnlineTxt != "")
             {
                 versionOnlineTxt = @"
                     <font color='IndianRed'>
@@ -622,6 +889,7 @@ namespace Commodore_Repair_Toolbox
                     <br />
                 ";
             }
+            */
 
             string htmlContent = @"
                 <html>
@@ -640,7 +908,7 @@ namespace Commodore_Repair_Toolbox
                 All programming done by Dennis Helligsø (dennis@commodore-repair-toolbox.dk).<br />
                 <br />
 
-                Visit project home page at <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox' target='_blank'>https://github.com/HovKlan-DH/Commodore-Repair-Toolbox</a><br />
+                Visit official project home page at <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox' target='_blank'>https://github.com/HovKlan-DH/Commodore-Repair-Toolbox</a><br />
                 <br />
                 
                 </body>
@@ -648,13 +916,13 @@ namespace Commodore_Repair_Toolbox
             ";
 
             // Open URLs in default web browser
-            webView23.CoreWebView2.NewWindowRequested += (sender, args) =>
+            webView2About.CoreWebView2.NewWindowRequested += (sender, args) =>
             {
                 args.Handled = true; // do not render in internal browser mode
                 Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
             };
 
-            webView23.NavigateToString(htmlContent);
+            webView2About.NavigateToString(htmlContent);
         }
 
 
@@ -729,7 +997,7 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
-        // Blink handling
+        // Blink handling.
         // ###########################################################################################
 
         private void CheckBoxBlink_CheckedChanged(object sender, EventArgs e)
@@ -806,7 +1074,44 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
+
+        // ###########################################################################################
+        // Handle input of email address in "Feedback" tab.
+        // ###########################################################################################
+
+        private void TextBox3_TextChanged(object sender, EventArgs e)
+        {
+            string email = textBox3.Text;
+            Configuration.SaveSetting("UserEmail", email);
+        }
+
+
+        // ###########################################################################################
+        // Changing tab.
+        // ###########################################################################################
+
+        private void TabControl_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (previousTab == tabFeedback && tabControl.SelectedTab != tabFeedback)
+            {
+                // Changed TO tabFeedback
+                textBoxFilterComponents.TextChanged += TextBoxFilterComponents_TextChanged;
+                AttachClickEventsToFocusFilterComponents(this);
+                textBoxFilterComponents.Focus();
+            }
+            else if (previousTab != tabFeedback && tabControl.SelectedTab == tabFeedback)
+            {
+                // Changed away FROM tabFeedback
+                textBoxFilterComponents.TextChanged -= TextBoxFilterComponents_TextChanged;
+                RemoveClickEventsToFocusFilterComponents();
+                textBox4.Focus();
+            }
+
+            previousTab = tabControl.SelectedTab;
+        }
         
+
+
 
 
 
@@ -858,7 +1163,7 @@ namespace Commodore_Repair_Toolbox
             this.UpdateStyles();
 
             panelMain.DoubleBuffered(true);
-            panelListMain.DoubleBuffered(true);
+            //panelListMain.DoubleBuffered(true);
             panelListAutoscroll.DoubleBuffered(true);
         }
 
@@ -868,24 +1173,59 @@ namespace Commodore_Repair_Toolbox
 
         // ---------------------------------------------------------------------
         // Apply saved settings to controls
-        private void ApplySavedSettings()
-        {
-            // Load saved settings for combo boxes, splitter, and selected image
-            string splitterPosVal = Configuration.GetSetting("SplitterPosition", defaultConfigurationSplitterPosition);
-            string comboBox1Val = Configuration.GetSetting("HardwareSelected", "0");
-            string comboBox2Val = Configuration.GetSetting("BoardSelected", "0");
-            string selectedImageVal = Configuration.GetSetting("SelectedThumbnail", "");
 
-            // Check if last viewed schematic is still available in data - if not
-            // then select the first available schematic
+        private void ApplyConfigSettings()
+        {
+            // Set default values first
+            string defaultSelectedHardware = classHardware.FirstOrDefault()?.Name;
+            string defaultSelectedBoard = classHardware.FirstOrDefault(h => h.Name == defaultSelectedHardware)?.Boards?.FirstOrDefault()?.Name;
+            string defaultSelectedSchematic = classHardware.FirstOrDefault(h => h.Name == defaultSelectedHardware)?.Boards?.FirstOrDefault(b => b.Name == defaultSelectedBoard)?.Files?.FirstOrDefault()?.Name;
+            string defaultSplitterPos = (splitContainerSchematics.Width * 0.9).ToString(); // 90% of full width
+
+            // Load saved settings from configuration file - or set default if none exists
+            string selectedHardwareVal = Configuration.GetSetting("HardwareSelected", defaultSelectedHardware);
+            string selectedBoardVal = Configuration.GetSetting("BoardSelected", defaultSelectedBoard);
+            string selectedSchematicVal = Configuration.GetSetting("SelectedThumbnail", defaultSelectedSchematic);
+            string splitterPosVal = Configuration.GetSetting("SplitterPosition", defaultSplitterPos);
+            string userEmail = Configuration.GetSetting("UserEmail", "");
+
+            textBox3.Text = userEmail; // set email address in "Feedback" tab
+
+            // Populate all hardware in combobox - and select
+            foreach (Hardware hardware in classHardware)
+            {
+                comboBoxHardware.Items.Add(hardware.Name);
+            }
+            int indexHardware = comboBoxHardware.Items.IndexOf(selectedHardwareVal);
+            comboBoxHardware.SelectedIndex = indexHardware;
+            hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
+            textBox5.Text = hardwareSelectedName; // feedback info           
+
+            // Populate all boards in combobox, based on selected hardware - and select
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            if (hw != null)
+            {
+                foreach (var board in hw.Boards)
+                {
+                    comboBoxBoard.Items.Add(board.Name);
+                }
+                int indexBoard = comboBoxBoard.Items.IndexOf(selectedBoardVal);
+                comboBoxBoard.SelectedIndex = indexBoard;
+                boardSelectedName = comboBoxBoard.SelectedItem.ToString();
+                textBox1.Text = boardSelectedName; // feedback info           
+            }
+
+            // Set the selected schematic
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (bd != null)
             {
-                var file = bd.Files.FirstOrDefault(f => f.Name == selectedImageVal) ?? bd.Files.FirstOrDefault();
-                if (file != null)
+                var schematic = bd.Files.FirstOrDefault(f => f.Name == selectedSchematicVal) ?? bd.Files.FirstOrDefault();
+                if (schematic != null)
                 {
-                    selectedImageVal = file.Name;
+                    //selectedSchematicVal = schematic.Name;
+                    schematicSelectedName = schematic.Name;
+                    boardSelectedFilename = Path.GetFileName(bd.Datafile); // feedback info
+                    LoadSelectedImage();
                 }
             }
 
@@ -893,33 +1233,7 @@ namespace Commodore_Repair_Toolbox
             if (int.TryParse(splitterPosVal, out int splitterPosition) && splitterPosition > 0)
             {
                 splitContainerSchematics.SplitterDistance = splitterPosition;
-            }
-
-            // Apply combobox selections
-            if (int.TryParse(comboBox1Val, out int comboBox1Index) && comboBox1Index >= 0 && comboBox1Index < comboBoxHardware.Items.Count)
-            {
-                comboBoxHardware.SelectedIndex = comboBox1Index;
-            }
-            else
-            {
-                comboBoxHardware.SelectedIndex = 0;
-            }
-
-            if (int.TryParse(comboBox2Val, out int comboBox2Index) && comboBox2Index >= 0 && comboBox2Index < comboBoxBoard.Items.Count)
-            {
-                comboBoxBoard.SelectedIndex = comboBox2Index;
-            }
-            else
-            {
-                comboBoxBoard.SelectedIndex = 0;
-            }
-
-            // Apply selected image if exists
-            if (!string.IsNullOrEmpty(selectedImageVal))
-            {
-                imageSelectedName = selectedImageVal;
-                LoadSelectedImage();
-            }
+            }            
         }
 
         // ---------------------------------------------------------------------
@@ -930,11 +1244,11 @@ namespace Commodore_Repair_Toolbox
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (bd != null)
             {
-                var file = bd.Files.FirstOrDefault(f => f.Name == imageSelectedName);
+                var file = bd.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
                 if (file != null)
                 {
-                    imageSelectedFile = file.FileName;
-                    InitializeTabMain();  // Load the selected image
+                    schematicSelectedFile = file.FileName;
+                    InitializeTabMain();
                 }
             }
         }
@@ -946,12 +1260,14 @@ namespace Commodore_Repair_Toolbox
             // Save combo box selections
             comboBoxHardware.SelectedIndexChanged += (s, e) =>
             {
-                Configuration.SaveSetting("HardwareSelected", comboBoxHardware.SelectedIndex.ToString());
+                //Configuration.SaveSetting("HardwareSelected", comboBoxHardware.SelectedIndex.ToString());
+                Configuration.SaveSetting("HardwareSelected", hardwareSelectedName);
             };
 
             comboBoxBoard.SelectedIndexChanged += (s, e) =>
             {
-                Configuration.SaveSetting("BoardSelected", comboBoxBoard.SelectedIndex.ToString());
+                //Configuration.SaveSetting("BoardSelected", comboBoxBoard.SelectedIndex.ToString());
+                Configuration.SaveSetting("BoardSelected", boardSelectedName);
             };
 
             // Save splitter position
@@ -960,14 +1276,16 @@ namespace Commodore_Repair_Toolbox
                 Configuration.SaveSetting("SplitterPosition", splitContainerSchematics.SplitterDistance.ToString());
             };
 
+            /*
             // Save selected image when changed
             panelListAutoscroll.ControlAdded += (s, e) =>
             {
-                if (e.Control is Panel panel && panel.Name == imageSelectedName)
+                if (e.Control is Panel panel && panel.Name == schematicSelectedName)
                 {
-                    Configuration.SaveSetting("ThumbnailImage", imageSelectedName);
+                    Configuration.SaveSetting("ThumbnailImage", schematicSelectedName);
                 }
             };
+            */
         }
 
 
@@ -1048,24 +1366,19 @@ namespace Commodore_Repair_Toolbox
 
         private void ShowComponentPopup(ComponentBoard comp)
         {
-            // If an old popup is still open, close it
-            if (componentInfoPopup != null && !componentInfoPopup.IsDisposed)
-            {
-                componentInfoPopup.Close();
-            }
-
-            // Create new popup
-            componentInfoPopup = new FormComponent(comp, hardwareSelectedFolder, boardSelectedFolder);
-
             // Show it modeless (non-blocking)
             string title = "";
             title = comp.Label;
-            title += comp.NameTechnical != "?" ? " | "+comp.NameTechnical : "";
+            title += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
             title += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
 
+            // Create new popup
+            componentInfoPopup = new FormComponent(comp, hardwareSelectedFolder, boardSelectedFolder);
             componentInfoPopup.Text = title;
-            componentInfoPopup.Show();
+            componentInfoPopup.Show(this);
+            componentInfoPopup.TopMost = true;
         }
+
 
         // ---------------------------------------------------------------------
         // Setup new board after user selects in comboBox2
@@ -1074,6 +1387,7 @@ namespace Commodore_Repair_Toolbox
         {
 
             boardSelectedName = comboBoxBoard.SelectedItem.ToString();
+            textBox1.Text = boardSelectedName; // feedback info
 
             var selectedHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var selectedBoard = selectedHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
@@ -1083,8 +1397,9 @@ namespace Commodore_Repair_Toolbox
             boardSelectedFolder = selectedBoard.Folder;
 
             // Default to first file
-            imageSelectedName = selectedBoard.Files.FirstOrDefault()?.Name;
-            imageSelectedFile = selectedBoard.Files.FirstOrDefault()?.FileName;
+            schematicSelectedName = selectedBoard.Files.FirstOrDefault()?.Name;
+            schematicSelectedFile = selectedBoard.Files.FirstOrDefault()?.FileName;
+            textBox2.Text = schematicSelectedName; // feedback info
 
             // Initialize UI
             InitializeComponentCategories();
@@ -1107,6 +1422,7 @@ namespace Commodore_Repair_Toolbox
 
             InitializeList();
             InitializeTabMain();
+            UpdateTabOverview(selectedBoard);
             UpdateTabRessources(selectedBoard);
         }
 
@@ -1177,7 +1493,7 @@ namespace Commodore_Repair_Toolbox
         {
             // Load main image
             image = Image.FromFile(
-                Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, imageSelectedFile)
+                Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, schematicSelectedFile)
             );
 
             // Clear old controls
@@ -1192,7 +1508,6 @@ namespace Commodore_Repair_Toolbox
             // Create scrolling container
             panelZoom = new CustomPanel
             {
-                Size = new Size(panelMain.Width - panelListMain.Width - 25, panelMain.Height),
                 AutoScroll = true,
                 Dock = DockStyle.Fill
             };
@@ -1229,7 +1544,7 @@ namespace Commodore_Repair_Toolbox
             labelFile = new Label
             {
                 Name = "labelFile",
-                Text = imageSelectedName,
+                Text = schematicSelectedName,
                 AutoSize = true,
                 BackColor = Color.Khaki,
                 ForeColor = Color.Black,
@@ -1273,102 +1588,167 @@ namespace Commodore_Repair_Toolbox
 
         private void PanelListAutoscroll_Layout(object sender, LayoutEventArgs e)
         {
-            AdjustImageSizes();
+            //ReadaptThumbnails();
         }
 
         private void InitializeList()
         {
+            StackTrace stackTrace = new StackTrace();
+            StackFrame callerFrame = stackTrace.GetFrame(1);
+            MethodBase callerMethod = callerFrame.GetMethod();
+            string callerName = callerMethod.Name;
+            Debug.WriteLine("[InitializeList] called from [" + callerName + "]");
+
+            panelListAutoscroll.AutoScroll = true;
+//            panelListAutoscroll.HorizontalScroll.Enabled = false;
+//            panelListAutoscroll.HorizontalScroll.Visible = false;
+
             panelListAutoscroll.Controls.Clear();
             overlayPanelsList.Clear();
             overlayListZoomFactors.Clear();
 
+            // Find relevant schematic images to show here
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (bd == null) return;
 
-            int yPosition = 5;
-            int availableWidth = panelListAutoscroll.ClientSize.Width - SystemInformation.VerticalScrollBarWidth;
-
-            foreach (BoardFileOverlays file in bd.Files)
+            // Walkthrough each schematic image for this board
+            foreach (BoardFileOverlays schematic in bd.Files)
             {
-                string path = Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.FileName);
-                Image image2 = Image.FromFile(path);
+                string filename = Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, schematic.FileName);
 
-                Panel thumbnailContainer = new Panel
+                // Panel that will hold the label and the image
+                Panel panelThumbnail = new Panel
                 {
-                    Name = file.Name + "_container",
+                    Name = schematic.Name + "_container",
                     BorderStyle = BorderStyle.FixedSingle,
-                    Location = new Point(0, yPosition),
                     Padding = new Padding(3),
-                    Margin = new Padding(0),
-                    Width = availableWidth,
-                    Height = 150
+                    //Margin = new Padding(0),
                 };
-                thumbnailContainer.DoubleBuffered(true);
 
-                Label labelListFile = new Label
+                Label labelThumbnail = new Label
                 {
-                    Text = file.Name,
+                    Text = schematic.Name,
                     AutoSize = false,
                     Dock = DockStyle.Top,
                     BorderStyle = BorderStyle.FixedSingle,
                     BackColor = Color.Khaki,
                     ForeColor = Color.Black,
                     Font = new Font("Calibri", 9),
-                    Padding = new Padding(2),
+                    //Padding = new Padding(0),
                     Height = 20
                 };
-                labelListFile.DoubleBuffered(true);
-                thumbnailContainer.Controls.Add(labelListFile);
 
-                Panel panelList2 = new Panel
+                Panel panelImage = new Panel
                 {
-                    Name = file.Name,
-                    BackgroundImage = Image.FromFile(path),
+                    Name = schematic.Name,
+                    BackgroundImage = Image.FromFile(filename),
                     BackgroundImageLayout = ImageLayout.Zoom,
-                    Dock = DockStyle.Fill,
-                    Margin = new Padding(0)
+                    //Dock = DockStyle.Fill,
+                    Dock = DockStyle.None,
+                    //Margin = new Padding(0)
                 };
-                panelList2.DoubleBuffered(true);
 
-                OverlayPanel overlayPanelList = new OverlayPanel
+                // Overlay panel for the image that will ensure we can click anywhere on the image (to select it)
+                OverlayPanel overlayPanel = new OverlayPanel
                 {
                     Dock = DockStyle.Fill
                 };
 
-                overlayPanelList.OverlayPanelMouseDown += (s, e2) =>
+                // Add panels to each other
+                panelListAutoscroll.Controls.Add(panelThumbnail);
+                panelThumbnail.Controls.Add(labelThumbnail);
+                panelThumbnail.Controls.Add(panelImage);
+                panelImage.Controls.Add(overlayPanel);
+
+                overlayPanelsList[schematic.Name] = overlayPanel;
+
+                panelThumbnail.DoubleBuffered(true);
+                labelThumbnail.DoubleBuffered(true);
+                panelImage.DoubleBuffered(true);
+                overlayPanel.DoubleBuffered(true);
+
+                // Attach "MouseDown" event to the overlay panel
+                overlayPanel.OverlayPanelMouseDown += (s, e2) =>
                 {
                     if (e2.Button == MouseButtons.Left)
-                        OnListImageLeftClicked(panelList2);
-                };
+                        OnListImageLeftClicked(panelImage);
+                };                
 
-                overlayPanelList.OverlayClicked += (s, e2) =>
+                // Attach "OverlayClicked" event to the overlay panel
+                overlayPanel.OverlayClicked += (s, e2) =>
                 {
                     if (e2.MouseArgs.Button == MouseButtons.Left)
-                        OnListImageLeftClicked(panelList2);
+                        OnListImageLeftClicked(panelImage);
                 };
-
-                panelList2.Controls.Add(overlayPanelList);
-                overlayPanelsList[file.Name] = overlayPanelList;
-                overlayListZoomFactors[file.Name] = 1.0f;
-
-                panelList2.BackgroundImage = Image.FromFile(path);
-                panelList2.BackgroundImageLayout = ImageLayout.Zoom;
-
-                thumbnailContainer.Controls.Add(panelList2);
-                panelListAutoscroll.Controls.Add(thumbnailContainer);
-
-                yPosition += thumbnailContainer.Height + 10;
             }
 
-            panelListAutoscroll.AutoScroll = true;
-            panelListAutoscroll.HorizontalScroll.Enabled = false;
-            panelListAutoscroll.HorizontalScroll.Visible = false;
-
-            AdjustImageSizes();
+            ReadaptThumbnails(); 
             DrawBorderInList();
             HighlightOverlays("list");
         }
+        private void ReadaptThumbnails()
+        {
+            StackTrace stackTrace = new StackTrace();
+            StackFrame callerFrame = stackTrace.GetFrame(1);
+            MethodBase callerMethod = callerFrame.GetMethod();
+            string callerName = callerMethod.Name;
+            Debug.WriteLine("[ReadaptThumbnails] called from [" + callerName +"]");
+
+            // Set initial values
+            int scrollbarWidth = 0;
+            if (panelListAutoscroll.VerticalScroll.Visible)
+            {
+                scrollbarWidth = SystemInformation.VerticalScrollBarWidth - 14;
+            }
+            int availableWidthForThumbnail = panelListAutoscroll.ClientSize.Width - scrollbarWidth;
+            int availableHeightForThumbnail = panelListAutoscroll.ClientSize.Height;
+            int yPosition = 5;
+
+            // Walkthrough all (parent) panels (one panel is a thumbnail)
+            foreach (Panel panelThumbnail in panelListAutoscroll.Controls.OfType<Panel>())
+            {
+                Label labelThumbnail = panelThumbnail.Controls[0] as Label;
+                Panel panelImage = panelThumbnail.Controls[1] as Panel;
+
+                int labelHeight = labelThumbnail.Height;
+                float aspectRatio = (float)panelImage.BackgroundImage.Height / panelImage.BackgroundImage.Width;
+                int newImageHeight = (int)(availableWidthForThumbnail * aspectRatio);
+
+              
+                panelThumbnail.Size = new Size(availableWidthForThumbnail, labelHeight + newImageHeight);
+                panelThumbnail.Location = new Point(0, yPosition);
+                panelImage.Size = new Size(availableWidthForThumbnail, newImageHeight - 5);
+                panelImage.Location = new Point(0, labelHeight);
+
+              
+
+                yPosition += panelThumbnail.Height + 10;
+
+                float scaleFactor = (float)panelImage.Width / panelImage.BackgroundImage.Width;
+                string key = panelThumbnail.Name.Replace("_container", "");
+                overlayListZoomFactors[key] = scaleFactor;
+                if (overlayPanelsList.ContainsKey(key))
+                {
+                    overlayPanelsList[key].Bounds = panelImage.ClientRectangle;
+                }
+
+              
+
+            }
+
+            
+
+            //panelListAutoscroll.AutoScrollMinSize = new Size(0, yPosition + 10);
+            HighlightOverlays("list");
+
+            if (panelListAutoscroll.HorizontalScroll.Visible)
+            {
+                //ReadaptThumbnails();
+            }
+        }
+
+
 
         private void RefreshThumbnailLabels()
         {
@@ -1409,58 +1789,22 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        // 2) Call this new method at the end of your UpdateHighlights() method:
-
-        private void AdjustImageSizes()
-        {
-            int scrollbarWidth = panelListAutoscroll.VerticalScroll.Visible
-                ? SystemInformation.VerticalScrollBarWidth - 14
-                : 0;
-            int availableWidth = panelListAutoscroll.ClientSize.Width - scrollbarWidth;
-            int yPosition = 5;
-
-            foreach (Panel container in panelListAutoscroll.Controls.OfType<Panel>())
-            {
-                if (container.Controls.Count < 2) continue;
-                Label lbl = container.Controls[0] as Label;
-                Panel imagePanel = container.Controls[1] as Panel;
-                if (imagePanel?.BackgroundImage == null) continue;
-
-                float aspectRatio = (float)imagePanel.BackgroundImage.Height / imagePanel.BackgroundImage.Width;
-                int newImageHeight = (int)(availableWidth * aspectRatio);
-
-                imagePanel.Bounds = new Rectangle(0, lbl.Height, availableWidth, newImageHeight);
-                container.Size = new Size(availableWidth, lbl.Height + newImageHeight);
-                container.Location = new Point(0, yPosition);
-
-                yPosition += container.Height + 10;
-
-                float scaleFactor = (float)availableWidth / imagePanel.BackgroundImage.Width;
-                string key = container.Name.Replace("_container", "");
-                overlayListZoomFactors[key] = scaleFactor;
-                if (overlayPanelsList.ContainsKey(key))
-                {
-                    overlayPanelsList[key].Bounds = imagePanel.ClientRectangle;
-                }
-            }
-
-            panelListAutoscroll.AutoScrollMinSize = new Size(0, yPosition + 10);
-            HighlightOverlays("list");
-        }
+        
 
         private void OnListImageLeftClicked(Panel pan)
         {
-            imageSelectedName = pan.Name;
-            Configuration.SaveSetting("SelectedThumbnail", imageSelectedName);  // Save selected image
+            schematicSelectedName = pan.Name;
+            Configuration.SaveSetting("SelectedThumbnail", schematicSelectedName);  // Save selected image
+            textBox2.Text = schematicSelectedName; // feedback info
 
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (bd != null)
             {
-                var file = bd.Files.FirstOrDefault(f => f.Name == imageSelectedName);
+                var file = bd.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
                 if (file != null)
                 {
-                    imageSelectedFile = file.FileName;
+                    schematicSelectedFile = file.FileName;
                     InitializeTabMain();  // Load the selected image
                 }
             }
@@ -1481,7 +1825,7 @@ namespace Commodore_Repair_Toolbox
         private void Panel_Paint_Special(object sender, PaintEventArgs e)
         {
             Panel panel = (Panel)sender;
-            string selectedContainer = imageSelectedName + "_container";
+            string selectedContainer = schematicSelectedName + "_container";
             if (panel.Name == selectedContainer)
             {
                 float penWidth = 2;
@@ -1543,10 +1887,11 @@ namespace Commodore_Repair_Toolbox
         // ---------------------------------------------------------------------
         // comboBox events
 
-        private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
+        private void comboBoxHardware_SelectedIndexChanged(object sender, EventArgs e)
         {
             comboBoxBoard.Items.Clear();
             hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
+            textBox5.Text = hardwareSelectedName; // feedback info
 
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             if (hw != null)
@@ -1559,7 +1904,7 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        private void comboBox2_SelectedIndexChanged(object sender, EventArgs e)
+        private void comboBoxBoard_SelectedIndexChanged(object sender, EventArgs e)
         {
             SetupNewBoard();
             UpdateHighlights(); // Clear old highlights
@@ -1671,7 +2016,7 @@ namespace Commodore_Repair_Toolbox
             // Only for the currently selected image
             foreach (BoardFileOverlays bf in bd.Files)
             {
-                if (bf.Name != imageSelectedName) continue;
+                if (bf.Name != schematicSelectedName) continue;
 
                 if (bf?.Components != null)
                 {
@@ -1718,7 +2063,7 @@ namespace Commodore_Repair_Toolbox
                 // Draw overlays on the main image
                 if (overlayPanel == null) return;
 
-                var bf = bd.Files.FirstOrDefault(f => f.Name == imageSelectedName);
+                var bf = bd.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
                 if (bf == null) return;
 
                 overlayPanel.Overlays.Clear();
@@ -1945,9 +2290,10 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        private void splitContainer1_SplitterMoved(object sender, SplitterEventArgs e)
+        private void SplitContainer1_SplitterMoved(object sender, SplitterEventArgs e)
         {
-            InitializeList();
+            //InitializeList();
+            ReadaptThumbnails();
         }
 
         // ---------------------------------------------------------------------------
@@ -2008,7 +2354,7 @@ namespace Commodore_Repair_Toolbox
             }
 
             // Toggle checkBox1 with SPACE key
-            if (keyData == Keys.Space)
+            if (keyData == Keys.Space && tabControl.SelectedTab.Text != "Feedback")
             {
                 checkBoxBlink.Checked = !checkBoxBlink.Checked;
                 return true;
@@ -2080,34 +2426,137 @@ namespace Commodore_Repair_Toolbox
         {
             Configuration.SaveSetting("WindowState", this.WindowState.ToString());
         }
-
-
-        
-
-
-        private void richTextBoxRessources_LinkClicked(object sender, LinkClickedEventArgs e)
-        {
-            try
-            {
-                if (e.LinkText.StartsWith("http://") || e.LinkText.StartsWith("https://"))
-                {
-                    Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
-                }
-                else if (e.LinkText.StartsWith("file:///"))
-                {
-                    string localPath = e.LinkText.Replace("file:///", "").Replace("/", "\\");
-                    Process.Start(new ProcessStartInfo(localPath) { UseShellExecute = true });
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to open link: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
+                
+        /*
         // What is this?
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+        */
+
+        private void button1_Click_1(object sender, EventArgs e)
+        {
+            string email = textBox3.Text;
+            string feedback = textBox4.Text;
+
+            // Validate the email address
+            bool isValidEmail = true;
+            if (email.Length > 0)
+            {
+                isValidEmail = IsValidEmail(email);
+            }
+
+            // Proceed if the email address is empty or valid
+            if (isValidEmail)
+            {
+                var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+                var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+                string boardFile = foundBoard?.Datafile;
+                string excelFilePath = Path.Combine(Application.StartupPath, foundHardware.Folder, boardFile);
+                try
+                {
+                    WebClient webClient = new WebClient();
+                    ServicePointManager.Expect100Continue = true;
+                    ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+                    webClient.Headers.Add("user-agent", "CRT "+ versionThis);
+
+                    // Build the data to send
+                    var data = new NameValueCollection
+                        {
+                            { "version", versionThis },
+                            { "hardware", hardwareSelectedName },
+                            { "board", boardSelectedName },
+                            { "schematic", schematicSelectedName },
+                            { "filename", boardFile },
+                            { "email", email },
+                            { "feedback", feedback }
+                        };
+
+                    // Attach the binary file if the checkbox is checked
+                    if (checkBox1.Checked)
+                    {
+                        byte[] fileBytes = File.ReadAllBytes(excelFilePath);
+                        string fileBase64 = Convert.ToBase64String(fileBytes);
+                        data["attachment"] = fileBase64;
+                    }
+
+                    // Send it to the server
+                    var response = webClient.UploadValues(crtPage + crtPageFeedback, "POST", data);
+                    string resultFromServer = Encoding.UTF8.GetString(response);
+                    if (resultFromServer == "Success")
+                    {
+                        if (email.Length > 0)
+                        {
+                            string txt = "Feedback sent. Please allow for some time, if any response is needed.";
+                            MessageBox.Show(txt,
+                                "OK: Feedback sent",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+                        }
+                        else
+                        {
+                            string txt = "Feedback sent. No response will be given, as you did not specify an email address.";
+                            MessageBox.Show(txt,
+                                "OK: Feedback sent",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+                        }
+                    } else
+                    {
+                        string txt = "No feedback sent - did you fill in some text or attached the Excel data file?";
+                        MessageBox.Show(txt,
+                            "ERROR: Feedback not sent",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
+                    }
+                }
+                catch (WebException ex)
+                {
+                    MessageBox.Show("CRT cannot submit the feedback right now, please retry later. If the issue persists, then you can connect directly with the developer at [dennis@commodore-repair-toolbox.dk]."+ Environment.NewLine + Environment.NewLine + "The exact recieved HTTP error is:" + Environment.NewLine + Environment.NewLine + ex.Message,
+                        "ERROR: Cannot connect with server",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
+
+            }
+            else
+            {
+                string txt = "Invalid email address [" + email + "].";
+                MessageBox.Show(txt,
+                    "ERROR: Feedback not sent",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        // ###########################################################################################
+        // Check if the email address typed in feedback is valid - not a very good check though!
+        // ###########################################################################################
+
+        private static bool IsValidEmail(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return false;
+
+            try
+            {
+                var addr = new System.Net.Mail.MailAddress(email);
+
+                // Ensure the original email matches exactly and contains a valid domain and TLD
+                return addr.Address == email &&
+                       Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$");
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+
+        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        {
+            textBox6.Text = checkBox1.Checked ? boardSelectedFilename : "";
+        }
+
     }
 
     // -------------------------------------------------------------------------

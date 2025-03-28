@@ -33,15 +33,31 @@
             this.tabSchematics = new System.Windows.Forms.TabPage();
             this.splitContainerSchematics = new System.Windows.Forms.SplitContainer();
             this.panelMain = new System.Windows.Forms.Panel();
-            this.panelListMain = new System.Windows.Forms.Panel();
             this.panelListAutoscroll = new System.Windows.Forms.Panel();
+            this.tabOverview = new System.Windows.Forms.TabPage();
+            this.webView2Overview = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.tabRessources = new System.Windows.Forms.TabPage();
-            this.webView21 = new Microsoft.Web.WebView2.WinForms.WebView2();
+            this.webView2Ressources = new Microsoft.Web.WebView2.WinForms.WebView2();
+            this.tabFeedback = new System.Windows.Forms.TabPage();
+            this.label9 = new System.Windows.Forms.Label();
+            this.button2 = new System.Windows.Forms.Button();
+            this.textBox6 = new System.Windows.Forms.TextBox();
+            this.label8 = new System.Windows.Forms.Label();
+            this.textBox4 = new System.Windows.Forms.TextBox();
+            this.checkBox1 = new System.Windows.Forms.CheckBox();
+            this.textBox5 = new System.Windows.Forms.TextBox();
+            this.label6 = new System.Windows.Forms.Label();
+            this.textBox3 = new System.Windows.Forms.TextBox();
+            this.textBox2 = new System.Windows.Forms.TextBox();
+            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.label4 = new System.Windows.Forms.Label();
+            this.label3 = new System.Windows.Forms.Label();
+            this.label2 = new System.Windows.Forms.Label();
+            this.label1 = new System.Windows.Forms.Label();
             this.tabHelp = new System.Windows.Forms.TabPage();
-            this.webView22 = new Microsoft.Web.WebView2.WinForms.WebView2();
+            this.webView2Help = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.tabAbout = new System.Windows.Forms.TabPage();
-            this.webView23 = new Microsoft.Web.WebView2.WinForms.WebView2();
-            this.richTextBoxHelp = new System.Windows.Forms.RichTextBox();
+            this.webView2About = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.comboBoxHardware = new System.Windows.Forms.ComboBox();
             this.labelHardware = new System.Windows.Forms.Label();
             this.labelBoard = new System.Windows.Forms.Label();
@@ -64,20 +80,24 @@
             this.splitContainerSchematics.Panel1.SuspendLayout();
             this.splitContainerSchematics.Panel2.SuspendLayout();
             this.splitContainerSchematics.SuspendLayout();
-            this.panelListMain.SuspendLayout();
+            this.tabOverview.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.webView2Overview)).BeginInit();
             this.tabRessources.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.webView21)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.webView2Ressources)).BeginInit();
+            this.tabFeedback.SuspendLayout();
             this.tabHelp.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.webView22)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.webView2Help)).BeginInit();
             this.tabAbout.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.webView23)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.webView2About)).BeginInit();
             this.panelBehindTab.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl
             // 
             this.tabControl.Controls.Add(this.tabSchematics);
+            this.tabControl.Controls.Add(this.tabOverview);
             this.tabControl.Controls.Add(this.tabRessources);
+            this.tabControl.Controls.Add(this.tabFeedback);
             this.tabControl.Controls.Add(this.tabHelp);
             this.tabControl.Controls.Add(this.tabAbout);
             this.tabControl.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
@@ -115,13 +135,12 @@
             // 
             // splitContainerSchematics.Panel2
             // 
-            this.splitContainerSchematics.Panel2.Controls.Add(this.panelListMain);
+            this.splitContainerSchematics.Panel2.Controls.Add(this.panelListAutoscroll);
             this.splitContainerSchematics.Panel2MinSize = 100;
             this.splitContainerSchematics.Size = new System.Drawing.Size(713, 536);
             this.splitContainerSchematics.SplitterDistance = 600;
             this.splitContainerSchematics.SplitterWidth = 11;
             this.splitContainerSchematics.TabIndex = 7;
-            this.splitContainerSchematics.SplitterMoved += new System.Windows.Forms.SplitterEventHandler(this.splitContainer1_SplitterMoved);
             // 
             // panelMain
             // 
@@ -131,16 +150,6 @@
             this.panelMain.Name = "panelMain";
             this.panelMain.Size = new System.Drawing.Size(600, 536);
             this.panelMain.TabIndex = 5;
-            // 
-            // panelListMain
-            // 
-            this.panelListMain.Controls.Add(this.panelListAutoscroll);
-            this.panelListMain.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panelListMain.Location = new System.Drawing.Point(0, 0);
-            this.panelListMain.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
-            this.panelListMain.Name = "panelListMain";
-            this.panelListMain.Size = new System.Drawing.Size(102, 536);
-            this.panelListMain.TabIndex = 6;
             // 
             // panelListAutoscroll
             // 
@@ -153,10 +162,35 @@
             this.panelListAutoscroll.Size = new System.Drawing.Size(102, 536);
             this.panelListAutoscroll.TabIndex = 0;
             // 
+            // tabOverview
+            // 
+            this.tabOverview.Controls.Add(this.webView2Overview);
+            this.tabOverview.Location = new System.Drawing.Point(4, 30);
+            this.tabOverview.Name = "tabOverview";
+            this.tabOverview.Size = new System.Drawing.Size(713, 536);
+            this.tabOverview.TabIndex = 8;
+            this.tabOverview.Text = "Overview";
+            this.tabOverview.UseVisualStyleBackColor = true;
+            // 
+            // webView2Overview
+            // 
+            this.webView2Overview.AllowExternalDrop = true;
+            this.webView2Overview.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.webView2Overview.BackColor = System.Drawing.Color.White;
+            this.webView2Overview.CreationProperties = null;
+            this.webView2Overview.DefaultBackgroundColor = System.Drawing.Color.White;
+            this.webView2Overview.Location = new System.Drawing.Point(0, 3);
+            this.webView2Overview.Name = "webView2Overview";
+            this.webView2Overview.Size = new System.Drawing.Size(710, 530);
+            this.webView2Overview.TabIndex = 6;
+            this.webView2Overview.ZoomFactor = 1D;
+            // 
             // tabRessources
             // 
             this.tabRessources.BackColor = System.Drawing.Color.White;
-            this.tabRessources.Controls.Add(this.webView21);
+            this.tabRessources.Controls.Add(this.webView2Ressources);
             this.tabRessources.Location = new System.Drawing.Point(4, 30);
             this.tabRessources.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabRessources.Name = "tabRessources";
@@ -164,24 +198,184 @@
             this.tabRessources.TabIndex = 3;
             this.tabRessources.Text = "Ressources";
             // 
-            // webView21
+            // webView2Ressources
             // 
-            this.webView21.AllowExternalDrop = true;
-            this.webView21.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            this.webView2Ressources.AllowExternalDrop = true;
+            this.webView2Ressources.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.webView21.CreationProperties = null;
-            this.webView21.DefaultBackgroundColor = System.Drawing.Color.White;
-            this.webView21.Location = new System.Drawing.Point(0, 3);
-            this.webView21.Name = "webView21";
-            this.webView21.Size = new System.Drawing.Size(710, 530);
-            this.webView21.TabIndex = 5;
-            this.webView21.ZoomFactor = 1D;
+            this.webView2Ressources.CreationProperties = null;
+            this.webView2Ressources.DefaultBackgroundColor = System.Drawing.Color.White;
+            this.webView2Ressources.Location = new System.Drawing.Point(0, 3);
+            this.webView2Ressources.Name = "webView2Ressources";
+            this.webView2Ressources.Size = new System.Drawing.Size(710, 530);
+            this.webView2Ressources.TabIndex = 5;
+            this.webView2Ressources.ZoomFactor = 1D;
+            // 
+            // tabFeedback
+            // 
+            this.tabFeedback.Controls.Add(this.label9);
+            this.tabFeedback.Controls.Add(this.button2);
+            this.tabFeedback.Controls.Add(this.textBox6);
+            this.tabFeedback.Controls.Add(this.label8);
+            this.tabFeedback.Controls.Add(this.textBox4);
+            this.tabFeedback.Controls.Add(this.checkBox1);
+            this.tabFeedback.Controls.Add(this.textBox5);
+            this.tabFeedback.Controls.Add(this.label6);
+            this.tabFeedback.Controls.Add(this.textBox3);
+            this.tabFeedback.Controls.Add(this.textBox2);
+            this.tabFeedback.Controls.Add(this.textBox1);
+            this.tabFeedback.Controls.Add(this.label4);
+            this.tabFeedback.Controls.Add(this.label3);
+            this.tabFeedback.Controls.Add(this.label2);
+            this.tabFeedback.Controls.Add(this.label1);
+            this.tabFeedback.Location = new System.Drawing.Point(4, 30);
+            this.tabFeedback.Name = "tabFeedback";
+            this.tabFeedback.Size = new System.Drawing.Size(713, 536);
+            this.tabFeedback.TabIndex = 7;
+            this.tabFeedback.Text = "Feedback";
+            this.tabFeedback.UseVisualStyleBackColor = true;
+            // 
+            // label9
+            // 
+            this.label9.AutoSize = true;
+            this.label9.Location = new System.Drawing.Point(132, 18);
+            this.label9.Name = "label9";
+            this.label9.Size = new System.Drawing.Size(297, 21);
+            this.label9.TabIndex = 16;
+            this.label9.Text = "Information being submitted in feedback:";
+            // 
+            // button2
+            // 
+            this.button2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.button2.Location = new System.Drawing.Point(14, 495);
+            this.button2.Name = "button2";
+            this.button2.Size = new System.Drawing.Size(211, 29);
+            this.button2.TabIndex = 8;
+            this.button2.Text = "Send feedback to developer";
+            this.button2.UseVisualStyleBackColor = true;
+            this.button2.Click += new System.EventHandler(this.button1_Click_1);
+            // 
+            // textBox6
+            // 
+            this.textBox6.Location = new System.Drawing.Point(136, 138);
+            this.textBox6.Name = "textBox6";
+            this.textBox6.ReadOnly = true;
+            this.textBox6.Size = new System.Drawing.Size(297, 28);
+            this.textBox6.TabIndex = 15;
+            // 
+            // label8
+            // 
+            this.label8.AutoSize = true;
+            this.label8.Location = new System.Drawing.Point(10, 141);
+            this.label8.Name = "label8";
+            this.label8.Size = new System.Drawing.Size(109, 21);
+            this.label8.TabIndex = 14;
+            this.label8.Text = "Excel data file:";
+            // 
+            // textBox4
+            // 
+            this.textBox4.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.textBox4.Location = new System.Drawing.Point(14, 267);
+            this.textBox4.Multiline = true;
+            this.textBox4.Name = "textBox4";
+            this.textBox4.Size = new System.Drawing.Size(684, 194);
+            this.textBox4.TabIndex = 13;
+            // 
+            // checkBox1
+            // 
+            this.checkBox1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.checkBox1.AutoSize = true;
+            this.checkBox1.Location = new System.Drawing.Point(14, 464);
+            this.checkBox1.Name = "checkBox1";
+            this.checkBox1.Size = new System.Drawing.Size(305, 25);
+            this.checkBox1.TabIndex = 12;
+            this.checkBox1.Text = "Attach Excel data file for selected board";
+            this.checkBox1.UseVisualStyleBackColor = true;
+            this.checkBox1.CheckedChanged += new System.EventHandler(this.checkBox1_CheckedChanged);
+            // 
+            // textBox5
+            // 
+            this.textBox5.Location = new System.Drawing.Point(136, 42);
+            this.textBox5.Name = "textBox5";
+            this.textBox5.ReadOnly = true;
+            this.textBox5.Size = new System.Drawing.Size(297, 28);
+            this.textBox5.TabIndex = 11;
+            // 
+            // label6
+            // 
+            this.label6.AutoSize = true;
+            this.label6.Location = new System.Drawing.Point(8, 45);
+            this.label6.Name = "label6";
+            this.label6.Size = new System.Drawing.Size(143, 21);
+            this.label6.TabIndex = 10;
+            this.label6.Text = "Selected hardware:";
+            // 
+            // textBox3
+            // 
+            this.textBox3.Location = new System.Drawing.Point(14, 202);
+            this.textBox3.Name = "textBox3";
+            this.textBox3.Size = new System.Drawing.Size(419, 28);
+            this.textBox3.TabIndex = 6;
+            // 
+            // textBox2
+            // 
+            this.textBox2.Location = new System.Drawing.Point(136, 106);
+            this.textBox2.Name = "textBox2";
+            this.textBox2.ReadOnly = true;
+            this.textBox2.Size = new System.Drawing.Size(297, 28);
+            this.textBox2.TabIndex = 5;
+            // 
+            // textBox1
+            // 
+            this.textBox1.Location = new System.Drawing.Point(136, 74);
+            this.textBox1.Name = "textBox1";
+            this.textBox1.ReadOnly = true;
+            this.textBox1.Size = new System.Drawing.Size(297, 28);
+            this.textBox1.TabIndex = 4;
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Location = new System.Drawing.Point(10, 243);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(187, 21);
+            this.label4.TabIndex = 3;
+            this.label4.Text = "Your feedback (text only):";
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Location = new System.Drawing.Point(10, 182);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(482, 21);
+            this.label3.TabIndex = 2;
+            this.label3.Text = "Your email address (optional, but needed if you want any response):";
+            // 
+            // label2
+            // 
+            this.label2.AutoSize = true;
+            this.label2.Location = new System.Drawing.Point(8, 109);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(146, 21);
+            this.label2.TabIndex = 1;
+            this.label2.Text = "Selected schematic:";
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Location = new System.Drawing.Point(8, 77);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(118, 21);
+            this.label1.TabIndex = 0;
+            this.label1.Text = "Selected board:";
             // 
             // tabHelp
             // 
             this.tabHelp.BackColor = System.Drawing.Color.White;
-            this.tabHelp.Controls.Add(this.webView22);
+            this.tabHelp.Controls.Add(this.webView2Help);
             this.tabHelp.Location = new System.Drawing.Point(4, 30);
             this.tabHelp.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabHelp.Name = "tabHelp";
@@ -189,24 +383,24 @@
             this.tabHelp.TabIndex = 6;
             this.tabHelp.Text = "Help";
             // 
-            // webView22
+            // webView2Help
             // 
-            this.webView22.AllowExternalDrop = true;
-            this.webView22.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            this.webView2Help.AllowExternalDrop = true;
+            this.webView2Help.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.webView22.CreationProperties = null;
-            this.webView22.DefaultBackgroundColor = System.Drawing.Color.White;
-            this.webView22.Location = new System.Drawing.Point(0, 3);
-            this.webView22.Name = "webView22";
-            this.webView22.Size = new System.Drawing.Size(710, 530);
-            this.webView22.TabIndex = 6;
-            this.webView22.ZoomFactor = 1D;
+            this.webView2Help.CreationProperties = null;
+            this.webView2Help.DefaultBackgroundColor = System.Drawing.Color.White;
+            this.webView2Help.Location = new System.Drawing.Point(0, 3);
+            this.webView2Help.Name = "webView2Help";
+            this.webView2Help.Size = new System.Drawing.Size(710, 530);
+            this.webView2Help.TabIndex = 6;
+            this.webView2Help.ZoomFactor = 1D;
             // 
             // tabAbout
             // 
             this.tabAbout.BackColor = System.Drawing.Color.White;
-            this.tabAbout.Controls.Add(this.webView23);
+            this.tabAbout.Controls.Add(this.webView2About);
             this.tabAbout.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.tabAbout.Location = new System.Drawing.Point(4, 30);
             this.tabAbout.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
@@ -215,34 +409,19 @@
             this.tabAbout.TabIndex = 5;
             this.tabAbout.Text = "About";
             // 
-            // webView23
+            // webView2About
             // 
-            this.webView23.AllowExternalDrop = true;
-            this.webView23.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            this.webView2About.AllowExternalDrop = true;
+            this.webView2About.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.webView23.CreationProperties = null;
-            this.webView23.DefaultBackgroundColor = System.Drawing.Color.White;
-            this.webView23.Location = new System.Drawing.Point(0, 3);
-            this.webView23.Name = "webView23";
-            this.webView23.Size = new System.Drawing.Size(710, 530);
-            this.webView23.TabIndex = 7;
-            this.webView23.ZoomFactor = 1D;
-            // 
-            // richTextBoxHelp
-            // 
-            this.richTextBoxHelp.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.richTextBoxHelp.BackColor = System.Drawing.Color.White;
-            this.richTextBoxHelp.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.richTextBoxHelp.Location = new System.Drawing.Point(552, 3);
-            this.richTextBoxHelp.Name = "richTextBoxHelp";
-            this.richTextBoxHelp.ReadOnly = true;
-            this.richTextBoxHelp.Size = new System.Drawing.Size(192, 211);
-            this.richTextBoxHelp.TabIndex = 0;
-            this.richTextBoxHelp.Text = "Text set in code ...";
-            this.richTextBoxHelp.LinkClicked += new System.Windows.Forms.LinkClickedEventHandler(this.richTextBox_LinkClicked);
+            this.webView2About.CreationProperties = null;
+            this.webView2About.DefaultBackgroundColor = System.Drawing.Color.White;
+            this.webView2About.Location = new System.Drawing.Point(0, 3);
+            this.webView2About.Name = "webView2About";
+            this.webView2About.Size = new System.Drawing.Size(710, 530);
+            this.webView2About.TabIndex = 7;
+            this.webView2About.ZoomFactor = 1D;
             // 
             // comboBoxHardware
             // 
@@ -255,7 +434,7 @@
             this.comboBoxHardware.Name = "comboBoxHardware";
             this.comboBoxHardware.Size = new System.Drawing.Size(273, 29);
             this.comboBoxHardware.TabIndex = 1;
-            this.comboBoxHardware.SelectedIndexChanged += new System.EventHandler(this.comboBox1_SelectedIndexChanged);
+            this.comboBoxHardware.SelectedIndexChanged += new System.EventHandler(this.comboBoxHardware_SelectedIndexChanged);
             // 
             // labelHardware
             // 
@@ -288,7 +467,7 @@
             this.comboBoxBoard.Name = "comboBoxBoard";
             this.comboBoxBoard.Size = new System.Drawing.Size(273, 29);
             this.comboBoxBoard.TabIndex = 3;
-            this.comboBoxBoard.SelectedIndexChanged += new System.EventHandler(this.comboBox2_SelectedIndexChanged);
+            this.comboBoxBoard.SelectedIndexChanged += new System.EventHandler(this.comboBoxBoard_SelectedIndexChanged);
             // 
             // listBoxComponents
             // 
@@ -407,7 +586,6 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.panelBehindTab.BackColor = System.Drawing.Color.WhiteSmoke;
             this.panelBehindTab.Controls.Add(this.tabControl);
-            this.panelBehindTab.Controls.Add(this.richTextBoxHelp);
             this.panelBehindTab.Location = new System.Drawing.Point(299, 13);
             this.panelBehindTab.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.panelBehindTab.Name = "panelBehindTab";
@@ -468,13 +646,16 @@
             this.splitContainerSchematics.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).EndInit();
             this.splitContainerSchematics.ResumeLayout(false);
-            this.panelListMain.ResumeLayout(false);
+            this.tabOverview.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.webView2Overview)).EndInit();
             this.tabRessources.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.webView21)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.webView2Ressources)).EndInit();
+            this.tabFeedback.ResumeLayout(false);
+            this.tabFeedback.PerformLayout();
             this.tabHelp.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.webView22)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.webView2Help)).EndInit();
             this.tabAbout.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.webView23)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.webView2About)).EndInit();
             this.panelBehindTab.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
@@ -497,7 +678,6 @@
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.Panel panelMain;
-        private System.Windows.Forms.Panel panelListMain;
         private System.Windows.Forms.Panel panelListAutoscroll;
         private System.Windows.Forms.ListBox listBoxCategories;
         private System.Windows.Forms.Label labelCategories;
@@ -507,10 +687,27 @@
         private System.Windows.Forms.Panel panelBehindTab;
         private System.Windows.Forms.CheckBox checkBoxBlink;
         private System.Windows.Forms.TabPage tabHelp;
-        private System.Windows.Forms.RichTextBox richTextBoxHelp;
         private System.Windows.Forms.TextBox textBoxFilterComponents;
-        private Microsoft.Web.WebView2.WinForms.WebView2 webView21;
-        private Microsoft.Web.WebView2.WinForms.WebView2 webView22;
-        private Microsoft.Web.WebView2.WinForms.WebView2 webView23;
+        private Microsoft.Web.WebView2.WinForms.WebView2 webView2Ressources;
+        private Microsoft.Web.WebView2.WinForms.WebView2 webView2Help;
+        private Microsoft.Web.WebView2.WinForms.WebView2 webView2About;
+        private System.Windows.Forms.TabPage tabFeedback;
+        private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.Button button2;
+        private System.Windows.Forms.TextBox textBox3;
+        private System.Windows.Forms.TextBox textBox2;
+        private System.Windows.Forms.TextBox textBox1;
+        private System.Windows.Forms.Label label4;
+        private System.Windows.Forms.CheckBox checkBox1;
+        private System.Windows.Forms.TextBox textBox5;
+        private System.Windows.Forms.Label label6;
+        private System.Windows.Forms.TextBox textBox4;
+        private System.Windows.Forms.TextBox textBox6;
+        private System.Windows.Forms.Label label8;
+        private System.Windows.Forms.Label label9;
+        private System.Windows.Forms.TabPage tabOverview;
+        private Microsoft.Web.WebView2.WinForms.WebView2 webView2Overview;
     }
 }
