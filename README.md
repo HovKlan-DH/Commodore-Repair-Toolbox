@@ -3,15 +3,15 @@
 This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ hence forward) - a Windows utility tool for repairing vintage computers or peripherals.
 
 > [!CAUTION]
-> Please do note that the data files have not yet reached its final maturity level, and by then its format most likely will change in a nearby future release!
+> Please do note that the data files have not yet reached its final maturity level, and by then its format _could_ change in a nearby future release!
 
 # Screenshots
 
 Main screen:\
-![Main screen](https://github.com/user-attachments/assets/cd6767e9-8b9a-4ff9-af3a-ef977a79f20a)
+![Main screen](https://github.com/user-attachments/assets/a79adbc0-00c3-444a-ba82-4f950d81daff)
 
 Popup component info:\
-![Component popup information](https://github.com/user-attachments/assets/b3ded206-6b5d-49d8-a011-ca532bc953e4)
+![Component popup information](https://github.com/user-attachments/assets/087dda87-c368-4dac-be0c-564916d70318)
 
 # Can you explain what it is?
 
@@ -23,14 +23,17 @@ It probably works the best, if the hardware is "simple" and have good documentat
 
 _CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file, `Commodore-Repair-Toolbox.exe`
 
-It will run on any 64-bit _Windows 10_ or newer. It does require _.NET Framework 4.8.1_, but this is an integrated part of the operating system.
+It will run on any 64-bit Windows 10 or newer. It does require _.NET Framework 4.8.1_, but this is an integrated part of the operating system.
 
 # Built-in hardware / schematics
 
-- Commodore 128 and 128D, schematics 310378
-- Soon to come (just need the time to input the data):
-    - Commodore 64 (Breadbin), schematics 250407 and 250425
-    - Commodore 64C, schematics 250466
+- **Commodore 128 and 128D**
+  - Schematics 310378
+- **Commodore 64 (Breadbin)**
+  - Schematics 250407
+  - Schematics 250425
+- **Commodore 64C**
+  - Schematics 250466
 
 # Your help would be really appreciated
 
@@ -45,10 +48,10 @@ You can also help specifically with these topics:
 You can also contribute by adding new data and send the Excel file and "label file" to me (view below for the software used for labeling).
 
 # Contact
-You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) in the project or write an email to **crt** at **mailscan** dot **dk**, if you want to raise an issue, suggest any changes or just have a comment.
+You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) here in the GitHub project page or write an email to **dennis** at **commodore-repair-toolbox** dot **dk**, if you want to report a problem, suggest any changes or just have a comment.
 
 # Software used
-For labelling the components in the schematics  I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and easy to use, once you learn its way of working. It will output a JSON file, which I then convert into an Excel format - you must send both this JSON file and its image file, if you have any updates.
+For labelling the components in the schematics  I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and easy to use, once you learn its way of working. It will output a JSON file, which then is [converted into Excel](https://commodore-repair-toolbox.dk/convert-via-to-excel/) format - you must send both this JSON file and its image file, if you have any updates.
 
 * The initial Excel data file is placed in same folder as executable file and is named `Commodore-Repair-Toolbox.xlsx`
 * Inside the `Data` folders I have placed the JSON source files used for labelling.
@@ -57,7 +60,7 @@ For labelling the components in the schematics  I have discovered the Windows op
 I have chosen Excel as the data format, as this should be known to the most, and it is fairly straightforward how to use. I am actually not sure, but I do believe there is a [free online Excel available from Microsoft](https://www.office.com/launch/excel), if you do not already have one installed.
 
 > [!CAUTION]
-> Please do note that the data files have not yet reached its final maturity level, and by then its format most likely will change in a nearby future release!
+> Please do note that the data files have not yet reached its final maturity level, and by then its format _could_ change in a nearby future release!
 
 # Near-term TODO
 
@@ -81,7 +84,7 @@ I have taken data from many places, but I do have a few _go-to_ places I frequen
 
 In some cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated.
 
-If you want to contribute with a major new or updated dataset, then please let me know, as I happily will show credits here for joint efforts. There is a large Commodore community, and I wish for collaboration into making this the best data and reference for Commodore reparing (well, on the Windows platform at least).
+If you want to contribute with a major new or updated dataset, then please let me know, as I happily will show credits here for joint efforts. There is a large Commodore community, and I wish for collaboration into making this a great reference for Commodore reparing (well, on the Windows platform at least).
 
 # Inspiration for creating this project
 
