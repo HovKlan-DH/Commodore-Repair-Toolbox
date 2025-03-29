@@ -273,13 +273,17 @@ namespace Commodore_Repair_Toolbox
                             string description = worksheet.Cells[row, 6].Text;
                             description = description.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", Environment.NewLine);
 
+                            string nameDisplay = label;
+                            nameDisplay += nameTechnical != "?" ? " | " + nameTechnical : "";
+                            nameDisplay += nameFriendly != "?" ? " | " + nameFriendly : "";
+
                             ComponentBoard comp = new ComponentBoard
                             {
                                 Label = label,
                                 NameTechnical = nameTechnical,
                                 NameFriendly = nameFriendly,
+                                NameDisplay = nameDisplay,
                                 Type = type,
-                                //ImagePinout = filePinout,
                                 OneLiner = oneliner,
                                 Description = description
                             };

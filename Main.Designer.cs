@@ -40,7 +40,7 @@
             this.webView2Ressources = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.tabFeedback = new System.Windows.Forms.TabPage();
             this.label9 = new System.Windows.Forms.Label();
-            this.button2 = new System.Windows.Forms.Button();
+            this.buttonSendFeedback = new System.Windows.Forms.Button();
             this.textBox6 = new System.Windows.Forms.TextBox();
             this.label8 = new System.Windows.Forms.Label();
             this.textBox4 = new System.Windows.Forms.TextBox();
@@ -215,7 +215,7 @@
             // tabFeedback
             // 
             this.tabFeedback.Controls.Add(this.label9);
-            this.tabFeedback.Controls.Add(this.button2);
+            this.tabFeedback.Controls.Add(this.buttonSendFeedback);
             this.tabFeedback.Controls.Add(this.textBox6);
             this.tabFeedback.Controls.Add(this.label8);
             this.tabFeedback.Controls.Add(this.textBox4);
@@ -245,16 +245,16 @@
             this.label9.TabIndex = 16;
             this.label9.Text = "Information being submitted in feedback:";
             // 
-            // button2
+            // buttonSendFeedback
             // 
-            this.button2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.button2.Location = new System.Drawing.Point(14, 495);
-            this.button2.Name = "button2";
-            this.button2.Size = new System.Drawing.Size(211, 29);
-            this.button2.TabIndex = 8;
-            this.button2.Text = "Send feedback to developer";
-            this.button2.UseVisualStyleBackColor = true;
-            this.button2.Click += new System.EventHandler(this.button1_Click_1);
+            this.buttonSendFeedback.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.buttonSendFeedback.Location = new System.Drawing.Point(14, 495);
+            this.buttonSendFeedback.Name = "buttonSendFeedback";
+            this.buttonSendFeedback.Size = new System.Drawing.Size(211, 29);
+            this.buttonSendFeedback.TabIndex = 8;
+            this.buttonSendFeedback.Text = "Send feedback to developer";
+            this.buttonSendFeedback.UseVisualStyleBackColor = true;
+            this.buttonSendFeedback.Click += new System.EventHandler(this.buttonSendFeedback_Click);
             // 
             // textBox6
             // 
@@ -482,7 +482,6 @@
             this.listBoxComponents.SelectionMode = System.Windows.Forms.SelectionMode.MultiSimple;
             this.listBoxComponents.Size = new System.Drawing.Size(273, 235);
             this.listBoxComponents.TabIndex = 7;
-            this.listBoxComponents.SelectedIndexChanged += new System.EventHandler(this.listBox1_SelectedIndexChanged);
             // 
             // labelComponents
             // 
@@ -505,7 +504,7 @@
             this.buttonClear.TabIndex = 9;
             this.buttonClear.Text = "Clear";
             this.buttonClear.UseVisualStyleBackColor = true;
-            this.buttonClear.Click += new System.EventHandler(this.button1_Click);
+            this.buttonClear.Click += new System.EventHandler(this.buttonClear_Click);
             // 
             // label7
             // 
@@ -541,7 +540,6 @@
             this.listBoxCategories.Size = new System.Drawing.Size(273, 109);
             this.listBoxCategories.Sorted = true;
             this.listBoxCategories.TabIndex = 10;
-            this.listBoxCategories.SelectedIndexChanged += new System.EventHandler(this.listBox2_SelectedIndexChanged);
             // 
             // labelCategories
             // 
@@ -695,7 +693,7 @@
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.Button button2;
+        private System.Windows.Forms.Button buttonSendFeedback;
         private System.Windows.Forms.TextBox textBox3;
         private System.Windows.Forms.TextBox textBox2;
         private System.Windows.Forms.TextBox textBox1;

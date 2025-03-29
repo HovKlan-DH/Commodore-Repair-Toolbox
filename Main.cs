@@ -8,7 +8,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
@@ -49,6 +48,7 @@ namespace Commodore_Repair_Toolbox
         private FormBorderStyle formPreviousFormBorderStyle;
         private Rectangle previousBoundsForm;
         private Rectangle previousBoundsPanelBehindTab;
+        private Rectangle previousBoundsFullscreenButton;
 
         // Main panel (left side) + image
         private CustomPanel panelZoom;
@@ -66,7 +66,6 @@ namespace Commodore_Repair_Toolbox
 
         // Resizing of window/schematic
         private bool isResizedByMouseWheel = false;
-        private bool isResizing = false;       
 
         // Data loaded from Excel
         public List<Hardware> classHardware = new List<Hardware>();
@@ -77,9 +76,8 @@ namespace Commodore_Repair_Toolbox
         private Dictionary<int, Size> overlayComponentsTabOriginalSizes = new Dictionary<int, Size>();
 
         // Selected entries in the components list
-        private List<string> listBoxComponentsSelectedLabels = new List<string>();
-        private Dictionary<string, string> listBoxNameValueMapping = new Dictionary<string, string>();
-
+        private List<string> listBoxComponentsSelectedText = new List<string>();
+        
         // Version information
         private string versionThis = "";
         private string versionOnline = "";
@@ -171,6 +169,8 @@ namespace Commodore_Repair_Toolbox
         private void Form_Shown(object sender, EventArgs e)
         {
             ReadaptThumbnails();
+            UpdateComponentList();
+            //FilterListBoxComponents();
         }
 
 
@@ -233,49 +233,51 @@ namespace Commodore_Repair_Toolbox
         {
             try
             {
-                WebClient webClient = new WebClient();
-                ServicePointManager.Expect100Continue = true;
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
-                webClient.Headers.Add("user-agent", "CRT "+ versionThis);
-
-                // Have some control POST data
-                var postData = new System.Collections.Specialized.NameValueCollection
+                using (WebClient webClient = new WebClient())
                 {
-                    { "control", "CRT" }
-                };
+                    ServicePointManager.Expect100Continue = true;
+                    ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+                    webClient.Headers.Add("user-agent", "CRT "+ versionThis);
 
-                // Send the POST data to the server
-                byte[] responseBytes = webClient.UploadValues(crtPage + crtPageAutoUpdate, postData);
-
-                // Convert the "response bytes" to a human readable string
-                onlineAvailableVersion = Encoding.UTF8.GetString(responseBytes);
-
-                if (onlineAvailableVersion.Substring(0, 7) == "Version")
-                {
-                    onlineAvailableVersion = onlineAvailableVersion.Substring(9);
-                    if (onlineAvailableVersion != versionThis)
+                    // Have some control POST data
+                    var postData = new System.Collections.Specialized.NameValueCollection
                     {
-                        tabAbout.Text = "About*";
-                        versionOnline = onlineAvailableVersion;
-                        versionOnlineTxt = "<font color='IndianRed'>";
-                        versionOnlineTxt += $"There is a newer version available online: <b>" + versionOnline + @"</b ><br />";
-                        versionOnlineTxt += "View the <i>Changelog</i> and download the new version from here, <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases' target='_blank'> https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases</a><br />";
-                        versionOnlineTxt += "<br />";
-                        versionOnlineTxt += "</font>";
+                        { "control", "CRT" }
+                    };
+
+                    // Send the POST data to the server
+                    byte[] responseBytes = webClient.UploadValues(crtPage + crtPageAutoUpdate, postData);
+
+                    // Convert the "response bytes" to a human readable string
+                    onlineAvailableVersion = Encoding.UTF8.GetString(responseBytes);
+
+                    if (onlineAvailableVersion.Substring(0, 7) == "Version")
+                    {
+                        onlineAvailableVersion = onlineAvailableVersion.Substring(9);
+                        if (onlineAvailableVersion != versionThis)
+                        {
+                            tabAbout.Text = "About*";
+                            versionOnline = onlineAvailableVersion;
+                            versionOnlineTxt = "<font color='IndianRed'>";
+                            versionOnlineTxt += $"There is a newer version available online: <b>" + versionOnline + @"</b ><br />";
+                            versionOnlineTxt += "View the <i>Changelog</i> and download the new version from here, <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases' target='_blank'> https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases</a><br />";
+                            versionOnlineTxt += "<br />";
+                            versionOnlineTxt += "</font>";
+                        } else
+                        {
+                            versionOnline = "";
+                        }
                     } else
                     {
-                        versionOnline = "";
+                        tabAbout.Text = "About*";
+                        versionOnlineTxt = "<font color='IndianRed'>";
+                        versionOnlineTxt += "<hr>";
+                        versionOnlineTxt += "ERROR:<br />";
+                        versionOnlineTxt += $"It was not possible to check for a newer version, as the server connection to <a href='https://commodore-repair-toolbox.dk' target='_blank'>https://commodore-repair-toolbox.dk</a> cannot be established - please check your connectivity.<br />The exact recieved HTTP error is:<br /><br /><b>{onlineAvailableVersion}</b>";
+                        versionOnlineTxt += "<hr>";
+                        versionOnlineTxt += "<br />";
+                        versionOnlineTxt += "</font>";
                     }
-                } else
-                {
-                    tabAbout.Text = "About*";
-                    versionOnlineTxt = "<font color='IndianRed'>";
-                    versionOnlineTxt += "<hr>";
-                    versionOnlineTxt += "ERROR:<br />";
-                    versionOnlineTxt += $"It was not possible to check for a newer version, as the server connection to <a href='https://commodore-repair-toolbox.dk' target='_blank'>https://commodore-repair-toolbox.dk</a> cannot be established - please check your connectivity.<br />The exact recieved HTTP error is:<br /><br /><b>{onlineAvailableVersion}</b>";
-                    versionOnlineTxt += "<hr>";
-                    versionOnlineTxt += "<br />";
-                    versionOnlineTxt += "</font>";
                 }
             }
             catch (Exception ex)
@@ -367,7 +369,8 @@ namespace Commodore_Repair_Toolbox
             textBox3.TextChanged += TextBox3_TextChanged;
             tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
             splitContainerSchematics.SplitterMoved += SplitContainer1_SplitterMoved;
-            this.Shown += new EventHandler(Form_Shown);
+            Shown += new EventHandler(Form_Shown);
+            listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
         }
 
 
@@ -380,14 +383,9 @@ namespace Commodore_Repair_Toolbox
         {
             if (!(parent is ComboBox))
             {
-                //                if (!string.IsNullOrEmpty(parent.Name)) // do not attach components without any name
-                //                {           
-                //                    Debug.WriteLine("AttachClickEventHandlers: " + (string.IsNullOrEmpty(parent.Name) ? "[Unnamed " + parent.GetType().Name + "]" : parent.Name));
-                //parent.Click += (s, e) => textBoxFilterComponents.Focus();
                 EventHandler handler = (s, e) => textBoxFilterComponents.Focus();
                 parent.Click += handler;
                 clickEventHandlers[parent] = handler;
-                //                }
             }
             foreach (Control child in parent.Controls)
             {
@@ -414,17 +412,19 @@ namespace Commodore_Repair_Toolbox
 
         private void Form_ResizeBegin(object sender, EventArgs e)
         {
-            isResizing = true;
+            SuspendLayout();
+//            isResizing = true;
         }
 
         private void Form_ResizeEnd(object sender, EventArgs e)
         {
             InitializeList();
 
-            isResizing = false;
+//            isResizing = false;
             ResizeTabImage();
             HighlightOverlays("tab");
             HighlightOverlays("list");
+            ResumeLayout();
         }
 
 
@@ -432,10 +432,6 @@ namespace Commodore_Repair_Toolbox
         // Initialize and update the tab for "Overview".
         // Will load new content from board data file.
         // ###########################################################################################
-
-        private EventHandler<CoreWebView2WebMessageReceivedEventArgs> _componentHandlerOverview;
-        private EventHandler<CoreWebView2WebMessageReceivedEventArgs> _fileOpenHandlerOverview;
-        private EventHandler<CoreWebView2NewWindowRequestedEventArgs> _urlHandlerOverview;
 
         private async void UpdateTabOverview(Board selectedBoard)
         {
@@ -596,62 +592,50 @@ namespace Commodore_Repair_Toolbox
             htmlContent += "</body>";
             htmlContent += "</html >";
 
-            // ---
-            // Make sure we only have one handler for the "open*" message (seems
-            // to be an issue where it can trigger an event multiple times!?
-
-            if (_componentHandlerOverview != null)
-            {
-                webView2Overview.CoreWebView2.WebMessageReceived -= _componentHandlerOverview;
-            }
-            _componentHandlerOverview = (sender, args) =>
-            {
-                string message = args.TryGetWebMessageAsString();
-                if (message.StartsWith("openComp:"))
-                {
-                    string compName = message.Substring("openComp:".Length);
-                    ComponentBoard selectedComp = foundBoard.Components.FirstOrDefault(c => c.Label == compName);
-                    if (selectedComp != null)
-                    {
-                        FormComponent componentInfoPopup = new FormComponent(selectedComp, hardwareSelectedFolder, boardSelectedFolder);
-                        componentInfoPopup.Show(this);
-                        componentInfoPopup.TopMost = true;
-                    }
-                }
-            };
-            webView2Overview.CoreWebView2.WebMessageReceived += _componentHandlerOverview;
-
-            // Handle the "file" handler
-            if (_fileOpenHandlerOverview != null)
-            {
-                webView2Overview.CoreWebView2.WebMessageReceived -= _fileOpenHandlerOverview;
-            }
-            _fileOpenHandlerOverview = (sender, args) =>
-            {
-                string message = args.TryGetWebMessageAsString();
-                if (message.StartsWith("openFile:"))
-                {
-                    string fileUrl = message.Substring("openFile:".Length);
-                    Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
-                }
-            };
-            webView2Overview.CoreWebView2.WebMessageReceived += _fileOpenHandlerOverview;
-
-            // Handle the "URL" handler
-            if (_urlHandlerOverview != null)
-            {
-                webView2Overview.CoreWebView2.NewWindowRequested -= _urlHandlerOverview;
-            }
-            _urlHandlerOverview = (sender, args) =>
-            {
-                args.Handled = true; // prevent the default behavior
-                Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
-            };
-            webView2Overview.CoreWebView2.NewWindowRequested += _urlHandlerOverview;
-
-            // ---
+            // Make sure we detach any current event handles, before we add a new one
+            webView2Overview.CoreWebView2.WebMessageReceived -= WebView2OverviewForm_WebMessageReceived; // detach first
+            webView2Overview.CoreWebView2.WebMessageReceived += WebView2OverviewForm_WebMessageReceived; // attach again
+            webView2Overview.CoreWebView2.WebMessageReceived -= WebView2OverviewFile_WebMessageReceived; // detach first
+            webView2Overview.CoreWebView2.WebMessageReceived += WebView2OverviewFile_WebMessageReceived; // attach again
+            webView2Overview.CoreWebView2.NewWindowRequested -= WebView2OverviewUrl_NewWindowRequested; // detach first
+            webView2Overview.CoreWebView2.NewWindowRequested += WebView2OverviewUrl_NewWindowRequested; // attach again
 
             webView2Overview.NavigateToString(htmlContent);
+        }
+
+        private void WebView2OverviewForm_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs args)
+        {
+            string message = args.TryGetWebMessageAsString();
+            if (message.StartsWith("openComp:"))
+            {
+                string compName = message.Substring("openComp:".Length);
+                var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+                var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+                ComponentBoard selectedComp = foundBoard?.Components.FirstOrDefault(c => c.Label == compName);
+                if (selectedComp != null)
+                {
+                    FormComponent componentInfoPopup = new FormComponent(selectedComp, hardwareSelectedFolder, boardSelectedFolder);
+                    componentInfoPopup.Show(this);
+                    componentInfoPopup.TopMost = true;
+                }
+            }
+        }
+
+        private void WebView2OverviewFile_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs args)
+        {
+            string message = args.TryGetWebMessageAsString();
+            if (message.StartsWith("openFile:"))
+            {
+                string fileUrl = message.Substring("openFile:".Length);
+                Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
+            }
+        }
+
+        private void WebView2OverviewUrl_NewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs args)
+        {
+            // Open URLs in default web browser
+            args.Handled = true; // prevent the default behavior
+            Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
         }
 
 
@@ -659,9 +643,6 @@ namespace Commodore_Repair_Toolbox
         // Initialize and update the tab for "Ressources".
         // Will load new content from board data file.
         // ###########################################################################################
-
-        private EventHandler<CoreWebView2WebMessageReceivedEventArgs> _fileOpenHandlerRessources;
-        private EventHandler<CoreWebView2NewWindowRequestedEventArgs> _urlHandlerRessources;
 
         private async void UpdateTabRessources(Board selectedBoard)
         {
@@ -740,42 +721,32 @@ namespace Commodore_Repair_Toolbox
             htmlContent += "</body>";
             htmlContent += "</html >";
 
-            // ---
-            // Make sure we only have one handler for the "openFile" message (seems
-            // to be an issue where it can trigger an event multiple times!?
-
-            // Handle the "file" handler
-            if (_fileOpenHandlerRessources != null)
-            {
-                webView2Ressources.CoreWebView2.WebMessageReceived -= _fileOpenHandlerRessources;
-            }
-            _fileOpenHandlerRessources = (sender, args) =>
-            {
-                string message = args.TryGetWebMessageAsString();
-                if (message.StartsWith("openFile:"))
-                {
-                    string fileUrl = message.Substring("openFile:".Length);
-                    Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
-                }
-            };
-            webView2Ressources.CoreWebView2.WebMessageReceived += _fileOpenHandlerRessources;
-
-            // Handle the "URL" handler
-            if (_urlHandlerRessources != null)
-            {
-                webView2Ressources.CoreWebView2.NewWindowRequested -= _urlHandlerRessources;
-            }
-            _urlHandlerRessources = (sender, args) =>
-            {
-                args.Handled = true; // prevent the default behavior
-                Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
-            };
-            webView2Ressources.CoreWebView2.NewWindowRequested += _urlHandlerRessources;
-
-            // ---
+            // Make sure we detach any current event handles, before we add a new one
+            webView2Ressources.CoreWebView2.WebMessageReceived -= WebView2RessourcesFile_WebMessageReceived; // detach first
+            webView2Ressources.CoreWebView2.WebMessageReceived += WebView2RessourcesFile_WebMessageReceived; // attach again
+            webView2Ressources.CoreWebView2.NewWindowRequested -= WebView2RessourcesUrl_NewWindowRequested; // detach first
+            webView2Ressources.CoreWebView2.NewWindowRequested += WebView2RessourcesUrl_NewWindowRequested; // attach again
 
             webView2Ressources.NavigateToString(htmlContent);
         }
+
+        private void WebView2RessourcesFile_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs args)
+        {
+            string message = args.TryGetWebMessageAsString();
+            if (message.StartsWith("openFile:"))
+            {
+                string fileUrl = message.Substring("openFile:".Length);
+                Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
+            }
+        }
+
+        private void WebView2RessourcesUrl_NewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs args)
+        {
+            // Open URLs in default web browser
+            args.Handled = true; // prevent the default behavior
+            Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
+        }
+
 
         // ###########################################################################################
         // Initialize the tab for "Help".
@@ -856,14 +827,18 @@ namespace Commodore_Repair_Toolbox
                 </html>
             ";
 
-            // Open URLs in default web browser
-            webView2Help.CoreWebView2.NewWindowRequested += (sender, args) =>
-            {
-                args.Handled = true; // do not render in internal browser mode
-                Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
-            };
+            // Make sure we detach any current event handles, before we add a new one
+            webView2Help.CoreWebView2.NewWindowRequested -= WebView2Help_NewWindowRequested; // detach first
+            webView2Help.CoreWebView2.NewWindowRequested += WebView2Help_NewWindowRequested; // attach again
 
             webView2Help.NavigateToString(htmlContent);
+        }
+
+        private void WebView2Help_NewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs args)
+        {
+            // Open URLs in default web browser
+            args.Handled = true;
+            Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
         }
 
 
@@ -877,19 +852,6 @@ namespace Commodore_Repair_Toolbox
             {
                 await webView2About.EnsureCoreWebView2Async(null);
             }
-
-            /*
-            if (versionOnlineTxt != "")
-            {
-                versionOnlineTxt = @"
-                    <font color='IndianRed'>
-                    There is a newer version available online: <b>" + versionOnline + @"</b><br />
-                    </font>
-                    View Changelog and download the new version from here, <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases' target='_blank'>https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases</a><br />
-                    <br />
-                ";
-            }
-            */
 
             string htmlContent = @"
                 <html>
@@ -915,14 +877,17 @@ namespace Commodore_Repair_Toolbox
                 </html>
             ";
 
-            // Open URLs in default web browser
-            webView2About.CoreWebView2.NewWindowRequested += (sender, args) =>
-            {
-                args.Handled = true; // do not render in internal browser mode
-                Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
-            };
+            // Make sure we detach any current event handles, before we add a new one
+            webView2About.CoreWebView2.NewWindowRequested -= WebView2About_NewWindowRequested; // detach first
+            webView2About.CoreWebView2.NewWindowRequested += WebView2About_NewWindowRequested; // attach again
 
             webView2About.NavigateToString(htmlContent);
+        }
+
+        private void WebView2About_NewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs args)
+        {
+            args.Handled = true; // do not render in internal browser mode
+            Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
         }
 
 
@@ -950,26 +915,61 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+
         // ###########################################################################################
-        // Filtering of components.
+        // Do an update of the component list, taking selection and filtering in to consideration.
         // ###########################################################################################
 
-        private void TextBoxFilterComponents_TextChanged(object sender, EventArgs e)
+        private void UpdateComponentSelection()
         {
-            FilterListBoxComponents();
+            // Debug
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[UpdateComponentSelection] called from [" + callerName + "]");
+            #endif
+
+            var listBoxComponentsSelectedClone = listBoxComponents.SelectedItems.Cast<object>().ToList(); // create a list of selected components
+
+            foreach (var item in listBoxComponents.Items)
+            {
+                if (listBoxComponentsSelectedClone.Contains(item))
+                {
+                    AddSelectedComponentIfNotInList(item.ToString());
+                } else
+                {
+                    RemoveSelectedComponentIfInList(item.ToString());
+                }
+            }
+
+            // Update overlays
+            ShowOverlaysAccordingToComponentList();
         }
 
-        private void ListBoxCategories_SelectedIndexChanged(object sender, EventArgs e)
+        private void UpdateComponentList()
         {
-            FilterListBoxComponents();
-        }
+            // Debug
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[UpdateComponentList] called from [" + callerName + "]");
+            #endif
 
-        private void FilterListBoxComponents()
-        {
+            // Decouple the event handler to avoid continues recycling
+            listBoxComponents.SelectedIndexChanged -= listBoxComponents_SelectedIndexChanged;
+
+            var componentsToAdd = new List<string>();
+            var componentsToRemove = new List<string>();
+            var listBoxComponentsSelectedClone = listBoxComponents.SelectedItems.Cast<object>().ToList(); // create a list of selected components
             string filterText = textBoxFilterComponents.Text.ToLower();
-            listBoxComponents.Items.Clear();
-            listBoxNameValueMapping.Clear();
 
+            listBoxComponents.Items.Clear();
+
+            // Walk through all components for selected hard and board
             var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (foundBoard != null)
@@ -978,21 +978,210 @@ namespace Commodore_Repair_Toolbox
                 {
                     foreach (ComponentBoard comp in foundBoard.Components)
                     {
-                        if (listBoxCategories.SelectedItems.Contains(comp.Type))
-                        {
-                            string displayText = comp.Label;
-                            displayText += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
-                            displayText += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
+                        string componentCategory = comp.Type;
+                        //string componentName = comp.Label;
+                        string componentDisplay = comp.NameDisplay;
 
-                            if (string.IsNullOrEmpty(filterText) || displayText.ToLower().Contains(filterText))
+                        // Check if category is selected - if so, add the component to the newly generated list and "selected" lsists, if it is selected
+                        if (listBoxCategories.SelectedItems.Contains(componentCategory))
+                        {
+
+                            // Only add the component to the list if it matches the filter
+                            if (string.IsNullOrEmpty(filterText) || componentDisplay.ToLower().Contains(filterText))
                             {
-                                listBoxComponents.Items.Add(displayText);
-                                listBoxNameValueMapping[displayText] = comp.Label;
+                                listBoxComponents.Items.Add(componentDisplay);
+
+                                // Add the component to the "selected" list + select it in the newly generated component list
+                                if (listBoxComponentsSelectedClone.Contains(componentDisplay))
+                                {
+                                    if (!listBoxComponentsSelectedText.Contains(componentDisplay))
+                                    {
+                                        AddSelectedComponentIfNotInList(componentDisplay);
+                                    }
+                                    int index = listBoxComponents.Items.IndexOf(componentDisplay);
+                                    if (index >= 0)
+                                    {
+                                        listBoxComponents.SetSelected(index, true);
+                                    }
+                                }
+                                else
+                                {
+                                    RemoveSelectedComponentIfInList(componentDisplay);
+                                }
                             }
+                            else
+                            {
+                                RemoveSelectedComponentIfInList(componentDisplay);
+                            }
+                        }
+
+                        // Remove the component from the "selected" list, if it exists there
+                        else
+                        {
+                            RemoveSelectedComponentIfInList(componentDisplay);
                         }
                     }
                 }
             }
+
+            // Update overlays
+            ShowOverlaysAccordingToComponentList();
+
+            // Reapply event handler
+            listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
+        }
+
+        private void RemoveSelectedComponentIfInList(string componentDisplay)
+        {
+            if (listBoxComponentsSelectedText.Contains(componentDisplay))
+            {
+                listBoxComponentsSelectedText.Remove(componentDisplay);
+            }
+        }
+
+        private void AddSelectedComponentIfNotInList(string componentDisplay)
+        {
+            if (!listBoxComponentsSelectedText.Contains(componentDisplay))
+            {
+                listBoxComponentsSelectedText.Add(componentDisplay);
+            }
+        }
+
+
+        // ###########################################################################################
+        // Handling highlighting of overlays for "Main" and thumbnail images.
+        // ###########################################################################################
+
+        private void HighlightOverlays(string scope)
+        {
+//            if (this.WindowState == FormWindowState.Minimized || isResizing)
+//            {
+//                return;
+//            }
+
+            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            if (bd == null) return;
+
+            // Main
+            if (scope == "tab")
+            {
+                // Draw overlays on the main image
+                if (overlayPanel == null) return;
+                var bf = bd.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
+                if (bf == null) return;
+
+                overlayPanel.Overlays.Clear();
+
+                Color colorZoom = Color.FromName(bf.HighlightColorTab);
+                int opacityZoom = bf.HighlightOpacityTab;
+
+                for (int i = 0; i < overlayComponentsTab.Count; i++)
+                {
+                    Rectangle rect = new Rectangle(
+                        (int)(overlayComponentsTabOriginalLocations[i].X * zoomFactor),
+                        (int)(overlayComponentsTabOriginalLocations[i].Y * zoomFactor),
+                        (int)(overlayComponentsTabOriginalSizes[i].Width * zoomFactor),
+                        (int)(overlayComponentsTabOriginalSizes[i].Height * zoomFactor)
+                    );
+
+                    // Find component "label" from component "display name"
+                    string componentLabel = bd.Components
+                        .FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.Label ?? "";
+
+                    // Check if the component is selected in component list
+                    bool highlighted = listBoxComponentsSelectedText.Contains(overlayComponentsTab[i].Name);
+
+                    overlayPanel.Overlays.Add(new OverlayInfo
+                    {
+                        Bounds = rect,
+                        Color = colorZoom,
+                        Opacity = opacityZoom,
+                        Highlighted = highlighted,
+                        ComponentLabel = componentLabel,
+                        ComponentDisplay = overlayComponentsTab[i].Name
+                    });
+
+                }
+                overlayPanel.Invalidate();
+            }
+
+            // Thumbnail list
+            else if (scope == "list")
+            {
+                // Draw overlays on each thumbnail
+                foreach (BoardFileOverlays bf in bd.Files)
+                {
+                    if (!overlayPanelsList.ContainsKey(bf.Name)) continue;
+
+                    OverlayPanel listPanel = overlayPanelsList[bf.Name];
+                    listPanel.Overlays.Clear();
+
+                    Color colorList = Color.FromName(bf.HighlightColorList);
+                    int opacityList = bf.HighlightOpacityList;
+                    float listZoom = overlayListZoomFactors[bf.Name];
+
+                    if (bf?.Components != null)
+                    {
+                        foreach (var comp in bf.Components)
+                        {
+                            if (comp.Overlays == null) continue;
+
+                            // Find component "display name"
+                            string componentDisplay = bd.Components
+                                .FirstOrDefault(cb => cb.Label == comp.Label)?.NameDisplay ?? "";
+
+                            // Check if the component is selected in component list
+                            bool highlighted = listBoxComponentsSelectedText.Contains(componentDisplay);
+
+                            foreach (var ov in comp.Overlays)
+                            {
+                                Rectangle rect = new Rectangle(
+                                    (int)(ov.Bounds.X * listZoom),
+                                    (int)(ov.Bounds.Y * listZoom),
+                                    (int)(ov.Bounds.Width * listZoom),
+                                    (int)(ov.Bounds.Height * listZoom)
+                                );
+                                listPanel.Overlays.Add(new OverlayInfo
+                                {
+                                    Bounds = rect,
+                                    Color = colorList,
+                                    Opacity = opacityList,
+                                    Highlighted = highlighted,
+                                    ComponentLabel = comp.Label,
+                                    ComponentDisplay = componentDisplay
+                                });
+                            }
+                        }
+                    }
+                    listPanel.Invalidate();
+                }
+            }
+        }
+
+
+        // ###########################################################################################
+        // Filtering of components.
+        // ###########################################################################################
+
+        private void TextBoxFilterComponents_TextChanged(object sender, EventArgs e)
+        {
+            UpdateComponentList();
+        }
+
+        private void ListBoxCategories_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            // Debug
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[ListBoxCategories_SelectedIndexChanged] called from [" + callerName + "]");
+            #endif
+
+            SaveSelectedCategories();
+            UpdateComponentList();
         }
 
 
@@ -1010,7 +1199,7 @@ namespace Commodore_Repair_Toolbox
             else
             {
                 blinkTimer.Stop();
-                EnableSelectedOverlays();
+                ReHighlightSelectedComponents(); // make sure the components will get highlighted again after end blinking
             }
         }
 
@@ -1026,7 +1215,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (var overlay in overlayPanel.Overlays)
                 {
-                    if (listBoxComponentsSelectedLabels.Contains(overlay.ComponentLabel))
+                    if (listBoxComponentsSelectedText.Contains(overlay.ComponentDisplay))
                     {
                         overlay.Highlighted = state;
                     }
@@ -1038,7 +1227,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (var overlay in overlayPanel.Overlays)
                 {
-                    if (listBoxComponentsSelectedLabels.Contains(overlay.ComponentLabel))
+                    if (listBoxComponentsSelectedText.Contains(overlay.ComponentDisplay))
                     {
                         overlay.Highlighted = state;
                     }
@@ -1047,13 +1236,13 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        private void EnableSelectedOverlays()
+        private void ReHighlightSelectedComponents()
         {
             foreach (var overlayPanel in overlayPanelsList.Values)
             {
                 foreach (var overlay in overlayPanel.Overlays)
                 {
-                    if (listBoxComponentsSelectedLabels.Contains(overlay.ComponentLabel))
+                    if (listBoxComponentsSelectedText.Contains(overlay.ComponentDisplay))
                     {
                         overlay.Highlighted = true;
                     }
@@ -1065,7 +1254,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (var overlay in overlayPanel.Overlays)
                 {
-                    if (listBoxComponentsSelectedLabels.Contains(overlay.ComponentLabel))
+                    if (listBoxComponentsSelectedText.Contains(overlay.ComponentDisplay))
                     {
                         overlay.Highlighted = true;
                     }
@@ -1111,24 +1300,17 @@ namespace Commodore_Repair_Toolbox
         }
         
 
-
-
-
-
-        // HERTIL
-
-
-
-
-
-
-
-
-
-
-
         private void AdjustComponentCategoriesListBoxHeight()
         {
+            // Debug
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[AdjustComponentCategoriesListBoxHeight] called from [" + callerName + "]");
+            #endif
+
             int listBoxLocationEnd_org = listBoxCategories.Location.Y + listBoxCategories.Height;
             int itemHeight = listBoxCategories.ItemHeight;
             int itemCount = listBoxCategories.Items.Count;
@@ -1150,8 +1332,10 @@ namespace Commodore_Repair_Toolbox
             }
         }     
 
+
         // ---------------------------------------------------------------------
         // Enable double-buffering for smoother UI rendering
+
         private void EnableDoubleBuffering()
         {
             SetStyle(
@@ -1166,9 +1350,6 @@ namespace Commodore_Repair_Toolbox
             //panelListMain.DoubleBuffered(true);
             panelListAutoscroll.DoubleBuffered(true);
         }
-
-
-
 
 
         // ---------------------------------------------------------------------
@@ -1275,17 +1456,6 @@ namespace Commodore_Repair_Toolbox
             {
                 Configuration.SaveSetting("SplitterPosition", splitContainerSchematics.SplitterDistance.ToString());
             };
-
-            /*
-            // Save selected image when changed
-            panelListAutoscroll.ControlAdded += (s, e) =>
-            {
-                if (e.Control is Panel panel && panel.Name == schematicSelectedName)
-                {
-                    Configuration.SaveSetting("ThumbnailImage", schematicSelectedName);
-                }
-            };
-            */
         }
 
 
@@ -1300,18 +1470,28 @@ namespace Commodore_Repair_Toolbox
             formPreviousFormBorderStyle = this.FormBorderStyle;
             previousBoundsForm = this.Bounds;
             previousBoundsPanelBehindTab = panelBehindTab.Bounds;
+            previousBoundsFullscreenButton = buttonFullscreen.Bounds;
             this.FormBorderStyle = FormBorderStyle.None;
             this.WindowState = FormWindowState.Normal;
             this.Bounds = Screen.PrimaryScreen.Bounds;
 
             // Set bounds for fullscreen panel
-            panelBehindTab.Location = new Point(panelBehindTab.Location.X, 0);
-            panelBehindTab.Width = ClientSize.Width - panelBehindTab.Location.X;
-            panelBehindTab.Height = ClientSize.Height;
+            //panelBehindTab.Location = new Point(panelBehindTab.Location.X, 0);
+            //panelBehindTab.Location = new Point(0, 0);
+            //panelBehindTab.Width = ClientSize.Width - panelBehindTab.Location.X;
+            //panelBehindTab.Height = ClientSize.Height;
+            panelBehindTab.Dock = DockStyle.Fill;
+            panelBehindTab.BringToFront();
+
+            buttonFullscreen.Location = new Point(10, panelBehindTab.Height - 55);
+            buttonFullscreen.BringToFront();
 
             // Determine which tab should be maximized
             panelBehindTab.Controls.Remove(panelMain);
             panelBehindTab.Controls.Add(panelMain);
+
+            // We hould not populate the filter textbox when inside fullscreen
+            textBoxFilterComponents.Enabled = false;
 
             // Hide tabs, and show fullscreen panel
             tabControl.Visible = false;
@@ -1326,18 +1506,23 @@ namespace Commodore_Repair_Toolbox
         private void FullscreenModeExit()
         {
             // Restore previous window state
+            panelBehindTab.Dock = DockStyle.None;
             this.FormBorderStyle = formPreviousFormBorderStyle;
             this.WindowState = formPreviousWindowState;
             this.Bounds = previousBoundsForm;
             panelBehindTab.Bounds = previousBoundsPanelBehindTab;
+            buttonFullscreen.Bounds = previousBoundsFullscreenButton;
 
             // Determine which tab should be repopulated with the previous maximized panel
             panelBehindTab.Controls.Remove(panelMain);
             splitContainerSchematics.Panel1.Controls.Add(panelMain);
 
+            // Re-enable the filter
+            textBoxFilterComponents.Enabled = true;
+            textBoxFilterComponents.Focus();
+
             // Show again the tabs, and hide the fullscreen panel
             tabControl.Visible = true;
-            //            AdjustPanelSchematicPanelsWidth();
             buttonFullscreen.Text = "Fullscreen";
             isFullscreen = false;
         }
@@ -1367,10 +1552,7 @@ namespace Commodore_Repair_Toolbox
         private void ShowComponentPopup(ComponentBoard comp)
         {
             // Show it modeless (non-blocking)
-            string title = "";
-            title = comp.Label;
-            title += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
-            title += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
+            string title = comp.NameDisplay;
 
             // Create new popup
             componentInfoPopup = new FormComponent(comp, hardwareSelectedFolder, boardSelectedFolder);
@@ -1385,6 +1567,13 @@ namespace Commodore_Repair_Toolbox
 
         private void SetupNewBoard()
         {
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[SetupNewBoard] called from [" + callerName + "]");
+            #endif
 
             boardSelectedName = comboBoxBoard.SelectedItem.ToString();
             textBox1.Text = boardSelectedName; // feedback info
@@ -1404,7 +1593,6 @@ namespace Commodore_Repair_Toolbox
             // Initialize UI
             InitializeComponentCategories();
 
-
             // If no config was found (or empty):
             bool loaded = LoadSelectedCategories(); // attempt to select from config
             if (!loaded && listBoxCategories.Items.Count > 0)
@@ -1415,8 +1603,6 @@ namespace Commodore_Repair_Toolbox
                     listBoxCategories.SetSelected(i, true);
                 }
             }
-
-            InitializeComponentList(true);
 
             AdjustComponentCategoriesListBoxHeight();
 
@@ -1432,6 +1618,15 @@ namespace Commodore_Repair_Toolbox
 
         private void InitializeComponentCategories()
         {
+            // Debug
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[InitializeComponentCategories] called from [" + callerName + "]");
+            #endif
+
             listBoxCategories.Items.Clear();
 
             var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
@@ -1451,46 +1646,20 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        private void InitializeComponentList(bool clearList = true)
-        {
-            listBoxComponents.Items.Clear();
-            listBoxNameValueMapping.Clear();
-
-            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            if (foundBoard != null)
-            {
-                if (foundBoard?.Components != null)
-                {
-                    foreach (ComponentBoard comp in foundBoard.Components)
-                    {
-                        if (listBoxCategories.SelectedItems.Contains(comp.Type))
-                        {
-                            string displayText = comp.Label;
-                            displayText += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
-                            displayText += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
-                            listBoxComponents.Items.Add(displayText);
-                            listBoxNameValueMapping[displayText] = comp.Label;
-
-                            if (listBoxComponentsSelectedLabels.Contains(comp.Label))
-                            {
-                                int idx = listBoxComponents.Items.IndexOf(displayText);
-                                listBoxComponents.SetSelected(idx, true);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Apply filter after initializing the component list
-            FilterListBoxComponents();
-        }
+        
 
         // ---------------------------------------------------------------------
         // Tab: main image (left side)
 
         private void InitializeTabMain()
         {
+            // Dispose the image, if one already exists
+            if (image != null)
+            {
+                image.Dispose();
+                image = null;
+            }
+
             // Load main image
             image = Image.FromFile(
                 Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, schematicSelectedFile)
@@ -1586,22 +1755,18 @@ namespace Commodore_Repair_Toolbox
         // ---------------------------------------------------------------------
         // Right-side list (thumbnails)
 
-        private void PanelListAutoscroll_Layout(object sender, LayoutEventArgs e)
-        {
-            //ReadaptThumbnails();
-        }
-
         private void InitializeList()
         {
-            StackTrace stackTrace = new StackTrace();
-            StackFrame callerFrame = stackTrace.GetFrame(1);
-            MethodBase callerMethod = callerFrame.GetMethod();
-            string callerName = callerMethod.Name;
-            Debug.WriteLine("[InitializeList] called from [" + callerName + "]");
+            // Debug
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[InitializeList] called from [" + callerName + "]");
+            #endif
 
             panelListAutoscroll.AutoScroll = true;
-//            panelListAutoscroll.HorizontalScroll.Enabled = false;
-//            panelListAutoscroll.HorizontalScroll.Visible = false;
 
             panelListAutoscroll.Controls.Clear();
             overlayPanelsList.Clear();
@@ -1644,9 +1809,7 @@ namespace Commodore_Repair_Toolbox
                     Name = schematic.Name,
                     BackgroundImage = Image.FromFile(filename),
                     BackgroundImageLayout = ImageLayout.Zoom,
-                    //Dock = DockStyle.Fill,
                     Dock = DockStyle.None,
-                    //Margin = new Padding(0)
                 };
 
                 // Overlay panel for the image that will ensure we can click anywhere on the image (to select it)
@@ -1672,28 +1835,30 @@ namespace Commodore_Repair_Toolbox
                 overlayPanel.OverlayPanelMouseDown += (s, e2) =>
                 {
                     if (e2.Button == MouseButtons.Left)
-                        OnListImageLeftClicked(panelImage);
+                        ThumbnailImageClicked(panelImage);
                 };                
 
                 // Attach "OverlayClicked" event to the overlay panel
                 overlayPanel.OverlayClicked += (s, e2) =>
                 {
                     if (e2.MouseArgs.Button == MouseButtons.Left)
-                        OnListImageLeftClicked(panelImage);
+                        ThumbnailImageClicked(panelImage);
                 };
             }
 
             ReadaptThumbnails(); 
             DrawBorderInList();
-            HighlightOverlays("list");
         }
         private void ReadaptThumbnails()
         {
-            StackTrace stackTrace = new StackTrace();
-            StackFrame callerFrame = stackTrace.GetFrame(1);
-            MethodBase callerMethod = callerFrame.GetMethod();
-            string callerName = callerMethod.Name;
-            Debug.WriteLine("[ReadaptThumbnails] called from [" + callerName +"]");
+            // Debug
+            #if DEBUG
+               StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[ReadaptThumbnails] called from [" + callerName +"]");
+            #endif
 
             // Set initial values
             int scrollbarWidth = 0;
@@ -1732,22 +1897,10 @@ namespace Commodore_Repair_Toolbox
                 {
                     overlayPanelsList[key].Bounds = panelImage.ClientRectangle;
                 }
-
-              
-
             }
-
-            
-
-            //panelListAutoscroll.AutoScrollMinSize = new Size(0, yPosition + 10);
+           
             HighlightOverlays("list");
-
-            if (panelListAutoscroll.HorizontalScroll.Visible)
-            {
-                //ReadaptThumbnails();
-            }
         }
-
 
 
         private void RefreshThumbnailLabels()
@@ -1768,9 +1921,15 @@ namespace Commodore_Repair_Toolbox
                 var labelListFile = container.Controls.OfType<Label>().FirstOrDefault();
                 if (labelListFile == null) continue;
 
-                bool hasSelectedComponent = listBoxComponentsSelectedLabels.Any(selectedLabel =>
+                bool hasSelectedComponent = listBoxComponentsSelectedText.Any(selectedComponentText =>
                 {
-                    var compBounds = file.Components.FirstOrDefault(c => c.Label == selectedLabel);
+                    // Find component "label"
+                    string componentLabel = bd.Components
+                        .FirstOrDefault(cb => cb.NameDisplay == selectedComponentText)?.Label ?? "";
+
+                    // Find component "bounds" for the label
+                    var compBounds = file.Components.FirstOrDefault(c => c.Label == componentLabel);
+
                     return compBounds != null && compBounds.Overlays != null && compBounds.Overlays.Count > 0;
                 });
 
@@ -1789,10 +1948,12 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        
 
-        private void OnListImageLeftClicked(Panel pan)
+        private void ThumbnailImageClicked(Panel pan)
         {
+            // Clear all current overlays
+            overlayPanel.Overlays.Clear();
+
             schematicSelectedName = pan.Name;
             Configuration.SaveSetting("SelectedThumbnail", schematicSelectedName);  // Save selected image
             textBox2.Text = schematicSelectedName; // feedback info
@@ -1805,11 +1966,12 @@ namespace Commodore_Repair_Toolbox
                 if (file != null)
                 {
                     schematicSelectedFile = file.FileName;
-                    InitializeTabMain();  // Load the selected image
+                    InitializeTabMain();  // load the selected image to "Main"
                 }
             }
 
-            DrawBorderInList();  // Ensure border is updated
+            // Ensure thumbnail border gets updated
+            DrawBorderInList(); 
         }
 
         private void DrawBorderInList()
@@ -1848,40 +2010,39 @@ namespace Commodore_Repair_Toolbox
         // ---------------------------------------------------------------------
         // listBox events
 
-        private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
+        private void listBoxComponents_SelectedIndexChanged(object sender, EventArgs e)
         {
-            UpdateHighlights();
+            //UpdateComponentList();
+            UpdateComponentSelection();
         }
 
-        private void listBox2_SelectedIndexChanged(object sender, EventArgs e)
+        // "Clear" button
+        private void buttonClear_Click(object sender, EventArgs e)
         {
-            InitializeComponentList(false);
-            SaveSelectedCategories(); // Save the user’s chosen categories
-            UpdateHighlights();
+            ClearEverything();
         }
 
-        // "Clear Selection" button
-        private void button1_Click(object sender, EventArgs e)
+        private void ClearEverything ()
         {
-            clearSelection();
+            listBoxComponents.ClearSelected();
+            listBoxComponentsSelectedText.Clear();
             textBoxFilterComponents.Text = "";
         }
 
-        private void clearSelection()
-        {
-            listBoxComponents.ClearSelected();
-            listBoxComponentsSelectedLabels.Clear();
-            UpdateHighlights();
-        }
-
-        // "Select All" button
+        // "Select all" button
         private void button2_Click(object sender, EventArgs e)
         {
+            
+            listBoxComponents.SelectedIndexChanged -= listBoxComponents_SelectedIndexChanged;
+
             for (int i = 0; i < listBoxComponents.Items.Count; i++)
             {
                 listBoxComponents.SetSelected(i, true);
             }
-            UpdateHighlights();
+
+            listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
+            UpdateComponentSelection();
+            //UpdateHighlights();
         }
 
         // ---------------------------------------------------------------------
@@ -1889,10 +2050,12 @@ namespace Commodore_Repair_Toolbox
 
         private void comboBoxHardware_SelectedIndexChanged(object sender, EventArgs e)
         {
+            ClearEverything();
+
             comboBoxBoard.Items.Clear();
             hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
             textBox5.Text = hardwareSelectedName; // feedback info
-
+            
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             if (hw != null)
             {
@@ -1907,7 +2070,7 @@ namespace Commodore_Repair_Toolbox
         private void comboBoxBoard_SelectedIndexChanged(object sender, EventArgs e)
         {
             SetupNewBoard();
-            UpdateHighlights(); // Clear old highlights
+            //UpdateHighlights(); // Clear old highlights
         }
 
         // ---------------------------------------------------------------------
@@ -1917,15 +2080,26 @@ namespace Commodore_Repair_Toolbox
         {
             if (image == null) return;
 
-            float xZoomFactor = (float)panelZoom.Width / image.Width;
-            float yZoomFactor = (float)panelZoom.Height / image.Height;
+            int scrollbarVerticalWidth = SystemInformation.VerticalScrollBarWidth;
+            int scrollbarHorizontalHeight = SystemInformation.HorizontalScrollBarHeight;
+
+            int availableWidth = panelZoom.Width - scrollbarVerticalWidth;
+            int availableHeight = panelZoom.Height - scrollbarHorizontalHeight;
+
+            float xZoomFactor = (float)availableWidth / image.Width;
+            float yZoomFactor = (float)availableHeight / image.Height;
             zoomFactor = Math.Min(xZoomFactor, yZoomFactor);
 
             panelImage.Size = new Size(
                 (int)(image.Width * zoomFactor),
                 (int)(image.Height * zoomFactor)
             );
+
             HighlightOverlays("tab");
+
+            // Always enforce scrollbars to avoid the weird "first zoom-in" flickering
+            panelZoom.AutoScroll = true;
+            panelZoom.AutoScrollMinSize = new Size(panelZoom.Width + 1, panelZoom.Height + 1);
         }
 
         private void panelZoom_Resize(object sender, EventArgs e)
@@ -2022,13 +2196,15 @@ namespace Commodore_Repair_Toolbox
                 {
                     foreach (var comp in bf.Components)
                     {
+                        string componentDisplay = bd.Components.FirstOrDefault(cb => cb.Label == comp.Label)?.NameDisplay ?? "";
                         if (comp.Overlays == null) continue;
 
                         foreach (var ov in comp.Overlays)
                         {
                             PictureBox overlayPictureBox = new PictureBox
                             {
-                                Name = comp.Label,
+                                //Name = comp.Label,
+                                Name = componentDisplay,
                                 Location = new Point(ov.Bounds.X, ov.Bounds.Y),
                                 Size = new Size(ov.Bounds.Width, ov.Bounds.Height),
                                 Tag = bf.Name
@@ -2044,115 +2220,9 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        // ---------------------------------------------------------------------
-        // Handling highlight overlays
 
-        private void HighlightOverlays(string scope)
+        private void ShowOverlaysAccordingToComponentList()
         {
-            if (this.WindowState == FormWindowState.Minimized || isResizing)
-            {
-                return;
-            }
-
-            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            if (bd == null) return;
-
-            if (scope == "tab")
-            {
-                // Draw overlays on the main image
-                if (overlayPanel == null) return;
-
-                var bf = bd.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
-                if (bf == null) return;
-
-                overlayPanel.Overlays.Clear();
-
-                Color colorZoom = Color.FromName(bf.HighlightColorTab);
-                int opacityZoom = bf.HighlightOpacityTab;
-
-                for (int i = 0; i < overlayComponentsTab.Count; i++)
-                {
-                    Rectangle rect = new Rectangle(
-                        (int)(overlayComponentsTabOriginalLocations[i].X * zoomFactor),
-                        (int)(overlayComponentsTabOriginalLocations[i].Y * zoomFactor),
-                        (int)(overlayComponentsTabOriginalSizes[i].Width * zoomFactor),
-                        (int)(overlayComponentsTabOriginalSizes[i].Height * zoomFactor)
-                    );
-
-                    bool highlighted = listBoxComponentsSelectedLabels.Contains(overlayComponentsTab[i].Name);
-
-                    overlayPanel.Overlays.Add(new OverlayInfo
-                    {
-                        Bounds = rect,
-                        Color = colorZoom,
-                        Opacity = opacityZoom,
-                        Highlighted = highlighted,
-                        ComponentLabel = overlayComponentsTab[i].Name
-                    });
-                }
-                overlayPanel.Invalidate();
-            }
-            else if (scope == "list")
-            {
-                // Draw overlays on each thumbnail
-                foreach (BoardFileOverlays bf in bd.Files)
-                {
-                    if (!overlayPanelsList.ContainsKey(bf.Name)) continue;
-
-                    OverlayPanel listPanel = overlayPanelsList[bf.Name];
-                    listPanel.Overlays.Clear();
-
-                    Color colorList = Color.FromName(bf.HighlightColorList);
-                    int opacityList = bf.HighlightOpacityList;
-                    float listZoom = overlayListZoomFactors[bf.Name];
-
-                    if (bf?.Components != null)
-                    {
-                        foreach (var comp in bf.Components)
-                        {
-                            if (comp.Overlays == null) continue;
-
-                            bool highlighted = listBoxComponentsSelectedLabels.Contains(comp.Label);
-
-                            foreach (var ov in comp.Overlays)
-                            {
-                                Rectangle rect = new Rectangle(
-                                    (int)(ov.Bounds.X * listZoom),
-                                    (int)(ov.Bounds.Y * listZoom),
-                                    (int)(ov.Bounds.Width * listZoom),
-                                    (int)(ov.Bounds.Height * listZoom)
-                                );
-                                listPanel.Overlays.Add(new OverlayInfo
-                                {
-                                    Bounds = rect,
-                                    Color = colorList,
-                                    Opacity = opacityList,
-                                    Highlighted = highlighted,
-                                    ComponentLabel = comp.Label
-                                });
-                            }
-                        }
-                    }
-                    listPanel.Invalidate();
-                }
-            }
-        }
-
-        private void UpdateHighlights()
-        {
-            listBoxComponentsSelectedLabels.Clear();
-
-            // Build a list of actual component labels from selected items
-            foreach (var selectedItem in listBoxComponents.SelectedItems)
-            {
-                string displayText = selectedItem.ToString();
-                if (listBoxNameValueMapping.TryGetValue(displayText, out string actualValue))
-                {
-                    listBoxComponentsSelectedLabels.Add(actualValue);
-                }
-            }
-
             HighlightOverlays("tab");
             HighlightOverlays("list");
 
@@ -2161,72 +2231,71 @@ namespace Commodore_Repair_Toolbox
         }
 
         // ---------------------------------------------------------------------
-        // Overlay events (mouse click, hover, etc.)
+        // Overlay mouse-click events
 
         private void OverlayPanel_OverlayClicked(object sender, OverlayClickedEventArgs e)
         {
-            // "labelClicked" is the component's label from the overlay
-            string labelClicked = e.OverlayInfo.ComponentLabel;
+            string componentClickedLabel = e.OverlayInfo.ComponentLabel;
 
+            // Find component "display name"
+            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            string componentDisplay = bd.Components
+                .FirstOrDefault(cb => cb.Label == componentClickedLabel)?.NameDisplay ?? "";
+
+            // Left-mouse click (select component and show popup)
             if (e.MouseArgs.Button == MouseButtons.Left)
             {
-                // 1) HIGHLIGHT the overlay by ensuring it's selected in listBox1
-                //    (If it isn't already.)
-                string key = listBoxNameValueMapping
-                    .FirstOrDefault(x => x.Value == labelClicked)
-                    .Key; // e.g. "R12   74LS257   DataBusChip"
-                int index = listBoxComponents.FindString(key);
+                // 1) HIGHLIGHT the overlay
+                if (!listBoxComponentsSelectedText.Contains(componentDisplay))
+                {
+                    listBoxComponentsSelectedText.Add(componentDisplay);
+                }
+                int index = listBoxComponents.Items.IndexOf(componentDisplay);
                 if (index >= 0)
                 {
-                    // Make sure it's selected (force highlight)
-                    if (!listBoxComponents.GetSelected(index))
-                    {
-                        listBoxComponents.SetSelected(index, true);
-                    }
+                    listBoxComponents.SetSelected(index, true);
                 }
-
-                // Refresh the highlight overlays
-                UpdateHighlights();
 
                 // 2) SHOW the form for the clicked component
                 var hardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var board = hardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-                var comp = board?.Components.FirstOrDefault(c => c.Label == labelClicked);
+                var comp = board?.Components.FirstOrDefault(c => c.Label == componentClickedLabel);
                 if (comp != null)
                 {
                     ShowComponentPopup(comp);
                 }
             }
+
+            // Right-mouse click (toggle component selection)
             else if (e.MouseArgs.Button == MouseButtons.Right)
             {
-                // Find item in listBox1 that has Value == labelClicked
-                string key = listBoxNameValueMapping
-                    .FirstOrDefault(x => x.Value == labelClicked)
-                    .Key;
-                int index = listBoxComponents.FindString(key);
 
-                if (index >= 0)
+                if (!listBoxComponentsSelectedText.Contains(componentDisplay))
                 {
-                    bool currentlySelected = listBoxComponents.GetSelected(index);
-                    listBoxComponents.SetSelected(index, !currentlySelected);
-                }
-                else
-                {
-                    // If not in list, re-add it
-                    foreach (var item in listBoxNameValueMapping)
+                    listBoxComponentsSelectedText.Add(componentDisplay);
+                    int index = listBoxComponents.Items.IndexOf(componentDisplay);
+                    if (index >= 0)
                     {
-                        if (item.Value == labelClicked)
-                        {
-                            listBoxComponents.Items.Add(item.Key);
-                            int newIndex = listBoxComponents.FindString(item.Key);
-                            listBoxComponents.SetSelected(newIndex, true);
-                            break;
-                        }
+                        listBoxComponents.SetSelected(index, true);
+                    }
+                } else
+                {
+                    listBoxComponentsSelectedText.Remove(componentDisplay);
+                    int index = listBoxComponents.Items.IndexOf(componentDisplay);
+                    if (index >= 0)
+                    {
+                        listBoxComponents.SetSelected(index, false);
                     }
                 }
-
-                UpdateHighlights();
+                    ShowOverlaysAccordingToComponentList();
+            } else
+            {
+                Debug.WriteLine("Will we ever get to here?");
             }
+
+            // Refresh the highlight overlays
+            ShowOverlaysAccordingToComponentList();
         }
 
         private void OverlayPanel_OverlayHoverChanged(object sender, OverlayHoverChangedEventArgs e)
@@ -2374,11 +2443,7 @@ namespace Commodore_Repair_Toolbox
                 buttonFullscreen.Enabled = false;
             }
         }
-
-        private void richTextBox_LinkClicked(object sender, LinkClickedEventArgs e)
-        {
-            Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
-        }
+                
 
         private void SaveSelectedCategories()
         {
@@ -2399,6 +2464,15 @@ namespace Commodore_Repair_Toolbox
 
         private bool LoadSelectedCategories()
         {
+            // Debug
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[LoadSelectedCategories] called from [" + callerName + "]");
+            #endif
+
             // e.g. "SelectedCategories|C128|310378"
             string configKey = $"SelectedCategories|{hardwareSelectedName}|{boardSelectedName}";
             string joined = Configuration.GetSetting(configKey, "");
@@ -2427,13 +2501,7 @@ namespace Commodore_Repair_Toolbox
             Configuration.SaveSetting("WindowState", this.WindowState.ToString());
         }
                 
-        /*
-        // What is this?
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
-        */
-
-        private void button1_Click_1(object sender, EventArgs e)
+        private void buttonSendFeedback_Click(object sender, EventArgs e)
         {
             string email = textBox3.Text;
             string feedback = textBox4.Text;
@@ -2454,59 +2522,61 @@ namespace Commodore_Repair_Toolbox
                 string excelFilePath = Path.Combine(Application.StartupPath, foundHardware.Folder, boardFile);
                 try
                 {
-                    WebClient webClient = new WebClient();
-                    ServicePointManager.Expect100Continue = true;
-                    ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
-                    webClient.Headers.Add("user-agent", "CRT "+ versionThis);
-
-                    // Build the data to send
-                    var data = new NameValueCollection
-                        {
-                            { "version", versionThis },
-                            { "hardware", hardwareSelectedName },
-                            { "board", boardSelectedName },
-                            { "schematic", schematicSelectedName },
-                            { "filename", boardFile },
-                            { "email", email },
-                            { "feedback", feedback }
-                        };
-
-                    // Attach the binary file if the checkbox is checked
-                    if (checkBox1.Checked)
+                    using (WebClient webClient = new WebClient())
                     {
-                        byte[] fileBytes = File.ReadAllBytes(excelFilePath);
-                        string fileBase64 = Convert.ToBase64String(fileBytes);
-                        data["attachment"] = fileBase64;
-                    }
+                        ServicePointManager.Expect100Continue = true;
+                        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+                        webClient.Headers.Add("user-agent", "CRT "+ versionThis);
 
-                    // Send it to the server
-                    var response = webClient.UploadValues(crtPage + crtPageFeedback, "POST", data);
-                    string resultFromServer = Encoding.UTF8.GetString(response);
-                    if (resultFromServer == "Success")
-                    {
-                        if (email.Length > 0)
+                        // Build the data to send
+                        var data = new NameValueCollection
+                            {
+                                { "version", versionThis },
+                                { "hardware", hardwareSelectedName },
+                                { "board", boardSelectedName },
+                                { "schematic", schematicSelectedName },
+                                { "filename", boardFile },
+                                { "email", email },
+                                { "feedback", feedback }
+                            };
+
+                        // Attach the binary file if the checkbox is checked
+                        if (checkBox1.Checked)
                         {
-                            string txt = "Feedback sent. Please allow for some time, if any response is needed.";
-                            MessageBox.Show(txt,
-                                "OK: Feedback sent",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Information);
+                            byte[] fileBytes = File.ReadAllBytes(excelFilePath);
+                            string fileBase64 = Convert.ToBase64String(fileBytes);
+                            data["attachment"] = fileBase64;
                         }
-                        else
+
+                        // Send it to the server
+                        var response = webClient.UploadValues(crtPage + crtPageFeedback, "POST", data);
+                        string resultFromServer = Encoding.UTF8.GetString(response);
+                        if (resultFromServer == "Success")
                         {
-                            string txt = "Feedback sent. No response will be given, as you did not specify an email address.";
+                            if (email.Length > 0)
+                            {
+                                string txt = "Feedback sent. Please allow for some time, if any response is needed.";
+                                MessageBox.Show(txt,
+                                    "OK: Feedback sent",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Information);
+                            }
+                            else
+                            {
+                                string txt = "Feedback sent. No response will be given, as you did not specify an email address.";
+                                MessageBox.Show(txt,
+                                    "OK: Feedback sent",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Information);
+                            }
+                        } else
+                        {
+                            string txt = "No feedback sent - did you fill in some text or attached the Excel data file?";
                             MessageBox.Show(txt,
-                                "OK: Feedback sent",
+                                "ERROR: Feedback not sent",
                                 MessageBoxButtons.OK,
-                                MessageBoxIcon.Information);
+                                MessageBoxIcon.Error);
                         }
-                    } else
-                    {
-                        string txt = "No feedback sent - did you fill in some text or attached the Excel data file?";
-                        MessageBox.Show(txt,
-                            "ERROR: Feedback not sent",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error);
                     }
                 }
                 catch (WebException ex)
@@ -2619,8 +2689,8 @@ namespace Commodore_Repair_Toolbox
         public string Label { get; set; }
         public string NameTechnical { get; set; }
         public string NameFriendly { get; set; }
+        public string NameDisplay { get; set; }
         public string Type { get; set; }
-        //public string ImagePinout { get; set; } // hest - must be deleted once replaced!
         public string OneLiner { get; set; }
         public string Description { get; set; }
         public List<ComponentLocalFiles> LocalFiles { get; set; }

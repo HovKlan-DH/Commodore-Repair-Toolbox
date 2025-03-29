@@ -12,6 +12,7 @@ namespace Commodore_Repair_Toolbox
         public int Opacity { get; set; } // 0-255
         public bool Highlighted { get; set; }
         public string ComponentLabel { get; set; }
+        public string ComponentDisplay { get; set; }
     }
 
     // Fired when an overlay is clicked (left or right)
