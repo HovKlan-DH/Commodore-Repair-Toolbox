@@ -48,7 +48,7 @@ You can also help specifically with these topics:
 You can also contribute by adding new data and send the Excel file and "label file" to me (view below for the software used for labeling).
 
 # Contact
-You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) here in the GitHub project page or write an email to **dennis** at **commodore-repair-toolbox** dot **dk**, if you want to report a problem, suggest any changes or just have a comment.
+You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) here in the GitHub project page or use the built-in "Feedback" tab, if you want to report a problem, suggest any changes or just have a comment.
 
 # Software used
 For labelling the components in the schematics  I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and easy to use, once you learn its way of working. It will output a JSON file, which then is [converted into Excel](https://commodore-repair-toolbox.dk/convert-via-to-excel/) format - you must send both this JSON file and its image file, if you have any updates.
