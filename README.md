@@ -75,7 +75,7 @@ There are bigger changes here, and I am not sure I want to go down this road - i
     - "Data has been updated" information
     - Rating system of user uploaded schematics
 
-# Data sources used for data configurations
+# Data sources used for configurations
 
 I have taken data from many places, but I do have a few _go-to_ places I frequently visit:
 - [My Old Computer](https://myoldcomputer.nl/technical-info/mainboards/) (view below also)
