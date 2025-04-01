@@ -33,7 +33,7 @@
             this.tabSchematics = new System.Windows.Forms.TabPage();
             this.splitContainerSchematics = new System.Windows.Forms.SplitContainer();
             this.panelMain = new System.Windows.Forms.Panel();
-            this.panelListAutoscroll = new System.Windows.Forms.Panel();
+            this.panelThumbnails = new System.Windows.Forms.Panel();
             this.tabOverview = new System.Windows.Forms.TabPage();
             this.webView2Overview = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.tabRessources = new System.Windows.Forms.TabPage();
@@ -43,11 +43,11 @@
             this.buttonSendFeedback = new System.Windows.Forms.Button();
             this.textBox6 = new System.Windows.Forms.TextBox();
             this.label8 = new System.Windows.Forms.Label();
-            this.textBox4 = new System.Windows.Forms.TextBox();
-            this.checkBox1 = new System.Windows.Forms.CheckBox();
+            this.textBoxFeedback = new System.Windows.Forms.TextBox();
+            this.checkBoxAttachExcel = new System.Windows.Forms.CheckBox();
             this.textBox5 = new System.Windows.Forms.TextBox();
             this.label6 = new System.Windows.Forms.Label();
-            this.textBox3 = new System.Windows.Forms.TextBox();
+            this.textBoxEmail = new System.Windows.Forms.TextBox();
             this.textBox2 = new System.Windows.Forms.TextBox();
             this.textBox1 = new System.Windows.Forms.TextBox();
             this.label4 = new System.Windows.Forms.Label();
@@ -106,7 +106,7 @@
             this.tabControl.Name = "tabControl";
             this.tabControl.Padding = new System.Drawing.Point(0, 0);
             this.tabControl.SelectedIndex = 0;
-            this.tabControl.Size = new System.Drawing.Size(721, 570);
+            this.tabControl.Size = new System.Drawing.Size(728, 570);
             this.tabControl.TabIndex = 0;
             this.tabControl.SelectedIndexChanged += new System.EventHandler(this.tabControl1_SelectedIndexChanged);
             // 
@@ -116,7 +116,7 @@
             this.tabSchematics.Location = new System.Drawing.Point(4, 30);
             this.tabSchematics.Margin = new System.Windows.Forms.Padding(0);
             this.tabSchematics.Name = "tabSchematics";
-            this.tabSchematics.Size = new System.Drawing.Size(713, 536);
+            this.tabSchematics.Size = new System.Drawing.Size(720, 536);
             this.tabSchematics.TabIndex = 0;
             this.tabSchematics.Text = "Schematics";
             this.tabSchematics.UseVisualStyleBackColor = true;
@@ -135,10 +135,10 @@
             // 
             // splitContainerSchematics.Panel2
             // 
-            this.splitContainerSchematics.Panel2.Controls.Add(this.panelListAutoscroll);
+            this.splitContainerSchematics.Panel2.Controls.Add(this.panelThumbnails);
             this.splitContainerSchematics.Panel2MinSize = 100;
-            this.splitContainerSchematics.Size = new System.Drawing.Size(713, 536);
-            this.splitContainerSchematics.SplitterDistance = 600;
+            this.splitContainerSchematics.Size = new System.Drawing.Size(720, 536);
+            this.splitContainerSchematics.SplitterDistance = 605;
             this.splitContainerSchematics.SplitterWidth = 11;
             this.splitContainerSchematics.TabIndex = 7;
             // 
@@ -148,19 +148,19 @@
             this.panelMain.Location = new System.Drawing.Point(0, 0);
             this.panelMain.Margin = new System.Windows.Forms.Padding(0);
             this.panelMain.Name = "panelMain";
-            this.panelMain.Size = new System.Drawing.Size(600, 536);
+            this.panelMain.Size = new System.Drawing.Size(605, 536);
             this.panelMain.TabIndex = 5;
             // 
-            // panelListAutoscroll
+            // panelThumbnails
             // 
-            this.panelListAutoscroll.AutoScroll = true;
-            this.panelListAutoscroll.BackColor = System.Drawing.Color.Transparent;
-            this.panelListAutoscroll.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panelListAutoscroll.Location = new System.Drawing.Point(0, 0);
-            this.panelListAutoscroll.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
-            this.panelListAutoscroll.Name = "panelListAutoscroll";
-            this.panelListAutoscroll.Size = new System.Drawing.Size(102, 536);
-            this.panelListAutoscroll.TabIndex = 0;
+            this.panelThumbnails.AutoScroll = true;
+            this.panelThumbnails.BackColor = System.Drawing.Color.Transparent;
+            this.panelThumbnails.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panelThumbnails.Location = new System.Drawing.Point(0, 0);
+            this.panelThumbnails.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.panelThumbnails.Name = "panelThumbnails";
+            this.panelThumbnails.Size = new System.Drawing.Size(104, 536);
+            this.panelThumbnails.TabIndex = 0;
             // 
             // tabOverview
             // 
@@ -218,11 +218,11 @@
             this.tabFeedback.Controls.Add(this.buttonSendFeedback);
             this.tabFeedback.Controls.Add(this.textBox6);
             this.tabFeedback.Controls.Add(this.label8);
-            this.tabFeedback.Controls.Add(this.textBox4);
-            this.tabFeedback.Controls.Add(this.checkBox1);
+            this.tabFeedback.Controls.Add(this.textBoxFeedback);
+            this.tabFeedback.Controls.Add(this.checkBoxAttachExcel);
             this.tabFeedback.Controls.Add(this.textBox5);
             this.tabFeedback.Controls.Add(this.label6);
-            this.tabFeedback.Controls.Add(this.textBox3);
+            this.tabFeedback.Controls.Add(this.textBoxEmail);
             this.tabFeedback.Controls.Add(this.textBox2);
             this.tabFeedback.Controls.Add(this.textBox1);
             this.tabFeedback.Controls.Add(this.label4);
@@ -273,28 +273,28 @@
             this.label8.TabIndex = 14;
             this.label8.Text = "Excel data file:";
             // 
-            // textBox4
+            // textBoxFeedback
             // 
-            this.textBox4.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            this.textBoxFeedback.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.textBox4.Location = new System.Drawing.Point(14, 267);
-            this.textBox4.Multiline = true;
-            this.textBox4.Name = "textBox4";
-            this.textBox4.Size = new System.Drawing.Size(684, 194);
-            this.textBox4.TabIndex = 13;
+            this.textBoxFeedback.Location = new System.Drawing.Point(14, 267);
+            this.textBoxFeedback.Multiline = true;
+            this.textBoxFeedback.Name = "textBoxFeedback";
+            this.textBoxFeedback.Size = new System.Drawing.Size(684, 194);
+            this.textBoxFeedback.TabIndex = 13;
             // 
-            // checkBox1
+            // checkBoxAttachExcel
             // 
-            this.checkBox1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.checkBox1.AutoSize = true;
-            this.checkBox1.Location = new System.Drawing.Point(14, 464);
-            this.checkBox1.Name = "checkBox1";
-            this.checkBox1.Size = new System.Drawing.Size(305, 25);
-            this.checkBox1.TabIndex = 12;
-            this.checkBox1.Text = "Attach Excel data file for selected board";
-            this.checkBox1.UseVisualStyleBackColor = true;
-            this.checkBox1.CheckedChanged += new System.EventHandler(this.checkBox1_CheckedChanged);
+            this.checkBoxAttachExcel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.checkBoxAttachExcel.AutoSize = true;
+            this.checkBoxAttachExcel.Location = new System.Drawing.Point(14, 464);
+            this.checkBoxAttachExcel.Name = "checkBoxAttachExcel";
+            this.checkBoxAttachExcel.Size = new System.Drawing.Size(305, 25);
+            this.checkBoxAttachExcel.TabIndex = 12;
+            this.checkBoxAttachExcel.Text = "Attach Excel data file for selected board";
+            this.checkBoxAttachExcel.UseVisualStyleBackColor = true;
+            this.checkBoxAttachExcel.CheckedChanged += new System.EventHandler(this.checkBox1_CheckedChanged);
             // 
             // textBox5
             // 
@@ -313,12 +313,12 @@
             this.label6.TabIndex = 10;
             this.label6.Text = "Selected hardware:";
             // 
-            // textBox3
+            // textBoxEmail
             // 
-            this.textBox3.Location = new System.Drawing.Point(14, 202);
-            this.textBox3.Name = "textBox3";
-            this.textBox3.Size = new System.Drawing.Size(419, 28);
-            this.textBox3.TabIndex = 6;
+            this.textBoxEmail.Location = new System.Drawing.Point(14, 202);
+            this.textBoxEmail.Name = "textBoxEmail";
+            this.textBoxEmail.Size = new System.Drawing.Size(419, 28);
+            this.textBoxEmail.TabIndex = 6;
             // 
             // textBox2
             // 
@@ -434,7 +434,6 @@
             this.comboBoxHardware.Name = "comboBoxHardware";
             this.comboBoxHardware.Size = new System.Drawing.Size(273, 29);
             this.comboBoxHardware.TabIndex = 1;
-            this.comboBoxHardware.SelectedIndexChanged += new System.EventHandler(this.comboBoxHardware_SelectedIndexChanged);
             // 
             // labelHardware
             // 
@@ -467,7 +466,6 @@
             this.comboBoxBoard.Name = "comboBoxBoard";
             this.comboBoxBoard.Size = new System.Drawing.Size(273, 29);
             this.comboBoxBoard.TabIndex = 3;
-            this.comboBoxBoard.SelectedIndexChanged += new System.EventHandler(this.comboBoxBoard_SelectedIndexChanged);
             // 
             // listBoxComponents
             // 
@@ -587,7 +585,7 @@
             this.panelBehindTab.Location = new System.Drawing.Point(299, 13);
             this.panelBehindTab.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.panelBehindTab.Name = "panelBehindTab";
-            this.panelBehindTab.Size = new System.Drawing.Size(771, 627);
+            this.panelBehindTab.Size = new System.Drawing.Size(782, 641);
             this.panelBehindTab.TabIndex = 14;
             // 
             // textBoxFilterComponents
@@ -676,7 +674,7 @@
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.Panel panelMain;
-        private System.Windows.Forms.Panel panelListAutoscroll;
+        private System.Windows.Forms.Panel panelThumbnails;
         private System.Windows.Forms.ListBox listBoxCategories;
         private System.Windows.Forms.Label labelCategories;
         private System.Windows.Forms.Button buttonAll;
@@ -694,14 +692,14 @@
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Button buttonSendFeedback;
-        private System.Windows.Forms.TextBox textBox3;
+        private System.Windows.Forms.TextBox textBoxEmail;
         private System.Windows.Forms.TextBox textBox2;
         private System.Windows.Forms.TextBox textBox1;
         private System.Windows.Forms.Label label4;
-        private System.Windows.Forms.CheckBox checkBox1;
+        private System.Windows.Forms.CheckBox checkBoxAttachExcel;
         private System.Windows.Forms.TextBox textBox5;
         private System.Windows.Forms.Label label6;
-        private System.Windows.Forms.TextBox textBox4;
+        private System.Windows.Forms.TextBox textBoxFeedback;
         private System.Windows.Forms.TextBox textBox6;
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.Label label9;
