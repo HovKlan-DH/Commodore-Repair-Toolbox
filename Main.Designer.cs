@@ -74,6 +74,7 @@
             this.panelBehindTab = new System.Windows.Forms.Panel();
             this.textBoxFilterComponents = new System.Windows.Forms.TextBox();
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
+            this.buttonResize = new System.Windows.Forms.Button();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -167,7 +168,7 @@
             this.tabOverview.Controls.Add(this.webView2Overview);
             this.tabOverview.Location = new System.Drawing.Point(4, 30);
             this.tabOverview.Name = "tabOverview";
-            this.tabOverview.Size = new System.Drawing.Size(713, 536);
+            this.tabOverview.Size = new System.Drawing.Size(720, 536);
             this.tabOverview.TabIndex = 8;
             this.tabOverview.Text = "Overview";
             this.tabOverview.UseVisualStyleBackColor = true;
@@ -194,7 +195,7 @@
             this.tabRessources.Location = new System.Drawing.Point(4, 30);
             this.tabRessources.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabRessources.Name = "tabRessources";
-            this.tabRessources.Size = new System.Drawing.Size(713, 536);
+            this.tabRessources.Size = new System.Drawing.Size(720, 536);
             this.tabRessources.TabIndex = 3;
             this.tabRessources.Text = "Ressources";
             // 
@@ -231,7 +232,7 @@
             this.tabFeedback.Controls.Add(this.label1);
             this.tabFeedback.Location = new System.Drawing.Point(4, 30);
             this.tabFeedback.Name = "tabFeedback";
-            this.tabFeedback.Size = new System.Drawing.Size(713, 536);
+            this.tabFeedback.Size = new System.Drawing.Size(720, 536);
             this.tabFeedback.TabIndex = 7;
             this.tabFeedback.Text = "Feedback";
             this.tabFeedback.UseVisualStyleBackColor = true;
@@ -379,7 +380,7 @@
             this.tabHelp.Location = new System.Drawing.Point(4, 30);
             this.tabHelp.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabHelp.Name = "tabHelp";
-            this.tabHelp.Size = new System.Drawing.Size(713, 536);
+            this.tabHelp.Size = new System.Drawing.Size(720, 536);
             this.tabHelp.TabIndex = 6;
             this.tabHelp.Text = "Help";
             // 
@@ -405,7 +406,7 @@
             this.tabAbout.Location = new System.Drawing.Point(4, 30);
             this.tabAbout.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabAbout.Name = "tabAbout";
-            this.tabAbout.Size = new System.Drawing.Size(713, 536);
+            this.tabAbout.Size = new System.Drawing.Size(720, 536);
             this.tabAbout.TabIndex = 5;
             this.tabAbout.Text = "About";
             // 
@@ -581,6 +582,7 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.panelBehindTab.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.panelBehindTab.Controls.Add(this.buttonResize);
             this.panelBehindTab.Controls.Add(this.tabControl);
             this.panelBehindTab.Location = new System.Drawing.Point(299, 13);
             this.panelBehindTab.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
@@ -608,6 +610,18 @@
             this.checkBoxBlink.TabIndex = 15;
             this.checkBoxBlink.Text = "Blink selected components";
             this.checkBoxBlink.UseVisualStyleBackColor = true;
+            // 
+            // buttonResize
+            // 
+            this.buttonResize.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.buttonResize.Font = new System.Drawing.Font("Calibri", 7.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.buttonResize.Location = new System.Drawing.Point(732, -1);
+            this.buttonResize.Name = "buttonResize";
+            this.buttonResize.Size = new System.Drawing.Size(50, 25);
+            this.buttonResize.TabIndex = 1;
+            this.buttonResize.Text = "Resize";
+            this.buttonResize.UseVisualStyleBackColor = true;
+            this.buttonResize.Click += new System.EventHandler(this.button1_Click);
             // 
             // Main
             // 
@@ -705,5 +719,6 @@
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.TabPage tabOverview;
         private Microsoft.Web.WebView2.WinForms.WebView2 webView2Overview;
+        private System.Windows.Forms.Button buttonResize;
     }
 }

@@ -24,12 +24,12 @@ namespace Commodore_Repair_Toolbox
                     );
             }
 
-            Debug.WriteLine("=== Config keys loaded ===");
+            Debug.WriteLine("---[Configuration file keys loaded]---");
             foreach (var kv in settings)
             {
                 Debug.WriteLine($"'{kv.Key}' => '{kv.Value}'");
             }
-            Debug.WriteLine("==========================");
+            Debug.WriteLine("--------------------------------------");
         }
 
         public static void SaveConfig()

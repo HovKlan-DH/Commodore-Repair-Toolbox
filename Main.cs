@@ -65,8 +65,8 @@ namespace Commodore_Repair_Toolbox
         private Dictionary<string, float> overlayListZoomFactors = new Dictionary<string, float>();
         private Color labelImageBgClr = Color.Khaki;
         private Color labelImageTxtClr = Color.Black;
-        private Color labelImageHasElementsBgClr = Color.Yellow;
-        private Color labelImageHasElementsTxtClr = Color.Black;
+        private Color labelImageHasElementsBgClr = Color.SteelBlue;
+        private Color labelImageHasElementsTxtClr = Color.White;
 
         // Resizing of window/schematic
         private bool isResizedByMouseWheel = false;
@@ -139,6 +139,11 @@ namespace Commodore_Repair_Toolbox
 
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
+
+            moveEndTimer.Interval = 300;
+            moveEndTimer.Tick += MoveEndTimer_Tick;
+            this.LocationChanged += Form_LocationChanged;
+            GetActiveMonitor();
         }
 
 
@@ -438,6 +443,7 @@ namespace Commodore_Repair_Toolbox
         private void Form_Resize(object sender, EventArgs e)
         {
             Configuration.SaveSetting("WindowState", this.WindowState.ToString());
+            ReadaptThumbnails();
         }
 
 
@@ -1252,7 +1258,16 @@ namespace Commodore_Repair_Toolbox
                 textBoxFeedback.Focus();
             }
 
-            previousTab = tabControl.SelectedTab;
+            // Show or hide the "Resize" button
+            if (tabControl.SelectedTab.Text == "Schematics")
+            {
+                buttonResize.Visible = true;
+            } else
+            {
+                buttonResize.Visible = false;
+            }
+
+                previousTab = tabControl.SelectedTab;
         }
 
 
@@ -1901,6 +1916,7 @@ namespace Commodore_Repair_Toolbox
             int availableWidthForThumbnailElement = availableWidthForThumbnailContainer - (thumbnailSelectedBorderWidth * 2);
 
             // Walkthrough all (parent) panels (a panel is a thumbnail container)
+            Debug.WriteLine("---");
             foreach (Panel panelThumbnail in panelThumbnails.Controls.OfType<Panel>())
             {
                 // Get the two elements inside the panel
@@ -1916,14 +1932,13 @@ namespace Commodore_Repair_Toolbox
                 int newImageHeight = (int)(availableWidthForThumbnailElement * aspectRatio);
 
                 // Set location and new size for all three elements
-                panelThumbnail.Location = new Point(padding, yPosition);
+                panelThumbnail.Location = new Point(padding, yPosition + panelThumbnails.AutoScrollPosition.Y); // "panelThumbnails.AutoScrollPosition.Y" will take into consideration, if there is a scrollbar visible, and then correctly position the thumbnail
                 panelThumbnail.Size = new Size(availableWidthForThumbnailContainer, labelHeight + newImageHeight + (thumbnailSelectedBorderWidth * 2));
                 labelImage.Location = new Point(thumbnailSelectedBorderWidth, thumbnailSelectedBorderWidth);
                 labelImage.Size = new Size(availableWidthForThumbnailElement, labelHeight + thumbnailSelectedBorderWidth);
                 pictureBoxImage.Location = new Point(thumbnailSelectedBorderWidth, labelHeight + thumbnailSelectedBorderWidth - 1); // -1 to avoid having a double-line
                 pictureBoxImage.Size = new Size(availableWidthForThumbnailElement, newImageHeight + 1); // +1 to compensate for the above -1
                 
-
                 yPosition += panelThumbnail.Height + verticalSpaceBetweenThumbnails;
 
                 float scaleFactor = (float)pictureBoxImage.Width / pictureBoxImage.BackgroundImage.Width;
@@ -1991,7 +2006,7 @@ namespace Commodore_Repair_Toolbox
             overlayPanel.Overlays.Clear();
 
             schematicSelectedName = pan.Name;
-            Configuration.SaveSetting("SelectedThumbnail", schematicSelectedName);  // Save selected image
+            Configuration.SaveSetting("SelectedThumbnail", schematicSelectedName);
             textBox2.Text = schematicSelectedName; // feedback info
 
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
@@ -2628,6 +2643,35 @@ namespace Commodore_Repair_Toolbox
             textBox6.Text = checkBoxAttachExcel.Checked ? boardSelectedFilename : "";
         }
 
+
+        private void GetActiveMonitor()
+        {
+            var screen = Screen.FromControl(this);
+            Debug.WriteLine("Monitor: " + screen.DeviceName);
+            //            Properties.Settings.Default.MonitorDeviceName = screen.DeviceName;
+            //            Properties.Settings.Default.Save();
+        }
+
+        private Timer moveEndTimer = new Timer();
+
+        private void Form_LocationChanged(object sender, EventArgs e)
+        {
+            moveEndTimer.Stop();
+            moveEndTimer.Start();
+        }
+
+        private void MoveEndTimer_Tick(object sender, EventArgs e)
+        {
+            moveEndTimer.Stop();
+            Screen currentScreen = Screen.FromControl(this);
+            string deviceName = currentScreen.DeviceName;
+            Debug.WriteLine("Moved to: " + deviceName);
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            ReadaptThumbnails();
+        }
     }
 
     // -------------------------------------------------------------------------
