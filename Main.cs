@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
@@ -102,6 +103,8 @@ namespace Commodore_Repair_Toolbox
         private Dictionary<Control, EventHandler> clickEventHandlers = new Dictionary<Control, EventHandler>();
         private TabPage previousTab;
         private int thumbnailSelectedBorderWidth = 3;
+        private Timer windowMoveStopTimer = new Timer();
+        private Point windowLastLocation;
 
 
         // ###########################################################################################
@@ -112,15 +115,15 @@ namespace Commodore_Repair_Toolbox
         {
             InitializeComponent();
 
-            // Create or overwrite the debug output file
-            CreateDebugOutputFile();
-
             // Get build type
             #if DEBUG
                 buildType = "Debug";
             #else
                 buildType = "Release";
             #endif
+
+            // Create or overwrite the debug output file
+            CreateDebugOutputFile();
 
             // Enable double-buffering for smoother UI rendering
             EnableDoubleBuffering();
@@ -139,11 +142,6 @@ namespace Commodore_Repair_Toolbox
 
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
-
-            moveEndTimer.Interval = 300;
-            moveEndTimer.Tick += MoveEndTimer_Tick;
-            this.LocationChanged += Form_LocationChanged;
-            GetActiveMonitor();
         }
 
 
@@ -162,9 +160,6 @@ namespace Commodore_Repair_Toolbox
                         
             tabControl.Dock = DockStyle.Fill;
 
-            // Set initial focus to textBoxFilterComponents
-            textBoxFilterComponents.Focus();
-
             // Initialize the blink timer
             InitializeBlinkTimer();
 
@@ -177,15 +172,18 @@ namespace Commodore_Repair_Toolbox
 
             ApplyConfigSettings();
 
-            AttachConfigurationSaveEvents();
-
             // Attach various event handles
             AttachEventHandlers();
+
+            AttachConfigurationSaveEvents();
 
             SetupNewBoard();
             LoadSelectedImage();
 
             UpdateComponentList();
+
+            // Set initial focus to textBoxFilterComponents
+            textBoxFilterComponents.Focus();
         }
 
 
@@ -340,6 +338,74 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
+        // Apply saved configuration settings to controls.
+        // ###########################################################################################
+
+        private void ApplyConfigSettings()
+        {
+            // Set default values first
+            string defaultSelectedHardware = classHardware.FirstOrDefault()?.Name;
+            string defaultSelectedBoard = classHardware.FirstOrDefault(h => h.Name == defaultSelectedHardware)?.Boards?.FirstOrDefault()?.Name;
+            string defaultSelectedSchematic = classHardware.FirstOrDefault(h => h.Name == defaultSelectedHardware)?.Boards?.FirstOrDefault(b => b.Name == defaultSelectedBoard)?.Files?.FirstOrDefault()?.Name;
+            string defaultSplitterPos = (splitContainerSchematics.Width * 0.9).ToString(); // 90% of full width
+
+            // Load saved settings from configuration file - or set default if none exists
+            string selectedHardwareVal = Configuration.GetSetting("HardwareSelected", defaultSelectedHardware);
+            string selectedBoardVal = Configuration.GetSetting("BoardSelected", defaultSelectedBoard);
+            string selectedSchematicVal = Configuration.GetSetting("SelectedThumbnail", defaultSelectedSchematic);
+            string splitterPosVal = Configuration.GetSetting("SplitterPosition", defaultSplitterPos);
+            string userEmail = Configuration.GetSetting("UserEmail", "");
+
+            textBoxEmail.Text = userEmail; // set email address in "Feedback" tab
+
+            // Populate all hardware in combobox - and select
+            foreach (Hardware hardware in classHardware)
+            {
+                comboBoxHardware.Items.Add(hardware.Name);
+            }
+            int indexHardware = comboBoxHardware.Items.IndexOf(selectedHardwareVal);
+            comboBoxHardware.SelectedIndex = indexHardware;
+            hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
+            textBox5.Text = hardwareSelectedName; // feedback info           
+
+            // Populate all boards in combobox, based on selected hardware - and select
+            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            if (hw != null)
+            {
+                foreach (var board in hw.Boards)
+                {
+                    comboBoxBoard.Items.Add(board.Name);
+                }
+                int indexBoard = comboBoxBoard.Items.IndexOf(selectedBoardVal);
+                comboBoxBoard.SelectedIndex = indexBoard;
+                boardSelectedName = comboBoxBoard.SelectedItem.ToString();
+                boardSelectedName = selectedBoardVal;
+                textBox1.Text = boardSelectedName; // feedback info           
+            }
+
+            // Set the selected schematic
+            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            if (bd != null)
+            {
+                var schematic = bd.Files.FirstOrDefault(f => f.Name == selectedSchematicVal) ?? bd.Files.FirstOrDefault();
+                if (schematic != null)
+                {
+                    //selectedSchematicVal = schematic.Name;
+                    schematicSelectedName = schematic.Name;
+                    boardSelectedFilename = Path.GetFileName(bd.Datafile); // feedback info
+                                                                           //LoadSelectedImage();
+                }
+            }
+
+            // Apply splitter position
+            if (int.TryParse(splitterPosVal, out int splitterPosition) && splitterPosition > 0)
+            {
+                splitContainerSchematics.SplitterDistance = splitterPosition;
+            }
+        }
+
+
+        // ###########################################################################################
         // Create/overwrite the debug output logfile
         // ###########################################################################################
 
@@ -385,6 +451,34 @@ namespace Commodore_Repair_Toolbox
             tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
             splitContainerSchematics.SplitterMoved += SplitContainer1_SplitterMoved;
             listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
+            windowMoveStopTimer.Interval = 200;
+            windowMoveStopTimer.Tick += MoveStopTimer_Tick;
+            Move += Form_Move;
+        }
+
+
+        // ###########################################################################################
+        // Attach event handlers for saving configuration settings.
+        // ###########################################################################################
+        private void AttachConfigurationSaveEvents()
+        {
+            // Selection of new hardware
+            comboBoxHardware.SelectedIndexChanged += (s, e) =>
+            {
+                Configuration.SaveSetting("HardwareSelected", hardwareSelectedName);
+            };
+
+            // Selection of new board
+            comboBoxBoard.SelectedIndexChanged += (s, e) =>
+            {
+                Configuration.SaveSetting("BoardSelected", boardSelectedName);
+            };
+
+            // Splitter moved
+            splitContainerSchematics.SplitterMoved += (s, e) =>
+            {
+                Configuration.SaveSetting("SplitterPosition", splitContainerSchematics.SplitterDistance.ToString());
+            };
         }
 
 
@@ -431,19 +525,22 @@ namespace Commodore_Repair_Toolbox
 
         private void Form_ResizeEnd(object sender, EventArgs e)
         {
-            //InitializeList();
-            ReadaptThumbnails();
-
             ResizeTabImage();
-            HighlightOverlays("tab");
-            HighlightOverlays("list");
             ResumeLayout();
+            ReadaptThumbnails();
         }
 
         private void Form_Resize(object sender, EventArgs e)
         {
             Configuration.SaveSetting("WindowState", this.WindowState.ToString());
             ReadaptThumbnails();
+        }
+
+        private void Form_Move(object sender, EventArgs e)
+        {
+            windowLastLocation = this.Location;
+            windowMoveStopTimer.Stop();
+            windowMoveStopTimer.Start();
         }
 
 
@@ -466,13 +563,25 @@ namespace Commodore_Repair_Toolbox
                 <script>
                     document.addEventListener('click', function(e) {
                     var target = e.target;
+                    <!-- Event for 'Open URL' -->
+                    if (target.tagName.toLowerCase() === 'a' && !target.href.startsWith('file://')) {
+                        e.preventDefault();
+                        window.chrome.webview.postMessage('openUrl:' + target.href);
+                    }
+                    <!-- Event for 'Open file' -->
                     if (target.tagName.toLowerCase() === 'a' && target.href.startsWith('file://')) {
                         e.preventDefault();
                         window.chrome.webview.postMessage('openFile:' + target.href);
                     }
+                    <!-- Event for 'Open component' -->
                     if (target.matches('[data-compLabel]')) {
                         var compLabel = target.getAttribute('data-compLabel');
                         window.chrome.webview.postMessage('openComp:' + compLabel);
+                    }
+                    <!-- Event for 'Close popup' -->
+                    if (!(e.target.tagName.toLowerCase() === 'a' && e.target.href.startsWith('file://')) &&
+                        !e.target.matches('[data-compLabel]')) {
+                        window.chrome.webview.postMessage('htmlClick');
                     }
                     });
                 </script>
@@ -612,20 +721,35 @@ namespace Commodore_Repair_Toolbox
             htmlContent += "</html >";
 
             // Make sure we detach any current event handles, before we add a new one
-            webView2Overview.CoreWebView2.WebMessageReceived -= WebView2OverviewForm_WebMessageReceived; // detach first
-            webView2Overview.CoreWebView2.WebMessageReceived += WebView2OverviewForm_WebMessageReceived; // attach again
-            webView2Overview.CoreWebView2.WebMessageReceived -= WebView2OpenFile_WebMessageReceived; // detach first
-            webView2Overview.CoreWebView2.WebMessageReceived += WebView2OpenFile_WebMessageReceived; // attach again
-            webView2Overview.CoreWebView2.NewWindowRequested -= WebView2OpenUrl_NewWindowRequested; // detach first
-            webView2Overview.CoreWebView2.NewWindowRequested += WebView2OpenUrl_NewWindowRequested; // attach again
+            webView2Overview.CoreWebView2.WebMessageReceived -= WebView2_WebMessageReceived;
+            webView2Overview.CoreWebView2.WebMessageReceived += WebView2_WebMessageReceived;
 
             webView2Overview.NavigateToString(htmlContent);
         }
 
-        private void WebView2OverviewForm_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs args)
+
+        private void WebView2_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
-            string message = args.TryGetWebMessageAsString();
-            if (message.StartsWith("openComp:"))
+            var message = e.TryGetWebMessageAsString();
+
+            CloseComponentPopup();
+
+            // Open URL
+            if (message.StartsWith("openUrl:"))
+            {
+                string url = message.Substring("openUrl:".Length);
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+
+            // Open file
+            else if (message.StartsWith("openFile:"))
+            {
+                string fileUrl = message.Substring("openFile:".Length);
+                Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
+            }
+
+            // Open component
+            else if (message.StartsWith("openComp:"))
             {
                 string compName = message.Substring("openComp:".Length);
                 var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
@@ -633,28 +757,26 @@ namespace Commodore_Repair_Toolbox
                 ComponentBoard selectedComp = foundBoard?.Components.FirstOrDefault(c => c.Label == compName);
                 if (selectedComp != null)
                 {
-                    FormComponent componentInfoPopup = new FormComponent(selectedComp, hardwareSelectedFolder, boardSelectedFolder);
+                    componentInfoPopup = new FormComponent(selectedComp, hardwareSelectedFolder, boardSelectedFolder);
                     componentInfoPopup.Show(this);
                     componentInfoPopup.TopMost = true;
                 }
             }
-        }
 
-        private void WebView2OpenFile_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs args)
-        {
-            string message = args.TryGetWebMessageAsString();
-            if (message.StartsWith("openFile:"))
+            // Click anywhere in HTML
+            else if (message == "htmlClick")
             {
-                string fileUrl = message.Substring("openFile:".Length);
-                Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
+                // NOP (it has this event to close the component popup)
             }
         }
 
-        private void WebView2OpenUrl_NewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs args)
+        private void CloseComponentPopup()
         {
-            // Open URL in default web browser
-            args.Handled = true;
-            Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
+            if (componentInfoPopup != null && !componentInfoPopup.IsDisposed)
+            {
+                componentInfoPopup.Close();
+                componentInfoPopup = null;
+            }
         }
 
 
@@ -741,12 +863,19 @@ namespace Commodore_Repair_Toolbox
             htmlContent += "</html >";
 
             // Make sure we detach any current event handles, before we add a new one
-            webView2Ressources.CoreWebView2.WebMessageReceived -= WebView2OpenFile_WebMessageReceived; // detach first
-            webView2Ressources.CoreWebView2.WebMessageReceived += WebView2OpenFile_WebMessageReceived; // attach again
+            webView2Ressources.CoreWebView2.WebMessageReceived -= WebView2_WebMessageReceived; // detach first
+            webView2Ressources.CoreWebView2.WebMessageReceived += WebView2_WebMessageReceived; // attach again
             webView2Ressources.CoreWebView2.NewWindowRequested -= WebView2OpenUrl_NewWindowRequested; // detach first
             webView2Ressources.CoreWebView2.NewWindowRequested += WebView2OpenUrl_NewWindowRequested; // attach again
 
             webView2Ressources.NavigateToString(htmlContent);
+        }
+
+        private void WebView2OpenUrl_NewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs args)
+        {
+            // Open URL in default web browser
+            args.Handled = true;
+            Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
         }
 
 
@@ -1043,6 +1172,15 @@ namespace Commodore_Repair_Toolbox
 
         private void HighlightOverlays(string scope)
         {
+            // Debug
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[HighlightOverlays("+ scope + ")] called from [" + callerName + "]");
+            #endif
+
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (bd == null) return;
@@ -1258,16 +1396,7 @@ namespace Commodore_Repair_Toolbox
                 textBoxFeedback.Focus();
             }
 
-            // Show or hide the "Resize" button
-            if (tabControl.SelectedTab.Text == "Schematics")
-            {
-                buttonResize.Visible = true;
-            } else
-            {
-                buttonResize.Visible = false;
-            }
-
-                previousTab = tabControl.SelectedTab;
+            previousTab = tabControl.SelectedTab;
         }
 
 
@@ -1308,136 +1437,64 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+        // ###########################################################################################
+        // Setup the board after user selects it in "comboboxBoard".
+        // ###########################################################################################
 
-
-
-
-
-
-
-
-
-        // I HAVE COME TO HERE FOR REFACTORING
-
-        private void AdjustComponentCategoriesListBoxHeight()
+        private void SetupNewBoard()
         {
-            // Debug
             #if DEBUG
                 StackTrace stackTrace = new StackTrace();
                 StackFrame callerFrame = stackTrace.GetFrame(1);
                 MethodBase callerMethod = callerFrame.GetMethod();
                 string callerName = callerMethod.Name;
-                Debug.WriteLine("[AdjustComponentCategoriesListBoxHeight] called from [" + callerName + "]");
+                Debug.WriteLine("[SetupNewBoard] called from [" + callerName + "]");
             #endif
 
-            int listBoxLocationEnd_org = listBoxCategories.Location.Y + listBoxCategories.Height;
-            int itemHeight = listBoxCategories.ItemHeight;
-            int itemCount = listBoxCategories.Items.Count;
-            int borderHeight = listBoxCategories.Height - listBoxCategories.ClientSize.Height;
-            listBoxCategories.Height = (itemHeight * itemCount) + borderHeight;
-            int listBoxLocationEnd_new = listBoxCategories.Location.Y + listBoxCategories.Height;
-            int diff =  listBoxLocationEnd_org - listBoxLocationEnd_new;
-            if (diff > 0)
+            listBoxComponents.Items.Clear();
+
+            boardSelectedName = comboBoxBoard.SelectedItem.ToString();
+            textBox1.Text = boardSelectedName; // feedback info
+
+            var selectedHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var selectedBoard = selectedHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            if (selectedHardware == null || selectedBoard == null) return;
+
+            hardwareSelectedFolder = selectedHardware.Folder;
+            boardSelectedFolder = selectedBoard.Folder;
+
+            // Default to first file
+            schematicSelectedName = selectedBoard.Files.FirstOrDefault()?.Name;
+            schematicSelectedFile = selectedBoard.Files.FirstOrDefault()?.FileName;
+            textBox2.Text = schematicSelectedName; // feedback info
+
+            // Initialize UI
+            InitializeComponentCategories();
+
+            // If no config was found (or empty):
+            bool loaded = LoadSelectedCategories(); // attempt to select from config
+            if (!loaded && listBoxCategories.Items.Count > 0)
             {
-                labelComponents.Location = new Point(labelComponents.Location.X, listBoxLocationEnd_new + 11);
-                listBoxComponents.Location = new Point(listBoxComponents.Location.X, listBoxLocationEnd_new + 11 + 20);
-                listBoxComponents.Height = listBoxComponents.Height + diff + 15;
-            } else
-            {
-                diff = Math.Abs(diff); // reverse the negative to a positive integer
-                labelComponents.Location = new Point(labelComponents.Location.X, listBoxLocationEnd_new + 11);
-                listBoxComponents.Location = new Point(listBoxComponents.Location.X, listBoxLocationEnd_new + 11 + 20);
-                listBoxComponents.Height = listBoxComponents.Height - diff + 15;
-            }
-        }     
-
-
-        // ---------------------------------------------------------------------
-        // Enable double-buffering for smoother UI rendering
-
-        private void EnableDoubleBuffering()
-        {
-            SetStyle(
-                ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.OptimizedDoubleBuffer |
-                ControlStyles.UserPaint,
-                true
-            );
-            this.UpdateStyles();
-
-            panelMain.DoubleBuffered(true);
-            //panelListMain.DoubleBuffered(true);
-            panelThumbnails.DoubleBuffered(true);
-        }
-
-
-        // ---------------------------------------------------------------------
-        // Apply saved settings to controls
-
-        private void ApplyConfigSettings()
-        {
-            // Set default values first
-            string defaultSelectedHardware = classHardware.FirstOrDefault()?.Name;
-            string defaultSelectedBoard = classHardware.FirstOrDefault(h => h.Name == defaultSelectedHardware)?.Boards?.FirstOrDefault()?.Name;
-            string defaultSelectedSchematic = classHardware.FirstOrDefault(h => h.Name == defaultSelectedHardware)?.Boards?.FirstOrDefault(b => b.Name == defaultSelectedBoard)?.Files?.FirstOrDefault()?.Name;
-            string defaultSplitterPos = (splitContainerSchematics.Width * 0.9).ToString(); // 90% of full width
-
-            // Load saved settings from configuration file - or set default if none exists
-            string selectedHardwareVal = Configuration.GetSetting("HardwareSelected", defaultSelectedHardware);
-            string selectedBoardVal = Configuration.GetSetting("BoardSelected", defaultSelectedBoard);
-            string selectedSchematicVal = Configuration.GetSetting("SelectedThumbnail", defaultSelectedSchematic);
-            string splitterPosVal = Configuration.GetSetting("SplitterPosition", defaultSplitterPos);
-            string userEmail = Configuration.GetSetting("UserEmail", "");
-
-            textBoxEmail.Text = userEmail; // set email address in "Feedback" tab
-
-            // Populate all hardware in combobox - and select
-            foreach (Hardware hardware in classHardware)
-            {
-                comboBoxHardware.Items.Add(hardware.Name);
-            }
-            int indexHardware = comboBoxHardware.Items.IndexOf(selectedHardwareVal);
-            comboBoxHardware.SelectedIndex = indexHardware;
-            hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
-            textBox5.Text = hardwareSelectedName; // feedback info           
-
-            // Populate all boards in combobox, based on selected hardware - and select
-            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            if (hw != null)
-            {
-                foreach (var board in hw.Boards)
+                // fallback: auto-select everything
+                for (int i = 0; i < listBoxCategories.Items.Count; i++)
                 {
-                    comboBoxBoard.Items.Add(board.Name);
-                }
-                int indexBoard = comboBoxBoard.Items.IndexOf(selectedBoardVal);
-                comboBoxBoard.SelectedIndex = indexBoard;
-                boardSelectedName = comboBoxBoard.SelectedItem.ToString();
-                textBox1.Text = boardSelectedName; // feedback info           
-            }
-
-            // Set the selected schematic
-            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            if (bd != null)
-            {
-                var schematic = bd.Files.FirstOrDefault(f => f.Name == selectedSchematicVal) ?? bd.Files.FirstOrDefault();
-                if (schematic != null)
-                {
-                    //selectedSchematicVal = schematic.Name;
-                    schematicSelectedName = schematic.Name;
-                    boardSelectedFilename = Path.GetFileName(bd.Datafile); // feedback info
-                    //LoadSelectedImage();
+                    listBoxCategories.SetSelected(i, true);
                 }
             }
 
-            // Apply splitter position
-            if (int.TryParse(splitterPosVal, out int splitterPosition) && splitterPosition > 0)
-            {
-                splitContainerSchematics.SplitterDistance = splitterPosition;
-            }            
+            SuspendLayout();
+            InitializeList();
+            InitializeTabMain();
+            UpdateTabOverview(selectedBoard);
+            UpdateTabRessources(selectedBoard);
+            ResumeLayout();
         }
 
-        // ---------------------------------------------------------------------
-        // Load the selected image based on saved setting
+
+        // ###########################################################################################
+        // Load the selected image, based on selected board and saved configuration setting.
+        // ###########################################################################################
+
         private void LoadSelectedImage()
         {
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
@@ -1453,30 +1510,44 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        // ---------------------------------------------------------------------
-        // Attach event handlers for saving settings
-        private void AttachConfigurationSaveEvents()
+
+        // ###########################################################################################
+        // Enable double-buffering for smoother UI rendering.
+        // ###########################################################################################
+
+        private void EnableDoubleBuffering()
         {
-            // Save combo box selections
-            comboBoxHardware.SelectedIndexChanged += (s, e) =>
-            {
-                //Configuration.SaveSetting("HardwareSelected", comboBoxHardware.SelectedIndex.ToString());
-                Configuration.SaveSetting("HardwareSelected", hardwareSelectedName);
-            };
+            SetStyle(
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.UserPaint,
+                true
+            );
+            this.UpdateStyles();
 
-            comboBoxBoard.SelectedIndexChanged += (s, e) =>
-            {
-                //Configuration.SaveSetting("BoardSelected", comboBoxBoard.SelectedIndex.ToString());
-                Configuration.SaveSetting("BoardSelected", boardSelectedName);
-            };
-
-            // Save splitter position
-            splitContainerSchematics.SplitterMoved += (s, e) =>
-            {
-                Configuration.SaveSetting("SplitterPosition", splitContainerSchematics.SplitterDistance.ToString());
-            };
+            panelMain.DoubleBuffered(true);
+            panelThumbnails.DoubleBuffered(true);
         }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // HEST - TO REFACTOR FROM HERE
 
         // ---------------------------------------------------------------------------
         // Fullscreen - Enter
@@ -1484,7 +1555,7 @@ namespace Commodore_Repair_Toolbox
 
         private void FullscreenModeEnter()
         {
-            // Save current and set new window state
+            // Save (in variable only - not config file) current and set new window state
             formPreviousWindowState = this.WindowState;
             formPreviousFormBorderStyle = this.FormBorderStyle;
             previousBoundsForm = this.Bounds;
@@ -1498,8 +1569,8 @@ namespace Commodore_Repair_Toolbox
             panelBehindTab.Dock = DockStyle.Fill;
             panelBehindTab.BringToFront();
 
-            buttonFullscreen.Location = new Point(10, panelBehindTab.Height - 55);
-            buttonFullscreen.BringToFront();
+//            buttonFullscreen.Location = new Point(10, panelBehindTab.Height - 55);
+//            buttonFullscreen.BringToFront();
 
             // Determine which tab should be maximized
             panelBehindTab.Controls.Remove(panelMain);
@@ -1550,11 +1621,7 @@ namespace Commodore_Repair_Toolbox
             parent.MouseDown += (s, e) =>
             {
                 // Only if we click in the main form and a popup is open
-                if (componentInfoPopup != null && componentInfoPopup.Visible)
-                {
-                    componentInfoPopup.Close();
-                    componentInfoPopup = null;
-                }
+                CloseComponentPopup();
             };
 
             // Recurse to child controls
@@ -1577,58 +1644,7 @@ namespace Commodore_Repair_Toolbox
         }
 
 
-        // ---------------------------------------------------------------------
-        // Setup new board after user selects in comboBox2
-
-        private void SetupNewBoard()
-        {
-            #if DEBUG
-                StackTrace stackTrace = new StackTrace();
-                StackFrame callerFrame = stackTrace.GetFrame(1);
-                MethodBase callerMethod = callerFrame.GetMethod();
-                string callerName = callerMethod.Name;
-                Debug.WriteLine("[SetupNewBoard] called from [" + callerName + "]");
-            #endif
-
-            boardSelectedName = comboBoxBoard.SelectedItem.ToString();
-            textBox1.Text = boardSelectedName; // feedback info
-
-            var selectedHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            var selectedBoard = selectedHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            if (selectedHardware == null || selectedBoard == null) return;
-
-            hardwareSelectedFolder = selectedHardware.Folder;
-            boardSelectedFolder = selectedBoard.Folder;
-
-            // Default to first file
-            schematicSelectedName = selectedBoard.Files.FirstOrDefault()?.Name;
-            schematicSelectedFile = selectedBoard.Files.FirstOrDefault()?.FileName;
-            textBox2.Text = schematicSelectedName; // feedback info
-
-            // Initialize UI
-            InitializeComponentCategories();
-
-            // If no config was found (or empty):
-            bool loaded = LoadSelectedCategories(); // attempt to select from config
-            if (!loaded && listBoxCategories.Items.Count > 0)
-            {
-                // fallback: auto-select everything
-                for (int i = 0; i < listBoxCategories.Items.Count; i++)
-                {
-                    listBoxCategories.SetSelected(i, true);
-                }
-            }
-
-            AdjustComponentCategoriesListBoxHeight();
-
-            SuspendLayout();
-            InitializeList();
-            InitializeTabMain();
-            UpdateTabOverview(selectedBoard);
-            UpdateTabRessources(selectedBoard);
-            ResumeLayout();
-        }
-
+        
 
         // ---------------------------------------------------------------------
         // Lists of components
@@ -1878,9 +1894,6 @@ namespace Commodore_Repair_Toolbox
                 panelImage.DoubleBuffered(true);
                 overlayPanel.DoubleBuffered(true);
 
-                // Attach the special "paint border" event handler
-                //panelThumbnail.Paint += PanelThumbnail_Paint;
-
                 // Attach "MouseDown" and "Clicked" events to the overlay panel
                 overlayPanel.OverlayPanelMouseDown += (s, e2) =>
                 {
@@ -1892,11 +1905,24 @@ namespace Commodore_Repair_Toolbox
                     if (e2.MouseArgs.Button == MouseButtons.Left)
                         ThumbnailImageClicked(panelImage);
                 };
+                labelThumbnail.MouseDown += (s, e2) =>
+                {
+                    if (e2.Button == MouseButtons.Left)
+                        ThumbnailImageClicked(panelImage);
+                };
+                labelThumbnail.Click += (s, e2) =>
+                {
+                    if (((MouseEventArgs)e2).Button == MouseButtons.Left)
+                        ThumbnailImageClicked(panelImage);
+                };
             }
             ReadaptThumbnails(); 
             DrawBorderInList();
         }
 
+
+        bool thumbnailsSameWidth = false;
+        int thumbnailsWidth = 0;
 
         private void ReadaptThumbnails()
         {
@@ -1909,14 +1935,54 @@ namespace Commodore_Repair_Toolbox
                 Debug.WriteLine("[ReadaptThumbnails] called from [" + callerName +"]");
             #endif
 
+            thumbnailsSameWidth = false;
+            thumbnailsWidth = 0;
+            int thumbnailsWidthOld = 0;
+
+            // Suspend continues redrawing of thumbnail panel
+            SuspendDrawing(panelThumbnails);
+
+            for (int i = 0; i <= 40; i++) // "40" is unrealistic here, as it should never go higher than 4
+            {
+                thumbnailsWidthOld = thumbnailsWidth;
+                if (!thumbnailsSameWidth)
+                {
+                    ReadaptThumbnails_Retry();
+                } else
+                {
+                    break;
+                }
+                
+                // if we end up in a race condition, then end redrawing when most of the thumbnail image is visible
+                if (i >= 3 && thumbnailsWidth < thumbnailsWidthOld)
+                {
+                    Debug.WriteLine("Race condition in [ReadaptThumbnails]");
+                    panelThumbnails.AutoScrollMinSize = new Size(0, panelThumbnails.ClientSize.Height + 1);
+                    break;
+                } else
+                {
+                    panelThumbnails.AutoScrollMinSize = Size.Empty;
+                }
+            }
+
+            HighlightOverlays("list");
+
+            ResumeDrawing(panelThumbnails);
+        }
+
+        private void ReadaptThumbnails_Retry()
+        {
+
             int yPosition = 3; // first thumbnail position
             int padding = 1; // padding from left and right borders
             int verticalSpaceBetweenThumbnails = 1;
             int availableWidthForThumbnailContainer = panelThumbnails.ClientSize.Width - (padding * 2);
             int availableWidthForThumbnailElement = availableWidthForThumbnailContainer - (thumbnailSelectedBorderWidth * 2);
 
+            // Check if we can end the loop for continues redrawing
+            thumbnailsSameWidth = availableWidthForThumbnailContainer == thumbnailsWidth ? true : false;
+
             // Walkthrough all (parent) panels (a panel is a thumbnail container)
-            Debug.WriteLine("---");
             foreach (Panel panelThumbnail in panelThumbnails.Controls.OfType<Panel>())
             {
                 // Get the two elements inside the panel
@@ -1938,18 +2004,20 @@ namespace Commodore_Repair_Toolbox
                 labelImage.Size = new Size(availableWidthForThumbnailElement, labelHeight + thumbnailSelectedBorderWidth);
                 pictureBoxImage.Location = new Point(thumbnailSelectedBorderWidth, labelHeight + thumbnailSelectedBorderWidth - 1); // -1 to avoid having a double-line
                 pictureBoxImage.Size = new Size(availableWidthForThumbnailElement, newImageHeight + 1); // +1 to compensate for the above -1
-                
+
                 yPosition += panelThumbnail.Height + verticalSpaceBetweenThumbnails;
 
                 float scaleFactor = (float)pictureBoxImage.Width / pictureBoxImage.BackgroundImage.Width;
                 string key = panelThumbnail.Name.Replace("_container", "");
+
+                // Update the aspect ratio used, in the overlay list
                 overlayListZoomFactors[key] = scaleFactor;
                 if (overlayPanelsList.ContainsKey(key))
                 {
                     overlayPanelsList[key].Bounds = pictureBoxImage.ClientRectangle;
                 }
             }
-            HighlightOverlays("list");
+            thumbnailsWidth = availableWidthForThumbnailContainer;
         }
 
 
@@ -1999,7 +2067,6 @@ namespace Commodore_Repair_Toolbox
         }
 
 
-        //private void ThumbnailImageClicked(Panel pan)
         private void ThumbnailImageClicked(PictureBox pan)
         {
             // Clear all current overlays
@@ -2307,9 +2374,6 @@ namespace Commodore_Repair_Toolbox
                     }
                 }
                     ShowOverlaysAccordingToComponentList();
-            } else
-            {
-                Debug.WriteLine("Will we ever get to here?");
             }
 
             // Refresh the highlight overlays
@@ -2407,6 +2471,7 @@ namespace Commodore_Repair_Toolbox
 
         private void buttonFullscreen_Click(object sender, EventArgs e)
         {
+            SuspendLayout();
             if (!isFullscreen)
             {
                 FullscreenModeEnter();
@@ -2414,10 +2479,15 @@ namespace Commodore_Repair_Toolbox
             else
             {
                 FullscreenModeExit();
-                SuspendLayout();
-                //InitializeList();
                 ReadaptThumbnails();
-                ResumeLayout();
+            }
+            ResumeLayout();
+
+            // Reposition "fullscreen button" when in fullscreen (can only be done when UI is rendered)
+            if (isFullscreen)
+            {
+                buttonFullscreen.Location = new Point(10, panelBehindTab.Height - 55);
+                buttonFullscreen.BringToFront();
             }
         }
 
@@ -2559,9 +2629,19 @@ namespace Commodore_Repair_Toolbox
                         // Attach the binary file if the checkbox is checked
                         if (checkBoxAttachExcel.Checked)
                         {
-                            byte[] fileBytes = File.ReadAllBytes(excelFilePath);
-                            string fileBase64 = Convert.ToBase64String(fileBytes);
-                            data["attachment"] = fileBase64;
+                            if (!IsFileLocked(excelFilePath))
+                            {
+                                byte[] fileBytes = File.ReadAllBytes(excelFilePath);
+                                string fileBase64 = Convert.ToBase64String(fileBytes);
+                                data["attachment"] = fileBase64;
+                            }
+                            else
+                            {
+                                MessageBox.Show("The Excel file currently has an exclusive lock, and cannot be read. Please close any application that might be using it and try again.",
+                                    "ERROR: Cannot read file",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Error);
+                            }
                         }
 
                         // Send it to the server
@@ -2614,6 +2694,28 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
+
+        // ###########################################################################################
+        // Check if the file is not exclusively locked by another application.
+        // ###########################################################################################
+
+        private bool IsFileLocked(string filePath)
+        {
+            try
+            {
+                using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    stream.Close();
+                }
+            }
+            catch (IOException)
+            {
+                return true;
+            }
+            return false;
+        }
+
+
         // ###########################################################################################
         // Check if the email address typed in feedback is valid - not a very good check though!
         // ###########################################################################################
@@ -2644,38 +2746,54 @@ namespace Commodore_Repair_Toolbox
         }
 
 
-        private void GetActiveMonitor()
+        private void MoveStopTimer_Tick(object sender, EventArgs e)
         {
-            var screen = Screen.FromControl(this);
-            Debug.WriteLine("Monitor: " + screen.DeviceName);
-            //            Properties.Settings.Default.MonitorDeviceName = screen.DeviceName;
-            //            Properties.Settings.Default.Save();
+            if (this.Location == windowLastLocation)
+            {
+                windowMoveStopTimer.Stop();
+                ReadaptThumbnails();
+            }
         }
 
-        private Timer moveEndTimer = new Timer();
 
-        private void Form_LocationChanged(object sender, EventArgs e)
+
+        // ***
+        // Completely stops repait - better than SuspendLayout
+        // ---
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern IntPtr SendMessage(IntPtr hWnd, int msg, bool wParam, int lParam);
+
+        private const int WM_SETREDRAW = 0x000B;
+
+        public static void SuspendDrawing(Control control)
         {
-            moveEndTimer.Stop();
-            moveEndTimer.Start();
+            SendMessage(control.Handle, WM_SETREDRAW, false, 0);
         }
 
-        private void MoveEndTimer_Tick(object sender, EventArgs e)
+        public static void ResumeDrawing(Control control)
         {
-            moveEndTimer.Stop();
-            Screen currentScreen = Screen.FromControl(this);
-            string deviceName = currentScreen.DeviceName;
-            Debug.WriteLine("Moved to: " + deviceName);
+            SendMessage(control.Handle, WM_SETREDRAW, true, 0);
+            control.Refresh();
         }
+        // ***
 
-        private void button1_Click(object sender, EventArgs e)
-        {
-            ReadaptThumbnails();
-        }
     }
 
     // -------------------------------------------------------------------------
     // Class definitions
+
+    /*
+    public class SuppressPaintPanel : Panel
+    {
+        public bool SuppressPaint { get; set; }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            if (!SuppressPaint)
+                base.OnPaint(e);
+        }
+    }
+    */
 
     // "Hardware" is read from the very first Excel file (Commodore-Repair-Toolbox.xlsx).
     // It contains a list of all associated boards and their respective data files.

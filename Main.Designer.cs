@@ -74,7 +74,6 @@
             this.panelBehindTab = new System.Windows.Forms.Panel();
             this.textBoxFilterComponents = new System.Windows.Forms.TextBox();
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
-            this.buttonResize = new System.Windows.Forms.Button();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -582,7 +581,6 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.panelBehindTab.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.panelBehindTab.Controls.Add(this.buttonResize);
             this.panelBehindTab.Controls.Add(this.tabControl);
             this.panelBehindTab.Location = new System.Drawing.Point(299, 13);
             this.panelBehindTab.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
@@ -610,18 +608,6 @@
             this.checkBoxBlink.TabIndex = 15;
             this.checkBoxBlink.Text = "Blink selected components";
             this.checkBoxBlink.UseVisualStyleBackColor = true;
-            // 
-            // buttonResize
-            // 
-            this.buttonResize.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.buttonResize.Font = new System.Drawing.Font("Calibri", 7.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonResize.Location = new System.Drawing.Point(732, -1);
-            this.buttonResize.Name = "buttonResize";
-            this.buttonResize.Size = new System.Drawing.Size(50, 25);
-            this.buttonResize.TabIndex = 1;
-            this.buttonResize.Text = "Resize";
-            this.buttonResize.UseVisualStyleBackColor = true;
-            this.buttonResize.Click += new System.EventHandler(this.button1_Click);
             // 
             // Main
             // 
@@ -719,6 +705,5 @@
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.TabPage tabOverview;
         private Microsoft.Web.WebView2.WinForms.WebView2 webView2Overview;
-        private System.Windows.Forms.Button buttonResize;
     }
 }
