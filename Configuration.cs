@@ -34,7 +34,11 @@ namespace Commodore_Repair_Toolbox
 
         public static void SaveConfig()
         {
-            File.WriteAllLines(filePath, settings.Select(kv => $"{kv.Key}={kv.Value}"));
+//            File.WriteAllLines(filePath, settings.Select(kv => $"{kv.Key}={kv.Value}"));
+
+            // Save lines alphabetically sorted
+            var sortedSettings = settings.OrderBy(kv => kv.Key).ToList();
+            File.WriteAllLines(filePath, sortedSettings.Select(kv => $"{kv.Key}={kv.Value}"));
         }
 
         public static string GetSetting(string key, string defaultValue = "")

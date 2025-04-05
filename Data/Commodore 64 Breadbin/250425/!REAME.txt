@@ -1,0 +1,23 @@
+-----------------------------------------
+How to modify the labelling of components
+-----------------------------------------
+
+1) You find the tool "VGG Image Annotator" (VIA) in "\Tools\via-2.0.12\"
+2) Drag the file "via.html" to your browser
+3) Open one of the JSON files
+4) VIA will now state that "File Not Found":
+  4a) In the left-side file panel, select the filename
+  4b) Click the right-side link, "browser's file seclector" and find the correct image file
+  4c) It should now load the image and show all the labellings
+5) Do your changes ...
+6) Save the project to the same JSON file
+7) Go to https://commodore-repair-toolbox.dk/convert-via-to-excel/
+8) Upload the JSON file and download the Excel file it will provide
+9) Copy/paste the data from the downloaded Excel file into the "Board" Excel file, in the worksheet "Component highlights"
+  9a) Do note that the downloaded Excel does NOT provide the correct value for the "Schematic name" column!
+  9b) You need to use the "Schematic name" from the worksheet "Board schematics" for that
+
+That's it - check the result :-)
+
+---
+Document revision: 2025-March-22

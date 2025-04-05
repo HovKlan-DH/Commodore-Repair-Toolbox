@@ -11,6 +11,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Web;
 using System.Windows.Forms;
 
 
@@ -44,6 +45,7 @@ namespace Commodore_Repair_Toolbox
         private bool blinkState = false;
 
         // Fullscreen mode
+        private string windowState = "Maximized";
         private bool isFullscreen = false;
         private FormWindowState formPreviousWindowState;
         private FormBorderStyle formPreviousFormBorderStyle;
@@ -152,8 +154,8 @@ namespace Commodore_Repair_Toolbox
 
         private void Form_Load(object sender, EventArgs e)
         {
-            string savedState = Configuration.GetSetting("WindowState", "Maximized");
-            if (Enum.TryParse(savedState, out FormWindowState state) && state != FormWindowState.Minimized)
+            windowState = Configuration.GetSetting("WindowState", "Maximized");
+            if (Enum.TryParse(windowState, out FormWindowState state) && state != FormWindowState.Minimized)
             {
                 this.WindowState = state;
             }
@@ -252,7 +254,7 @@ namespace Commodore_Repair_Toolbox
                     ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
                     webClient.Headers.Add("user-agent", "CRT "+ versionThis);
 
-                    // Have some control POST data
+                    // Include some control POST data
                     var postData = new System.Collections.Specialized.NameValueCollection
                     {
                         { "control", "CRT" }
@@ -346,14 +348,10 @@ namespace Commodore_Repair_Toolbox
             // Set default values first
             string defaultSelectedHardware = classHardware.FirstOrDefault()?.Name;
             string defaultSelectedBoard = classHardware.FirstOrDefault(h => h.Name == defaultSelectedHardware)?.Boards?.FirstOrDefault()?.Name;
-            string defaultSelectedSchematic = classHardware.FirstOrDefault(h => h.Name == defaultSelectedHardware)?.Boards?.FirstOrDefault(b => b.Name == defaultSelectedBoard)?.Files?.FirstOrDefault()?.Name;
-            string defaultSplitterPos = (splitContainerSchematics.Width * 0.9).ToString(); // 90% of full width
 
             // Load saved settings from configuration file - or set default if none exists
             string selectedHardwareVal = Configuration.GetSetting("HardwareSelected", defaultSelectedHardware);
             string selectedBoardVal = Configuration.GetSetting("BoardSelected", defaultSelectedBoard);
-            string selectedSchematicVal = Configuration.GetSetting("SelectedThumbnail", defaultSelectedSchematic);
-            string splitterPosVal = Configuration.GetSetting("SplitterPosition", defaultSplitterPos);
             string userEmail = Configuration.GetSetting("UserEmail", "");
 
             textBoxEmail.Text = userEmail; // set email address in "Feedback" tab
@@ -379,28 +377,7 @@ namespace Commodore_Repair_Toolbox
                 int indexBoard = comboBoxBoard.Items.IndexOf(selectedBoardVal);
                 comboBoxBoard.SelectedIndex = indexBoard;
                 boardSelectedName = comboBoxBoard.SelectedItem.ToString();
-                boardSelectedName = selectedBoardVal;
                 textBox1.Text = boardSelectedName; // feedback info           
-            }
-
-            // Set the selected schematic
-            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            if (bd != null)
-            {
-                var schematic = bd.Files.FirstOrDefault(f => f.Name == selectedSchematicVal) ?? bd.Files.FirstOrDefault();
-                if (schematic != null)
-                {
-                    //selectedSchematicVal = schematic.Name;
-                    schematicSelectedName = schematic.Name;
-                    boardSelectedFilename = Path.GetFileName(bd.Datafile); // feedback info
-                                                                           //LoadSelectedImage();
-                }
-            }
-
-            // Apply splitter position
-            if (int.TryParse(splitterPosVal, out int splitterPosition) && splitterPosition > 0)
-            {
-                splitContainerSchematics.SplitterDistance = splitterPosition;
             }
         }
 
@@ -435,7 +412,6 @@ namespace Commodore_Repair_Toolbox
 
         private void AttachEventHandlers()
         {
-            Resize += Form_Resize;
             ResizeBegin += Form_ResizeBegin;
             ResizeEnd += Form_ResizeEnd;
             comboBoxHardware.SelectedIndexChanged += comboBoxHardware_SelectedIndexChanged;
@@ -472,12 +448,6 @@ namespace Commodore_Repair_Toolbox
             comboBoxBoard.SelectedIndexChanged += (s, e) =>
             {
                 Configuration.SaveSetting("BoardSelected", boardSelectedName);
-            };
-
-            // Splitter moved
-            splitContainerSchematics.SplitterMoved += (s, e) =>
-            {
-                Configuration.SaveSetting("SplitterPosition", splitContainerSchematics.SplitterDistance.ToString());
             };
         }
 
@@ -530,17 +500,38 @@ namespace Commodore_Repair_Toolbox
             ReadaptThumbnails();
         }
 
-        private void Form_Resize(object sender, EventArgs e)
-        {
-            Configuration.SaveSetting("WindowState", this.WindowState.ToString());
-            ReadaptThumbnails();
-        }
-
         private void Form_Move(object sender, EventArgs e)
         {
+            // Disable event for "splitter moved", as it otherwise ruins the saved data
+            splitContainerSchematics.SplitterMoved -= SplitContainer1_SplitterMoved;
+
+            // Enable/reset the time to detect when the movemen has stopped
             windowLastLocation = this.Location;
             windowMoveStopTimer.Stop();
             windowMoveStopTimer.Start();
+        }
+
+
+        // ###########################################################################################
+        // What happens when window movement has stopped
+        // ###########################################################################################
+
+        private void MoveStopTimer_Tick(object sender, EventArgs e)
+        {
+            if (this.Location == windowLastLocation)
+            {
+                windowMoveStopTimer.Stop();
+
+                // Save the new "window state" and load and apply the splitter position for the new state
+                windowState = this.WindowState.ToString();
+                Configuration.SaveSetting("WindowState", windowState);
+                LoadAndApplySplitterPosition();
+
+                ReadaptThumbnails();
+
+                // We can now reenable the event for "splitter moved"
+                splitContainerSchematics.SplitterMoved += SplitContainer1_SplitterMoved;
+            }
         }
 
 
@@ -688,8 +679,11 @@ namespace Commodore_Repair_Toolbox
                             int counter = 1;
                             foreach (ComponentLocalFiles file in comp.LocalFiles)
                             {
-                                string filePath = Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.FileName);
-                                htmlContent += "<a href='file:///" + filePath.Replace(@"\", @"\\") + "' class='tooltip-link' data-title='" + file.Name + "' target='_blank'>#" + counter + "</a> ";
+                                // Translate the relative path into an absolute path
+                                string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.FileName));
+                                string fileUri = new Uri(filePath).AbsoluteUri;
+
+                                htmlContent += "<a href='" + fileUri + "' class='tooltip-link' data-title='" + file.Name + "' target='_blank'>#" + counter + "</a> ";
                                 counter++;
                             }
                         }
@@ -745,7 +739,13 @@ namespace Commodore_Repair_Toolbox
             else if (message.StartsWith("openFile:"))
             {
                 string fileUrl = message.Substring("openFile:".Length);
-                Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
+                if (File.Exists(new Uri(fileUrl).LocalPath))
+                {
+                    Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
+                } else
+                {
+                    DebugOutput("File ["+ new Uri(fileUrl).LocalPath + "] does not exists!");
+                }
             }
 
             // Open component
@@ -826,8 +826,11 @@ namespace Commodore_Repair_Toolbox
 
                     foreach (var file in group)
                     {
-                        string filePath = Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.Datafile);
-                        htmlContent += "<li><a href='file:///" + filePath.Replace(@"\", @"\\") + "' target='_blank'>" + file.Name + "</a></li>";
+                        // Translate the relative path into an absolute path
+                        string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.Datafile));
+                        string fileUri = new Uri(filePath).AbsoluteUri;
+
+                        htmlContent += "<li><a href='"+ fileUri +"' target='_blank'>" + file.Name + "</a></li>";
                     }
                     htmlContent += "</ul>";
                     htmlContent += "<br />";
@@ -931,11 +934,11 @@ namespace Commodore_Repair_Toolbox
                 </ul>
                 <br />
                 
-                Configuration saved:<br />
+                Configuration saved (per board):<br />
                 <ul>
                 <li>Last viewed schematic</li>
                 <li>Schematic/thumbnails slider position</li>
-                <li>Shown component categories saved per board</li>
+                <li>Shown component categories</li>
                 </ul>
                 <br />
 
@@ -1462,10 +1465,20 @@ namespace Commodore_Repair_Toolbox
 
             hardwareSelectedFolder = selectedHardware.Folder;
             boardSelectedFolder = selectedBoard.Folder;
+            boardSelectedFilename = selectedBoard.Datafile;
 
-            // Default to first file
-            schematicSelectedName = selectedBoard.Files.FirstOrDefault()?.Name;
-            schematicSelectedFile = selectedBoard.Files.FirstOrDefault()?.FileName;
+            // Load selected thumbnail from configuration file, if already set
+            string configKey = $"SelectedThumbnail|{hardwareSelectedName}|{boardSelectedName}";
+            schematicSelectedName = Configuration.GetSetting(configKey, null);
+
+            // Select the schematic - check if we can find the current selection, but otherwise default to first schematic
+            var selectedSchematic = selectedBoard.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
+            if (selectedSchematic == null)
+            {
+                selectedSchematic = selectedBoard.Files.FirstOrDefault();
+            }
+            schematicSelectedName = selectedSchematic?.Name;
+            schematicSelectedFile = selectedSchematic?.FileName;
             textBox2.Text = schematicSelectedName; // feedback info
 
             // Initialize UI
@@ -1482,12 +1495,36 @@ namespace Commodore_Repair_Toolbox
                 }
             }
 
+            LoadAndApplySplitterPosition();
+
             SuspendLayout();
             InitializeList();
             InitializeTabMain();
             UpdateTabOverview(selectedBoard);
             UpdateTabRessources(selectedBoard);
             ResumeLayout();
+        }
+
+
+        private void LoadAndApplySplitterPosition()
+        {
+            // Debug
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[LoadAndApplySplitterPosition] called from [" + callerName + "]");
+            #endif
+
+            // Load and apply the board specific splitter position
+            string defaultSplitterPos = (splitContainerSchematics.Width * 0.9).ToString(); // 90% of full width
+            string configKey = $"SplitterPosition|{windowState}|{hardwareSelectedName}|{boardSelectedName}";
+            string splitterPosVal = Configuration.GetSetting(configKey, defaultSplitterPos);
+            if (int.TryParse(splitterPosVal, out int splitterPosition) && splitterPosition > 0)
+            {
+                splitContainerSchematics.SplitterDistance = splitterPosition;
+            }
         }
 
 
@@ -2069,11 +2106,24 @@ namespace Commodore_Repair_Toolbox
 
         private void ThumbnailImageClicked(PictureBox pan)
         {
+            // Debug
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[ThumbnailImageClicked] called from [" + callerName + "]");
+            #endif
+
             // Clear all current overlays
             overlayPanel.Overlays.Clear();
 
             schematicSelectedName = pan.Name;
-            Configuration.SaveSetting("SelectedThumbnail", schematicSelectedName);
+
+            // Save the board specific selected thumbnail to configuration file
+            string configKey = $"SelectedThumbnail|{hardwareSelectedName}|{boardSelectedName}";
+            Configuration.SaveSetting(configKey, schematicSelectedName);
+
             textBox2.Text = schematicSelectedName; // feedback info
 
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
@@ -2091,6 +2141,8 @@ namespace Commodore_Repair_Toolbox
             // Ensure thumbnail border gets updated
             DrawBorderInList(); 
         }
+
+
 
 
 
@@ -2443,6 +2495,11 @@ namespace Commodore_Repair_Toolbox
 
         private void SplitContainer1_SplitterMoved(object sender, SplitterEventArgs e)
         {
+            Debug.WriteLine("---- SplitContainer1_SplitterMoved=" + windowState);
+            // Save the board specific splitter position to configuration file
+            string configKey = $"SplitterPosition|{windowState}|{hardwareSelectedName}|{boardSelectedName}";
+            Configuration.SaveSetting(configKey, splitContainerSchematics.SplitterDistance.ToString());
+
             ReadaptThumbnails();
         }
 
@@ -2715,7 +2772,7 @@ namespace Commodore_Repair_Toolbox
             return false;
         }
 
-
+                
         // ###########################################################################################
         // Check if the email address typed in feedback is valid - not a very good check though!
         // ###########################################################################################
@@ -2740,25 +2797,17 @@ namespace Commodore_Repair_Toolbox
         }
 
 
-        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        private void checkBoxAttachExcel_CheckedChanged(object sender, EventArgs e)
         {
             textBox6.Text = checkBoxAttachExcel.Checked ? boardSelectedFilename : "";
         }
 
 
-        private void MoveStopTimer_Tick(object sender, EventArgs e)
-        {
-            if (this.Location == windowLastLocation)
-            {
-                windowMoveStopTimer.Stop();
-                ReadaptThumbnails();
-            }
-        }
 
 
 
         // ***
-        // Completely stops repait - better than SuspendLayout
+        // Completely stop repaint on a specific control - better than SuspendLayout
         // ---
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         public static extern IntPtr SendMessage(IntPtr hWnd, int msg, bool wParam, int lParam);

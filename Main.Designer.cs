@@ -294,7 +294,7 @@
             this.checkBoxAttachExcel.TabIndex = 12;
             this.checkBoxAttachExcel.Text = "Attach Excel data file for selected board";
             this.checkBoxAttachExcel.UseVisualStyleBackColor = true;
-            this.checkBoxAttachExcel.CheckedChanged += new System.EventHandler(this.checkBox1_CheckedChanged);
+            this.checkBoxAttachExcel.CheckedChanged += new System.EventHandler(this.checkBoxAttachExcel_CheckedChanged);
             // 
             // textBox5
             // 
