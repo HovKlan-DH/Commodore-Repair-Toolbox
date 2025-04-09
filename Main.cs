@@ -11,7 +11,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Web;
+//using System.Web;
 using System.Windows.Forms;
 
 
@@ -92,9 +92,9 @@ namespace Commodore_Repair_Toolbox
 
         // Current user selection
         public string hardwareSelectedName;
-        private string hardwareSelectedFolder;
+//        private string hardwareSelectedFolder;
         private string boardSelectedName;
-        private string boardSelectedFolder;
+//        private string boardSelectedFolder;
         private string boardSelectedFilename;
         private string schematicSelectedName;
         private string schematicSelectedFile;
@@ -362,6 +362,11 @@ namespace Commodore_Repair_Toolbox
                 comboBoxHardware.Items.Add(hardware.Name);
             }
             int indexHardware = comboBoxHardware.Items.IndexOf(selectedHardwareVal);
+            if (indexHardware == -1)
+            {
+                indexHardware = comboBoxHardware.Items.IndexOf(defaultSelectedHardware);
+                hardwareSelectedName = defaultSelectedHardware;
+            }
             comboBoxHardware.SelectedIndex = indexHardware;
             hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
             textBox5.Text = hardwareSelectedName; // feedback info           
@@ -375,6 +380,11 @@ namespace Commodore_Repair_Toolbox
                     comboBoxBoard.Items.Add(board.Name);
                 }
                 int indexBoard = comboBoxBoard.Items.IndexOf(selectedBoardVal);
+                if (indexBoard == -1)
+                {
+                    indexBoard = comboBoxBoard.Items.IndexOf(defaultSelectedBoard);
+                    boardSelectedName = defaultSelectedBoard;
+                }
                 comboBoxBoard.SelectedIndex = indexBoard;
                 boardSelectedName = comboBoxBoard.SelectedItem.ToString();
                 textBox1.Text = boardSelectedName; // feedback info           
@@ -680,7 +690,8 @@ namespace Commodore_Repair_Toolbox
                             foreach (ComponentLocalFiles file in comp.LocalFiles)
                             {
                                 // Translate the relative path into an absolute path
-                                string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.FileName));
+//                                string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.FileName));
+                                string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, file.FileName));
                                 string fileUri = new Uri(filePath).AbsoluteUri;
 
                                 htmlContent += "<a href='" + fileUri + "' class='tooltip-link' data-title='" + file.Name + "' target='_blank'>#" + counter + "</a> ";
@@ -757,7 +768,8 @@ namespace Commodore_Repair_Toolbox
                 ComponentBoard selectedComp = foundBoard?.Components.FirstOrDefault(c => c.Label == compName);
                 if (selectedComp != null)
                 {
-                    componentInfoPopup = new FormComponent(selectedComp, hardwareSelectedFolder, boardSelectedFolder);
+//                    componentInfoPopup = new FormComponent(selectedComp, hardwareSelectedFolder, boardSelectedFolder);
+                    componentInfoPopup = new FormComponent(selectedComp);
                     componentInfoPopup.Show(this);
                     componentInfoPopup.TopMost = true;
                 }
@@ -827,7 +839,8 @@ namespace Commodore_Repair_Toolbox
                     foreach (var file in group)
                     {
                         // Translate the relative path into an absolute path
-                        string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.Datafile));
+//                        string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.Datafile));
+                        string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, file.Datafile));
                         string fileUri = new Uri(filePath).AbsoluteUri;
 
                         htmlContent += "<li><a href='"+ fileUri +"' target='_blank'>" + file.Name + "</a></li>";
@@ -1193,7 +1206,7 @@ namespace Commodore_Repair_Toolbox
             {
                 // Draw overlays on the main image
                 if (overlayPanel == null) return;
-                var bf = bd.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
+                var bf = bd?.Files?.FirstOrDefault(f => f.Name == schematicSelectedName);
                 if (bf == null) return;
 
                 overlayPanel.Overlays.Clear();
@@ -1234,52 +1247,55 @@ namespace Commodore_Repair_Toolbox
             // Thumbnail list
             else if (scope == "list")
             {
-                // Draw overlays on each thumbnail
-                foreach (BoardFileOverlays bf in bd.Files)
+                if (bd.Files != null)
                 {
-                    if (!overlayPanelsList.ContainsKey(bf.Name)) continue;
-
-                    OverlayPanel listPanel = overlayPanelsList[bf.Name];
-                    listPanel.Overlays.Clear();
-
-                    Color colorList = Color.FromName(bf.HighlightColorList);
-                    int opacityList = bf.HighlightOpacityList;
-                    float listZoom = overlayListZoomFactors[bf.Name];
-
-                    if (bf?.Components != null)
+                    // Draw overlays on each thumbnail
+                    foreach (BoardFileOverlays bf in bd.Files)
                     {
-                        foreach (var comp in bf.Components)
+                        if (!overlayPanelsList.ContainsKey(bf.Name)) continue;
+
+                        OverlayPanel listPanel = overlayPanelsList[bf.Name];
+                        listPanel.Overlays.Clear();
+
+                        Color colorList = Color.FromName(bf.HighlightColorList);
+                        int opacityList = bf.HighlightOpacityList;
+                        float listZoom = overlayListZoomFactors[bf.Name];
+
+                        if (bf?.Components != null)
                         {
-                            if (comp.Overlays == null) continue;
-
-                            // Find component "display name"
-                            string componentDisplay = bd.Components
-                                .FirstOrDefault(cb => cb.Label == comp.Label)?.NameDisplay ?? "";
-
-                            // Check if the component is selected in component list
-                            bool highlighted = listBoxComponentsSelectedText.Contains(componentDisplay);
-
-                            foreach (var ov in comp.Overlays)
+                            foreach (var comp in bf.Components)
                             {
-                                Rectangle rect = new Rectangle(
-                                    (int)(ov.Bounds.X * listZoom),
-                                    (int)(ov.Bounds.Y * listZoom),
-                                    (int)(ov.Bounds.Width * listZoom),
-                                    (int)(ov.Bounds.Height * listZoom)
-                                );
-                                listPanel.Overlays.Add(new OverlayInfo
+                                if (comp.Overlays == null) continue;
+
+                                // Find component "display name"
+                                string componentDisplay = bd.Components
+                                    .FirstOrDefault(cb => cb.Label == comp.Label)?.NameDisplay ?? "";
+
+                                // Check if the component is selected in component list
+                                bool highlighted = listBoxComponentsSelectedText.Contains(componentDisplay);
+
+                                foreach (var ov in comp.Overlays)
                                 {
-                                    Bounds = rect,
-                                    Color = colorList,
-                                    Opacity = opacityList,
-                                    Highlighted = highlighted,
-                                    ComponentLabel = comp.Label,
-                                    ComponentDisplay = componentDisplay
-                                });
+                                    Rectangle rect = new Rectangle(
+                                        (int)(ov.Bounds.X * listZoom),
+                                        (int)(ov.Bounds.Y * listZoom),
+                                        (int)(ov.Bounds.Width * listZoom),
+                                        (int)(ov.Bounds.Height * listZoom)
+                                    );
+                                    listPanel.Overlays.Add(new OverlayInfo
+                                    {
+                                        Bounds = rect,
+                                        Color = colorList,
+                                        Opacity = opacityList,
+                                        Highlighted = highlighted,
+                                        ComponentLabel = comp.Label,
+                                        ComponentDisplay = componentDisplay
+                                    });
+                                }
                             }
                         }
+                        listPanel.Invalidate();
                     }
-                    listPanel.Invalidate();
                 }
             }
         }
@@ -1463,19 +1479,20 @@ namespace Commodore_Repair_Toolbox
             var selectedBoard = selectedHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (selectedHardware == null || selectedBoard == null) return;
 
-            hardwareSelectedFolder = selectedHardware.Folder;
-            boardSelectedFolder = selectedBoard.Folder;
-            boardSelectedFilename = selectedBoard.Datafile;
+//            hardwareSelectedFolder = selectedHardware.Folder;
+//            boardSelectedFolder = selectedBoard.Folder;
+            boardSelectedFilename = selectedBoard.DataFile;
 
             // Load selected thumbnail from configuration file, if already set
             string configKey = $"SelectedThumbnail|{hardwareSelectedName}|{boardSelectedName}";
             schematicSelectedName = Configuration.GetSetting(configKey, null);
 
             // Select the schematic - check if we can find the current selection, but otherwise default to first schematic
-            var selectedSchematic = selectedBoard.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
+//            var selectedSchematic = selectedBoard.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
+            var selectedSchematic = selectedBoard?.Files?.FirstOrDefault(f => f.Name == schematicSelectedName);
             if (selectedSchematic == null)
             {
-                selectedSchematic = selectedBoard.Files.FirstOrDefault();
+                selectedSchematic = selectedBoard?.Files?.FirstOrDefault();
             }
             schematicSelectedName = selectedSchematic?.Name;
             schematicSelectedFile = selectedSchematic?.FileName;
@@ -1674,7 +1691,8 @@ namespace Commodore_Repair_Toolbox
             string title = comp.NameDisplay;
 
             // Create new popup
-            componentInfoPopup = new FormComponent(comp, hardwareSelectedFolder, boardSelectedFolder);
+//            componentInfoPopup = new FormComponent(comp, hardwareSelectedFolder, boardSelectedFolder);
+            componentInfoPopup = new FormComponent(comp);
             componentInfoPopup.Text = title;
             componentInfoPopup.Show(this);
             componentInfoPopup.TopMost = true;
@@ -1740,8 +1758,10 @@ namespace Commodore_Repair_Toolbox
             }
 
             // Load main image
+//            string filePath = Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, schematicSelectedFile);
+            string filePath = Path.Combine(Application.StartupPath, schematicSelectedFile);
             image = Image.FromFile(
-                Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, schematicSelectedFile)
+                filePath
             );
 
             // Clear old controls
@@ -1879,11 +1899,13 @@ namespace Commodore_Repair_Toolbox
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (bd == null) return;
+            if (bd.Files == null) return;
 
             // Walkthrough each schematic image for this board
             foreach (BoardFileOverlays schematic in bd.Files)
             {
-                string filename = Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, schematic.FileName);
+//                string filename = Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, schematic.FileName);
+                string filename = Path.Combine(Application.StartupPath, schematic.FileName);
 
                 // Panel that will hold the label and the image
                 Panel panelThumbnail = new Panel
@@ -2063,6 +2085,7 @@ namespace Commodore_Repair_Toolbox
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (bd == null) return;
+            if (bd.Files == null) return;
 
             foreach (var file in bd.Files)
             {
@@ -2661,8 +2684,9 @@ namespace Commodore_Repair_Toolbox
             {
                 var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-                string boardFile = foundBoard?.Datafile;
-                string excelFilePath = Path.Combine(Application.StartupPath, foundHardware.Folder, boardFile);
+                string boardFile = foundBoard?.DataFile;
+//                string excelFilePath = Path.Combine(Application.StartupPath, foundHardware.Folder, boardFile);
+                string excelFilePath = Path.Combine(Application.StartupPath, boardFile);
                 try
                 {
                     using (WebClient webClient = new WebClient())
@@ -2849,8 +2873,8 @@ namespace Commodore_Repair_Toolbox
     public class Hardware
     {
         public string Name { get; set; }
-        public string Folder { get; set; }
-        public string Datafile { get; set; }
+ //       public string Folder { get; set; }
+ //       public string Datafile { get; set; }
         public List<Board> Boards { get; set; }
     }
 
@@ -2858,8 +2882,8 @@ namespace Commodore_Repair_Toolbox
     public class Board
     {
         public string Name { get; set; }
-        public string Folder { get; set; }
-        public string Datafile { get; set; }
+//        public string Folder { get; set; }
+        public string DataFile { get; set; }
         public List<BoardFileOverlays> Files { get; set; }
         public List<ComponentBoard> Components { get; set; }
         public List<BoardLink> BoardLinks { get; set; }

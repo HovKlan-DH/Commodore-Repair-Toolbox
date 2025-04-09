@@ -12,17 +12,18 @@ namespace Commodore_Repair_Toolbox
         private readonly Dictionary<string, string> localFiles = new Dictionary<string, string>();
         private readonly Dictionary<string, string> links = new Dictionary<string, string>();
 
-        private readonly string hardwareSelectedFolder;
-        private readonly string boardSelectedFolder;
+//        private readonly string hardwareSelectedFolder;
+//        private readonly string boardSelectedFolder;
 
         public string PictureBoxName { get; }
 
-        public FormComponent(ComponentBoard component, string hwSelectedFolder, string bdSelectedFolder)
+//        public FormComponent(ComponentBoard component, string hwSelectedFolder, string bdSelectedFolder)
+        public FormComponent(ComponentBoard component)
         {
             InitializeComponent();
 
-            hardwareSelectedFolder = hwSelectedFolder;
-            boardSelectedFolder = bdSelectedFolder;
+//            hardwareSelectedFolder = hwSelectedFolder;
+//            boardSelectedFolder = bdSelectedFolder;
 
             PictureBoxName = component.Label;
 
@@ -40,10 +41,7 @@ namespace Commodore_Repair_Toolbox
             // Pinout image
             if (component.ComponentImages != null && component.ComponentImages.Count > 0)
             {
-                var imagePath = Path.Combine(
-                    Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder,
-                    component.ComponentImages[0].FileName // Assuming the first image is the pinout image
-                );
+                var imagePath = Path.Combine(Application.StartupPath, component.ComponentImages[0].FileName); // assuming the first image is the pinout image
                 if (File.Exists(imagePath))
                 {
                     pictureBox1.Image = Image.FromFile(imagePath);
@@ -97,8 +95,7 @@ namespace Commodore_Repair_Toolbox
             string selectedName = listBox1.SelectedItem.ToString();
             if (!localFiles.ContainsKey(selectedName)) return;
 
-            var filePath = Path.Combine(Application.StartupPath, hardwareSelectedFolder, 
-                boardSelectedFolder, localFiles[selectedName]);
+            var filePath = Path.Combine(Application.StartupPath, localFiles[selectedName]);
 
             if (File.Exists(filePath))
             {
