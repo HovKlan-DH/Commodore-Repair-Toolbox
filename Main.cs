@@ -107,6 +107,8 @@ namespace Commodore_Repair_Toolbox
         private int thumbnailSelectedBorderWidth = 3;
         private Timer windowMoveStopTimer = new Timer();
         private Point windowLastLocation;
+        bool thumbnailsSameWidth = false;
+        int thumbnailsWidth = 0;
 
 
         // ###########################################################################################
@@ -161,6 +163,7 @@ namespace Commodore_Repair_Toolbox
             }
                         
             tabControl.Dock = DockStyle.Fill;
+            panelLabelsVisible.Visible = false;
 
             // Initialize the blink timer
             InitializeBlinkTimer();
@@ -348,10 +351,18 @@ namespace Commodore_Repair_Toolbox
             // Set default values first
             string defaultSelectedHardware = classHardware.FirstOrDefault()?.Name;
             string defaultSelectedBoard = classHardware.FirstOrDefault(h => h.Name == defaultSelectedHardware)?.Boards?.FirstOrDefault()?.Name;
+            string defaultShowLabel = "True";
+            string defaultShowTechnicalName = "False";
+            string defaultShowFriendlyName = "False";
+            string defaultShowLabelsHeight = "95";
 
             // Load saved settings from configuration file - or set default if none exists
             string selectedHardwareVal = Configuration.GetSetting("HardwareSelected", defaultSelectedHardware);
             string selectedBoardVal = Configuration.GetSetting("BoardSelected", defaultSelectedBoard);
+            string selectedShowLabel = Configuration.GetSetting("ShowLabel", defaultShowLabel);
+            string selectedShowTechnicalName = Configuration.GetSetting("ShowTechnicalName", defaultShowTechnicalName);
+            string selectedShowFriendlyName = Configuration.GetSetting("ShowFriendlyName", defaultShowFriendlyName);
+            string showLabelsHeight = Configuration.GetSetting("ShowLabelsHeight", defaultShowLabelsHeight);
             string userEmail = Configuration.GetSetting("UserEmail", "");
 
             textBoxEmail.Text = userEmail; // set email address in "Feedback" tab
@@ -389,6 +400,14 @@ namespace Commodore_Repair_Toolbox
                 boardSelectedName = comboBoxBoard.SelectedItem.ToString();
                 textBox1.Text = boardSelectedName; // feedback info           
             }
+
+            // Set the "Labels visible" checkboxes
+            checkBox1.Checked = selectedShowLabel == "True" ? true : false;
+            checkBox2.Checked = selectedShowTechnicalName == "True" ? true : false;
+            checkBox3.Checked = selectedShowFriendlyName == "True" ? true : false;
+
+            // .. and the height for its panel
+            panelLabelsVisible.Height = Convert.ToInt32(showLabelsHeight);
         }
 
 
@@ -636,7 +655,8 @@ namespace Commodore_Repair_Toolbox
                 </head>
                 <body>
                 " + htmlForTabs + @"
-                <h1>Overview of components</h1><br />
+                <h1>Overview of components</h1>
+                This is a complete overview of all components for the selected board.<br /><br />
             ";
 
             var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
@@ -912,7 +932,7 @@ namespace Commodore_Repair_Toolbox
                 <meta charset='UTF-8'>
                 </head>
                 <body>
-                "+ htmlForTabs +@"
+                "+ htmlForTabs + @"
                 <h1>Help for application usage</h1><br />
 
                 <i>Commodore Repair Toolbox</i> is fairly simple, but some basic help is always nice to have.<br />
@@ -947,11 +967,11 @@ namespace Commodore_Repair_Toolbox
                 </ul>
                 <br />
                 
-                Configuration saved (per board):<br />
+                Labels visible:<br />
                 <ul>
-                <li>Last viewed schematic</li>
-                <li>Schematic/thumbnails slider position</li>
-                <li>Shown component categories</li>
+                <li>When only one checkbox is selected, then it will replace whitespaces in text with new-lines to condense the text</li>
+                <li>If no components are selected for the specific schematic, then the panel with checkboxes will not be shown</li>
+                <li>The panel can be toggled minimized/maximized with the ""M"" button</li>
                 </ul>
                 <br />
 
@@ -963,7 +983,8 @@ namespace Commodore_Repair_Toolbox
 
                 How-to report a problem or comment something:<br />
                 <ul>
-                <li>View <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues' target='_blank'>GitHub Issues</a></li>
+                <li>Through the ""Feedback"" tab</li>
+                <li>Through <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues' target='_blank'>GitHub Issues</a></li>
                 </ul>
                 <br />
                 
@@ -1209,10 +1230,13 @@ namespace Commodore_Repair_Toolbox
                 var bf = bd?.Files?.FirstOrDefault(f => f.Name == schematicSelectedName);
                 if (bf == null) return;
 
+                DisposeAllControls(overlayPanel);
                 overlayPanel.Overlays.Clear();
 
                 Color colorZoom = Color.FromName(bf.HighlightColorTab);
                 int opacityZoom = bf.HighlightOpacityTab;
+
+                bool hasHighlightedOverlays = false;
 
                 for (int i = 0; i < overlayComponentsTab.Count; i++)
                 {
@@ -1224,8 +1248,9 @@ namespace Commodore_Repair_Toolbox
                     );
 
                     // Find component "label" from component "display name"
-                    string componentLabel = bd.Components
-                        .FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.Label ?? "";
+                    string componentLabel = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.Label ?? "";
+                    string componentTechName = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.NameTechnical ?? "";
+                    string componentFriendlyName = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.NameFriendly ?? "";
 
                     // Check if the component is selected in component list
                     bool highlighted = listBoxComponentsSelectedText.Contains(overlayComponentsTab[i].Name);
@@ -1240,8 +1265,59 @@ namespace Commodore_Repair_Toolbox
                         ComponentDisplay = overlayComponentsTab[i].Name
                     });
 
+                    // Create a label, if the component is highlighted
+                    if (highlighted)
+                    {
+                        hasHighlightedOverlays = true;
+
+                        string labelText = checkBox1.Checked ? componentLabel : "";
+                        labelText += checkBox2.Checked && componentTechName != "" ? Environment.NewLine + componentTechName : "";
+                        labelText += checkBox3.Checked && componentFriendlyName != "" ? Environment.NewLine + componentFriendlyName : "";
+
+                        // Overwrite the label text, if we hae only one checkbox enabled
+                        labelText = checkBox1.Checked && !checkBox2.Checked && !checkBox3.Checked ? componentLabel.Replace(" ", Environment.NewLine) : labelText;
+                        labelText = !checkBox1.Checked && checkBox2.Checked && !checkBox3.Checked ? componentTechName.Replace(" ", Environment.NewLine) : labelText;
+                        labelText = !checkBox1.Checked && !checkBox2.Checked && checkBox3.Checked ? componentFriendlyName.Replace(" ", Environment.NewLine) : labelText;
+
+                        // Weird command but it will remove empty newlines at beginning and end
+                        labelText = string.Join(Environment.NewLine, labelText.Split(new[] { Environment.NewLine }, StringSplitOptions.None).Where(line => !string.IsNullOrWhiteSpace(line)));
+
+                        Label label = new Label
+                        {
+                            Text = labelText,
+                            AutoSize = true,
+                            BackColor = Color.Khaki,
+                            ForeColor = Color.Black,
+                            Font = new Font("Calibri", 9, FontStyle.Bold),
+                            BorderStyle = BorderStyle.FixedSingle,
+                            TextAlign = ContentAlignment.MiddleCenter,
+                            Enabled = false,
+                        };
+
+                        // Calculate the label center/middle position within the rectangle
+                        int labelX = rect.X + (rect.Width - label.PreferredWidth) / 2;
+                        int labelY = rect.Y + (rect.Height - label.PreferredHeight) / 2;
+                        label.Location = new Point(labelX, labelY);
+
+                        overlayPanel.Controls.Add(label);
+                    }
                 }
                 overlayPanel.Invalidate();
+
+                // Ensure the "Labels visible" panel is visible
+                if (hasHighlightedOverlays)
+                {
+                    // Add the label panel to "panelMain"
+                    panelMain.Controls.Add(panelLabelsVisible);
+                    int visibleHeight = panelZoom.ClientRectangle.Height;
+                    panelLabelsVisible.Location = new Point(0, visibleHeight - panelLabelsVisible.Height); // bottom-left corner of the visible area
+                    panelLabelsVisible.BringToFront();
+                    panelLabelsVisible.Visible = true;
+                }
+                else
+                {
+                    panelLabelsVisible.Visible = false;
+                }
             }
 
             // Thumbnail list
@@ -1415,6 +1491,12 @@ namespace Commodore_Repair_Toolbox
                 textBoxFeedback.Focus();
             }
 
+            // Make sure to resize thumbnails, in case some resizing has happend in between
+            if (tabControl.SelectedTab == tabSchematics)
+            {
+                ReadaptThumbnails();
+            }
+
             previousTab = tabControl.SelectedTab;
         }
 
@@ -1515,7 +1597,7 @@ namespace Commodore_Repair_Toolbox
             LoadAndApplySplitterPosition();
 
             SuspendLayout();
-            InitializeList();
+            InitializeThumbnails();
             InitializeTabMain();
             UpdateTabOverview(selectedBoard);
             UpdateTabRessources(selectedBoard);
@@ -1876,7 +1958,8 @@ namespace Commodore_Repair_Toolbox
                 child.Dispose();
             }
         }
-        private void InitializeList()
+
+        private void InitializeThumbnails()
         {
             // Debug
             #if DEBUG
@@ -1979,9 +2062,6 @@ namespace Commodore_Repair_Toolbox
             DrawBorderInList();
         }
 
-
-        bool thumbnailsSameWidth = false;
-        int thumbnailsWidth = 0;
 
         private void ReadaptThumbnails()
         {
@@ -2255,11 +2335,11 @@ namespace Commodore_Repair_Toolbox
                 (int)(image.Height * zoomFactor)
             );
 
-            HighlightOverlays("tab");
-
             // Always enforce scrollbars to avoid the weird "first zoom-in" flickering
             panelZoom.AutoScroll = true;
             panelZoom.AutoScrollMinSize = new Size(panelZoom.Width + 1, panelZoom.Height + 1);
+
+            HighlightOverlays("tab");
         }
 
         private void panelZoom_Resize(object sender, EventArgs e)
@@ -2566,7 +2646,7 @@ namespace Commodore_Repair_Toolbox
             // Reposition "fullscreen button" when in fullscreen (can only be done when UI is rendered)
             if (isFullscreen)
             {
-                buttonFullscreen.Location = new Point(10, panelBehindTab.Height - 55);
+                buttonFullscreen.Location = new Point(200, panelBehindTab.Height - 55);
                 buttonFullscreen.BringToFront();
             }
         }
@@ -2850,6 +2930,37 @@ namespace Commodore_Repair_Toolbox
         }
         // ***
 
+        private void checkBoxVisibleLabels_CheckedChanged(object sender, EventArgs e)
+        {
+            HighlightOverlays("tab");
+
+            // Save the state of the checkboxes
+            Configuration.SaveSetting("ShowLabel", checkBox1.Checked.ToString());
+            Configuration.SaveSetting("ShowTechnicalName", checkBox2.Checked.ToString());
+            Configuration.SaveSetting("ShowFriendlyName", checkBox3.Checked.ToString());
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            int currentHeight = panelLabelsVisible.Height;
+            int newHeight = 0;
+
+            if (currentHeight == 95)
+            {
+                newHeight = 26;
+            } else
+            {
+                newHeight = 95;
+            }
+
+            panelLabelsVisible.Height = newHeight;
+
+            Configuration.SaveSetting("ShowLabelsHeight", newHeight.ToString());
+
+            // Reposition the panel
+            int visibleHeight = panelZoom.ClientRectangle.Height;
+            panelLabelsVisible.Location = new Point(0, visibleHeight - panelLabelsVisible.Height); // bottom-left corner of the visible area
+        }
     }
 
     // -------------------------------------------------------------------------

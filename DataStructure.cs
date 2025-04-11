@@ -41,14 +41,14 @@ namespace Commodore_Repair_Toolbox
 
                 while (worksheet.Cells[row, 1].Value != null)
                 {
-                    string active = worksheet.Cells[row, 1].Value.ToString();
+                    string active = worksheet.Cells[row, 1].Value?.ToString() ?? "0";
 
                     // Only add hardware, if it is marked as active
                     if (active == "1")
                     {
-                        string nameHardware = worksheet.Cells[row, 2].Value.ToString();
-                        string nameBoard = worksheet.Cells[row, 3].Value.ToString();
-                        string datafile = worksheet.Cells[row, 4].Value.ToString();
+                        string nameHardware = worksheet.Cells[row, 2].Value?.ToString() ?? "";
+                        string nameBoard = worksheet.Cells[row, 3].Value?.ToString() ?? "";
+                        string datafile = worksheet.Cells[row, 4].Value?.ToString() ?? "";
 
                         // Check if the board datafile exists
                         string filePath = Path.Combine(Application.StartupPath, datafile);
@@ -138,11 +138,11 @@ namespace Commodore_Repair_Toolbox
 
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string active = worksheet.Cells[row, 1].Value.ToString();
-                                string name = worksheet.Cells[row, 2].Value.ToString();
-                                string fileName = worksheet.Cells[row, 3].Value.ToString();
-                                string colorZoom = worksheet.Cells[row, 4].Value.ToString();
-                                string colorList = worksheet.Cells[row, 5].Value.ToString();
+                                string active = worksheet.Cells[row, 1].Value?.ToString() ?? "0";
+                                string name = worksheet.Cells[row, 2].Value?.ToString() ?? "";
+                                string fileName = worksheet.Cells[row, 3].Value?.ToString() ?? "";
+                                string colorZoom = worksheet.Cells[row, 4].Value?.ToString() ?? "";
+                                string colorList = worksheet.Cells[row, 5].Value?.ToString() ?? "";
 
                                 // Only add schematic, if it is marked as active
                                 if (active == "1")
@@ -151,11 +151,11 @@ namespace Commodore_Repair_Toolbox
                                     if (File.Exists(filePath))
                                     {
                                         // Convert from fraction to 0-255
-                                        string cellValue = worksheet.Cells[row, 6].Value.ToString();
+                                        string cellValue = worksheet.Cells[row, 6].Value?.ToString() ?? "";
                                         int opacityZoom = (int)(double.Parse(cellValue) * 100);
                                         opacityZoom = (int)((opacityZoom / 100.0) * 255);
 
-                                        cellValue = worksheet.Cells[row, 7].Value.ToString();
+                                        cellValue = worksheet.Cells[row, 7].Value?.ToString() ?? "";
                                         int opacityList = (int)(double.Parse(cellValue) * 100);
                                         opacityList = (int)((opacityList / 100.0) * 255);
 
@@ -243,17 +243,17 @@ namespace Commodore_Repair_Toolbox
 
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string label = worksheet.Cells[row, 1].Value.ToString();
-                                string nameTechnical = worksheet.Cells[row, 2].Value?.ToString() ?? "?";
-                                string nameFriendly = worksheet.Cells[row, 3].Value?.ToString() ?? "?";
+                                string label = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+                                string nameTechnical = worksheet.Cells[row, 2].Value?.ToString() ?? "";
+                                string nameFriendly = worksheet.Cells[row, 3].Value?.ToString() ?? "";
                                 string type = worksheet.Cells[row, 4].Value?.ToString() ?? "Misc";
                                 string oneliner = worksheet.Cells[row, 5].Value?.ToString() ?? "";
-                                string description = worksheet.Cells[row, 6].Text;
+                                string description = worksheet.Cells[row, 6].Text ?? "";
                                 description = description.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", Environment.NewLine);
 
                                 string nameDisplay = label;
-                                nameDisplay += nameTechnical != "?" ? " | " + nameTechnical : "";
-                                nameDisplay += nameFriendly != "?" ? " | " + nameFriendly : "";
+                                nameDisplay += nameTechnical != "" ? " | " + nameTechnical : "";
+                                nameDisplay += nameFriendly != "" ? " | " + nameFriendly : "";
 
                                 ComponentBoard comp = new ComponentBoard
                                 {
@@ -368,9 +368,9 @@ namespace Commodore_Repair_Toolbox
 
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string componentName = worksheet.Cells[row, 1].Value.ToString();
-                                string name = worksheet.Cells[row, 2].Value.ToString();
-                                string fileName = worksheet.Cells[row, 3].Value.ToString();
+                                string componentName = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+                                string name = worksheet.Cells[row, 2].Value?.ToString() ?? "";
+                                string fileName = worksheet.Cells[row, 3].Value?.ToString() ?? "";
 
                                 // Log if file does not exists
                                 string filePath = Path.Combine(Application.StartupPath, fileName);
@@ -383,7 +383,7 @@ namespace Commodore_Repair_Toolbox
                                 else
                                 {
                                     // Add file to class
-                                    var classComponent = board.Components.FirstOrDefault(c => c.Label == componentName);
+                                    var classComponent = board?.Components?.FirstOrDefault(c => c.Label == componentName);
                                     if (classComponent != null)
                                     {
                                         if (classComponent.LocalFiles == null) classComponent.LocalFiles = new List<ComponentLocalFiles>();
@@ -436,9 +436,9 @@ namespace Commodore_Repair_Toolbox
 
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string componentName = worksheet.Cells[row, 1].Value.ToString();
-                                string linkName = worksheet.Cells[row, 2].Value.ToString();
-                                string linkUrl = worksheet.Cells[row, 3].Value.ToString();
+                                string componentName = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+                                string linkName = worksheet.Cells[row, 2].Value?.ToString() ?? "";
+                                string linkUrl = worksheet.Cells[row, 3].Value?.ToString() ?? "";
 
                                 var comp = board?.Components?.FirstOrDefault(c => c.Label == componentName);
                                 if (comp != null)
@@ -495,12 +495,16 @@ namespace Commodore_Repair_Toolbox
 
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string imageName = worksheet.Cells[row, 1].Value.ToString();
-                                string componentName = worksheet.Cells[row, 2].Value.ToString();
-                                int x = (int)(double)worksheet.Cells[row, 3].Value;
-                                int y = (int)(double)worksheet.Cells[row, 4].Value;
-                                int w = (int)(double)worksheet.Cells[row, 5].Value;
-                                int h = (int)(double)worksheet.Cells[row, 6].Value;
+                                string imageName = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+                                string componentName = worksheet.Cells[row, 2].Value?.ToString() ?? "";
+//                                int x = (int)(double)worksheet.Cells[row, 3].Value;
+//                                int y = (int)(double)worksheet.Cells[row, 4].Value;
+//                                int w = (int)(double)worksheet.Cells[row, 5].Value;
+//                                int h = (int)(double)worksheet.Cells[row, 6].Value;
+                                int x = worksheet.Cells[row, 3].Value != null ? (int)(double)worksheet.Cells[row, 3].Value : 0;
+                                int y = worksheet.Cells[row, 4].Value != null ? (int)(double)worksheet.Cells[row, 4].Value : 0;
+                                int w = worksheet.Cells[row, 5].Value != null ? (int)(double)worksheet.Cells[row, 5].Value : 0;
+                                int h = worksheet.Cells[row, 6].Value != null ? (int)(double)worksheet.Cells[row, 6].Value : 0;
 
                                 var bf = board.Files?.FirstOrDefault(f => f.Name == imageName);
 
@@ -576,9 +580,9 @@ namespace Commodore_Repair_Toolbox
 
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string category = worksheet.Cells[row, 1].Value.ToString();
-                                string linkName = worksheet.Cells[row, 2].Value.ToString();
-                                string linkUrl = worksheet.Cells[row, 3].Value.ToString();
+                                string category = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+                                string linkName = worksheet.Cells[row, 2].Value?.ToString() ?? "";
+                                string linkUrl = worksheet.Cells[row, 3].Value?.ToString() ?? "";
 
                                 // Create a new BoardLink instance and add it to the BoardLinks list
                                 BoardLink boardLink = new BoardLink
@@ -635,9 +639,9 @@ namespace Commodore_Repair_Toolbox
 
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string category = worksheet.Cells[row, 1].Value.ToString();
-                                string name = worksheet.Cells[row, 2].Value.ToString();
-                                string fileName = worksheet.Cells[row, 3].Value.ToString();
+                                string category = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+                                string name = worksheet.Cells[row, 2].Value?.ToString() ?? "";
+                                string fileName = worksheet.Cells[row, 3].Value?.ToString() ?? "";
 
                                 // Log if file does not exists
                                 //                            filePath = Path.Combine(Application.StartupPath, hardware.Folder, board.Folder, fileName);
@@ -700,22 +704,22 @@ namespace Commodore_Repair_Toolbox
 
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string componentName = worksheet.Cells[row, 1].Value.ToString();
-                                string name = worksheet.Cells[row, 2].Value.ToString();
-                                string fileName = worksheet.Cells[row, 3].Value.ToString();
+                                string componentName = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+                                string name = worksheet.Cells[row, 2].Value?.ToString() ?? "";
+                                string fileName = worksheet.Cells[row, 3].Value?.ToString() ?? "";
 
                                 // Log if file does not exists
                                 string filePath = Path.Combine(Application.StartupPath, fileName);
                                 if (!File.Exists(filePath))
                                 {
                                     string fileName1 = Path.GetFileName(filePathBoardData);
-                                    string error = $"ERROR: Excel file [{fileName1}] worksheet [{sheet}] then file [{fileName}] does not exists";
+                                    string error = $"ERROR: Excel file [{fileName1}] worksheet [{sheet}] the file [{fileName}] does not exists";
                                     Main.DebugOutput(error);
                                 }
                                 else
                                 {
                                     // Add file to class
-                                    var classComponent = board.Components.FirstOrDefault(c => c.Label == componentName);
+                                    var classComponent = board?.Components?.FirstOrDefault(c => c.Label == componentName);
                                     if (classComponent != null)
                                     {
                                         if (classComponent.ComponentImages == null) classComponent.ComponentImages = new List<ComponentImages>();

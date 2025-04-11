@@ -33,6 +33,11 @@
             this.tabSchematics = new System.Windows.Forms.TabPage();
             this.splitContainerSchematics = new System.Windows.Forms.SplitContainer();
             this.panelMain = new System.Windows.Forms.Panel();
+            this.panelLabelsVisible = new System.Windows.Forms.Panel();
+            this.label10 = new System.Windows.Forms.Label();
+            this.checkBox1 = new System.Windows.Forms.CheckBox();
+            this.checkBox3 = new System.Windows.Forms.CheckBox();
+            this.checkBox2 = new System.Windows.Forms.CheckBox();
             this.panelThumbnails = new System.Windows.Forms.Panel();
             this.tabOverview = new System.Windows.Forms.TabPage();
             this.webView2Overview = new Microsoft.Web.WebView2.WinForms.WebView2();
@@ -74,12 +79,15 @@
             this.panelBehindTab = new System.Windows.Forms.Panel();
             this.textBoxFilterComponents = new System.Windows.Forms.TextBox();
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
+            this.button1 = new System.Windows.Forms.Button();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
             this.splitContainerSchematics.Panel1.SuspendLayout();
             this.splitContainerSchematics.Panel2.SuspendLayout();
             this.splitContainerSchematics.SuspendLayout();
+            this.panelMain.SuspendLayout();
+            this.panelLabelsVisible.SuspendLayout();
             this.tabOverview.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.webView2Overview)).BeginInit();
             this.tabRessources.SuspendLayout();
@@ -144,12 +152,72 @@
             // 
             // panelMain
             // 
+            this.panelMain.Controls.Add(this.panelLabelsVisible);
             this.panelMain.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelMain.Location = new System.Drawing.Point(0, 0);
             this.panelMain.Margin = new System.Windows.Forms.Padding(0);
             this.panelMain.Name = "panelMain";
             this.panelMain.Size = new System.Drawing.Size(605, 536);
             this.panelMain.TabIndex = 5;
+            // 
+            // panelLabelsVisible
+            // 
+            this.panelLabelsVisible.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.panelLabelsVisible.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.panelLabelsVisible.Controls.Add(this.button1);
+            this.panelLabelsVisible.Controls.Add(this.label10);
+            this.panelLabelsVisible.Controls.Add(this.checkBox1);
+            this.panelLabelsVisible.Controls.Add(this.checkBox3);
+            this.panelLabelsVisible.Controls.Add(this.checkBox2);
+            this.panelLabelsVisible.Location = new System.Drawing.Point(28, 388);
+            this.panelLabelsVisible.Name = "panelLabelsVisible";
+            this.panelLabelsVisible.Size = new System.Drawing.Size(119, 95);
+            this.panelLabelsVisible.TabIndex = 4;
+            this.panelLabelsVisible.Visible = false;
+            // 
+            // label10
+            // 
+            this.label10.AutoSize = true;
+            this.label10.Location = new System.Drawing.Point(-1, 4);
+            this.label10.Name = "label10";
+            this.label10.Size = new System.Drawing.Size(101, 21);
+            this.label10.TabIndex = 4;
+            this.label10.Text = "Labels visible";
+            // 
+            // checkBox1
+            // 
+            this.checkBox1.AutoSize = true;
+            this.checkBox1.Checked = true;
+            this.checkBox1.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.checkBox1.Location = new System.Drawing.Point(3, 23);
+            this.checkBox1.Name = "checkBox1";
+            this.checkBox1.Size = new System.Drawing.Size(110, 25);
+            this.checkBox1.TabIndex = 1;
+            this.checkBox1.Text = "Board label";
+            this.checkBox1.UseVisualStyleBackColor = true;
+            this.checkBox1.CheckedChanged += new System.EventHandler(this.checkBoxVisibleLabels_CheckedChanged);
+            // 
+            // checkBox3
+            // 
+            this.checkBox3.AutoSize = true;
+            this.checkBox3.Location = new System.Drawing.Point(3, 67);
+            this.checkBox3.Name = "checkBox3";
+            this.checkBox3.Size = new System.Drawing.Size(131, 25);
+            this.checkBox3.TabIndex = 3;
+            this.checkBox3.Text = "Friendly name";
+            this.checkBox3.UseVisualStyleBackColor = true;
+            this.checkBox3.CheckedChanged += new System.EventHandler(this.checkBoxVisibleLabels_CheckedChanged);
+            // 
+            // checkBox2
+            // 
+            this.checkBox2.AutoSize = true;
+            this.checkBox2.Location = new System.Drawing.Point(3, 45);
+            this.checkBox2.Name = "checkBox2";
+            this.checkBox2.Size = new System.Drawing.Size(137, 25);
+            this.checkBox2.TabIndex = 2;
+            this.checkBox2.Text = "Technical name";
+            this.checkBox2.UseVisualStyleBackColor = true;
+            this.checkBox2.CheckedChanged += new System.EventHandler(this.checkBoxVisibleLabels_CheckedChanged);
             // 
             // panelThumbnails
             // 
@@ -609,6 +677,16 @@
             this.checkBoxBlink.Text = "Blink selected components";
             this.checkBoxBlink.UseVisualStyleBackColor = true;
             // 
+            // button1
+            // 
+            this.button1.Location = new System.Drawing.Point(95, 0);
+            this.button1.Name = "button1";
+            this.button1.Size = new System.Drawing.Size(22, 23);
+            this.button1.TabIndex = 5;
+            this.button1.Text = "M";
+            this.button1.UseVisualStyleBackColor = true;
+            this.button1.Click += new System.EventHandler(this.button1_Click);
+            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 21F);
@@ -642,6 +720,9 @@
             this.splitContainerSchematics.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).EndInit();
             this.splitContainerSchematics.ResumeLayout(false);
+            this.panelMain.ResumeLayout(false);
+            this.panelLabelsVisible.ResumeLayout(false);
+            this.panelLabelsVisible.PerformLayout();
             this.tabOverview.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.webView2Overview)).EndInit();
             this.tabRessources.ResumeLayout(false);
@@ -705,5 +786,11 @@
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.TabPage tabOverview;
         private Microsoft.Web.WebView2.WinForms.WebView2 webView2Overview;
+        private System.Windows.Forms.CheckBox checkBox2;
+        private System.Windows.Forms.CheckBox checkBox3;
+        private System.Windows.Forms.CheckBox checkBox1;
+        private System.Windows.Forms.Panel panelLabelsVisible;
+        private System.Windows.Forms.Label label10;
+        private System.Windows.Forms.Button button1;
     }
 }
