@@ -1,5 +1,4 @@
-﻿using Commodore_Repair_Toolbox;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -12,18 +11,11 @@ namespace Commodore_Repair_Toolbox
         private readonly Dictionary<string, string> localFiles = new Dictionary<string, string>();
         private readonly Dictionary<string, string> links = new Dictionary<string, string>();
 
-//        private readonly string hardwareSelectedFolder;
-//        private readonly string boardSelectedFolder;
-
         public string PictureBoxName { get; }
 
-//        public FormComponent(ComponentBoard component, string hwSelectedFolder, string bdSelectedFolder)
-        public FormComponent(ComponentBoard component)
+        public FormComponent(BoardComponents component)
         {
             InitializeComponent();
-
-//            hardwareSelectedFolder = hwSelectedFolder;
-//            boardSelectedFolder = bdSelectedFolder;
 
             PictureBoxName = component.Label;
 
@@ -83,7 +75,6 @@ namespace Commodore_Repair_Toolbox
 
         private void button1_Click(object sender, EventArgs e)
         {
-            // "Close" button
             Close();
         }
 
@@ -103,7 +94,6 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        // Handle link selection
         private void listBox2_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (listBox2.SelectedItem == null) return;

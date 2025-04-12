@@ -125,12 +125,24 @@ namespace Commodore_Repair_Toolbox
 
                         if (worksheet != null)
                         {
+                            string revisionDate = "(unknown)";
+                            string searchRevisionDate = "# Revision date:";
+                            board.RevisionDate = revisionDate; // make sure we set some value to the board
 
                             string searchHeader = "Schematic name";
+
                             int row = 1;
                             while (row <= worksheet.Dimension.End.Row)
                             {
-                                // Check "row" and column 2
+                                // Get the "revision date", if it is present
+                                if (worksheet.Cells[row, 1].Value?.ToString().StartsWith(searchRevisionDate) == true)
+                                {
+                                    string fullValue = worksheet.Cells[row, 1].Value.ToString();
+                                    revisionDate = fullValue.Substring(searchRevisionDate.Length).Trim(); // Extract and trim the date
+                                    board.RevisionDate = revisionDate;
+                                }
+
+                                // Check "row" and column 2 for the "searchHeader" (will be below the above IF-sentense)
                                 if (worksheet.Cells[row, 2].Value?.ToString() == searchHeader) break;
                                 row++;
                             }
@@ -159,10 +171,10 @@ namespace Commodore_Repair_Toolbox
                                         int opacityList = (int)(double.Parse(cellValue) * 100);
                                         opacityList = (int)((opacityList / 100.0) * 255);
 
-                                        BoardFileOverlays bf = new BoardFileOverlays
+                                        BoardOverlays bo = new BoardOverlays
                                         {
                                             Name = name,
-                                            FileName = fileName,
+                                            SchematicFileName = fileName,
                                             HighlightColorTab = colorZoom,
                                             HighlightColorList = colorList,
                                             HighlightOpacityTab = opacityZoom,
@@ -170,9 +182,9 @@ namespace Commodore_Repair_Toolbox
                                         };
                                         if (board.Files == null)
                                         {
-                                            board.Files = new List<BoardFileOverlays>();
+                                            board.Files = new List<BoardOverlays>();
                                         }
-                                        board.Files.Add(bf);
+                                        board.Files.Add(bo);
                                     }
                                     else
                                     {
@@ -255,7 +267,7 @@ namespace Commodore_Repair_Toolbox
                                 nameDisplay += nameTechnical != "" ? " | " + nameTechnical : "";
                                 nameDisplay += nameFriendly != "" ? " | " + nameFriendly : "";
 
-                                ComponentBoard comp = new ComponentBoard
+                                BoardComponents comp = new BoardComponents
                                 {
                                     Label = label,
                                     NameTechnical = nameTechnical,
@@ -265,7 +277,7 @@ namespace Commodore_Repair_Toolbox
                                     OneLiner = oneliner,
                                     Description = description
                                 };
-                                if (board.Components == null) board.Components = new List<ComponentBoard>();
+                                if (board.Components == null) board.Components = new List<BoardComponents>();
                                 board.Components.Add(comp);
                                 row++;
                             }
@@ -289,7 +301,7 @@ namespace Commodore_Repair_Toolbox
 
                     if (board.Files != null)
                     {
-                        foreach (BoardFileOverlays bf in board.Files)
+                        foreach (BoardOverlays bo in board.Files)
                         {
         
                             string filePath = Path.Combine(Application.StartupPath, board.DataFile);
@@ -317,8 +329,8 @@ namespace Commodore_Repair_Toolbox
                                         {
                                             Label = name
                                         };
-                                        if (bf.Components == null) bf.Components = new List<ComponentBounds>();
-                                        bf.Components.Add(cb);
+                                        if (bo.Components == null) bo.Components = new List<ComponentBounds>();
+                                        bo.Components.Add(cb);
                                         row++;
                                     }
                                 }
@@ -497,10 +509,6 @@ namespace Commodore_Repair_Toolbox
                             {
                                 string imageName = worksheet.Cells[row, 1].Value?.ToString() ?? "";
                                 string componentName = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-//                                int x = (int)(double)worksheet.Cells[row, 3].Value;
-//                                int y = (int)(double)worksheet.Cells[row, 4].Value;
-//                                int w = (int)(double)worksheet.Cells[row, 5].Value;
-//                                int h = (int)(double)worksheet.Cells[row, 6].Value;
                                 int x = worksheet.Cells[row, 3].Value != null ? (int)(double)worksheet.Cells[row, 3].Value : 0;
                                 int y = worksheet.Cells[row, 4].Value != null ? (int)(double)worksheet.Cells[row, 4].Value : 0;
                                 int w = worksheet.Cells[row, 5].Value != null ? (int)(double)worksheet.Cells[row, 5].Value : 0;
@@ -575,7 +583,7 @@ namespace Commodore_Repair_Toolbox
                             // Initialize the BoardLinks list if it's null
                             if (board.BoardLinks == null)
                             {
-                                board.BoardLinks = new List<BoardLink>();
+                                board.BoardLinks = new List<BoardLinks>();
                             }
 
                             while (worksheet.Cells[row, 1].Value != null)
@@ -585,7 +593,7 @@ namespace Commodore_Repair_Toolbox
                                 string linkUrl = worksheet.Cells[row, 3].Value?.ToString() ?? "";
 
                                 // Create a new BoardLink instance and add it to the BoardLinks list
-                                BoardLink boardLink = new BoardLink
+                                BoardLinks boardLink = new BoardLinks
                                 {
                                     Category = category,
                                     Name = linkName,

@@ -193,12 +193,10 @@ namespace Commodore_Repair_Toolbox
                 else
                 {
                     // Single right-click => detect overlays
-//                    bool clickedOverlay = false;
                     for (int i = Overlays.Count - 1; i >= 0; i--)
                     {
                         if (Overlays[i].Bounds.Contains(e.Location))
                         {
-//                            clickedOverlay = true;
                             // Pass a "right-click" overlay event
                             OverlayClicked?.Invoke(this, new OverlayClickedEventArgs(Overlays[i], e));
                             break;

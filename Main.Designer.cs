@@ -34,6 +34,7 @@
             this.splitContainerSchematics = new System.Windows.Forms.SplitContainer();
             this.panelMain = new System.Windows.Forms.Panel();
             this.panelLabelsVisible = new System.Windows.Forms.Panel();
+            this.button1 = new System.Windows.Forms.Button();
             this.label10 = new System.Windows.Forms.Label();
             this.checkBox1 = new System.Windows.Forms.CheckBox();
             this.checkBox3 = new System.Windows.Forms.CheckBox();
@@ -79,7 +80,6 @@
             this.panelBehindTab = new System.Windows.Forms.Panel();
             this.textBoxFilterComponents = new System.Windows.Forms.TextBox();
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
-            this.button1 = new System.Windows.Forms.Button();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -174,6 +174,17 @@
             this.panelLabelsVisible.Size = new System.Drawing.Size(119, 95);
             this.panelLabelsVisible.TabIndex = 4;
             this.panelLabelsVisible.Visible = false;
+            this.panelLabelsVisible.Click += new System.EventHandler(this.TogglePanelLabelsVisibility_Click);
+            // 
+            // button1
+            // 
+            this.button1.Location = new System.Drawing.Point(95, 0);
+            this.button1.Name = "button1";
+            this.button1.Size = new System.Drawing.Size(22, 23);
+            this.button1.TabIndex = 5;
+            this.button1.Text = "M";
+            this.button1.UseVisualStyleBackColor = true;
+            this.button1.Click += new System.EventHandler(this.TogglePanelLabelsVisibility_Click);
             // 
             // label10
             // 
@@ -183,6 +194,7 @@
             this.label10.Size = new System.Drawing.Size(101, 21);
             this.label10.TabIndex = 4;
             this.label10.Text = "Labels visible";
+            this.label10.Click += new System.EventHandler(this.TogglePanelLabelsVisibility_Click);
             // 
             // checkBox1
             // 
@@ -628,7 +640,7 @@
             this.buttonAll.TabIndex = 12;
             this.buttonAll.Text = "All";
             this.buttonAll.UseVisualStyleBackColor = true;
-            this.buttonAll.Click += new System.EventHandler(this.button2_Click);
+            this.buttonAll.Click += new System.EventHandler(this.buttonAll_Click);
             // 
             // buttonFullscreen
             // 
@@ -676,16 +688,6 @@
             this.checkBoxBlink.TabIndex = 15;
             this.checkBoxBlink.Text = "Blink selected components";
             this.checkBoxBlink.UseVisualStyleBackColor = true;
-            // 
-            // button1
-            // 
-            this.button1.Location = new System.Drawing.Point(95, 0);
-            this.button1.Name = "button1";
-            this.button1.Size = new System.Drawing.Size(22, 23);
-            this.button1.TabIndex = 5;
-            this.button1.Text = "M";
-            this.button1.UseVisualStyleBackColor = true;
-            this.button1.Click += new System.EventHandler(this.button1_Click);
             // 
             // Main
             // 

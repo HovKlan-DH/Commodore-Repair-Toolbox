@@ -11,7 +11,6 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-//using System.Web;
 using System.Windows.Forms;
 
 
@@ -62,6 +61,7 @@ namespace Commodore_Repair_Toolbox
         private Label labelFile;
         private Label labelComponent;
         private OverlayPanel overlayPanel;
+        private Dictionary<string, Control> overlayLabelMap = new Dictionary<string, Control>();
 
         // Thumbnails (right-side of SplitContainer)
         private Dictionary<string, OverlayPanel> overlayPanelsList = new Dictionary<string, OverlayPanel>();
@@ -84,7 +84,7 @@ namespace Commodore_Repair_Toolbox
 
         // Selected entries in the components list
         private List<string> listBoxComponentsSelectedText = new List<string>();
-        
+
         // Version information
         private string versionThis = "";
         private string versionOnline = "";
@@ -92,9 +92,7 @@ namespace Commodore_Repair_Toolbox
 
         // Current user selection
         public string hardwareSelectedName;
-//        private string hardwareSelectedFolder;
         private string boardSelectedName;
-//        private string boardSelectedFolder;
         private string boardSelectedFilename;
         private string schematicSelectedName;
         private string schematicSelectedFile;
@@ -576,6 +574,15 @@ namespace Commodore_Repair_Toolbox
                 await webView2Overview.EnsureCoreWebView2Async(null);
             }
 
+            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+
+            string revisionDate = "";
+            if (foundBoard != null)
+            {
+                revisionDate = foundBoard.RevisionDate;
+            }
+
             string htmlContent = @"
                 <html>
                 <head>
@@ -657,10 +664,9 @@ namespace Commodore_Repair_Toolbox
                 " + htmlForTabs + @"
                 <h1>Overview of components</h1>
                 This is a complete overview of all components for the selected board.<br /><br />
+                The data for this board has the revision date: <b>" + revisionDate + @"</b><br /><br />
             ";
 
-            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (foundBoard != null)
             {
                 if (foundBoard?.Components != null)
@@ -680,7 +686,7 @@ namespace Commodore_Repair_Toolbox
                     htmlContent += "</thead>";
                     htmlContent += "<tbody>";
 
-                    foreach (ComponentBoard comp in foundBoard.Components)
+                    foreach (BoardComponents comp in foundBoard.Components)
                     {
 
                         string compType = comp.Type;
@@ -785,10 +791,9 @@ namespace Commodore_Repair_Toolbox
                 string compName = message.Substring("openComp:".Length);
                 var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-                ComponentBoard selectedComp = foundBoard?.Components.FirstOrDefault(c => c.Label == compName);
+                BoardComponents selectedComp = foundBoard?.Components.FirstOrDefault(c => c.Label == compName);
                 if (selectedComp != null)
                 {
-//                    componentInfoPopup = new FormComponent(selectedComp, hardwareSelectedFolder, boardSelectedFolder);
                     componentInfoPopup = new FormComponent(selectedComp);
                     componentInfoPopup.Show(this);
                     componentInfoPopup.TopMost = true;
@@ -859,7 +864,6 @@ namespace Commodore_Repair_Toolbox
                     foreach (var file in group)
                     {
                         // Translate the relative path into an absolute path
-//                        string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.Datafile));
                         string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, file.Datafile));
                         string fileUri = new Uri(filePath).AbsoluteUri;
 
@@ -949,10 +953,10 @@ namespace Commodore_Repair_Toolbox
 
                 Keyboard functions:<br />
                 <ul>
-                <li><b>F11</b> will toggle fullscreen</li>
+                <li><b>F11</b> will toggle fullscreen (only in ""Schematics"" tab)</li>
                 <li><b>ESCAPE</b> will exit fullscreen or close popup component information</li>
                 <li><b>SPACE</b> will toggle blinking for selected components (does not apply in ""Feedback"" tab)</li>
-                <li>Focus cursor in input field, and type, to filter component list</li>
+                <li>Start typing anywhere to filter component list</li>
                 </ul>
                 <br />
 
@@ -961,7 +965,7 @@ namespace Commodore_Repair_Toolbox
                 <li>When a component is selected, then it will visualize if component is part of thumbnail in list-view:</li>
                 <ul>
                 <li>Appending an asterisk/* as first character in thumbnail label</li>
-                <li>Background color of thumbnail label changes to red</li>
+                <li>Background color of thumbnail label changes to blue</li>
                 </ul>
                 <li>You cannot highlight a component in image, if its component category is unselected</li>
                 </ul>
@@ -969,9 +973,17 @@ namespace Commodore_Repair_Toolbox
                 
                 Labels visible:<br />
                 <ul>
-                <li>When only one checkbox is selected, then it will replace whitespaces in text with new-lines to condense the text</li>
                 <li>If no components are selected for the specific schematic, then the panel with checkboxes will not be shown</li>
                 <li>The panel can be toggled minimized/maximized with the ""M"" button</li>
+                <li>When only one checkbox is selected, then it will replace whitespaces in text with new-lines to condense the text</li>
+                </ul>
+                <br />
+
+                Settings saved:<br />
+                <ul>
+                <li>Various selections will be saved to a configuration file</li>
+                <li>Some settings are ""per board"" while others are general</li>
+                <li>Configuration file is located in same directory as the executable file</li>
                 </ul>
                 <br />
 
@@ -981,10 +993,10 @@ namespace Commodore_Repair_Toolbox
                 </ul>
                 <br />
 
-                How-to report a problem or comment something:<br />
+                Report a problem or comment something from either of these places:<br />
                 <ul>
                 <li>Through the ""Feedback"" tab</li>
-                <li>Through <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues' target='_blank'>GitHub Issues</a></li>
+                <li>Through the <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues' target='_blank'>GitHub Issues</a></li>
                 </ul>
                 <br />
                 
@@ -1023,7 +1035,7 @@ namespace Commodore_Repair_Toolbox
                 "+ htmlForTabs + @"
                 <h1>Commodore Repair Toolbox</h1><br />
 
-                You are running version: <b>"+ versionThis + @"</b><br />
+                You are running version <b>"+ versionThis + @"</b> (64-bit)<br />
                 <br />
 
                 " + versionOnlineTxt + @"
@@ -1122,6 +1134,9 @@ namespace Commodore_Repair_Toolbox
             var listBoxComponentsSelectedClone = listBoxComponents.SelectedItems.Cast<object>().ToList(); // create a list of selected components
             string filterText = textBoxFilterComponents.Text.ToLower();
 
+            // Convert the selected items to a "HashSet" for faster lookup
+            var selectedComponents = new HashSet<string>(listBoxComponentsSelectedText);
+
             listBoxComponents.Items.Clear();
 
             // Walk through all components for selected hard and board
@@ -1131,16 +1146,14 @@ namespace Commodore_Repair_Toolbox
             {
                 if (foundBoard?.Components != null)
                 {
-                    foreach (ComponentBoard comp in foundBoard.Components)
+                    foreach (BoardComponents comp in foundBoard.Components)
                     {
                         string componentCategory = comp.Type;
-                        //string componentName = comp.Label;
                         string componentDisplay = comp.NameDisplay;
 
                         // Check if category is selected - if so, add the component to the newly generated list and "selected" lsists, if it is selected
                         if (listBoxCategories.SelectedItems.Contains(componentCategory))
                         {
-
                             // Only add the component to the list if it matches the filter
                             if (string.IsNullOrEmpty(filterText) || componentDisplay.ToLower().Contains(filterText))
                             {
@@ -1149,7 +1162,7 @@ namespace Commodore_Repair_Toolbox
                                 // Add the component to the "selected" list + select it in the newly generated component list
                                 if (listBoxComponentsSelectedClone.Contains(componentDisplay))
                                 {
-                                    if (!listBoxComponentsSelectedText.Contains(componentDisplay))
+                                    if (!selectedComponents.Contains(componentDisplay))
                                     {
                                         AddSelectedComponentIfNotInList(componentDisplay);
                                     }
@@ -1202,6 +1215,11 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
+        private void listBoxComponents_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            UpdateComponentSelection();
+        }
+
 
         // ###########################################################################################
         // Handling highlighting of overlays for "Main" and thumbnail images.
@@ -1222,6 +1240,9 @@ namespace Commodore_Repair_Toolbox
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (bd == null) return;
 
+            // Convert the selected items to a "HashSet" for faster lookup
+            var selectedComponents = new HashSet<string>(listBoxComponentsSelectedText);
+            
             // Main
             if (scope == "tab")
             {
@@ -1253,7 +1274,7 @@ namespace Commodore_Repair_Toolbox
                     string componentFriendlyName = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.NameFriendly ?? "";
 
                     // Check if the component is selected in component list
-                    bool highlighted = listBoxComponentsSelectedText.Contains(overlayComponentsTab[i].Name);
+                    bool highlighted = selectedComponents.Contains(overlayComponentsTab[i].Name);
 
                     overlayPanel.Overlays.Add(new OverlayInfo
                     {
@@ -1282,24 +1303,34 @@ namespace Commodore_Repair_Toolbox
                         // Weird command but it will remove empty newlines at beginning and end
                         labelText = string.Join(Environment.NewLine, labelText.Split(new[] { Environment.NewLine }, StringSplitOptions.None).Where(line => !string.IsNullOrWhiteSpace(line)));
 
-                        Label label = new Label
+                        // Add a component label, if one of the checkboxes are checked
+                        if (checkBox1.Checked || checkBox2.Checked || checkBox3.Checked)
                         {
-                            Text = labelText,
-                            AutoSize = true,
-                            BackColor = Color.Khaki,
-                            ForeColor = Color.Black,
-                            Font = new Font("Calibri", 9, FontStyle.Bold),
-                            BorderStyle = BorderStyle.FixedSingle,
-                            TextAlign = ContentAlignment.MiddleCenter,
-                            Enabled = false,
-                        };
+                            Label label = new Label
+                            {
+                                Name = "Label for component",
+                                Text = labelText,
+                                AutoSize = true,
+                                BackColor = Color.Khaki,
+                                ForeColor = Color.Black,
+                                Font = new Font("Calibri", 9, FontStyle.Bold),
+                                BorderStyle = BorderStyle.FixedSingle,
+                                TextAlign = ContentAlignment.MiddleCenter,
+                                Enabled = false,
+                                Tag = componentLabel,
+                            };
+                            label.DoubleBuffered(true);
 
-                        // Calculate the label center/middle position within the rectangle
-                        int labelX = rect.X + (rect.Width - label.PreferredWidth) / 2;
-                        int labelY = rect.Y + (rect.Height - label.PreferredHeight) / 2;
-                        label.Location = new Point(labelX, labelY);
+                            // Calculate the label center/middle position within the rectangle
+                            int labelX = rect.X + (rect.Width - label.PreferredWidth) / 2;
+                            int labelY = rect.Y + (rect.Height - label.PreferredHeight) / 2;
+                            label.Location = new Point(labelX, labelY);
 
-                        overlayPanel.Controls.Add(label);
+                            // Have a mapping table, as this isfaster than seaching all controls for a specific name
+                            overlayLabelMap[componentLabel] = label;
+
+                            overlayPanel.Controls.Add(label);
+                        }
                     }
                 }
                 overlayPanel.Invalidate();
@@ -1310,7 +1341,7 @@ namespace Commodore_Repair_Toolbox
                     // Add the label panel to "panelMain"
                     panelMain.Controls.Add(panelLabelsVisible);
                     int visibleHeight = panelZoom.ClientRectangle.Height;
-                    panelLabelsVisible.Location = new Point(0, visibleHeight - panelLabelsVisible.Height); // bottom-left corner of the visible area
+                    panelLabelsVisible.Location = new Point(0, visibleHeight - panelLabelsVisible.Height - 2); // bottom-left corner of the visible area
                     panelLabelsVisible.BringToFront();
                     panelLabelsVisible.Visible = true;
                 }
@@ -1326,20 +1357,20 @@ namespace Commodore_Repair_Toolbox
                 if (bd.Files != null)
                 {
                     // Draw overlays on each thumbnail
-                    foreach (BoardFileOverlays bf in bd.Files)
+                    foreach (BoardOverlays bo in bd.Files)
                     {
-                        if (!overlayPanelsList.ContainsKey(bf.Name)) continue;
+                        if (!overlayPanelsList.ContainsKey(bo.Name)) continue;
 
-                        OverlayPanel listPanel = overlayPanelsList[bf.Name];
+                        OverlayPanel listPanel = overlayPanelsList[bo.Name];
                         listPanel.Overlays.Clear();
 
-                        Color colorList = Color.FromName(bf.HighlightColorList);
-                        int opacityList = bf.HighlightOpacityList;
-                        float listZoom = overlayListZoomFactors[bf.Name];
+                        Color colorList = Color.FromName(bo.HighlightColorList);
+                        int opacityList = bo.HighlightOpacityList;
+                        float listZoom = overlayListZoomFactors[bo.Name];
 
-                        if (bf?.Components != null)
+                        if (bo?.Components != null)
                         {
-                            foreach (var comp in bf.Components)
+                            foreach (var comp in bo.Components)
                             {
                                 if (comp.Overlays == null) continue;
 
@@ -1348,7 +1379,7 @@ namespace Commodore_Repair_Toolbox
                                     .FirstOrDefault(cb => cb.Label == comp.Label)?.NameDisplay ?? "";
 
                                 // Check if the component is selected in component list
-                                bool highlighted = listBoxComponentsSelectedText.Contains(componentDisplay);
+                                bool highlighted = selectedComponents.Contains(componentDisplay);
 
                                 foreach (var ov in comp.Overlays)
                                 {
@@ -1401,6 +1432,59 @@ namespace Commodore_Repair_Toolbox
             UpdateComponentList();
         }
 
+        // ###########################################################################################
+        // Save the selected categories.
+        // ###########################################################################################              
+
+        private void SaveSelectedCategories()
+        {
+            // 1) Build a unique config key from hardware and board
+            string configKey = $"SelectedCategories|{hardwareSelectedName}|{boardSelectedName}";
+
+            // 2) Gather selected categories from "listBoxCategories"
+            var selectedCategories = listBoxCategories.SelectedItems
+                .Cast<object>()
+                .Select(item => item.ToString());
+
+            string joined = string.Join(";", selectedCategories);
+
+            Configuration.SaveSetting(configKey, joined);
+        }
+
+
+        // ###########################################################################################
+        // ###########################################################################################
+
+        private bool LoadSelectedCategories()
+        {
+            // Debug
+#if DEBUG
+            StackTrace stackTrace = new StackTrace();
+            StackFrame callerFrame = stackTrace.GetFrame(1);
+            MethodBase callerMethod = callerFrame.GetMethod();
+            string callerName = callerMethod.Name;
+            Debug.WriteLine("[LoadSelectedCategories] called from [" + callerName + "]");
+#endif
+
+            // Get "SelectedCategories" from configuration file
+            string configKey = $"SelectedCategories|{hardwareSelectedName}|{boardSelectedName}";
+            string joined = Configuration.GetSetting(configKey, "");
+
+            if (string.IsNullOrEmpty(joined)) return false;
+
+            listBoxCategories.ClearSelected();
+            string[] categories = joined.Split(';');
+            foreach (string cat in categories)
+            {
+                int idx = listBoxCategories.Items.IndexOf(cat);
+                if (idx >= 0)
+                {
+                    listBoxCategories.SetSelected(idx, true);
+                }
+            }
+            return true;
+        }
+
 
         // ###########################################################################################
         // Blink handling.
@@ -1428,37 +1512,75 @@ namespace Commodore_Repair_Toolbox
 
         private void BlinkSelectedOverlays(bool state)
         {
-            foreach (var overlayPanel in overlayPanelsList.Values)
-            {
-                foreach (var overlay in overlayPanel.Overlays)
-                {
-                    if (listBoxComponentsSelectedText.Contains(overlay.ComponentDisplay))
-                    {
-                        overlay.Highlighted = state;
-                    }
-                }
-                overlayPanel.Invalidate();
-            }
+            SuspendDrawing(panelImageMain);
 
+            // Convert the selected items to a "HashSet" for faster lookup
+            var selectedComponents = new HashSet<string>(listBoxComponentsSelectedText);
+
+            // Handle the main/schematic image
             if (overlayPanel != null)
             {
                 foreach (var overlay in overlayPanel.Overlays)
                 {
-                    if (listBoxComponentsSelectedText.Contains(overlay.ComponentDisplay))
+                    if (selectedComponents.Contains(overlay.ComponentDisplay))
+                    {
+                        overlay.Highlighted = state;
+
+                        if (overlayLabelMap.TryGetValue(overlay.ComponentLabel, out var label))
+                        {
+                            label.Visible = state;
+                        }
+                    }
+                }
+            }
+
+            ResumeDrawing(panelImageMain);
+
+            // Handle the thumbnails
+            foreach (var overlayPanel2 in overlayPanelsList.Values)
+            {
+                foreach (var overlay in overlayPanel2.Overlays)
+                {
+                    if (selectedComponents.Contains(overlay.ComponentDisplay))
                     {
                         overlay.Highlighted = state;
                     }
                 }
-                overlayPanel.Invalidate();
+                overlayPanel2.Invalidate();
             }
-        }
+        }                        
 
         private void ReHighlightSelectedComponents()
         {
             ShowOverlaysAccordingToComponentList();
         }
 
+/*
+        // ###########################################################################################
+        // Do a global search for a control with a specific tag.
+        // ###########################################################################################
 
+        private Control FindControlByTag(Control parent, object tag)
+        {
+            foreach (Control control in parent.Controls)
+            {
+                // Return control as soon s we have found tag
+                if (control.Tag != null && control.Tag.Equals(tag))
+                {
+                    return control;
+                }
+
+                // Recursively search in child controls
+                Control foundControl = FindControlByTag(control, tag);
+                if (foundControl != null)
+                {
+                    return foundControl;
+                }
+            }
+            return null;
+        }
+ */       
+        
         // ###########################################################################################
         // Handle input of email address in "Feedback" tab.
         // ###########################################################################################
@@ -1561,8 +1683,6 @@ namespace Commodore_Repair_Toolbox
             var selectedBoard = selectedHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (selectedHardware == null || selectedBoard == null) return;
 
-//            hardwareSelectedFolder = selectedHardware.Folder;
-//            boardSelectedFolder = selectedBoard.Folder;
             boardSelectedFilename = selectedBoard.DataFile;
 
             // Load selected thumbnail from configuration file, if already set
@@ -1570,14 +1690,13 @@ namespace Commodore_Repair_Toolbox
             schematicSelectedName = Configuration.GetSetting(configKey, null);
 
             // Select the schematic - check if we can find the current selection, but otherwise default to first schematic
-//            var selectedSchematic = selectedBoard.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
             var selectedSchematic = selectedBoard?.Files?.FirstOrDefault(f => f.Name == schematicSelectedName);
             if (selectedSchematic == null)
             {
                 selectedSchematic = selectedBoard?.Files?.FirstOrDefault();
             }
             schematicSelectedName = selectedSchematic?.Name;
-            schematicSelectedFile = selectedSchematic?.FileName;
+            schematicSelectedFile = selectedSchematic?.SchematicFileName;
             textBox2.Text = schematicSelectedName; // feedback info
 
             // Initialize UI
@@ -1603,7 +1722,6 @@ namespace Commodore_Repair_Toolbox
             UpdateTabRessources(selectedBoard);
             ResumeLayout();
         }
-
 
         private void LoadAndApplySplitterPosition()
         {
@@ -1640,7 +1758,7 @@ namespace Commodore_Repair_Toolbox
                 var file = bd.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
                 if (file != null)
                 {
-                    schematicSelectedFile = file.FileName;
+                    schematicSelectedFile = file.SchematicFileName;
                     InitializeTabMain();
                 }
             }
@@ -1666,47 +1784,25 @@ namespace Commodore_Repair_Toolbox
         }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        // HEST - TO REFACTOR FROM HERE
-
-        // ---------------------------------------------------------------------------
-        // Fullscreen - Enter
-        // ---------------------------------------------------------------------------
+        // ###########################################################################################
+        // Enter fullscreen.
+        // ###########################################################################################
 
         private void FullscreenModeEnter()
         {
             // Save (in variable only - not config file) current and set new window state
-            formPreviousWindowState = this.WindowState;
-            formPreviousFormBorderStyle = this.FormBorderStyle;
-            previousBoundsForm = this.Bounds;
+            formPreviousWindowState = WindowState;
+            formPreviousFormBorderStyle = FormBorderStyle;
+            previousBoundsForm = Bounds;
             previousBoundsPanelBehindTab = panelBehindTab.Bounds;
             previousBoundsFullscreenButton = buttonFullscreen.Bounds;
-            this.FormBorderStyle = FormBorderStyle.None;
-            this.WindowState = FormWindowState.Normal;
-            this.Bounds = Screen.PrimaryScreen.Bounds;
+            FormBorderStyle = FormBorderStyle.None;
+            WindowState = FormWindowState.Normal;
+            Bounds = Screen.PrimaryScreen.Bounds;
 
             // Set bounds for fullscreen panel
             panelBehindTab.Dock = DockStyle.Fill;
             panelBehindTab.BringToFront();
-
-//            buttonFullscreen.Location = new Point(10, panelBehindTab.Height - 55);
-//            buttonFullscreen.BringToFront();
 
             // Determine which tab should be maximized
             panelBehindTab.Controls.Remove(panelMain);
@@ -1721,17 +1817,18 @@ namespace Commodore_Repair_Toolbox
             isFullscreen = true;
         }
 
-        // ---------------------------------------------------------------------------
-        // Fullscreen - exit
-        // ---------------------------------------------------------------------------
+
+        // ###########################################################################################
+        // Exit fullscreen.
+        // ###########################################################################################
 
         private void FullscreenModeExit()
         {
             // Restore previous window state
             panelBehindTab.Dock = DockStyle.None;
-            this.FormBorderStyle = formPreviousFormBorderStyle;
-            this.WindowState = formPreviousWindowState;
-            this.Bounds = previousBoundsForm;
+            FormBorderStyle = formPreviousFormBorderStyle;
+            WindowState = formPreviousWindowState;
+            Bounds = previousBoundsForm;
             panelBehindTab.Bounds = previousBoundsPanelBehindTab;
             buttonFullscreen.Bounds = previousBoundsFullscreenButton;
 
@@ -1749,88 +1846,66 @@ namespace Commodore_Repair_Toolbox
             isFullscreen = false;
         }
 
-       
 
-        private void AttachClosePopupOnClick(Control parent)
+        // ###########################################################################################
+        // Handle the fullscreen button click.
+        // ###########################################################################################
+
+        private void buttonFullscreen_Click(object sender, EventArgs e)
         {
-            // Attach a single MouseDown event to close any open popup
-            parent.MouseDown += (s, e) =>
+            SuspendLayout();
+            if (!isFullscreen)
             {
-                // Only if we click in the main form and a popup is open
-                CloseComponentPopup();
-            };
+                FullscreenModeEnter();
+            }
+            else
+            {
+                FullscreenModeExit();
+                ReadaptThumbnails();
+            }
 
-            // Recurse to child controls
-            foreach (Control child in parent.Controls)
+            ResumeLayout();
+
+            // Reposition fullscreen button when in fullscreen (can only be done when UI is rendered)
+            if (isFullscreen)
             {
-                AttachClosePopupOnClick(child);
+                buttonFullscreen.Location = new Point(panelBehindTab.Width - buttonFullscreen.Width - 25, panelBehindTab.Height - 55);
+                buttonFullscreen.BringToFront();
             }
         }
 
-        private void ShowComponentPopup(ComponentBoard comp)
+
+        // ###########################################################################################
+        // Check if the "Fullscreen" button should be enabled or not.
+        // ###########################################################################################
+
+        private void tabControl1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            // Show it modeless (non-blocking)
-            string title = comp.NameDisplay;
-
-            // Create new popup
-//            componentInfoPopup = new FormComponent(comp, hardwareSelectedFolder, boardSelectedFolder);
-            componentInfoPopup = new FormComponent(comp);
-            componentInfoPopup.Text = title;
-            componentInfoPopup.Show(this);
-            componentInfoPopup.TopMost = true;
-        }
-
-
-        
-
-        // ---------------------------------------------------------------------
-        // Lists of components
-
-        private void InitializeComponentCategories()
-        {
-            // Debug
-            #if DEBUG
-                StackTrace stackTrace = new StackTrace();
-                StackFrame callerFrame = stackTrace.GetFrame(1);
-                MethodBase callerMethod = callerFrame.GetMethod();
-                string callerName = callerMethod.Name;
-                Debug.WriteLine("[InitializeComponentCategories] called from [" + callerName + "]");
-            #endif
-
-            listBoxCategories.Items.Clear();
-
-            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            if (foundBoard != null)
+            if (tabControl.SelectedTab.Text == "Schematics")
             {
-                if (foundBoard?.Components != null)
-                {
-                    foreach (ComponentBoard component in foundBoard.Components)
-                    {
-                        if (!string.IsNullOrEmpty(component.Type) && !listBoxCategories.Items.Contains(component.Type))
-                        {
-                            listBoxCategories.Items.Add(component.Type);
-                        }
-                    }
-                }
+                buttonFullscreen.Enabled = true;
+            }
+            else
+            {
+                buttonFullscreen.Enabled = false;
             }
         }
 
-        
 
-        // ---------------------------------------------------------------------
-        // Tab: main image (left side)
+        // ###########################################################################################
+        // Initialize the main/schematic image.
+        // ###########################################################################################
 
         private void InitializeTabMain()
         {
             // Debug
-            #if DEBUG
-                StackTrace stackTrace = new StackTrace();
-                StackFrame callerFrame = stackTrace.GetFrame(1);
-                MethodBase callerMethod = callerFrame.GetMethod();
-                string callerName = callerMethod.Name;
-                Debug.WriteLine("[InitializeTabMain] called from [" + callerName + "]");
-            #endif
+#if DEBUG
+            StackTrace stackTrace = new StackTrace();
+            StackFrame callerFrame = stackTrace.GetFrame(1);
+            MethodBase callerMethod = callerFrame.GetMethod();
+            string callerName = callerMethod.Name;
+            Debug.WriteLine("[InitializeTabMain] called from [" + callerName + "]");
+#endif
 
             // Dispose the image, if one already exists
             if (image != null)
@@ -1840,7 +1915,6 @@ namespace Commodore_Repair_Toolbox
             }
 
             // Load main image
-//            string filePath = Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, schematicSelectedFile);
             string filePath = Path.Combine(Application.StartupPath, schematicSelectedFile);
             image = Image.FromFile(
                 filePath
@@ -1933,42 +2007,61 @@ namespace Commodore_Repair_Toolbox
             AttachClosePopupOnClick(this);
         }
 
-        // ---------------------------------------------------------------------
-        // Right-side list (thumbnails)
+        // ###########################################################################################
+        // Create overlay arrays for the main/schematic image.
+        // ###########################################################################################
 
-        /*
-        private void PanelThumbnail_Paint(object sender, PaintEventArgs e)
+        private void CreateOverlayArraysToTab()
         {
-            Panel panel = (Panel)sender;
-            using (Pen pen = new Pen(Color.Red, thumbnailSelectedBorderWidth))
+            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            if (bd == null) return;
+
+            foreach (BoardOverlays bo in bd.Files)
             {
-                pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Dash;
-                float offset = pen.Width / 2;
-                e.Graphics.DrawRectangle(pen, offset, offset, panel.ClientSize.Width - pen.Width, panel.ClientSize.Height - pen.Width);
+                if (bo.Name != schematicSelectedName) continue;
+                if (bo?.Components != null)
+                {
+                    foreach (var comp in bo.Components)
+                    {
+                        string componentDisplay = bd.Components.FirstOrDefault(cb => cb.Label == comp.Label)?.NameDisplay ?? "";
+                        if (comp.Overlays == null) continue;
+
+                        foreach (var ov in comp.Overlays)
+                        {
+                            PictureBox overlayPictureBox = new PictureBox
+                            {
+                                Name = componentDisplay,
+                                Location = new Point(ov.Bounds.X, ov.Bounds.Y),
+                                Size = new Size(ov.Bounds.Width, ov.Bounds.Height),
+                                Tag = bo.Name
+                            };
+
+                            overlayComponentsTab.Add(overlayPictureBox);
+                            int idx = overlayComponentsTab.Count - 1;
+                            overlayComponentsTabOriginalSizes[idx] = overlayPictureBox.Size;
+                            overlayComponentsTabOriginalLocations[idx] = overlayPictureBox.Location;
+                        }
+                    }
+                }
             }
         }
-        */
 
-        void DisposeAllControls(Control parent)
-        {
-            for (int i = parent.Controls.Count - 1; i >= 0; i--)
-            {
-                Control child = parent.Controls[i];
-                DisposeAllControls(child);
-                child.Dispose();
-            }
-        }
+
+        // ###########################################################################################
+        // Initialize the list of thumbnails.
+        // ###########################################################################################
 
         private void InitializeThumbnails()
         {
             // Debug
-            #if DEBUG
-                StackTrace stackTrace = new StackTrace();
-                StackFrame callerFrame = stackTrace.GetFrame(1);
-                MethodBase callerMethod = callerFrame.GetMethod();
-                string callerName = callerMethod.Name;
-                Debug.WriteLine("[InitializeList] called from [" + callerName + "]");
-            #endif
+#if DEBUG
+            StackTrace stackTrace = new StackTrace();
+            StackFrame callerFrame = stackTrace.GetFrame(1);
+            MethodBase callerMethod = callerFrame.GetMethod();
+            string callerName = callerMethod.Name;
+            Debug.WriteLine("[InitializeList] called from [" + callerName + "]");
+#endif
 
             // Gracefully dispose all controls
             DisposeAllControls(panelThumbnails);
@@ -1985,10 +2078,9 @@ namespace Commodore_Repair_Toolbox
             if (bd.Files == null) return;
 
             // Walkthrough each schematic image for this board
-            foreach (BoardFileOverlays schematic in bd.Files)
+            foreach (BoardOverlays schematic in bd.Files)
             {
-//                string filename = Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, schematic.FileName);
-                string filename = Path.Combine(Application.StartupPath, schematic.FileName);
+                string filename = Path.Combine(Application.StartupPath, schematic.SchematicFileName);
 
                 // Panel that will hold the label and the image
                 Panel panelThumbnail = new Panel
@@ -2041,7 +2133,7 @@ namespace Commodore_Repair_Toolbox
                 {
                     if (e2.Button == MouseButtons.Left)
                         ThumbnailImageClicked(panelImage);
-                };                
+                };
                 overlayPanel.OverlayClicked += (s, e2) =>
                 {
                     if (e2.MouseArgs.Button == MouseButtons.Left)
@@ -2058,21 +2150,25 @@ namespace Commodore_Repair_Toolbox
                         ThumbnailImageClicked(panelImage);
                 };
             }
-            ReadaptThumbnails(); 
+            ReadaptThumbnails();
             DrawBorderInList();
         }
 
 
+        // ###########################################################################################
+        // Resize the thumbnails.
+        // ###########################################################################################
+
         private void ReadaptThumbnails()
         {
             // Debug
-            #if DEBUG
-               StackTrace stackTrace = new StackTrace();
-                StackFrame callerFrame = stackTrace.GetFrame(1);
-                MethodBase callerMethod = callerFrame.GetMethod();
-                string callerName = callerMethod.Name;
-                Debug.WriteLine("[ReadaptThumbnails] called from [" + callerName +"]");
-            #endif
+#if DEBUG
+            StackTrace stackTrace = new StackTrace();
+            StackFrame callerFrame = stackTrace.GetFrame(1);
+            MethodBase callerMethod = callerFrame.GetMethod();
+            string callerName = callerMethod.Name;
+            Debug.WriteLine("[ReadaptThumbnails] called from [" + callerName + "]");
+#endif
 
             thumbnailsSameWidth = false;
             thumbnailsWidth = 0;
@@ -2087,18 +2183,20 @@ namespace Commodore_Repair_Toolbox
                 if (!thumbnailsSameWidth)
                 {
                     ReadaptThumbnails_Retry();
-                } else
+                }
+                else
                 {
                     break;
                 }
-                
+
                 // if we end up in a race condition, then end redrawing when most of the thumbnail image is visible
                 if (i >= 3 && thumbnailsWidth < thumbnailsWidthOld)
                 {
                     Debug.WriteLine("Race condition in [ReadaptThumbnails]");
                     panelThumbnails.AutoScrollMinSize = new Size(0, panelThumbnails.ClientSize.Height + 1);
                     break;
-                } else
+                }
+                else
                 {
                     panelThumbnails.AutoScrollMinSize = Size.Empty;
                 }
@@ -2160,12 +2258,19 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+        // ###########################################################################################
+        // Refresh the labels of the thumbnails (show if component is included), based on selected components.
+        // ###########################################################################################
+
         private void RefreshThumbnailLabels()
         {
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
             if (bd == null) return;
             if (bd.Files == null) return;
+
+            // Convert the selected items to a "HashSet" for faster lookup
+            var selectedComponents = new HashSet<string>(listBoxComponentsSelectedText);
 
             foreach (var file in bd.Files)
             {
@@ -2179,7 +2284,7 @@ namespace Commodore_Repair_Toolbox
                 var labelListFile = container.Controls.OfType<Label>().FirstOrDefault();
                 if (labelListFile == null) continue;
 
-                bool hasSelectedComponent = listBoxComponentsSelectedText.Any(selectedComponentText =>
+                bool hasSelectedComponent = selectedComponents.Any(selectedComponentText =>
                 {
                     // Find component "label"
                     string componentLabel = bd.Components
@@ -2207,17 +2312,20 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+        // ###########################################################################################
+        // Handle the click on a thumbnail image.
+        // ###########################################################################################
+
         private void ThumbnailImageClicked(PictureBox pan)
         {
             // Debug
-            #if DEBUG
-                StackTrace stackTrace = new StackTrace();
-                StackFrame callerFrame = stackTrace.GetFrame(1);
-                MethodBase callerMethod = callerFrame.GetMethod();
-                string callerName = callerMethod.Name;
-                Debug.WriteLine("[ThumbnailImageClicked] called from [" + callerName + "]");
-            #endif
-
+#if DEBUG
+            StackTrace stackTrace = new StackTrace();
+            StackFrame callerFrame = stackTrace.GetFrame(1);
+            MethodBase callerMethod = callerFrame.GetMethod();
+            string callerName = callerMethod.Name;
+            Debug.WriteLine("[ThumbnailImageClicked] called from [" + callerName + "]");
+#endif
             // Clear all current overlays
             overlayPanel.Overlays.Clear();
 
@@ -2236,85 +2344,55 @@ namespace Commodore_Repair_Toolbox
                 var file = bd.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
                 if (file != null)
                 {
-                    schematicSelectedFile = file.FileName;
+                    schematicSelectedFile = file.SchematicFileName;
                     InitializeTabMain();  // load the selected image to "Main"
                 }
             }
 
             // Ensure thumbnail border gets updated
-            DrawBorderInList(); 
+            DrawBorderInList();
         }
 
 
+        // ###########################################################################################
+        // Initialize the component categories.
+        // ###########################################################################################
 
-
-
-
-        // ---------------------------------------------------------------------
-        // listBox events
-
-        private void listBoxComponents_SelectedIndexChanged(object sender, EventArgs e)
+        private void InitializeComponentCategories()
         {
-            UpdateComponentSelection();
-        }
+            // Debug
+#if DEBUG
+            StackTrace stackTrace = new StackTrace();
+            StackFrame callerFrame = stackTrace.GetFrame(1);
+            MethodBase callerMethod = callerFrame.GetMethod();
+            string callerName = callerMethod.Name;
+            Debug.WriteLine("[InitializeComponentCategories] called from [" + callerName + "]");
+#endif
 
-        // "Clear" button
-        private void buttonClear_Click(object sender, EventArgs e)
-        {
-            ClearEverything();
-        }
+            listBoxCategories.Items.Clear();
 
-        private void ClearEverything ()
-        {
-            listBoxComponents.ClearSelected();
-            listBoxComponentsSelectedText.Clear();
-            textBoxFilterComponents.Text = "";
-        }
+            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
 
-        // "Select all" button
-        private void button2_Click(object sender, EventArgs e)
-        {
-            
-            listBoxComponents.SelectedIndexChanged -= listBoxComponents_SelectedIndexChanged;
-
-            for (int i = 0; i < listBoxComponents.Items.Count; i++)
+            if (foundBoard?.Components != null)
             {
-                listBoxComponents.SetSelected(i, true);
-            }
+                // Use a "HashSet" to track added categories for faster lookups
+                var addedTypes = new HashSet<string>();
 
-            listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
-            UpdateComponentSelection();
-        }
-
-        // ---------------------------------------------------------------------
-        // comboBox events
-
-        private void comboBoxHardware_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            ClearEverything();
-
-            comboBoxBoard.Items.Clear();
-            hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
-            textBox5.Text = hardwareSelectedName; // feedback info
-            
-            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            if (hw != null)
-            {
-                foreach (var board in hw.Boards)
+                foreach (BoardComponents component in foundBoard.Components)
                 {
-                    comboBoxBoard.Items.Add(board.Name);
+                    if (!string.IsNullOrEmpty(component.Type) && addedTypes.Add(component.Type))
+                    {
+                        listBoxCategories.Items.Add(component.Type);
+                    }
                 }
-                comboBoxBoard.SelectedIndex = 0;
             }
         }
 
-        private void comboBoxBoard_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            SetupNewBoard();
-        }
 
-        // ---------------------------------------------------------------------
-        // Overlays for main image
+        // ###########################################################################################
+        // Resize the main/schematic image.
+        // ###########################################################################################
 
         private void ResizeTabImage()
         {
@@ -2341,6 +2419,11 @@ namespace Commodore_Repair_Toolbox
 
             HighlightOverlays("tab");
         }
+
+
+        // ###########################################################################################
+        // Resize the tab image when the panel is resized by mousewheel.
+        // ###########################################################################################
 
         private void panelZoom_Resize(object sender, EventArgs e)
         {
@@ -2418,60 +2501,24 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        // ---------------------------------------------------------------------
-        // Creating the overlay arrays
 
-        private void CreateOverlayArraysToTab()
-        {
-            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            if (bd == null) return;
-
-            // Only for the currently selected image
-            foreach (BoardFileOverlays bf in bd.Files)
-            {
-                if (bf.Name != schematicSelectedName) continue;
-
-                if (bf?.Components != null)
-                {
-                    foreach (var comp in bf.Components)
-                    {
-                        string componentDisplay = bd.Components.FirstOrDefault(cb => cb.Label == comp.Label)?.NameDisplay ?? "";
-                        if (comp.Overlays == null) continue;
-
-                        foreach (var ov in comp.Overlays)
-                        {
-                            PictureBox overlayPictureBox = new PictureBox
-                            {
-                                //Name = comp.Label,
-                                Name = componentDisplay,
-                                Location = new Point(ov.Bounds.X, ov.Bounds.Y),
-                                Size = new Size(ov.Bounds.Width, ov.Bounds.Height),
-                                Tag = bf.Name
-                            };
-
-                            overlayComponentsTab.Add(overlayPictureBox);
-                            int idx = overlayComponentsTab.Count - 1;
-                            overlayComponentsTabOriginalSizes[idx] = overlayPictureBox.Size;
-                            overlayComponentsTabOriginalLocations[idx] = overlayPictureBox.Location;
-                        }
-                    }
-                }
-            }
-        }
-
+        // ###########################################################################################
+        // Highlight all overlays according to the selected components.
+        // ###########################################################################################
 
         private void ShowOverlaysAccordingToComponentList()
         {
             HighlightOverlays("tab");
             HighlightOverlays("list");
 
-            // Refresh the thumbnail labels to show asterisks
+            // Refresh the thumbnails, to show if thumbnail includes the selected components
             RefreshThumbnailLabels();
         }
 
-        // ---------------------------------------------------------------------
-        // Overlay mouse-click events
+
+        // ###########################################################################################
+        // Handle click-event for component highlights - both left- and rightclick events.
+        // ###########################################################################################
 
         private void OverlayPanel_OverlayClicked(object sender, OverlayClickedEventArgs e)
         {
@@ -2519,7 +2566,8 @@ namespace Commodore_Repair_Toolbox
                     {
                         listBoxComponents.SetSelected(index, true);
                     }
-                } else
+                }
+                else
                 {
                     listBoxComponentsSelectedText.Remove(componentDisplay);
                     int index = listBoxComponents.Items.IndexOf(componentDisplay);
@@ -2528,12 +2576,17 @@ namespace Commodore_Repair_Toolbox
                         listBoxComponents.SetSelected(index, false);
                     }
                 }
-                    ShowOverlaysAccordingToComponentList();
+                ShowOverlaysAccordingToComponentList();
             }
 
             // Refresh the highlight overlays
             ShowOverlaysAccordingToComponentList();
         }
+
+
+        // ###########################################################################################
+        // Handle mouse-hover event for component highlights.
+        // ###########################################################################################
 
         private void OverlayPanel_OverlayHoverChanged(object sender, OverlayHoverChangedEventArgs e)
         {
@@ -2564,6 +2617,11 @@ namespace Commodore_Repair_Toolbox
                 labelComponent.Visible = false;
             }
         }
+
+
+        // ###########################################################################################
+        // Allow panning when right-clicking (and hold) directly on a component overlay.
+        // ###########################################################################################
 
         private void OverlayPanel_OverlayPanelMouseDown(object sender, MouseEventArgs e)
         {
@@ -2596,9 +2654,139 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
+
+        // ###########################################################################################
+        // Close any open component informtion popup.
+        // ###########################################################################################
+
+        private void AttachClosePopupOnClick(Control parent)
+        {
+            // Attach a single MouseDown event to close any open popup
+            parent.MouseDown += (s, e) =>
+            {
+                // Only if we click in the main form and a popup is open
+                CloseComponentPopup();
+            };
+
+            // Recurse to child controls
+            foreach (Control child in parent.Controls)
+            {
+                AttachClosePopupOnClick(child);
+            }
+        }
+
+
+        // ###########################################################################################
+        // Show the component information popup.
+        // ###########################################################################################
+
+        private void ShowComponentPopup(BoardComponents comp)
+        {
+            string title = comp.NameDisplay;
+            componentInfoPopup = new FormComponent(comp);
+            componentInfoPopup.Text = title;
+            componentInfoPopup.Show(this);
+            componentInfoPopup.TopMost = true;
+        }
+
+
+        // ###########################################################################################
+        // Dispose all controls in a parent control.
+        // Proper handling of memory.
+        // ###########################################################################################
+
+        void DisposeAllControls(Control parent)
+        {
+            // Debug
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[DisposeAllControls("+ parent +")] called from [" + callerName + "]");
+            #endif
+
+            for (int i = parent.Controls.Count - 1; i >= 0; i--)
+            {
+                Control child = parent.Controls[i];
+                DisposeAllControls(child);
+                child.Dispose();
+            }
+        }
+
+
+        // ###########################################################################################
+        // "All" and "Clear" buttons
+        // ###########################################################################################
+
+        // "All" button
+        private void buttonAll_Click(object sender, EventArgs e)
+        {
+            listBoxComponents.SelectedIndexChanged -= listBoxComponents_SelectedIndexChanged;
+
+            for (int i = 0; i < listBoxComponents.Items.Count; i++)
+            {
+                listBoxComponents.SetSelected(i, true);
+            }
+
+            listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
+            UpdateComponentSelection();
+        }
+
+        // "Clear" button
+        private void buttonClear_Click(object sender, EventArgs e)
+        {
+            ClearEverything();
+        }
+
+        private void ClearEverything ()
+        {
+            listBoxComponents.ClearSelected();
+            listBoxComponentsSelectedText.Clear();
+            textBoxFilterComponents.Text = "";
+        }
+
+
+        // ###########################################################################################
+        // "Hardware" combobox change.
+        // ###########################################################################################
+
+        private void comboBoxHardware_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            ClearEverything();
+
+            comboBoxBoard.Items.Clear();
+            hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
+            textBox5.Text = hardwareSelectedName; // feedback info
+            
+            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            if (hw != null)
+            {
+                foreach (var board in hw.Boards)
+                {
+                    comboBoxBoard.Items.Add(board.Name);
+                }
+                comboBoxBoard.SelectedIndex = 0;
+            }
+        }
+
+
+        // ###########################################################################################
+        // "Board" combobox change.
+        // ###########################################################################################
+
+        private void comboBoxBoard_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            SetupNewBoard();
+        }
+
+
+        // ###########################################################################################
+        // Save and resize thumbnails when the splitter position changes.
+        // ###########################################################################################
+
         private void SplitContainer1_SplitterMoved(object sender, SplitterEventArgs e)
         {
-            Debug.WriteLine("---- SplitContainer1_SplitterMoved=" + windowState);
             // Save the board specific splitter position to configuration file
             string configKey = $"SplitterPosition|{windowState}|{hardwareSelectedName}|{boardSelectedName}";
             Configuration.SaveSetting(configKey, splitContainerSchematics.SplitterDistance.ToString());
@@ -2606,9 +2794,10 @@ namespace Commodore_Repair_Toolbox
             ReadaptThumbnails();
         }
 
-        // ---------------------------------------------------------------------------
-        // Custom paint event for SplitContainer
-        // ---------------------------------------------------------------------------
+
+        // ###########################################################################################
+        // Paint event for "SplitContainer".
+        // ###########################################################################################
 
         private void SplitContainer1_Paint(object sender, PaintEventArgs e)
         {
@@ -2622,38 +2811,17 @@ namespace Commodore_Repair_Toolbox
                 int y1 = splitContainer.Panel1.ClientRectangle.Top;
                 int y2 = splitContainer.Panel1.ClientRectangle.Bottom;
 
-                using (Pen pen = new Pen(Color.LightGray, 2))
+                using (Pen pen = new Pen(Color.Gray, 2))
                 {
                     e.Graphics.DrawLine(pen, x, y1, x, y2);
                 }
             }
         }
 
-        private void buttonFullscreen_Click(object sender, EventArgs e)
-        {
-            SuspendLayout();
-            if (!isFullscreen)
-            {
-                FullscreenModeEnter();
-            }
-            else
-            {
-                FullscreenModeExit();
-                ReadaptThumbnails();
-            }
-            ResumeLayout();
 
-            // Reposition "fullscreen button" when in fullscreen (can only be done when UI is rendered)
-            if (isFullscreen)
-            {
-                buttonFullscreen.Location = new Point(200, panelBehindTab.Height - 55);
-                buttonFullscreen.BringToFront();
-            }
-        }
-
-        // ---------------------------------------------------------------------------
-        // Keyboard handling
-        // ---------------------------------------------------------------------------
+        // ###########################################################################################
+        // Keyboard handling.
+        // ###########################################################################################
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
@@ -2682,71 +2850,11 @@ namespace Commodore_Repair_Toolbox
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        private void tabControl1_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            if (tabControl.SelectedTab.Text == "Schematics")
-            {
-                buttonFullscreen.Enabled = true;
-            }
-            else
-            {
-                buttonFullscreen.Enabled = false;
-            }
-        }
-                
 
-        private void SaveSelectedCategories()
-        {
-            // 1) Build a unique config key from hardware and board
-            string configKey = $"SelectedCategories|{hardwareSelectedName}|{boardSelectedName}";
+        // ###########################################################################################
+        // Post feedback to server.
+        // ###########################################################################################
 
-            // 2) Gather selected categories from listBox2
-            var selectedCategories = listBoxCategories.SelectedItems
-                .Cast<object>()
-                .Select(item => item.ToString());
-
-            // 3) Join them into a single string (e.g. CSV)
-            string joined = string.Join(";", selectedCategories);
-
-            // 4) Save to config
-            Configuration.SaveSetting(configKey, joined);
-        }
-
-        private bool LoadSelectedCategories()
-        {
-            // Debug
-            #if DEBUG
-                StackTrace stackTrace = new StackTrace();
-                StackFrame callerFrame = stackTrace.GetFrame(1);
-                MethodBase callerMethod = callerFrame.GetMethod();
-                string callerName = callerMethod.Name;
-                Debug.WriteLine("[LoadSelectedCategories] called from [" + callerName + "]");
-            #endif
-
-            // e.g. "SelectedCategories|C128|310378"
-            string configKey = $"SelectedCategories|{hardwareSelectedName}|{boardSelectedName}";
-            string joined = Configuration.GetSetting(configKey, "");
-
-            if (string.IsNullOrEmpty(joined))
-            {
-                // No saved categories => return false so we can fallback
-                return false;
-            }
-
-            listBoxCategories.ClearSelected();
-            string[] categories = joined.Split(';');
-            foreach (string cat in categories)
-            {
-                int idx = listBoxCategories.Items.IndexOf(cat);
-                if (idx >= 0)
-                {
-                    listBoxCategories.SetSelected(idx, true);
-                }
-            }
-            return true;
-        }
-
-                
         private void buttonSendFeedback_Click(object sender, EventArgs e)
         {
             string email = textBoxEmail.Text;
@@ -2765,7 +2873,6 @@ namespace Commodore_Repair_Toolbox
                 var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
                 string boardFile = foundBoard?.DataFile;
-//                string excelFilePath = Path.Combine(Application.StartupPath, foundHardware.Folder, boardFile);
                 string excelFilePath = Path.Combine(Application.StartupPath, boardFile);
                 try
                 {
@@ -2857,7 +2964,7 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
-        // Check if the file is not exclusively locked by another application.
+        // Check if the file is exclusively locked by another application.
         // ###########################################################################################
 
         private bool IsFileLocked(string filePath)
@@ -2878,7 +2985,7 @@ namespace Commodore_Repair_Toolbox
 
                 
         // ###########################################################################################
-        // Check if the email address typed in feedback is valid - not a very good check though!
+        // Check if the email address syntax is valid.
         // ###########################################################################################
 
         private static bool IsValidEmail(string email)
@@ -2901,22 +3008,26 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+        // ###########################################################################################
+        // Populate the filename of the attached Excel file, to the feedback tab UI.
+        // ###########################################################################################
+
         private void checkBoxAttachExcel_CheckedChanged(object sender, EventArgs e)
         {
-            textBox6.Text = checkBoxAttachExcel.Checked ? boardSelectedFilename : "";
+            string txtForField = Path.GetFileName(boardSelectedFilename);
+            textBox6.Text = checkBoxAttachExcel.Checked ? txtForField : "";
         }
 
 
-
-
-
-        // ***
-        // Completely stop repaint on a specific control - better than SuspendLayout
-        // ---
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        public static extern IntPtr SendMessage(IntPtr hWnd, int msg, bool wParam, int lParam);
+        // ###########################################################################################
+        // Define a custom method to suspend and resume drawing on a control.
+        // Should be better than "SuspendLayout" and "ResumeLayout".
+        // ###########################################################################################
 
         private const int WM_SETREDRAW = 0x000B;
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern IntPtr SendMessage(IntPtr hWnd, int msg, bool wParam, int lParam);
 
         public static void SuspendDrawing(Control control)
         {
@@ -2928,19 +3039,29 @@ namespace Commodore_Repair_Toolbox
             SendMessage(control.Handle, WM_SETREDRAW, true, 0);
             control.Refresh();
         }
-        // ***
+
+
+        // ###########################################################################################
+        // Save the 3 checkboxes in "Labels visible".
+        // ###########################################################################################
 
         private void checkBoxVisibleLabels_CheckedChanged(object sender, EventArgs e)
         {
-            HighlightOverlays("tab");
-
             // Save the state of the checkboxes
             Configuration.SaveSetting("ShowLabel", checkBox1.Checked.ToString());
             Configuration.SaveSetting("ShowTechnicalName", checkBox2.Checked.ToString());
             Configuration.SaveSetting("ShowFriendlyName", checkBox3.Checked.ToString());
+
+            // Refresh the overlays
+            HighlightOverlays("tab");
         }
 
-        private void button1_Click(object sender, EventArgs e)
+
+        // ###########################################################################################
+        // Minimize and maximize the "Labels visible" panel.
+        // ###########################################################################################
+
+        private void TogglePanelLabelsVisibility_Click(object sender, EventArgs e)
         {
             int currentHeight = panelLabelsVisible.Height;
             int newHeight = 0;
@@ -2959,77 +3080,35 @@ namespace Commodore_Repair_Toolbox
 
             // Reposition the panel
             int visibleHeight = panelZoom.ClientRectangle.Height;
-            panelLabelsVisible.Location = new Point(0, visibleHeight - panelLabelsVisible.Height); // bottom-left corner of the visible area
+            panelLabelsVisible.Location = new Point(0, visibleHeight - panelLabelsVisible.Height - 2); // bottom-left corner of the visible area
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Class definitions
+    // ###########################################################################################
+    // Class definitions.
+    // ###########################################################################################
 
-    /*
-    public class SuppressPaintPanel : Panel
-    {
-        public bool SuppressPaint { get; set; }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            if (!SuppressPaint)
-                base.OnPaint(e);
-        }
-    }
-    */
-
-    // "Hardware" is read from the very first Excel file (Commodore-Repair-Toolbox.xlsx).
-    // It contains a list of all associated boards and their respective data files.
+    // "Hardware" is read from the Excel file in level 1, "Commodore-Repair-Toolbox.xlsx".
+    // It contains a list of all associated boards.
     public class Hardware
     {
         public string Name { get; set; }
- //       public string Folder { get; set; }
- //       public string Datafile { get; set; }
         public List<Board> Boards { get; set; }
     }
 
-    // "Board" is read from level 2 of the Excel data files
+    // "Board" is read from the Excel file in level 1, "Commodore-Repair-Toolbox.xlsx".
     public class Board
     {
         public string Name { get; set; }
-//        public string Folder { get; set; }
+        public string RevisionDate { get; set; }
         public string DataFile { get; set; }
-        public List<BoardFileOverlays> Files { get; set; }
-        public List<ComponentBoard> Components { get; set; }
-        public List<BoardLink> BoardLinks { get; set; }
+        public List<BoardOverlays> Files { get; set; }
+        public List<BoardComponents> Components { get; set; }
+        public List<BoardLinks> BoardLinks { get; set; }
         public List<BoardLocalFiles> BoardLocalFiles { get; set; }
     }
 
-    // "BoardFileOverlays" contains all overlay info and bounds per image
-    public class BoardFileOverlays
-    {
-        public string Name { get; set; }
-        public string FileName { get; set; }
-        public string HighlightColorTab { get; set; }
-        public string HighlightColorList { get; set; }
-        public int HighlightOpacityTab { get; set; }
-        public int HighlightOpacityList { get; set; }
-        public List<ComponentBounds> Components { get; set; }
-    }
-
-    // "BoardLink" contains all web links per board
-    public class BoardLink
-    {
-        public string Category { get; set; }
-        public string Name { get; set; }
-        public string Url { get; set; }
-    }
-
-    // "BoardLocalFiles" contains all local file links per board
-    public class BoardLocalFiles
-    {
-        public string Category { get; set; }
-        public string Name { get; set; }
-        public string Datafile { get; set; }
-    }
-        
-    public class ComponentBoard
+    public class BoardComponents
     {
         public string Label { get; set; }
         public string NameTechnical { get; set; }
@@ -3043,6 +3122,32 @@ namespace Commodore_Repair_Toolbox
         public List<ComponentImages> ComponentImages { get; set; }
     }
 
+    public class BoardOverlays
+    {
+        public string Name { get; set; }
+        public string SchematicFileName { get; set; }
+        public string HighlightColorTab { get; set; }
+        public string HighlightColorList { get; set; }
+        public int HighlightOpacityTab { get; set; }
+        public int HighlightOpacityList { get; set; }
+        public List<ComponentBounds> Components { get; set; }
+    }
+
+    public class BoardLinks
+    {
+        public string Category { get; set; }
+        public string Name { get; set; }
+        public string Url { get; set; }
+    }
+
+    public class BoardLocalFiles
+    {
+        public string Category { get; set; }
+        public string Name { get; set; }
+        public string Datafile { get; set; }
+    }
+        
+    
     public class ComponentBounds
     {
         public string Label { get; set; }
