@@ -8,12 +8,12 @@ This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ he
 # Screenshots
 
 Main screen:\
-![Main screen](https://github.com/user-attachments/assets/a79adbc0-00c3-444a-ba82-4f950d81daff)
+![Main screen](https://github.com/user-attachments/assets/e2e22044-d2d2-4b57-9931-7357919d8897)
 
 Popup component info:\
 ![Component popup information](https://github.com/user-attachments/assets/087dda87-c368-4dac-be0c-564916d70318)
 
-# Can you explain what it is?
+# What is it?
 
 With _CRT_ you can easily view schematics, zoom in/out, identify components, see chip pinouts, study datasheets, ressources and various other information, helping you diagnosing and repairing good old vintage hardware. It is primarily dedicated to Commodore, and have a few built-in configurations for Commodore computers, but it does support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine.
 
@@ -28,12 +28,12 @@ It will run on any 64-bit Windows 10 or newer. It does require _.NET Framework 4
 # Built-in hardware / schematics
 
 - **Commodore 64 (Breadbin)**
-  - Schematics 250407
-  - Schematics 250425
+  - 250407
+  - 250425
 - **Commodore 64C**
-  - Schematics 250466
+  - 250466
 - **Commodore 128 and 128D**
-  - Schematics 310378
+  - 310378
 
 # Your help would be really appreciated
 
@@ -50,25 +50,13 @@ You can also contribute by adding new data and send the Excel file and "label fi
 # Contact
 You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) here in the GitHub project page or use the built-in "Feedback" tab, if you want to report a problem, suggest any changes or just have a comment.
 
-# Software used
-For labelling the components in the schematics  I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and easy to use, once you learn its way of working. It will output a JSON file, which then is [converted into Excel](https://commodore-repair-toolbox.dk/convert-via-to-excel/) format - you must send both this JSON file and its image file, if you have any updates.
-
-* The initial Excel data file is placed in same folder as executable file and is named `Commodore-Repair-Toolbox.xlsx`
-* Inside the `Data` folders I have placed the JSON source files used for labelling.
-* Inside the `Tools` folder I have placed the VGG web application - you should load the `via.html` into your local browser.
-
-I have chosen Excel as the data format, as this should be known to the most, and it is fairly straightforward how to use. I am actually not sure, but I do believe there is a [free online Excel available from Microsoft](https://www.office.com/launch/excel), if you do not already have one installed.
-
-> [!CAUTION]
-> Please do note that the data files have not yet reached its final maturity level, and by then its format _could_ change in a nearby future release!
-
-# Near-term TODO
-
-View [issues](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) for reported bugs and upcoming enhancements.
+# Documentation
+Please refer to The [Wiki Documentation](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/wiki/Documentation) page.
+For labelling the components in the schematics  I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and 
 
 # Future ideas / wishlist
 
-There are bigger changes here, and I am not sure I want to go down this road - it will for sure depend on usage, as I personally do not have any use for the collaboration topics, if this is primarily used only by myself :grin:
+There are major changes in some of these, and I am not sure I want to go down this road - it will for sure depend on usage, as I personally do not have any use for the collaboration topics, if this is primarily used only by myself :grin:
 
 - More pictures in popup component info (data model is ready for it)
 - Have people download and upload new schematics or updates directly from tool
