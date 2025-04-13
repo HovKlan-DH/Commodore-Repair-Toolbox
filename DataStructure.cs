@@ -13,7 +13,7 @@ namespace Commodore_Repair_Toolbox
         // Loads all data from Excel into classHardware
         public static void GetAllData(List<Hardware> classHardware)
         {
-            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+            ExcelPackage.License.SetNonCommercialPersonal("Dennis Helligsø");
 
             string filePathMain = Path.Combine(Application.StartupPath, "Commodore-Repair-Toolbox.xlsx");
 
