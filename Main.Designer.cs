@@ -636,7 +636,7 @@
             this.buttonAll.Name = "buttonAll";
             this.buttonAll.Size = new System.Drawing.Size(71, 30);
             this.buttonAll.TabIndex = 12;
-            this.buttonAll.Text = "All";
+            this.buttonAll.Text = "Mark all";
             this.buttonAll.UseVisualStyleBackColor = true;
             this.buttonAll.Click += new System.EventHandler(this.buttonAll_Click);
             // 
