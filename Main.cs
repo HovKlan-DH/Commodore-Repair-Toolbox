@@ -378,7 +378,7 @@ namespace Commodore_Repair_Toolbox
             }
             comboBoxHardware.SelectedIndex = indexHardware;
             hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
-            textBox5.Text = hardwareSelectedName; // feedback info           
+            textBox5.Text = ConvertStringToLabel(hardwareSelectedName); // feedback info           
 
             // Populate all boards in combobox, based on selected hardware - and select
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
@@ -396,7 +396,7 @@ namespace Commodore_Repair_Toolbox
                 }
                 comboBoxBoard.SelectedIndex = indexBoard;
                 boardSelectedName = comboBoxBoard.SelectedItem.ToString();
-                textBox1.Text = boardSelectedName; // feedback info           
+                textBox1.Text = ConvertStringToLabel(boardSelectedName); // feedback info           
             }
 
             // Set the "Labels visible" checkboxes
@@ -457,6 +457,7 @@ namespace Commodore_Repair_Toolbox
             windowMoveStopTimer.Interval = 200;
             windowMoveStopTimer.Tick += MoveStopTimer_Tick;
             Move += Form_Move;
+//            listBoxComponents.SelectedIndexChanged += (s, e) => UpdateTabOverview(GetSelectedBoard());
         }
 
 
@@ -663,7 +664,7 @@ namespace Commodore_Repair_Toolbox
                 <body>
                 " + htmlForTabs + @"
                 <h1>Overview of components</h1>
-                This is a complete overview of all components for the selected board.<br /><br />
+                This is a overview of all components for the selected board. Components listed, follows what is visible in the ""Component list"".<br /><br />
                 The data for this board has the revision date: <b>" + revisionDate + @"</b><br /><br />
             ";
 
@@ -671,6 +672,9 @@ namespace Commodore_Repair_Toolbox
             {
                 if (foundBoard?.Components != null)
                 {
+                    // Filter components based on what is visible in "listBoxComponents"
+                    var visibleComponents = listBoxComponents.Items.Cast<string>().ToHashSet();
+
                     htmlContent += "<table width='100%' border='1'>";
                     htmlContent += "<thead>";
                     htmlContent += "<tr>";
@@ -688,6 +692,7 @@ namespace Commodore_Repair_Toolbox
 
                     foreach (BoardComponents comp in foundBoard.Components)
                     {
+                        if (!visibleComponents.Contains(comp.NameDisplay)) continue; // skip component if it is not visible in "listBoxComponents"
 
                         string compType = comp.Type;
                         string compLabel = comp.Label;
@@ -1195,6 +1200,9 @@ namespace Commodore_Repair_Toolbox
             // Update overlays
             ShowOverlaysAccordingToComponentList();
 
+            // Trigger the "Overview" tab update
+            UpdateTabOverview(GetSelectedBoardClass());
+
             // Reapply event handler
             listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
         }
@@ -1291,14 +1299,14 @@ namespace Commodore_Repair_Toolbox
                     {
                         hasHighlightedOverlays = true;
 
-                        string labelText = checkBox1.Checked ? componentLabel : "";
-                        labelText += checkBox2.Checked && componentTechName != "" ? Environment.NewLine + componentTechName : "";
-                        labelText += checkBox3.Checked && componentFriendlyName != "" ? Environment.NewLine + componentFriendlyName : "";
+                        string labelText = checkBox1.Checked ? ConvertStringToLabel(componentLabel) : "";
+                        labelText += checkBox2.Checked && componentTechName != "" ? Environment.NewLine + ConvertStringToLabel(componentTechName) : "";
+                        labelText += checkBox3.Checked && componentFriendlyName != "" ? Environment.NewLine + ConvertStringToLabel(componentFriendlyName) : "";
 
                         // Overwrite the label text, if we hae only one checkbox enabled
-                        labelText = checkBox1.Checked && !checkBox2.Checked && !checkBox3.Checked ? componentLabel.Replace(" ", Environment.NewLine) : labelText;
-                        labelText = !checkBox1.Checked && checkBox2.Checked && !checkBox3.Checked ? componentTechName.Replace(" ", Environment.NewLine) : labelText;
-                        labelText = !checkBox1.Checked && !checkBox2.Checked && checkBox3.Checked ? componentFriendlyName.Replace(" ", Environment.NewLine) : labelText;
+                        labelText = checkBox1.Checked && !checkBox2.Checked && !checkBox3.Checked ? ConvertStringToLabel(componentLabel.Replace(" ", Environment.NewLine)) : labelText;
+                        labelText = !checkBox1.Checked && checkBox2.Checked && !checkBox3.Checked ? ConvertStringToLabel(componentTechName.Replace(" ", Environment.NewLine)) : labelText;
+                        labelText = !checkBox1.Checked && !checkBox2.Checked && checkBox3.Checked ? ConvertStringToLabel(componentFriendlyName.Replace(" ", Environment.NewLine)) : labelText;
 
                         // Weird command but it will remove empty newlines at beginning and end
                         labelText = string.Join(Environment.NewLine, labelText.Split(new[] { Environment.NewLine }, StringSplitOptions.None).Where(line => !string.IsNullOrWhiteSpace(line)));
@@ -1677,27 +1685,27 @@ namespace Commodore_Repair_Toolbox
             listBoxComponents.Items.Clear();
 
             boardSelectedName = comboBoxBoard.SelectedItem.ToString();
-            textBox1.Text = boardSelectedName; // feedback info
+            textBox1.Text = ConvertStringToLabel(boardSelectedName); // feedback info
 
-            var selectedHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            var selectedBoard = selectedHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            if (selectedHardware == null || selectedBoard == null) return;
+//            var selectedHardwareClass = GetSelectedHardware();
+            var selectedBoardClass = GetSelectedBoardClass();
+            if (selectedBoardClass == null) return;
 
-            boardSelectedFilename = selectedBoard.DataFile;
+            boardSelectedFilename = selectedBoardClass.DataFile;
 
             // Load selected thumbnail from configuration file, if already set
             string configKey = $"SelectedThumbnail|{hardwareSelectedName}|{boardSelectedName}";
             schematicSelectedName = Configuration.GetSetting(configKey, null);
 
             // Select the schematic - check if we can find the current selection, but otherwise default to first schematic
-            var selectedSchematic = selectedBoard?.Files?.FirstOrDefault(f => f.Name == schematicSelectedName);
+            var selectedSchematic = selectedBoardClass?.Files?.FirstOrDefault(f => f.Name == schematicSelectedName);
             if (selectedSchematic == null)
             {
-                selectedSchematic = selectedBoard?.Files?.FirstOrDefault();
+                selectedSchematic = selectedBoardClass?.Files?.FirstOrDefault();
             }
             schematicSelectedName = selectedSchematic?.Name;
             schematicSelectedFile = selectedSchematic?.SchematicFileName;
-            textBox2.Text = schematicSelectedName; // feedback info
+            textBox2.Text = ConvertStringToLabel(schematicSelectedName); // feedback info
 
             // Initialize UI
             InitializeComponentCategories();
@@ -1718,8 +1726,8 @@ namespace Commodore_Repair_Toolbox
             SuspendLayout();
             InitializeThumbnails();
             InitializeTabMain();
-            UpdateTabOverview(selectedBoard);
-            UpdateTabRessources(selectedBoard);
+            UpdateTabOverview(selectedBoardClass);
+            UpdateTabRessources(selectedBoardClass);
             ResumeLayout();
         }
 
@@ -1742,6 +1750,28 @@ namespace Commodore_Repair_Toolbox
             {
                 splitContainerSchematics.SplitterDistance = splitterPosition;
             }
+        }
+
+
+        // ###########################################################################################
+        // Get the class of the selected board.
+        // ###########################################################################################
+
+        private Board GetSelectedBoardClass()
+        {
+            var hardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            return hardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+        }
+
+
+        // ###########################################################################################
+        // Convert special characters, so they can be shown in labels.
+        // Currently I only know of "&" being a problem?
+        // ###########################################################################################
+
+        private string ConvertStringToLabel(string str)
+        {
+            return str.Replace("&", "&&");
         }
 
 
@@ -1899,13 +1929,13 @@ namespace Commodore_Repair_Toolbox
         private void InitializeTabMain()
         {
             // Debug
-#if DEBUG
-            StackTrace stackTrace = new StackTrace();
-            StackFrame callerFrame = stackTrace.GetFrame(1);
-            MethodBase callerMethod = callerFrame.GetMethod();
-            string callerName = callerMethod.Name;
-            Debug.WriteLine("[InitializeTabMain] called from [" + callerName + "]");
-#endif
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[InitializeTabMain] called from [" + callerName + "]");
+            #endif
 
             // Dispose the image, if one already exists
             if (image != null)
@@ -1968,7 +1998,7 @@ namespace Commodore_Repair_Toolbox
             labelFile = new Label
             {
                 Name = "labelFile",
-                Text = schematicSelectedName,
+                Text = ConvertStringToLabel(schematicSelectedName),
                 AutoSize = true,
                 BackColor = Color.Khaki,
                 ForeColor = Color.Black,
@@ -2298,13 +2328,13 @@ namespace Commodore_Repair_Toolbox
 
                 if (hasSelectedComponent)
                 {
-                    labelListFile.Text = "* " + file.Name;
+                    labelListFile.Text = "* " + ConvertStringToLabel(file.Name);
                     labelListFile.BackColor = labelImageHasElementsBgClr;
                     labelListFile.ForeColor = labelImageHasElementsTxtClr;
                 }
                 else
                 {
-                    labelListFile.Text = file.Name;
+                    labelListFile.Text = ConvertStringToLabel(file.Name);
                     labelListFile.BackColor = labelImageBgClr;
                     labelListFile.ForeColor = labelImageTxtClr;
                 }
@@ -2335,7 +2365,7 @@ namespace Commodore_Repair_Toolbox
             string configKey = $"SelectedThumbnail|{hardwareSelectedName}|{boardSelectedName}";
             Configuration.SaveSetting(configKey, schematicSelectedName);
 
-            textBox2.Text = schematicSelectedName; // feedback info
+            textBox2.Text = ConvertStringToLabel(schematicSelectedName); // feedback info
 
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
@@ -2601,13 +2631,13 @@ namespace Commodore_Repair_Toolbox
 
                 if (comp != null)
                 {
-                    labelComponent.Text = comp.Label;
+                    labelComponent.Text = ConvertStringToLabel(comp.Label);
                     labelComponent.Text += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
                     labelComponent.Text += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
                 }
                 else
                 {
-                    labelComponent.Text = e.OverlayInfo.ComponentLabel;
+                    labelComponent.Text = ConvertStringToLabel(e.OverlayInfo.ComponentLabel);
                 }
                 labelComponent.Visible = true;
             }
@@ -2684,7 +2714,7 @@ namespace Commodore_Repair_Toolbox
         {
             string title = comp.NameDisplay;
             componentInfoPopup = new FormComponent(comp);
-            componentInfoPopup.Text = title;
+            componentInfoPopup.Text = ConvertStringToLabel(title);
             componentInfoPopup.Show(this);
             componentInfoPopup.TopMost = true;
         }
@@ -2757,7 +2787,7 @@ namespace Commodore_Repair_Toolbox
 
             comboBoxBoard.Items.Clear();
             hardwareSelectedName = comboBoxHardware.SelectedItem.ToString();
-            textBox5.Text = hardwareSelectedName; // feedback info
+            textBox5.Text = ConvertStringToLabel(hardwareSelectedName); // feedback info
             
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             if (hw != null)
@@ -2858,7 +2888,7 @@ namespace Commodore_Repair_Toolbox
         private void buttonSendFeedback_Click(object sender, EventArgs e)
         {
             string email = textBoxEmail.Text;
-            string feedback = textBoxFeedback.Text;
+            string feedback = ConvertStringToLabel(textBoxFeedback.Text);
 
             // Validate the email address
             bool isValidEmail = true;
