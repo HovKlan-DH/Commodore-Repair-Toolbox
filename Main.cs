@@ -457,7 +457,6 @@ namespace Commodore_Repair_Toolbox
             windowMoveStopTimer.Interval = 200;
             windowMoveStopTimer.Tick += MoveStopTimer_Tick;
             Move += Form_Move;
-//            listBoxComponents.SelectedIndexChanged += (s, e) => UpdateTabOverview(GetSelectedBoard());
         }
 
 
@@ -721,7 +720,6 @@ namespace Commodore_Repair_Toolbox
                             foreach (ComponentLocalFiles file in comp.LocalFiles)
                             {
                                 // Translate the relative path into an absolute path
-//                                string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, hardwareSelectedFolder, boardSelectedFolder, file.FileName));
                                 string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, file.FileName));
                                 string fileUri = new Uri(filePath).AbsoluteUri;
 
@@ -1466,13 +1464,13 @@ namespace Commodore_Repair_Toolbox
         private bool LoadSelectedCategories()
         {
             // Debug
-#if DEBUG
-            StackTrace stackTrace = new StackTrace();
-            StackFrame callerFrame = stackTrace.GetFrame(1);
-            MethodBase callerMethod = callerFrame.GetMethod();
-            string callerName = callerMethod.Name;
-            Debug.WriteLine("[LoadSelectedCategories] called from [" + callerName + "]");
-#endif
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[LoadSelectedCategories] called from [" + callerName + "]");
+            #endif
 
             // Get "SelectedCategories" from configuration file
             string configKey = $"SelectedCategories|{hardwareSelectedName}|{boardSelectedName}";
@@ -1563,31 +1561,6 @@ namespace Commodore_Repair_Toolbox
             ShowOverlaysAccordingToComponentList();
         }
 
-/*
-        // ###########################################################################################
-        // Do a global search for a control with a specific tag.
-        // ###########################################################################################
-
-        private Control FindControlByTag(Control parent, object tag)
-        {
-            foreach (Control control in parent.Controls)
-            {
-                // Return control as soon s we have found tag
-                if (control.Tag != null && control.Tag.Equals(tag))
-                {
-                    return control;
-                }
-
-                // Recursively search in child controls
-                Control foundControl = FindControlByTag(control, tag);
-                if (foundControl != null)
-                {
-                    return foundControl;
-                }
-            }
-            return null;
-        }
- */       
         
         // ###########################################################################################
         // Handle input of email address in "Feedback" tab.
@@ -1687,7 +1660,6 @@ namespace Commodore_Repair_Toolbox
             boardSelectedName = comboBoxBoard.SelectedItem.ToString();
             textBox1.Text = ConvertStringToLabel(boardSelectedName); // feedback info
 
-//            var selectedHardwareClass = GetSelectedHardware();
             var selectedBoardClass = GetSelectedBoardClass();
             if (selectedBoardClass == null) return;
 
@@ -2085,13 +2057,13 @@ namespace Commodore_Repair_Toolbox
         private void InitializeThumbnails()
         {
             // Debug
-#if DEBUG
-            StackTrace stackTrace = new StackTrace();
-            StackFrame callerFrame = stackTrace.GetFrame(1);
-            MethodBase callerMethod = callerFrame.GetMethod();
-            string callerName = callerMethod.Name;
-            Debug.WriteLine("[InitializeList] called from [" + callerName + "]");
-#endif
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[InitializeList] called from [" + callerName + "]");
+            #endif
 
             // Gracefully dispose all controls
             DisposeAllControls(panelThumbnails);
@@ -2192,13 +2164,13 @@ namespace Commodore_Repair_Toolbox
         private void ReadaptThumbnails()
         {
             // Debug
-#if DEBUG
-            StackTrace stackTrace = new StackTrace();
-            StackFrame callerFrame = stackTrace.GetFrame(1);
-            MethodBase callerMethod = callerFrame.GetMethod();
-            string callerName = callerMethod.Name;
-            Debug.WriteLine("[ReadaptThumbnails] called from [" + callerName + "]");
-#endif
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[ReadaptThumbnails] called from [" + callerName + "]");
+            #endif
 
             thumbnailsSameWidth = false;
             thumbnailsWidth = 0;
@@ -2349,13 +2321,14 @@ namespace Commodore_Repair_Toolbox
         private void ThumbnailImageClicked(PictureBox pan)
         {
             // Debug
-#if DEBUG
-            StackTrace stackTrace = new StackTrace();
-            StackFrame callerFrame = stackTrace.GetFrame(1);
-            MethodBase callerMethod = callerFrame.GetMethod();
-            string callerName = callerMethod.Name;
-            Debug.WriteLine("[ThumbnailImageClicked] called from [" + callerName + "]");
-#endif
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[ThumbnailImageClicked] called from [" + callerName + "]");
+            #endif
+
             // Clear all current overlays
             overlayPanel.Overlays.Clear();
 
@@ -2391,13 +2364,13 @@ namespace Commodore_Repair_Toolbox
         private void InitializeComponentCategories()
         {
             // Debug
-#if DEBUG
-            StackTrace stackTrace = new StackTrace();
-            StackFrame callerFrame = stackTrace.GetFrame(1);
-            MethodBase callerMethod = callerFrame.GetMethod();
-            string callerName = callerMethod.Name;
-            Debug.WriteLine("[InitializeComponentCategories] called from [" + callerName + "]");
-#endif
+            #if DEBUG
+                StackTrace stackTrace = new StackTrace();
+                StackFrame callerFrame = stackTrace.GetFrame(1);
+                MethodBase callerMethod = callerFrame.GetMethod();
+                string callerName = callerMethod.Name;
+                Debug.WriteLine("[InitializeComponentCategories] called from [" + callerName + "]");
+            #endif
 
             listBoxCategories.Items.Clear();
 
@@ -2746,10 +2719,26 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
-        // "All" and "Clear" buttons
+        // "Clear" buttons
         // ###########################################################################################
 
-        // "All" button
+        private void buttonClear_Click(object sender, EventArgs e)
+        {
+            ClearEverything();
+        }
+
+        private void ClearEverything()
+        {
+            listBoxComponents.ClearSelected();
+            listBoxComponentsSelectedText.Clear();
+            textBoxFilterComponents.Text = "";
+        }
+                        
+        
+        // ###########################################################################################
+        // "Mark all" button
+        // ###########################################################################################
+
         private void buttonAll_Click(object sender, EventArgs e)
         {
             listBoxComponents.SelectedIndexChanged -= listBoxComponents_SelectedIndexChanged;
@@ -2761,19 +2750,6 @@ namespace Commodore_Repair_Toolbox
 
             listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
             UpdateComponentSelection();
-        }
-
-        // "Clear" button
-        private void buttonClear_Click(object sender, EventArgs e)
-        {
-            ClearEverything();
-        }
-
-        private void ClearEverything ()
-        {
-            listBoxComponents.ClearSelected();
-            listBoxComponentsSelectedText.Clear();
-            textBoxFilterComponents.Text = "";
         }
 
 
@@ -3114,6 +3090,7 @@ namespace Commodore_Repair_Toolbox
         }
     }
 
+
     // ###########################################################################################
     // Class definitions.
     // ###########################################################################################
@@ -3176,7 +3153,6 @@ namespace Commodore_Repair_Toolbox
         public string Name { get; set; }
         public string Datafile { get; set; }
     }
-        
     
     public class ComponentBounds
     {
