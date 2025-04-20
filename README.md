@@ -27,6 +27,8 @@ It will run on any 64-bit Windows 10 or newer. It does require _.NET Framework 4
 
 # Built-in hardware / schematics
 
+- **Commodore VIC-20** (soon to be released)
+  - 250403 (CR)
 - **Commodore 64 (Breadbin)**
   - 250407
   - 250425
@@ -40,17 +42,20 @@ It will run on any 64-bit Windows 10 or newer. It does require _.NET Framework 4
 I would really appreciate if some Commodore experts would take a look, and let me know of obvious factual errors or things I have missed :pray:
 
 You can also help specifically with these topics:
-- Do you have higher-quality images of the schematics?
+- Do you have higher-quality images of the used schematics?
 - Do you have (better) datasheets or pinouts for any of the components?
 - Do you see missing components in either the component list or as a highlight?
 - Can you improve any data or fill in more technical details anywhere?
+- Can you meassure a specific IC on your own system, and send me the expected values? (on a good working system)
 
 You can also contribute by adding new data and send the Excel file and "label file" to me (view below for the software used for labeling).
 
 # Contact
-You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) here in the GitHub project page or use the built-in "Feedback" tab, if you want to report a problem, suggest any changes or just have a comment.
+
+You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) here in the GitHub project page or use the built-in "Feedback" tab, if you want to report a problem, suggest any changes or just have a comment. I would appreciate some feedback, to know if this is actually useful for others or if you see some missing functionalities that could be benefitial for many.
 
 # Documentation
+
 Please refer to The [Wiki Documentation](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/wiki/Documentation) page.
 For labelling the components in the schematics  I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and 
 
@@ -58,7 +63,6 @@ For labelling the components in the schematics  I have discovered the Windows op
 
 There are major changes in some of these, and I am not sure I want to go down this road - it will for sure depend on usage, as I personally do not have any use for the collaboration topics, if this is primarily used only by myself :grin:
 
-- More pictures in popup component info (data model is ready for it)
 - Have people download and upload new schematics or updates directly from tool
     - "Data has been updated" information
     - Rating system of user uploaded schematics
