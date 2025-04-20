@@ -199,23 +199,50 @@ REM Pack EXE with ILRepack
 REM --------------------------
 ILRepack /out:"$(TargetPath)" "$(TargetPath)" "$(TargetDir)EPPlus.dll" "$(TargetDir)EPPlus.Interfaces.dll" "$(TargetDir)EPPlus.System.Drawing.dll" "$(TargetDir)Microsoft.Bcl.Cryptography.dll" "$(TargetDir)Microsoft.IO.RecyclableMemoryStream.dll" "$(TargetDir)Microsoft.Web.WebView2.Core.dll" "$(TargetDir)Microsoft.Web.WebView2.WinForms.dll" "$(TargetDir)Newtonsoft.Json.dll" "$(TargetDir)System.Buffers.dll" "$(TargetDir)System.ComponentModel.Annotations.dll" "$(TargetDir)System.Drawing.Common.dll" "$(TargetDir)System.Formats.Asn1.dll" "$(TargetDir)System.Memory.dll" "$(TargetDir)System.Numerics.Vectors.dll" "$(TargetDir)System.Runtime.CompilerServices.Unsafe.dll" "$(TargetDir)System.Security.Cryptography.Xml.dll" "$(TargetDir)System.ValueTuple.dll"
 
-rem if exist "runtimes\win-x64\native\WebView2Loader.dll" (
-rem     copy /Y "runtimes\win-x64\native\WebView2Loader.dll" .
-rem )
+REM ----------------------------------------------------
+REM Delete old directories and files in LOCAL folder
+REM ----------------------------------------------------
+IF EXIST "Data" RMDIR /S /Q "Data"
+IF EXIST "Tools" RMDIR /S /Q "Tools"
+IF EXIST "Commodore-Repair-Toolbox.exe.WebView2" RMDIR /S /Q "Commodore-Repair-Toolbox.exe.WebView2"
+IF EXIST "Commodore-Repair-Toolbox.cfg" DEL /Q "Commodore-Repair-Toolbox.cfg"
+IF EXIST "Commodore-Repair-Toolbox.xlsx" DEL /Q "Commodore-Repair-Toolbox.xlsx"
+
+REM -------------------------------------------------------------------------
+REM Delete old directories and files in where GitHub will get data from
+REM -------------------------------------------------------------------------
+IF EXIST "..\..\..\Data" RMDIR /S /Q "..\..\..\Data"
+IF EXIST "..\..\..\Tools" RMDIR /S /Q "..\..\..\Tools"
+
+REM --------------------------------------------------------------------------
+REM Copy directories and files from the "Debug" folder to LOCAL folder
+REM --------------------------------------------------------------------------
+XCOPY "..\Debug\Data" "Data" /E /I /H /C /Q /Y
+XCOPY "..\Debug\Tools" "Tools" /E /I /H /C /Q /Y
+COPY "..\Debug\Commodore-Repair-Toolbox.xlsx" .
+
+REM ------------------------------------------------------------------------------------
+REM Copy directories and files to same folder as where GitHub gets its data from
+REM ------------------------------------------------------------------------------------
+XCOPY Data "..\..\..\Data" /E /I /H /C /Q /Y
+XCOPY "Tools" "..\..\..\Tools" /E /I /H /C /Q /Y
+COPY Commodore-Repair-Toolbox.xlsx "..\..\..\Data"
+COPY "..\!README.txt" "..\..\..\Data"
+
 
 REM --------------------------------
 REM Digitally sign the application
 REM --------------------------------
-signtool.exe sign /fd sha256 /tr http://ts.ssl.com /td sha256 /n "Dennis Helligsø" "$(TargetPath)"
+rem signtool.exe sign /fd sha256 /tr http://ts.ssl.com /td sha256 /n "Dennis Helligsø" "$(TargetPath)"
 
 REM ----------------------------------------------------------
 REM Delete unnecessary files (to check it works without it)
 REM ----------------------------------------------------------
-del *.dll
-del *.xml
-del *.pdb
-del *.config
-del *.log
+del /Q *.dll
+del /Q *.xml
+del /Q *.pdb
+del /Q *.config
+del /Q *.log
 
 )
 </PostBuildEvent>

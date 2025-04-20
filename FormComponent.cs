@@ -20,14 +20,14 @@ namespace Commodore_Repair_Toolbox
             PictureBoxName = component.Label;
 
             // Basic labels
-            label1.Text = component.Label;
-            label2.Text = component.NameTechnical;
-            label3.Text = component.NameFriendly;
+            label1.Text = Main.ConvertStringToLabel(component.Label);
+            label2.Text = Main.ConvertStringToLabel(component.NameTechnical);
+            label3.Text = Main.ConvertStringToLabel(component.NameFriendly);
             label4.Text = component.Type;
-            label5.Text = component.OneLiner;
+            label5.Text = Main.ConvertStringToLabel(component.OneLiner);
 
             // Description box
-            textBox1.Text = component.Description;
+            textBox1.Text = Main.ConvertStringToLabel(component.Description);
             textBox1.ScrollBars = ScrollBars.Vertical;
 
             // Pinout image

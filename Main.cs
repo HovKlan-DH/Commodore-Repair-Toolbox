@@ -677,14 +677,14 @@ namespace Commodore_Repair_Toolbox
                     htmlContent += "<table width='100%' border='1'>";
                     htmlContent += "<thead>";
                     htmlContent += "<tr>";
-                    htmlContent += "<th>Type</th>";
-                    htmlContent += "<th>Component</th>";
-                    htmlContent += "<th>Technical name</th>";
-                    htmlContent += "<th>Friendly name</th>";
-                    htmlContent += "<th>Short descr.</th>";
-                    htmlContent += "<th>Long descr.</th>";
-                    htmlContent += "<th>Local files</th>";
-                    htmlContent += "<th>Web links</th>";
+                    htmlContent += "<th valign='bottom'>Type</th>";
+                    htmlContent += "<th valign='bottom'>Component</th>";
+                    htmlContent += "<th valign='bottom'>Technical name</th>";
+                    htmlContent += "<th valign='bottom'>Friendly name</th>";
+                    htmlContent += "<th valign='bottom'>Short descr.</th>";
+                    htmlContent += "<th valign='bottom'>Long descr.</th>";
+                    htmlContent += "<th valign='bottom'>Local files</th>";
+                    htmlContent += "<th valign='bottom'>Web links</th>";
                     htmlContent += "</tr>";
                     htmlContent += "</thead>";
                     htmlContent += "<tbody>";
@@ -1741,7 +1741,7 @@ namespace Commodore_Repair_Toolbox
         // Currently I only know of "&" being a problem?
         // ###########################################################################################
 
-        private string ConvertStringToLabel(string str)
+        public static string ConvertStringToLabel(string str)
         {
             return str.Replace("&", "&&");
         }
@@ -2605,8 +2605,8 @@ namespace Commodore_Repair_Toolbox
                 if (comp != null)
                 {
                     labelComponent.Text = ConvertStringToLabel(comp.Label);
-                    labelComponent.Text += comp.NameTechnical != "?" ? " | " + comp.NameTechnical : "";
-                    labelComponent.Text += comp.NameFriendly != "?" ? " | " + comp.NameFriendly : "";
+                    labelComponent.Text += comp.NameTechnical != "?" ? " | " + ConvertStringToLabel(comp.NameTechnical) : "";
+                    labelComponent.Text += comp.NameFriendly != "?" ? " | " + ConvertStringToLabel(comp.NameFriendly) : "";
                 }
                 else
                 {

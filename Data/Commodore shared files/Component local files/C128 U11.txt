@@ -1,0 +1,60 @@
+----------------------------------
+U11, PLA, Programmable Logic Array
+----------------------------------
+2025-April-20
+
+
+Not all pins are investigated yet - will hopefully come. Please connect, if you have better explanations.
+
+
+---------------
+Pin Explanation
+---------------
+1 	A15 		Address line 15
+2 	A14			..
+3 	A13			..
+4 	A12			..
+5 	A11			..
+6 	A10 		..
+7 	VICFIX 		Not used; connected to GND
+8 	DMAACK		"Direct Memory Access Acknowledge" is not utilized and connected to +5VDC to keep it inactive
+9 	AEC 		Indicates whether the CPU or the VIC-IIe has control over the system bus. High equals the CPU has control; Low equals the VIC or an external DMA controller has access to the bus
+10 	R/W 		Read/Write indicates the direction of data transfer on the data bus. When HIGH, it is a read operation (CPU is reading data); when LOW, it is a write operation (CPU is writing data)
+11 	GAME
+12 	EXROM
+13 	Z80 EN
+14 	Z80 I/O
+15 	64/128		HIGH sets C128 mode
+16 	I/O SE
+17 	ROMBANKHI
+18 	ROMBANKLO
+19 	VMA4
+20 	VMA5
+21 	BA 			"Bus Available" is an output signal to coordinate bus access between the CPU and VIC-IIe video chip. When LOW, the CPU must relinquish control of the bus, allowing the VIC-IIe to access memory for video data
+22 	LORAM 		Input signal that, in conjunction with other control lines like HIRAM and CHAREN, determines the memory configuration. When LORAM is LOW, it enables the Basic ROM; when HIGH then RAM is selected
+23 	HIRAM 		Input signal that, in conjunction with other control lines like LORAM and CHAREN, determines the memory configuration. When HIRAM is LOW, it enables the Kernal ROM; when HIGH then RAM is selected
+24 	VSS 		Ground
+25 	CHAREN		Input that determines whether the CPU accesses the "Character ROM" (U18) or the I/O area in the $D000–$DFFF address range. When CHAREN is LOW, the "Character ROM" is selected; when HIGH, the I/O area is selected
+26 	VA14
+27 	128/256		Distinguish between the standard 128KByte RAM configuration and an expanded 256KByte configuration
+28 	N/C 		Not connected
+29 	/SDEN		Chip select for dynamic RAM chips - LOW equals it is enabled
+30 	/ROM L 		Enables access to the low area of ROMs - LOW equals it is enabled
+31 	/ROM H 		Enables access to the high area of ROMs - LOW equals it is enabled
+32 	CLRBNK
+33 	/FROM 		Chip select for "Function ROM" (U36) - LOW equals it is enabled
+34 	/ROM4 		Chip select for "Kernal & 40/80 columns; ROM 4" (U35) - LOW equals it is selected
+35 	/ROM3 		Chip select for "Basic; ROM 3" (U34) - LOW equals it is selected
+36 	/ROM2 		Chip select for "Basic; ROM 2" (U33) - LOW equals it is selected
+37 	/ROM1 		Chip select for "Kernal & Basic; ROM 1" (U32) - LOW equals it is selected
+38 	/IO CS
+39 	DIR 		 Controls direction of data flow on the data bus. When active, it enables data to be driven onto the bus; when inactive, it sets the bus to a high-impedance state, allowing other devices to drive the bus
+40 	DWE
+41 	CASENB
+42 	/VIC 		Chip select for the VIC-IIe chip - LOW equals it is selected
+43 	/IO ACC 	Chip select for various I/O chips like CIA1 and CIA2, SID, and VDC - LOW equals it is selected
+44 	GWE
+45 	/COLRAM 	Chip select for color RAM (U19) - LOW equals it is selected
+46 	/CHARROM 	Chip select for "Character; ROM" (U18) - LOW equals it is selected
+47 	CLK 		Outputs system clock (/CAS signal); used to latch the column address into the DRAM chips
+48 	VCC 		+5VDC
