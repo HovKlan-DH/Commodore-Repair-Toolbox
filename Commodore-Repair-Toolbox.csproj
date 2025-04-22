@@ -205,7 +205,6 @@ REM ----------------------------------------------------
 IF EXIST "Data" RMDIR /S /Q "Data"
 IF EXIST "Tools" RMDIR /S /Q "Tools"
 IF EXIST "Commodore-Repair-Toolbox.exe.WebView2" RMDIR /S /Q "Commodore-Repair-Toolbox.exe.WebView2"
-IF EXIST "Commodore-Repair-Toolbox.cfg" DEL /Q "Commodore-Repair-Toolbox.cfg"
 IF EXIST "Commodore-Repair-Toolbox.xlsx" DEL /Q "Commodore-Repair-Toolbox.xlsx"
 
 REM -------------------------------------------------------------------------
@@ -243,6 +242,7 @@ del /Q *.xml
 del /Q *.pdb
 del /Q *.config
 del /Q *.log
+del /Q *.cfg
 
 )
 </PostBuildEvent>
