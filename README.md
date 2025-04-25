@@ -59,14 +59,6 @@ You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Tool
 Please refer to The [Wiki Documentation](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/wiki/Documentation) page.
 For labelling the components in the schematics  I have discovered the Windows open source application [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/) version 2.0.12. It is quite handy and 
 
-# Future ideas / wishlist
-
-There are major changes in some of these, and I am not sure I want to go down this road - it will for sure depend on usage, as I personally do not have any use for the collaboration topics, if this is primarily used only by myself :grin:
-
-- Have people download and upload new schematics or updates directly from tool
-    - "Data has been updated" information
-    - Rating system of user uploaded schematics
-
 # Data sources used for configurations
 
 I have taken data from many places, but I do have a few _go-to_ places I frequently visit:
