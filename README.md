@@ -31,7 +31,7 @@ It will run on any 64-bit Windows 10 or newer. It does require _.NET Framework 4
 
 # Built-in hardware / schematics
 
-- **Commodore VIC-20** (soon to be released)
+- **Commodore VIC-20**
   - 250403 (CR)
 - **Commodore 64 (Breadbin)**
   - 250407
