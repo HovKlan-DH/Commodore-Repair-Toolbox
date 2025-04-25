@@ -7,6 +7,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net;
+//using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -34,6 +35,18 @@ namespace Commodore_Repair_Toolbox
             ul { margin: 0px; }
             a { color: #5181d0; }
             </style>
+            <script>
+            document.addEventListener('click', function(e) {
+                // Return if we should not react on this class
+                if (e.target.tagName.toLowerCase() === 'td' && 
+                    e.target.classList.contains('doNotFocusFilter') && 
+                    e.target.hasAttribute('data-compLabel')) {
+                    return; // Do nothing if this specific element is clicked
+                }
+                // Send an event for clicking anywhere in the HTML code
+                window.chrome.webview.postMessage('htmlClick');
+            });
+            </script>
         ";
 
         // Reference to the popup/info form
@@ -183,9 +196,9 @@ namespace Commodore_Repair_Toolbox
             SetupNewBoard();
             LoadSelectedImage();
 
-            UpdateComponentList();
+            UpdateComponentList("Form_Shown");
 
-            // Set initial focus to textBoxFilterComponents
+            // Set initial focus to "textBoxFilterComponents"
             textBoxFilterComponents.Focus();
         }
 
@@ -706,7 +719,7 @@ namespace Commodore_Repair_Toolbox
                         htmlContent += "<tr>";
 
                         htmlContent += $"<td valign='top'>{compType}</td>";
-                        htmlContent += $"<td valign='top' data-compLabel='{compLabel}'>{compLabel}</td>";
+                        htmlContent += $"<td valign='top' data-compLabel='{compLabel}' class='doNotFocusFilter'>{compLabel}</td>";
                         htmlContent += $"<td valign='top'>{compNameTechnical}</td>";
                         htmlContent += $"<td valign='top'>{compNameFriendly}</td>";
                         htmlContent += $"<td valign='top'>{compDescrShort}</td>";
@@ -799,13 +812,14 @@ namespace Commodore_Repair_Toolbox
                 {
                     componentInfoPopup = new FormComponent(selectedComp);
                     componentInfoPopup.Show(this);
-                    componentInfoPopup.TopMost = true;
+                    componentInfoPopup.BringToFront();
                 }
             }
 
             // Click anywhere in HTML
             else if (message == "htmlClick")
             {
+                textBoxFilterComponents.Focus();
                 // NOP (it has this event to close the component popup)
             }
         }
@@ -838,11 +852,11 @@ namespace Commodore_Repair_Toolbox
                 <meta charset='UTF-8'>
                 <script>
                 document.addEventListener('click', function(e) {
-                var target = e.target;
-                if (target.tagName.toLowerCase() === 'a' && target.href.startsWith('file://')) {
-                e.preventDefault();
-                window.chrome.webview.postMessage('openFile:' + target.href);
-                }
+                    var target = e.target;
+                    if (target.tagName.toLowerCase() === 'a' && target.href.startsWith('file://')) {
+                        e.preventDefault();
+                        window.chrome.webview.postMessage('openFile:' + target.href);
+                    }
                 });
                 </script>
                 </head>
@@ -919,6 +933,9 @@ namespace Commodore_Repair_Toolbox
             // Open URL in default web browser
             args.Handled = true;
             Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
+
+            // Set focus back to the "textBoxFilterComponents"
+            textBoxFilterComponents.Focus();
         }
 
 
@@ -942,28 +959,39 @@ namespace Commodore_Repair_Toolbox
                 "+ htmlForTabs + @"
                 <h1>Help for application usage</h1><br />
 
-                <i>Commodore Repair Toolbox</i> is fairly simple, but some basic help is always nice to have.<br />
+                <b>""Schematics"" tab</b>:<br />
                 <br />
 
-                Mouse functions:<br />
+                <ul>
+                <li>Mouse functions:</li>
                 <ul>
                 <li><b>Left-click</b> on a component will show a information popup</li>
                 <li><b>Right-click</b> on a component will toggle highlight</li>
                 <li><b>Right-click</b> and <b>Hold</b> will pan the image</li>
                 <li><b>Scrollwheel</b> will zoom in/out</li>
                 </ul>
-                <br />
-
-                Keyboard functions:<br />
-                <ul>
-                <li><b>F11</b> will toggle fullscreen (only in ""Schematics"" tab)</li>
-                <li><b>ESCAPE</b> will exit fullscreen or close popup component information</li>
-                <li><b>SPACE</b> will toggle blinking for selected components (does not apply in ""Feedback"" tab)</li>
-                <li>Start typing anywhere to filter component list</li>
                 </ul>
                 <br />
 
-                Component selection:<br />
+                <ul>
+                <li>Keyboard functions:</li>
+                <ul>
+                <li><b>F11</b> will toggle fullscreen</li>
+                <li><b>ESCAPE</b> will exit fullscreen</li>
+                <li><b>ENTER</b> will toggle blinking for selected components</li>
+                <li><b>ALT</b>+<b>A</b> will select all components in ""Component list""</li>
+                <li><b>ALT</b>+<b>C</b> will clear all selections and show all components in ""Component list""</li>
+                <li>Start typing anywhere to filter component list</li>
+                <li>Filtering supports multi-word/character searching:</li>
+                <ul>
+                <li><span style='background:lightgrey;'>&nbsp;cpu 2 85&nbsp;</span> will find e.g. the component <span style='background:lightgrey;'>&nbsp;U6 | CPU | 8502&nbsp;</span></li>
+                </ul>
+                </ul>
+                </ul>
+                <br />
+
+                <ul>
+                <li>Component selection:</li>
                 <ul>
                 <li>When a component is selected, then it will visualize if component is part of thumbnail in list-view:</li>
                 <ul>
@@ -972,34 +1000,61 @@ namespace Commodore_Repair_Toolbox
                 </ul>
                 <li>You cannot highlight a component in image, if its component category is unselected</li>
                 </ul>
+                </ul>
                 <br />
                 
-                Labels visible:<br />
+                <ul>
+                <li>Labels visible:</li>
                 <ul>
                 <li>If no components are selected for the specific schematic, then the panel with checkboxes will not be shown</li>
                 <li>The panel can be toggled minimized/maximized with the ""M"" button</li>
                 <li>When only one checkbox is selected, then it will replace whitespaces in text with new-lines to condense the text</li>
                 </ul>
-                <br />
-
-                Settings saved:<br />
-                <ul>
-                <li>Various selections will be saved to a configuration file</li>
-                <li>Some settings are ""per board"" while others are general</li>
-                <li>Configuration file is located in same directory as the executable file</li>
                 </ul>
                 <br />
 
-                How-to add or update your own data:<br />
+                <b>""Component information popup""</b>:<br />
+                <br />
+
+                If multiple images are available for the selected component, then it will show ""Image 1 of x"" in the top right corner.<br />
+                <br />
+
+                <ul>
+                <li>Mouse functions:</li>
+                <ul>
+                <li><b>Click</b> in the image area will change back to first image (typical the pinout)</li>
+                <li><b>Scrollwheel</b> will change image, if multiple images</li>
+                </ul>
+                </ul>
+                <br />
+
+                <ul>
+                <li>Keyboard functions:</li>
+                <ul>
+                <li><b>ARROW KEYS</b> will change image, if multiple images</li>
+                <li><b>SPACE</b> will change back to first image (typical the pinout)</li>
+                <li><b>ESCAPE</b> or <b>ENTER</b> will close popup</li>
+                </ul>
+                </ul>
+                <br />
+
+                <b>Misc</b>:<br />
+                <br />
+
+                <ul>
+                <li>How-to add or update your own data:</li>
                 <ul>
                 <li>View <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox?tab=readme-ov-file#software-used' target='_blank'>GitHub Documentation</a></li>
                 </ul>
+                </ul>
                 <br />
 
-                Report a problem or comment something from either of these places:<br />
+                <ul>
+                <li>Report a problem or comment something from either of these places:</li>
                 <ul>
                 <li>Through the ""Feedback"" tab</li>
                 <li>Through the <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues' target='_blank'>GitHub Issues</a></li>
+                </ul>
                 </ul>
                 <br />
                 
@@ -1011,6 +1066,8 @@ namespace Commodore_Repair_Toolbox
             ";
 
             // Make sure we detach any current event handles, before we add a new one
+            webView2Help.CoreWebView2.WebMessageReceived -= WebView2_WebMessageReceived; // detach first
+            webView2Help.CoreWebView2.WebMessageReceived += WebView2_WebMessageReceived; // attach again
             webView2Help.CoreWebView2.NewWindowRequested -= WebView2OpenUrl_NewWindowRequested; // detach first
             webView2Help.CoreWebView2.NewWindowRequested += WebView2OpenUrl_NewWindowRequested; // attach again
 
@@ -1054,6 +1111,8 @@ namespace Commodore_Repair_Toolbox
             ";
 
             // Make sure we detach any current event handles, before we add a new one
+            webView2About.CoreWebView2.WebMessageReceived -= WebView2_WebMessageReceived; // detach first
+            webView2About.CoreWebView2.WebMessageReceived += WebView2_WebMessageReceived; // attach again
             webView2About.CoreWebView2.NewWindowRequested -= WebView2OpenUrl_NewWindowRequested; // detach first
             webView2About.CoreWebView2.NewWindowRequested += WebView2OpenUrl_NewWindowRequested; // attach again
 
@@ -1114,70 +1173,72 @@ namespace Commodore_Repair_Toolbox
                 }
             }
 
+            UpdateShowOfSelectedComponents();
+
             // Update overlays
             ShowOverlaysAccordingToComponentList();
         }
 
-        private void UpdateComponentList()
-        {
-            // Debug
-            #if DEBUG
-                StackTrace stackTrace = new StackTrace();
-                StackFrame callerFrame = stackTrace.GetFrame(1);
-                MethodBase callerMethod = callerFrame.GetMethod();
-                string callerName = callerMethod.Name;
-                Debug.WriteLine("[UpdateComponentList] called from [" + callerName + "]");
-            #endif
 
-            // Decouple the event handler to avoid continues recycling
+        private void UpdateComponentList(string from)
+        {
+#if DEBUG
+            StackTrace stackTrace = new StackTrace();
+            StackFrame callerFrame = stackTrace.GetFrame(1);
+            MethodBase callerMethod = callerFrame.GetMethod();
+            string callerName = callerMethod.Name;
+            Debug.WriteLine("[UpdateComponentList] called from [" + callerName + "]");
+#endif
+
+            // Decouple the event handler to avoid continuous recycling
             listBoxComponents.SelectedIndexChanged -= listBoxComponents_SelectedIndexChanged;
 
-            var componentsToAdd = new List<string>();
-            var componentsToRemove = new List<string>();
             var listBoxComponentsSelectedClone = listBoxComponents.SelectedItems.Cast<object>().ToList(); // create a list of selected components
             string filterText = textBoxFilterComponents.Text.ToLower();
+            string[] searchTerms = filterText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries); // Split filter text into terms
+
+            // Deselect all components if we have an empty filter search
+            if (from == "TextBoxFilterComponents_TextChanged" && searchTerms.Length == 0)
+            {
+                listBoxComponentsSelectedClone.Clear();
+                listBoxComponentsSelectedText.Clear();
+            }
 
             // Convert the selected items to a "HashSet" for faster lookup
             var selectedComponents = new HashSet<string>(listBoxComponentsSelectedText);
 
+            listBoxComponents.BeginUpdate(); // suspend redrawing this listBox while updating it
             listBoxComponents.Items.Clear();
 
-            // Walk through all components for selected hard and board
+            // Walk through all components for selected hardware and board
             var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            if (foundBoard != null)
+            if (foundBoard != null && foundBoard.Components != null)
             {
-                if (foundBoard?.Components != null)
+                foreach (BoardComponents comp in foundBoard.Components)
                 {
-                    foreach (BoardComponents comp in foundBoard.Components)
+                    string componentCategory = comp.Type;
+                    string componentDisplay = comp.NameDisplay;
+
+                    if (listBoxCategories.SelectedItems.Contains(componentCategory))
                     {
-                        string componentCategory = comp.Type;
-                        string componentDisplay = comp.NameDisplay;
+                        // Check if the component matches all search terms
+                        bool matchesAllTerms = searchTerms.Length == 0 || searchTerms.All(term => componentDisplay.ToLower().Contains(term));
 
-                        // Check if category is selected - if so, add the component to the newly generated list and "selected" lsists, if it is selected
-                        if (listBoxCategories.SelectedItems.Contains(componentCategory))
+                        if (matchesAllTerms)
                         {
-                            // Only add the component to the list if it matches the filter
-                            if (string.IsNullOrEmpty(filterText) || componentDisplay.ToLower().Contains(filterText))
-                            {
-                                listBoxComponents.Items.Add(componentDisplay);
+                            listBoxComponents.Items.Add(componentDisplay);
 
-                                // Add the component to the "selected" list + select it in the newly generated component list
-                                if (listBoxComponentsSelectedClone.Contains(componentDisplay))
+                            if (listBoxComponentsSelectedClone.Contains(componentDisplay) || (from == "TextBoxFilterComponents_TextChanged" && searchTerms.Length > 0))
+                            {
+                                if (!selectedComponents.Contains(componentDisplay))
                                 {
-                                    if (!selectedComponents.Contains(componentDisplay))
-                                    {
-                                        AddSelectedComponentIfNotInList(componentDisplay);
-                                    }
-                                    int index = listBoxComponents.Items.IndexOf(componentDisplay);
-                                    if (index >= 0)
-                                    {
-                                        listBoxComponents.SetSelected(index, true);
-                                    }
+                                    AddSelectedComponentIfNotInList(componentDisplay);
                                 }
-                                else
+                                int index = listBoxComponents.Items.IndexOf(componentDisplay);
+                                if (index >= 0)
                                 {
-                                    RemoveSelectedComponentIfInList(componentDisplay);
+                                    listBoxComponents.SetSelected(index, true);
                                 }
                             }
                             else
@@ -1185,23 +1246,24 @@ namespace Commodore_Repair_Toolbox
                                 RemoveSelectedComponentIfInList(componentDisplay);
                             }
                         }
-
-                        // Remove the component from the "selected" list, if it exists there
                         else
                         {
                             RemoveSelectedComponentIfInList(componentDisplay);
                         }
                     }
+                    else
+                    {
+                        RemoveSelectedComponentIfInList(componentDisplay);
+                    }
                 }
             }
 
-            // Update overlays
-            ShowOverlaysAccordingToComponentList();
+            listBoxComponents.EndUpdate(); // resume redrawing of this specific listBox
 
-            // Trigger the "Overview" tab update
+            UpdateShowOfSelectedComponents();
+            ShowOverlaysAccordingToComponentList();
             UpdateTabOverview(GetSelectedBoardClass());
 
-            // Reapply event handler
             listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
         }
 
@@ -1226,6 +1288,17 @@ namespace Commodore_Repair_Toolbox
             UpdateComponentSelection();
         }
 
+        private void UpdateShowOfSelectedComponents()
+        {
+            if (listBoxComponentsSelectedText.Count > 0)
+            {
+                labelComponents.Text = $"Component list ({listBoxComponentsSelectedText.Count} selected)";
+            } else
+            {
+                labelComponents.Text = "Component list";
+            }                
+        }
+        
 
         // ###########################################################################################
         // Handling highlighting of overlays for "Main" and thumbnail images.
@@ -1416,12 +1489,15 @@ namespace Commodore_Repair_Toolbox
 
         // ###########################################################################################
         // Filtering of components.
+        // Dividing string with whitespaces will do a multi-word search, where the
+        // order is not imporant.
         // ###########################################################################################
-
+        
         private void TextBoxFilterComponents_TextChanged(object sender, EventArgs e)
         {
-            UpdateComponentList();
+            UpdateComponentList("TextBoxFilterComponents_TextChanged");
         }
+
 
         private void ListBoxCategories_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -1435,8 +1511,9 @@ namespace Commodore_Repair_Toolbox
             #endif
 
             SaveSelectedCategories();
-            UpdateComponentList();
+            UpdateComponentList("ListBoxCategories_SelectedIndexChanged");
         }
+
 
         // ###########################################################################################
         // Save the selected categories.
@@ -1459,6 +1536,7 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
+        // Load the selected categories from configuration file.
         // ###########################################################################################
 
         private bool LoadSelectedCategories()
@@ -1655,6 +1733,7 @@ namespace Commodore_Repair_Toolbox
                 Debug.WriteLine("[SetupNewBoard] called from [" + callerName + "]");
             #endif
 
+//            listBoxComponents.BeginUpdate(); // suspend redrawing this listBox while updating it
             listBoxComponents.Items.Clear();
 
             boardSelectedName = comboBoxBoard.SelectedItem.ToString();
@@ -1683,6 +1762,7 @@ namespace Commodore_Repair_Toolbox
             InitializeComponentCategories();
 
             // If no config was found (or empty):
+            listBoxCategories.BeginUpdate(); // suspend redrawing this listBox while updating it
             bool loaded = LoadSelectedCategories(); // attempt to select from config
             if (!loaded && listBoxCategories.Items.Count > 0)
             {
@@ -1692,6 +1772,7 @@ namespace Commodore_Repair_Toolbox
                     listBoxCategories.SetSelected(i, true);
                 }
             }
+            listBoxCategories.EndUpdate(); // resume redrawing of this specific listBox
 
             LoadAndApplySplitterPosition();
 
@@ -2372,6 +2453,7 @@ namespace Commodore_Repair_Toolbox
                 Debug.WriteLine("[InitializeComponentCategories] called from [" + callerName + "]");
             #endif
 
+            listBoxCategories.BeginUpdate(); // suspend redrawing this listBox while updating it
             listBoxCategories.Items.Clear();
 
             var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
@@ -2390,6 +2472,7 @@ namespace Commodore_Repair_Toolbox
                     }
                 }
             }
+            listBoxCategories.EndUpdate(); // resume redrawing of this specific listBox
         }
 
 
@@ -2582,6 +2665,8 @@ namespace Commodore_Repair_Toolbox
                 ShowOverlaysAccordingToComponentList();
             }
 
+            listBoxComponents.EndUpdate(); // resume redrawing of this specific listBox
+
             // Refresh the highlight overlays
             ShowOverlaysAccordingToComponentList();
         }
@@ -2689,7 +2774,7 @@ namespace Commodore_Repair_Toolbox
             componentInfoPopup = new FormComponent(comp);
             componentInfoPopup.Text = ConvertStringToLabel(title);
             componentInfoPopup.Show(this);
-            componentInfoPopup.TopMost = true;
+            componentInfoPopup.BringToFront();
         }
 
 
@@ -2700,15 +2785,6 @@ namespace Commodore_Repair_Toolbox
 
         void DisposeAllControls(Control parent)
         {
-            // Debug
-            #if DEBUG
-                StackTrace stackTrace = new StackTrace();
-                StackFrame callerFrame = stackTrace.GetFrame(1);
-                MethodBase callerMethod = callerFrame.GetMethod();
-                string callerName = callerMethod.Name;
-                Debug.WriteLine("[DisposeAllControls("+ parent +")] called from [" + callerName + "]");
-            #endif
-
             for (int i = parent.Controls.Count - 1; i >= 0; i--)
             {
                 Control child = parent.Controls[i];
@@ -2743,10 +2819,14 @@ namespace Commodore_Repair_Toolbox
         {
             listBoxComponents.SelectedIndexChanged -= listBoxComponents_SelectedIndexChanged;
 
+            listBoxComponents.BeginUpdate(); // suspend redrawing this listBox while updating it
+
             for (int i = 0; i < listBoxComponents.Items.Count; i++)
             {
                 listBoxComponents.SetSelected(i, true);
             }
+
+            listBoxComponents.EndUpdate(); // resume redrawing of this specific listBox
 
             listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
             UpdateComponentSelection();
@@ -2847,9 +2927,23 @@ namespace Commodore_Repair_Toolbox
             }
 
             // Toggle "checkBoxBlink" with SPACE key
-            if (keyData == Keys.Space && tabControl.SelectedTab.Text != "Feedback")
+            if (keyData == Keys.Enter && tabControl.SelectedTab.Text != "Feedback")
             {
                 checkBoxBlink.Checked = !checkBoxBlink.Checked;
+                return true;
+            }
+
+            // Trigger the "buttonAll_Click" event
+            if (keyData == (Keys.Alt | Keys.A))
+            {
+                buttonAll_Click(null, EventArgs.Empty);
+                return true;
+            }
+
+            // Trigger the "buttonClear_Click" event
+            if (keyData == (Keys.Alt | Keys.C))
+            {
+                buttonClear_Click(null, EventArgs.Empty);
                 return true;
             }
 
@@ -3124,6 +3218,7 @@ namespace Commodore_Repair_Toolbox
         public string Type { get; set; }
         public string OneLiner { get; set; }
         public string Description { get; set; }
+        public List<ComponentOscilloscope> Oscilloscope { get; set; }
         public List<ComponentLocalFiles> LocalFiles { get; set; }
         public List<ComponentLinks> ComponentLinks { get; set; }
         public List<ComponentImages> ComponentImages { get; set; }
@@ -3179,8 +3274,18 @@ namespace Commodore_Repair_Toolbox
 
     public class ComponentImages
     {
+        public string Region { get; set; }
+        public string Pin { get; set; }
         public string Name { get; set; }
         public string FileName { get; set; }
+    }
+
+    public class ComponentOscilloscope
+    {
+        public string Name { get; set; }
+        public string Region { get; set; }
+        public string Pin { get; set; }
+        public string Reading { get; set; }
     }
 
     public class CustomPanel : Panel

@@ -1,0 +1,53 @@
+--------------------------------------
+Hardware      : Commodore 128 and 128D
+Board         : 310378
+Revision date : 2025-April-24
+-----------------------------
+Component     : U38-U53, 4164, Dynamic RAM
+------------------------------------------
+
+View the general introduction in the "Resources" tab; "Introduction to C128/C128D scope measurements".
+
+Note that the below measurements are not bulletproof facts - they are concrete measurements done on my system
+at a specific point in time, but there may be many reasons if you are not getting the exact same readings.
+If you know my readings are wrong, then I would appreciate feedback so I can correct it, so future
+users can benefit from it.
+
+Similary, if you have the possibility to do the same measuremnts on a NTSC system, this would be great, so both
+regions can be supported here.
+
+
+--------------------
+Tooling requirements
+--------------------
+- Oscilloscope
+
+
+Below are documented ALL 16 x "4164 Dynamic RAM" as they are almost identical.
+Only pin 15 differs.
+
+
+----------
+PAL system
+----------
+  1 NC		= N/A
+  2 D     = pulsing
+  3 /W    = pulsing, but mostly HIGH
+  4 /RAS  = pulsing
+  5 A0    = pulsing
+  6 A2    = pulsing
+  7 A1    = pulsing
+  8 VCC   = 4.5V (+5VDC power rail)
+  9 A7    = pulsing
+ 10 A5    = pulsing
+ 11 A4    = pulsing
+ 12 A3    = pulsing
+ 13 A6    = pulsing
+ 14 Q     = pulsing
+*15 /CAS  = HIGH for top-row ICs (U46,U47,U48,U49,U50,U51,U52,U53)
+*15 /CAS  = pulsing for bottom-row ICs (U38,U39,U40,U41,U42,U43,U44,U45)
+ 16 VSS   = 0V (GND)
+
+
+This is written by the "Commodore Repair Toolbox" developer.
+Connect with me via the "Feedback" tab.

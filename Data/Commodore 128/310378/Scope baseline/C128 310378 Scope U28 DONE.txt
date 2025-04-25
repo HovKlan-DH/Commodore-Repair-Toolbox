@@ -1,0 +1,48 @@
+--------------------------------------
+Hardware      : Commodore 128 and 128D
+Board         : 310378
+Revision date : 2025-April-24
+-----------------------------
+Component     : U28, 8701, Clock generator
+------------------------------------------
+
+View the general introduction in the "Resources" tab; "Introduction to C128/C128D scope measurements".
+
+Note that the below measurements are not bulletproof facts - they are concrete measurements done on my system
+at a specific point in time, but there may be many reasons if you are not getting the exact same readings.
+If you know my readings are wrong, then I would appreciate feedback so I can correct it, so future
+users can benefit from it.
+
+Similary, if you have the possibility to do the same measuremnts on a NTSC system, this would be great, so both
+regions can be supported here.
+
+
+--------------------
+Tooling requirements
+--------------------
+- Oscilloscope
+
+
+----------
+PAL system
+----------
+ 1 NC		    = N/A
+ 2 VSS 		  = 0V (GND)
+ 3 NC		    = N/A
+ 4 NC	 	    = N/A
+ 5 /RESET	  = 3.72V (this one is weird, as it is not shown in C128 schematic?)
+ 6 ΦDOT		  = 7.8820 MHz
+ 7 /PAL		  = LOW
+ 8 ΦCOLOR	  = 17.7345 MHz
+ 9 VSS 		  = 0V (GND)
+10 NC       = N/A
+11 NC       = N/A
+12 VDD 		  = 4.74V (+5VDC power rail)
+13 XTAL OUT = 17.7326 MHz
+14 XTAL IN  = 17.7342 MHz - you might need to change to "10x" attenuation on your probe to be able to measure this, as signal is quite fragile and the C128 will stall system if using "x1" (harmless, but will need power-recycle)
+15 VDD      = 4.76V (+5VDC power rail)
+16 NC       = N/A
+
+
+This is written by the "Commodore Repair Toolbox" developer.
+Connect with me via the "Feedback" tab.

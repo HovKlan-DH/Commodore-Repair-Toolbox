@@ -1,0 +1,85 @@
+--------------------------------------
+Hardware      : Commodore 128 and 128D
+Board         : 310378
+Revision date : 2025-April-24
+-----------------------------
+Component     : U21, 8566, VIC-IIe
+----------------------------------
+
+View the general introduction in the "Resources" tab; "Introduction to C128/C128D scope measurements".
+
+Note that the below measurements are not bulletproof facts - they are concrete measurements done on my system
+at a specific point in time, but there may be many reasons if you are not getting the exact same readings.
+If you know my readings are wrong, then I would appreciate feedback so I can correct it, so future
+users can benefit from it.
+
+Similary, if you have the possibility to do the same measuremnts on a NTSC system, this would be great, so both
+regions can be supported here.
+
+
+--------------------
+Tooling requirements
+--------------------
+- Oscilloscope
+
+
+----------
+PAL system
+----------
+ 1 DB6     =
+ 2 DB5     =
+ 3 DB4     =
+ 4 DB3     =
+ 5 DB2     =
+ 6 DB1     =
+ 7 DB0     =
+ 8 /IRQ    =
+ 9 /LP     =
+10 BA      =
+11 /DMAR   =
+12 AEC     =
+13 /CS     =
+14 R/W     =
+15 /DMAA   =
+16 CL      =
+17 S/LUM   =
+18 1MHz    =
+19 /RAS    =
+20 CAS     =
+21 MU      =
+22 /IDACC  =
+23 2MHz    =
+24 VSS     = 0V (GND)
+25 Z80PHI  =
+26 K0      =
+27 K1      =
+28 K2      =
+29 PHCL    =
+30 PHIN    =
+31 A11     =
+32 A0      =
+33 A1      =
+34 A2      =
+35 A3      =
+36 A4      =
+37 A5      =
+38 A6      =
+39 A7      =
+40 A8      =
+41 A9      =
+42 A10     =
+43 DB11    =
+44 DB10    =
+45 DB9     =
+46 DB8     =
+47 DB7     =
+48 VCC     = V (+5VDC power rail)
+
+
+ 4 NC		    = 17.7345 MHz
+ 5 ΦDOT     = pulsing, but mostly LOW
+6 ΦDOT		  = pulsing, but mostly HIGH
+
+
+This is written by the "Commodore Repair Toolbox" developer.
+Connect with me via the "Feedback" tab.
