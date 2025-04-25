@@ -232,7 +232,7 @@ COPY "..\!README.txt" "..\..\..\Data"
 REM --------------------------------
 REM Digitally sign the application
 REM --------------------------------
-rem signtool.exe sign /fd sha256 /tr http://ts.ssl.com /td sha256 /n "Dennis Helligsø" "$(TargetPath)"
+signtool.exe sign /fd sha256 /tr http://ts.ssl.com /td sha256 /n "Dennis Helligsø" "$(TargetPath)"
 
 REM ----------------------------------------------------------
 REM Delete unnecessary files (to check it works without it)
