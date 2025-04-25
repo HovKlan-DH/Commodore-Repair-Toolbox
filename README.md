@@ -7,11 +7,15 @@ This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ he
 
 # Screenshots
 
-Main screen:\
-![Main screen](https://github.com/user-attachments/assets/e2e22044-d2d2-4b57-9931-7357919d8897)
+Main screen with schematic view:\
+![Main screen with schematic view](https://github.com/user-attachments/assets/b6970119-f3c2-4ce3-b425-904ef98e3352)
 
-Popup component info:\
-![Component popup information](https://github.com/user-attachments/assets/087dda87-c368-4dac-be0c-564916d70318)
+Component information popup:\
+![Component information popup](https://github.com/user-attachments/assets/fe500981-3bef-4d99-b2f5-f22406eb6e66)
+
+Oscilloscope baseline measurement:\
+![Oscilloscope baseline measurement](https://github.com/user-attachments/assets/f318fe19-4184-4ec7-b93f-9492c704b6c1)
+
 
 # What is it?
 
