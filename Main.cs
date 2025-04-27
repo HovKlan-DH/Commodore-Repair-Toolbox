@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -200,6 +201,8 @@ namespace Commodore_Repair_Toolbox
 
             // Set initial focus to "textBoxFilterComponents"
             textBoxFilterComponents.Focus();
+
+            StartDrawingPolylines();
         }
 
 
@@ -2047,6 +2050,12 @@ namespace Commodore_Repair_Toolbox
             overlayPanel.OverlayPanelMouseMove += OverlayPanel_OverlayPanelMouseMove;
             overlayPanel.OverlayPanelMouseUp += OverlayPanel_OverlayPanelMouseUp;
 
+            // hest
+            overlayPanel.MouseDown += panelImageMain_MouseDown;
+            overlayPanel.MouseMove += panelImageMain_MouseMove;
+            overlayPanel.MouseUp += panelImageMain_MouseUp;
+            overlayPanel.Paint += panelImageMain_Paint;
+
             // Top-left label: file name
             labelFile = new Label
             {
@@ -3182,6 +3191,467 @@ namespace Commodore_Repair_Toolbox
             int visibleHeight = panelZoom.ClientRectangle.Height;
             panelLabelsVisible.Location = new Point(0, visibleHeight - panelLabelsVisible.Height - 2); // bottom-left corner of the visible area
         }
+
+
+
+
+        // hest
+
+        // Add these fields to the Main class
+        private bool isDrawing = false;
+        private List<List<Point>> polylines = new List<List<Point>>(); // List of polylines
+        private List<Point> currentPolyline = null; // Current polyline being drawn
+        private const int MarkerRadius = 6; // Radius of the marker circle
+        private (int LineIndex, int PointIndex) selectedMarker = (-1, -1); // Tracks the selected marker
+        private int selectedPolylineIndex = -1;
+        private Dictionary<int, Color> polylineColors = new Dictionary<int, Color>();
+        private MouseEventArgs lastMouseEvent;
+
+
+        private void StartDrawingPolylines ()
+        {
+            isDrawing = true;
+            overlayPanel.Cursor = Cursors.Cross; // Change cursor to indicate drawing mode
+            UpdateButtonColorPolylineState();
+        }
+
+        // Modify the panelImageMain_MouseDown method
+        private void panelImageMain_MouseDown(object sender, MouseEventArgs e)
+        {
+            lastMouseEvent = e;
+
+            if (e.Button == MouseButtons.Right)
+            {
+                HandleRightClick(e);
+                return;
+            }
+
+            if (e.Button == MouseButtons.Left)
+            {
+                bool clickedOnMarker = false;
+
+                // Check if clicking on an existing marker
+                for (int i = 0; i < polylines.Count; i++)
+                {
+                    for (int j = 0; j < polylines[i].Count; j++)
+                    {
+                        Point scaledMarker = ScalePoint(polylines[i][j]);
+                        if (IsPointInMarker(e.Location, scaledMarker))
+                        {
+                            selectedMarker = (i, j);
+                            selectedPolylineIndex = i;
+                            overlayPanel.Invalidate();
+                            UpdateButtonColorPolylineState();
+                            clickedOnMarker = true;
+                            return;
+                        }
+                    }
+                }
+
+                // If not clicking on a marker, check if clicking on a line segment
+                if (!clickedOnMarker)
+                {
+                    for (int i = 0; i < polylines.Count; i++)
+                    {
+                        for (int j = 0; j < polylines[i].Count - 1; j++)
+                        {
+                            Point scaledStart = ScalePoint(polylines[i][j]);
+                            Point scaledEnd = ScalePoint(polylines[i][j + 1]);
+                            Point closestPoint = GetClosestPointOnLine(scaledStart, scaledEnd, e.Location);
+
+                            if (IsPointNearLine(e.Location, closestPoint))
+                            {
+                                selectedPolylineIndex = i;
+                                selectedMarker = (-1, -1);
+
+                                // Insert new marker immediately
+                                Point newPointUnscaled = new Point((int)(closestPoint.X / zoomFactor), (int)(closestPoint.Y / zoomFactor));
+                                polylines[i].Insert(j + 1, newPointUnscaled);
+                                selectedMarker = (i, j + 1);
+
+                                overlayPanel.Invalidate();
+                                UpdateButtonColorPolylineState();
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                // If in drawing mode, add points to a new polyline
+                if (isDrawing)
+                {
+                    if (currentPolyline == null)
+                    {
+                        currentPolyline = new List<Point>();
+                        selectedPolylineIndex = polylines.Count;
+                    }
+                    Point pointUnscaled = new Point((int)(e.Location.X / zoomFactor), (int)(e.Location.Y / zoomFactor));
+                    currentPolyline.Add(pointUnscaled);
+                    return;
+                }
+
+                // Deselect if clicking empty space
+                selectedPolylineIndex = -1;
+                selectedMarker = (-1, -1);
+                overlayPanel.Invalidate();
+                UpdateButtonColorPolylineState();
+            }
+        }
+
+        // Add this method to handle right-clicks
+        private void HandleRightClick(MouseEventArgs e)
+        {
+            // First, check if the right-click is on a marker.
+            for (int i = 0; i < polylines.Count; i++)
+            {
+                for (int j = 0; j < polylines[i].Count; j++)
+                {
+                    Point scaledMarker = ScalePoint(polylines[i][j]);
+                    if (IsPointInMarker(e.Location, scaledMarker))
+                    {
+                        // If the polyline has only two markers left, remove the whole polyline.
+                        if (polylines[i].Count <= 2)
+                        {
+                            polylines.RemoveAt(i);
+                            if (polylineColors.ContainsKey(i))
+                            {
+                                polylineColors.Remove(i);
+                            }
+                        }
+                        else // Otherwise, remove only the clicked marker.
+                        {
+                            polylines[i].RemoveAt(j);
+                        }
+                        selectedMarker = (-1, -1);
+                        selectedPolylineIndex = -1;
+                        overlayPanel.Invalidate();
+                        UpdateButtonColorPolylineState();
+                        return;
+                    }
+                }
+            }
+
+            // If no marker was hit, check if the right-click is near a line segment.
+            for (int i = 0; i < polylines.Count; i++)
+            {
+                for (int j = 0; j < polylines[i].Count - 1; j++)
+                {
+                    Point scaledStart = ScalePoint(polylines[i][j]);
+                    Point scaledEnd = ScalePoint(polylines[i][j + 1]);
+                    Point closestPoint = GetClosestPointOnLine(scaledStart, scaledEnd, e.Location);
+                    if (IsPointNearLine(e.Location, closestPoint))
+                    {
+                        // Right-click on a polyline (not on a marker) deletes the entire polyline.
+                        polylines.RemoveAt(i);
+                        if (polylineColors.ContainsKey(i))
+                        {
+                            polylineColors.Remove(i);
+                        }
+                        selectedMarker = (-1, -1);
+                        selectedPolylineIndex = -1;
+                        overlayPanel.Invalidate();
+                        UpdateButtonColorPolylineState();
+                        return;
+                    }
+                }
+            }
+        }
+
+
+        // MouseMove event for overlayPanel
+        private void panelImageMain_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (isDrawing && e.Button == MouseButtons.Left && currentPolyline != null)
+            {
+                Point pointUnscaled = new Point((int)(e.Location.X / zoomFactor), (int)(e.Location.Y / zoomFactor));
+                if (currentPolyline.Count == 1) // Only update the second point dynamically
+                {
+                    currentPolyline.Add(pointUnscaled);
+                }
+                else
+                {
+                    currentPolyline[currentPolyline.Count - 1] = pointUnscaled;
+                }
+                overlayPanel.Invalidate();
+            }
+            else if (selectedMarker.LineIndex != -1 && e.Button == MouseButtons.Left)
+            {
+                Point newPointUnscaled = new Point((int)(e.Location.X / zoomFactor), (int)(e.Location.Y / zoomFactor));
+
+                if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
+                {
+                    var polyline = polylines[selectedMarker.LineIndex];
+                    if (selectedMarker.PointIndex >= 0 && selectedMarker.PointIndex < polyline.Count)
+                    {
+                        Point? previousPoint = selectedMarker.PointIndex > 0 ? polyline[selectedMarker.PointIndex - 1] : (Point?)null;
+                        Point? nextPoint = selectedMarker.PointIndex < polyline.Count - 1 ? polyline[selectedMarker.PointIndex + 1] : (Point?)null;
+
+                        // Case 1: Only two points in polyline (start + end) or this is an outer marker
+                        if (polyline.Count == 2 ||
+                            (selectedMarker.PointIndex == 0 && nextPoint.HasValue) ||
+                            (selectedMarker.PointIndex == polyline.Count - 1 && previousPoint.HasValue))
+                        {
+                            // For start marker (align with the end marker)
+                            if (selectedMarker.PointIndex == 0 && nextPoint.HasValue)
+                            {
+                                int deltaX = Math.Abs(nextPoint.Value.X - newPointUnscaled.X);
+                                int deltaY = Math.Abs(nextPoint.Value.Y - newPointUnscaled.Y);
+
+                                if (deltaX < deltaY)
+                                {
+                                    // Snap X to align vertically
+                                    newPointUnscaled.X = nextPoint.Value.X;
+                                }
+                                else
+                                {
+                                    // Snap Y to align horizontally
+                                    newPointUnscaled.Y = nextPoint.Value.Y;
+                                }
+                            }
+                            // For end marker (align with the start marker)
+                            else if (selectedMarker.PointIndex == polyline.Count - 1 && previousPoint.HasValue)
+                            {
+                                int deltaX = Math.Abs(previousPoint.Value.X - newPointUnscaled.X);
+                                int deltaY = Math.Abs(previousPoint.Value.Y - newPointUnscaled.Y);
+
+                                if (deltaX < deltaY)
+                                {
+                                    // Snap X to align vertically
+                                    newPointUnscaled.X = previousPoint.Value.X;
+                                }
+                                else
+                                {
+                                    // Snap Y to align horizontally
+                                    newPointUnscaled.Y = previousPoint.Value.Y;
+                                }
+                            }
+                        }
+                        // Case 2: Inner marker (between start and end) - align both X and Y
+                        else if (previousPoint.HasValue && nextPoint.HasValue)
+                        {
+                            // For inner markers, we align both horizontally AND vertically
+                            // Based on the closest neighbors
+
+                            // Find closest X value from either previous or next point
+                            if (Math.Abs(previousPoint.Value.X - newPointUnscaled.X) <
+                                Math.Abs(nextPoint.Value.X - newPointUnscaled.X))
+                            {
+                                newPointUnscaled.X = previousPoint.Value.X;
+                            }
+                            else
+                            {
+                                newPointUnscaled.X = nextPoint.Value.X;
+                            }
+
+                            // Find closest Y value from either previous or next point  
+                            if (Math.Abs(previousPoint.Value.Y - newPointUnscaled.Y) <
+                                Math.Abs(nextPoint.Value.Y - newPointUnscaled.Y))
+                            {
+                                newPointUnscaled.Y = previousPoint.Value.Y;
+                            }
+                            else
+                            {
+                                newPointUnscaled.Y = nextPoint.Value.Y;
+                            }
+                        }
+                    }
+                }
+
+                polylines[selectedMarker.LineIndex][selectedMarker.PointIndex] = newPointUnscaled;
+                overlayPanel.Invalidate();
+            }
+        }
+
+        // Helper method to calculate the closest point on a line
+        private Point GetClosestPointOnLine(Point start, Point end, Point clickPoint)
+        {
+            float dx = end.X - start.X;
+            float dy = end.Y - start.Y;
+
+            if (dx == 0 && dy == 0) return start; // Line is a point
+
+            float t = ((clickPoint.X - start.X) * dx + (clickPoint.Y - start.Y) * dy) / (dx * dx + dy * dy);
+            t = Math.Max(0, Math.Min(1, t)); // Clamp t to the range [0, 1]
+
+            return new Point((int)(start.X + t * dx), (int)(start.Y + t * dy));
+        }
+
+        // Helper method to check if a point is near a line
+        private bool IsPointNearLine(Point clickPoint, Point closestPoint)
+        {
+            const int proximityThreshold = 5; // Adjust as needed
+            return Math.Abs(clickPoint.X - closestPoint.X) <= proximityThreshold &&
+                   Math.Abs(clickPoint.Y - closestPoint.Y) <= proximityThreshold;
+        }
+
+        // MouseUp event for overlayPanel
+        private void panelImageMain_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (isDrawing && e.Button == MouseButtons.Left)
+            {
+                if (currentPolyline != null && currentPolyline.Count > 1)
+                {
+                    polylines.Add(currentPolyline); // Save the completed polyline
+                }
+                currentPolyline = null; // Reset the current polyline
+            }
+            else if (e.Button == MouseButtons.Left)
+            {
+                // Add a new marker to an existing polyline if a line segment was clicked
+                if (selectedPolylineIndex != -1)
+                {
+                    for (int j = 0; j < polylines[selectedPolylineIndex].Count - 1; j++)
+                    {
+                        Point scaledStart = ScalePoint(polylines[selectedPolylineIndex][j]);
+                        Point scaledEnd = ScalePoint(polylines[selectedPolylineIndex][j + 1]);
+                        Point closestPoint = GetClosestPointOnLine(scaledStart, scaledEnd, lastMouseEvent.Location);
+
+                        if (IsPointNearLine(lastMouseEvent.Location, closestPoint))
+                        {
+                            // Insert new marker
+                            Point newPointUnscaled = new Point((int)(closestPoint.X / zoomFactor), (int)(closestPoint.Y / zoomFactor));
+                            polylines[selectedPolylineIndex].Insert(j + 1, newPointUnscaled);
+                            selectedMarker = (selectedPolylineIndex, j + 1);
+                            overlayPanel.Invalidate();
+                            break;
+                        }
+                    }
+                }
+
+                selectedMarker = (-1, -1); // Deselect marker
+            }
+        }
+
+        // Paint event for overlayPanel
+        private void panelImageMain_Paint(object sender, PaintEventArgs e)
+        {
+            for (int i = 0; i < polylines.Count; i++)
+            {
+                DrawPolyline(e.Graphics, polylines[i], Pens.Red, i);
+            }
+
+            if (currentPolyline != null && currentPolyline.Count > 1)
+            {
+                DrawPolyline(e.Graphics, currentPolyline, Pens.Blue, -1);
+            }
+        }
+
+        // Helper method to draw a polyline
+        // Helper method to draw a polyline
+        // Helper method to draw a polyline
+        // Update the DrawPolyline method to ensure all markers are drawn
+        // Updated DrawPolyline method
+        private void DrawPolyline(Graphics graphics, List<Point> polyline, Pen defaultPen, int polylineIndex)
+        {
+            Color lineColor = polylineColors.ContainsKey(polylineIndex) ? polylineColors[polylineIndex] : defaultPen.Color;
+            bool isSelected = (polylineIndex == selectedPolylineIndex);
+
+            using (Pen customPen = new Pen(lineColor, 5))
+            using (Pen outlinePen = new Pen(Color.Black, 9)) // 9 is thicker than 5
+            {
+                outlinePen.LineJoin = LineJoin.Round;
+                customPen.LineJoin = LineJoin.Round;
+
+                for (int i = 0; i < polyline.Count - 1; i++)
+                {
+                    Point scaledStart = ScalePoint(polyline[i]);
+                    Point scaledEnd = ScalePoint(polyline[i + 1]);
+
+                    if (isSelected)
+                    {
+                        graphics.DrawLine(outlinePen, scaledStart, scaledEnd); // Draw outline if selected
+                    }
+
+                    graphics.DrawLine(customPen, scaledStart, scaledEnd); // Draw the line
+                }
+            }
+
+            // Draw markers only if the polyline is selected
+            if (isSelected)
+            {
+                foreach (var point in polyline)
+                {
+                    Point scaledPoint = ScalePoint(point);
+                    DrawMarker(graphics, scaledPoint, lineColor);
+                }
+            }
+        }
+
+
+        // Helper method to draw a marker
+        // Helper method to draw a marker
+        // Update the DrawMarker method to ensure the white outline does not overlap the red area
+        // Update the DrawMarker method to ensure the white outline is drawn correctly
+        private void DrawMarker(Graphics graphics, Point point, Color color)
+        {
+            Rectangle markerBounds = new Rectangle(
+                point.X - MarkerRadius,
+                point.Y - MarkerRadius,
+                MarkerRadius * 2,
+                MarkerRadius * 2
+            );
+
+            // Fill the marker with the selected color
+            using (Brush brush = new SolidBrush(color))
+            {
+                graphics.FillEllipse(brush, markerBounds);
+            }
+
+            // Draw the white outline after the fill
+            using (Pen outlinePen = new Pen(Color.White, 2))
+            {
+                graphics.DrawEllipse(outlinePen, markerBounds);
+            }
+        }
+
+        // Helper method to scale a point based on zoom factor
+        private Point ScalePoint(Point point)
+        {
+            return new Point((int)(point.X * zoomFactor), (int)(point.Y * zoomFactor));
+        }
+
+        // Helper method to check if a point is inside a marker
+        private bool IsPointInMarker(Point point, Point markerCenter)
+        {
+            return Math.Pow(point.X - markerCenter.X, 2) + Math.Pow(point.Y - markerCenter.Y, 2) <= Math.Pow(MarkerRadius, 2);
+        }
+
+        private void UpdateButtonColorPolylineState()
+        {
+            buttonColorPolyline.Enabled = selectedPolylineIndex != -1;
+        }
+
+
+        // ----------------
+
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            if (selectedPolylineIndex == -1)
+            {
+                MessageBox.Show("Please select a polyline first.", "No Polyline Selected", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (colorDialog1.ShowDialog() == DialogResult.OK)
+            {
+                // Set the selected color for the selected polyline
+                polylineColors[selectedPolylineIndex] = colorDialog1.Color;
+                overlayPanel.Invalidate(); // Redraw the panel to apply the new color
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
+
     }
 
 

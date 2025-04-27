@@ -80,6 +80,9 @@
             this.panelBehindTab = new System.Windows.Forms.Panel();
             this.textBoxFilterComponents = new System.Windows.Forms.TextBox();
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
+            this.buttonDraw = new System.Windows.Forms.Button();
+            this.colorDialog1 = new System.Windows.Forms.ColorDialog();
+            this.buttonColorPolyline = new System.Windows.Forms.Button();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -687,12 +690,34 @@
             this.checkBoxBlink.Text = "Blink selected components";
             this.checkBoxBlink.UseVisualStyleBackColor = true;
             // 
+            // buttonDraw
+            // 
+            this.buttonDraw.Location = new System.Drawing.Point(245, 618);
+            this.buttonDraw.Name = "buttonDraw";
+            this.buttonDraw.Size = new System.Drawing.Size(48, 23);
+            this.buttonDraw.TabIndex = 16;
+            this.buttonDraw.Text = "D";
+            this.buttonDraw.UseVisualStyleBackColor = true;
+//            this.buttonDraw.Click += new System.EventHandler(this.buttonDraw_Click);
+            // 
+            // buttonColorPolyline
+            // 
+            this.buttonColorPolyline.Location = new System.Drawing.Point(206, 618);
+            this.buttonColorPolyline.Name = "buttonColorPolyline";
+            this.buttonColorPolyline.Size = new System.Drawing.Size(33, 23);
+            this.buttonColorPolyline.TabIndex = 17;
+            this.buttonColorPolyline.Text = "C";
+            this.buttonColorPolyline.UseVisualStyleBackColor = true;
+            this.buttonColorPolyline.Click += new System.EventHandler(this.button2_Click);
+            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 21F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.WhiteSmoke;
             this.ClientSize = new System.Drawing.Size(1082, 653);
+            this.Controls.Add(this.buttonColorPolyline);
+            this.Controls.Add(this.buttonDraw);
             this.Controls.Add(this.textBoxFilterComponents);
             this.Controls.Add(this.checkBoxBlink);
             this.Controls.Add(this.panelBehindTab);
@@ -792,5 +817,8 @@
         private System.Windows.Forms.Panel panelLabelsVisible;
         private System.Windows.Forms.Label label10;
         private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.Button buttonDraw;
+        private System.Windows.Forms.ColorDialog colorDialog1;
+        private System.Windows.Forms.Button buttonColorPolyline;
     }
 }
