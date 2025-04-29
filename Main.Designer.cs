@@ -82,6 +82,8 @@
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
             this.buttonColorPolyline = new System.Windows.Forms.Button();
+            this.label11 = new System.Windows.Forms.Label();
+            this.panel1 = new System.Windows.Forms.Panel();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -154,6 +156,7 @@
             // 
             // panelMain
             // 
+            this.panelMain.Controls.Add(this.panel1);
             this.panelMain.Controls.Add(this.panelLabelsVisible);
             this.panelMain.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelMain.Location = new System.Drawing.Point(0, 0);
@@ -697,7 +700,26 @@
             this.buttonColorPolyline.TabIndex = 17;
             this.buttonColorPolyline.Text = "C";
             this.buttonColorPolyline.UseVisualStyleBackColor = true;
-            this.buttonColorPolyline.Click += new System.EventHandler(this.button2_Click);
+            this.buttonColorPolyline.Click += new System.EventHandler(this.buttonColorPolyline_Click);
+            // 
+            // label11
+            // 
+            this.label11.AutoSize = true;
+            this.label11.BackColor = System.Drawing.Color.Moccasin;
+            this.label11.Location = new System.Drawing.Point(139, 633);
+            this.label11.Name = "label11";
+            this.label11.Size = new System.Drawing.Size(61, 21);
+            this.label11.TabIndex = 18;
+            this.label11.Text = "label11";
+            // 
+            // panel1
+            // 
+            this.panel1.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.panel1.Location = new System.Drawing.Point(184, 388);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(200, 100);
+            this.panel1.TabIndex = 5;
             // 
             // Main
             // 
@@ -705,6 +727,7 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.WhiteSmoke;
             this.ClientSize = new System.Drawing.Size(1082, 653);
+            this.Controls.Add(this.label11);
             this.Controls.Add(this.buttonColorPolyline);
             this.Controls.Add(this.textBoxFilterComponents);
             this.Controls.Add(this.checkBoxBlink);
@@ -806,6 +829,8 @@
         private System.Windows.Forms.Label label10;
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.ColorDialog colorDialog1;
+        private System.Windows.Forms.Label label11;
         private System.Windows.Forms.Button buttonColorPolyline;
+        private System.Windows.Forms.Panel panel1;
     }
 }

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+//using System.Windows.Shapes;
 
 namespace Commodore_Repair_Toolbox
 {
@@ -49,5 +50,11 @@ namespace Commodore_Repair_Toolbox
             settings[key] = value;
             SaveConfig();
         }
+
+
+
+
+
+
     }
 }
