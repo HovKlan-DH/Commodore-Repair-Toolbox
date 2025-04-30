@@ -125,6 +125,8 @@ namespace Commodore_Repair_Toolbox
         //        private PolylinesManagement polylinesManagement = new PolylinesManagement();
         private PolylinesManagement polylinesManagement;
         private int zoomLevel = 1;
+        private int panelTracesVisibleHeight = 0;
+        private bool isPanelTracesVisible = false;
 
 
         // ###########################################################################################
@@ -201,7 +203,7 @@ namespace Commodore_Repair_Toolbox
             AttachConfigurationSaveEvents();
 
             SetupNewBoard();
-            LoadSelectedImage();
+            //LoadSelectedImage();
 
             UpdateComponentList("Form_Shown");
 
@@ -212,6 +214,7 @@ namespace Commodore_Repair_Toolbox
             label11.Text = $"{zoomLevel}";
 
             StartDrawingPolylines();
+            PopulatePolylineVisibilityPanel();
         }
 
         private void Form_Closing(object sender, FormClosingEventArgs e)
@@ -385,6 +388,8 @@ namespace Commodore_Repair_Toolbox
             string defaultShowTechnicalName = "False";
             string defaultShowFriendlyName = "False";
             string defaultShowLabelsHeight = "95";
+            string defaultShowTraces = "True";
+            string defaultShowTracesHeight = "0";
 
             // Load saved settings from configuration file - or set default if none exists
             string selectedHardwareVal = Configuration.GetSetting("HardwareSelected", defaultSelectedHardware);
@@ -393,6 +398,8 @@ namespace Commodore_Repair_Toolbox
             string selectedShowTechnicalName = Configuration.GetSetting("ShowTechnicalName", defaultShowTechnicalName);
             string selectedShowFriendlyName = Configuration.GetSetting("ShowFriendlyName", defaultShowFriendlyName);
             string showLabelsHeight = Configuration.GetSetting("ShowLabelsHeight", defaultShowLabelsHeight);
+            string showTraces = Configuration.GetSetting("ShowTraces", defaultShowTraces);
+            string showTracesHeight = Configuration.GetSetting("ShowTracesHeight", defaultShowTracesHeight);
             string userEmail = Configuration.GetSetting("UserEmail", "");
 
             textBoxEmail.Text = userEmail; // set email address in "Feedback" tab
@@ -438,6 +445,9 @@ namespace Commodore_Repair_Toolbox
 
             // .. and the height for its panel
             panelLabelsVisible.Height = Convert.ToInt32(showLabelsHeight);
+
+            panelTracesVisibleHeight = Convert.ToInt32(showTracesHeight);
+            isPanelTracesVisible = bool.TryParse(showTraces, out bool result) && result;
         }
 
 
@@ -1808,6 +1818,7 @@ namespace Commodore_Repair_Toolbox
 
             // Load polylines after initializing thumbnails and tabs
             PolylinesManagement.LoadPolylines();
+            PopulatePolylineVisibilityPanel();
 
             ResumeLayout();
         }
@@ -1860,6 +1871,7 @@ namespace Commodore_Repair_Toolbox
         // Load the selected image, based on selected board and saved configuration setting.
         // ###########################################################################################
 
+        /*
         private void LoadSelectedImage()
         {
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
@@ -1874,6 +1886,7 @@ namespace Commodore_Repair_Toolbox
                 }
             }
         }
+        */
 
 
         // ###########################################################################################
@@ -2485,7 +2498,7 @@ namespace Commodore_Repair_Toolbox
             PolylinesManagement.selectedMarker = (-1, -1);
 
             // Update button state
-            UpdateButtonColorPolylineState();
+//            UpdateButtonColorPolylineState();
 
             PopulatePolylineVisibilityPanel();
 
@@ -3275,9 +3288,9 @@ namespace Commodore_Repair_Toolbox
 
         private void StartDrawingPolylines()
         {
-            PolylinesManagement.isDrawing = true;
+//            PolylinesManagement.isDrawing = true;
             overlayPanel.Cursor = Cursors.Cross; // Change cursor to indicate drawing mode
-            UpdateButtonColorPolylineState();
+//            UpdateButtonColorPolylineState();
 
             // Ensure the current image has an entry in the dictionary
             if (!PolylinesManagement.imagePolylines.ContainsKey(Main.schematicSelectedName))
@@ -3294,7 +3307,7 @@ namespace Commodore_Repair_Toolbox
 
         public void UpdateButtonColorPolylineState()
         {
-            buttonColorPolyline.Enabled = PolylinesManagement.selectedPolylineIndex != -1;
+//            buttonColorPolyline.Enabled = PolylinesManagement.selectedPolylineIndex != -1;
         }
 
 
@@ -3304,14 +3317,15 @@ namespace Commodore_Repair_Toolbox
 
         private void buttonColorPolyline_Click(object sender, EventArgs e)
         {
-            if (PolylinesManagement.selectedPolylineIndex == -1)
-            {
-                MessageBox.Show("Please select a polyline first", "No polyline selected", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
             if (colorDialog1.ShowDialog() == DialogResult.OK)
             {
+                // If we should only choose the color for the next new polyline
+                if (PolylinesManagement.selectedPolylineIndex == -1)
+                {
+                    PolylinesManagement.LastSelectedPolylineColor = colorDialog1.Color;
+                    return;
+                }
+
                 // Use the composite key to set the color
                 var key = (schematicSelectedName, PolylinesManagement.selectedPolylineIndex);
                 PolylinesManagement.polylineColors[key] = colorDialog1.Color;
@@ -3334,28 +3348,72 @@ namespace Commodore_Repair_Toolbox
 
         public void PopulatePolylineVisibilityPanel()
         {
+            panelZoom.Invalidate();
+
+            SuspendDrawing(panel1);
+
+            // Check if we should minimize again
+//            bool shouldMinimize = false;
+//            if (panel1.Height == 26)
+//            {
+//                shouldMinimize = true;
+//            }
+
             // Clear existing controls in the panel
             panel1.Controls.Clear();
 
-            // Get the polyline colors for the selected schematic
-            var relevantColors = PolylinesManagement.polylineColors
+           // Get the polyline colors for the selected schematic
+           var relevantColors = PolylinesManagement.polylineColors
                 .Where(kvp => kvp.Key.ImageName == schematicSelectedName)
                 .GroupBy(kvp => kvp.Value.ToArgb()) // Group by ARGB value
                 .ToDictionary(group => Color.FromArgb(group.Key), group => group.Count()); // Convert back to Color and count
 
-            Debug.WriteLine("relevantColors.Count="+relevantColors.Count);
+            foreach (var color in relevantColors.Keys)
+            {
+                if (!PolylinesManagement.CheckboxStates.ContainsKey(color))
+                {
+                    PolylinesManagement.CheckboxStates[color] = true; // Default to visible
+                }
+            }
 
-            int yOffset = 0; // Start position for the first checkbox
+            int yOffset = 0; // start position for the first element
+
+            // Create a label to display the headline
+            Label labelHeadline = new Label
+            {
+                Text = "Traces visible",
+                AutoSize = true,
+                Location = new Point(1, yOffset + 4),
+                Font = new Font("Calibri", 10, FontStyle.Regular)
+            };
+
+            // Create a button to toggle visibility of panel
+            Button buttonToggleTracesVisibility = new Button
+            {
+                Text = "M",
+                Size = new Size(22, 23),
+                BackColor = Color.LightGray,
+            };
+            buttonToggleTracesVisibility.Location = new Point(panel1.Width - buttonToggleTracesVisibility.Width - 2, yOffset);
+
+            panel1.Controls.Add(labelHeadline);
+            panel1.Controls.Add(buttonToggleTracesVisibility);
+            panel1.Controls.Add(buttonColorPolyline);
+            panel1.Controls.Add(button2);
+
+            yOffset += labelHeadline.Height + 9;
+
             foreach (var colorEntry in relevantColors)
             {
                 var color = colorEntry.Key;
                 var count = colorEntry.Value;
 
                 // Create the checkbox
+                bool isChecked = PolylinesManagement.CheckboxStates.ContainsKey(color) ? PolylinesManagement.CheckboxStates[color] : true;
                 CheckBox checkBox = new CheckBox
                 {
                     Text = "", // No text, as the color is visualized
-                    Checked = true,
+                    Checked = isChecked,
                     Tag = color,
                     AutoSize = true,
                     Location = new Point(5, yOffset) // Position next to the color panel
@@ -3364,10 +3422,10 @@ namespace Commodore_Repair_Toolbox
                 // Create a panel to display the color
                 Panel colorPanel = new Panel
                 {
-                    Size = new Size(50, 11), // Small square to represent the color
+                    Size = new Size(50, 13), // Small square to represent the color
                     BackColor = color,
                     BorderStyle = BorderStyle.FixedSingle,
-                    Location = new Point(25, yOffset + 1) // Align with the checkbox
+                    Location = new Point(25, yOffset) // Align with the checkbox
                 };
 
                 // Create a label to display the counter
@@ -3378,83 +3436,166 @@ namespace Commodore_Repair_Toolbox
                     Location = new Point(80, yOffset), // Position after the color panel
                     Font = new Font("Calibri", 9, FontStyle.Regular)
                 };
+                counterLabel.Location = new Point(colorPanel.Right + 2, yOffset - 1);
 
                 // Attach an event handler to toggle visibility
-                checkBox.CheckedChanged += (sender, e) =>
-                {
-                    var cb = sender as CheckBox;
-                    if (cb != null && cb.Tag is Color selectedColor)
-                    {
-                        TogglePolylineVisibility(selectedColor, cb.Checked);
-                    }
-                };
+                checkBox.CheckedChanged += CheckBox_CheckedChanged;
+                colorPanel.Click += ColorPanel_Click;
 
                 // Add the color panel, checkbox, and counter label to the manual panel
                 panel1.Controls.Add(colorPanel);
                 panel1.Controls.Add(checkBox);
                 panel1.Controls.Add(counterLabel);
+                
 
                 yOffset += Math.Max(colorPanel.Height, checkBox.Height) + 5; // Adjust spacing
             }
 
+            int buttonSize = (panel1.Width - 13) / 2;
+            buttonColorPolyline.Size = new Size(buttonSize, 23);
+            button2.Size = new Size(buttonSize, 23);
+            buttonColorPolyline.Location = new Point(5, yOffset);
+            button2.Location = new Point(panel1.Width - button2.Width - 5, yOffset);
+
             // Add the label panel to "panelMain"
             panelMain.Controls.Add(panel1);
 
+            // Attach the event handler for the button
+            panel1.Click -= TogglePanelTracesVisibility_Click;
+            panel1.Click += TogglePanelTracesVisibility_Click;
+            labelHeadline.Click -= TogglePanelTracesVisibility_Click;
+            labelHeadline.Click += TogglePanelTracesVisibility_Click;
+            buttonToggleTracesVisibility.Click -= TogglePanelTracesVisibility_Click;
+            buttonToggleTracesVisibility.Click += TogglePanelTracesVisibility_Click;
+
+            if (isPanelTracesVisible)
+            {
+                panel1.Height = yOffset + buttonColorPolyline.Height + 5;
+                panelTracesVisibleHeight = panel1.Height;
+                Configuration.SaveSetting("ShowTracesHeight", panelTracesVisibleHeight.ToString());
+            } else
+            {
+                panel1.Height = 26;
+            }
+
+
             int visibleHeight = panelZoom.ClientRectangle.Height;
-            panel1.Location = new Point(0, visibleHeight - panel1.Height - 2); // bottom-left corner of the visible area
-            panel1.BringToFront();
-            panel1.Visible = true;
+            int visibleWidth = panelZoom.ClientRectangle.Width;
+            panel1.Location = new Point(visibleWidth - panel1.Width - 2, visibleHeight - panel1.Height - 2); // bottom-left corner of the visible area
+
+            ResumeDrawing(panel1);
+
+            if (relevantColors.Count == 0)
+            {
+                panel1.Visible = false;
+            }
+            else
+            {
+                panel1.Visible = true;
+                panel1.BringToFront();
+            }
+
         }
 
-        // Method to toggle visibility of polylines with a specific color
-        // Method to toggle visibility of polylines with a specific color
-        private void TogglePolylineVisibility(Color color, bool isVisible)
+        private void CheckBox_CheckedChanged(object sender, EventArgs e)
         {
-            foreach (var imageName in PolylinesManagement.imagePolylines.Keys)
+            var cb = sender as CheckBox;
+            if (cb != null && cb.Tag is Color selectedColor)
             {
-                var polylines = PolylinesManagement.imagePolylines[imageName];
+                polylinesManagement.TogglePolylineVisibility(selectedColor, cb.Checked);
+            }
+        }
 
-                for (int polylineIndex = 0; polylineIndex < polylines.Count; polylineIndex++)
+        private void ColorPanel_Click(object sender, EventArgs e)
+        {
+            var panel = sender as Panel;
+            if (panel != null && panel.BackColor is Color selectedColor)
+            {
+                // Toggle the visibility state
+                bool isVisible = PolylinesManagement.CheckboxStates.ContainsKey(selectedColor)
+                                 && PolylinesManagement.CheckboxStates[selectedColor];
+                PolylinesManagement.CheckboxStates[selectedColor] = !isVisible;
+
+                // Update the visibility of the polyline
+                polylinesManagement.TogglePolylineVisibility(selectedColor, !isVisible);
+
+                // Find the corresponding checkbox
+                foreach (Control control in panel1.Controls)
                 {
-                    
-
-//                    if (PolylinesManagement.polylineColors.TryGetValue((imageName, polylineIndex), out var polylineColor) && polylineColor == color)
-                    if (PolylinesManagement.polylineColors.TryGetValue((imageName, polylineIndex), out var polylineColor) && polylineColor.ToArgb() == color.ToArgb())
-                        {
-                        Debug.WriteLine($"Checking polyline color: {polylineColor}, Target color: {color}");
-                        if (isVisible)
-                        {
-                            PolylinesManagement.visiblePolylines.Add((imageName, polylineIndex));
-                        }
-                        else
-                        {
-                            PolylinesManagement.visiblePolylines.Remove((imageName, polylineIndex));
-                        }
+                    if (control is CheckBox checkBox && checkBox.Tag is Color color && color == selectedColor)
+                    {
+                        // Set the checkbox state to match the new visibility state
+                        checkBox.Checked = !isVisible;
+                        break;
                     }
                 }
             }
-
-            
-
-            // Redraw the overlay panel to reflect changes
-            Main.overlayPanel.Invalidate();
         }
 
 
 
 
+        // ###########################################################################################
+        // Minimize and maximize the "Labels visible" panel.
+        // ###########################################################################################
 
+        private void TogglePanelTracesVisibility_Click(object sender, EventArgs e)
+        {
+            TogglePanelTracesVisibility();
+        }
 
+        private void TogglePanelTracesVisibility()
+        {
+            int currentHeight = panel1.Height;
+            int newHeight = 0;
 
+            if (currentHeight > 26)
+            {
+                newHeight = 26;
+                isPanelTracesVisible = false;
+            }
+            else
+            {
+                newHeight = panelTracesVisibleHeight;
+                isPanelTracesVisible = true;
+            }
 
+            panel1.Height = newHeight;
 
+            //            Configuration.SaveSetting("ShowLabelsHeight", newHeight.ToString());
 
+            // Reposition the panel
+            int visibleHeight = panelZoom.ClientRectangle.Height;
+            int visibleWidth = panelZoom.ClientRectangle.Width;
+            panel1.Location = new Point(visibleWidth - panel1.Width - 2, visibleHeight - panel1.Height - 2); // bottom-left corner of the visible area
 
+            Configuration.SaveSetting("ShowTraces", isPanelTracesVisible.ToString());
 
+        }
 
+        private void button2_Click(object sender, EventArgs e)
+        {
+            // Confirm deletion
+            var confirmResult = MessageBox.Show(
+                "Are you sure you want to delete all traces for the selected hardware and board?",
+                "Confirm deletion of all traces",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning
+            );
 
+            if (confirmResult == DialogResult.Yes)
+            {
+                // Clear traces for the selected hardware and board
+                var selectedHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+                var selectedBoard = selectedHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
 
-
+                if (selectedBoard != null)
+                {
+                    PolylinesManagement.ClearTracesForBoard(selectedBoard);
+                    PopulatePolylineVisibilityPanel();
+                }
+            }
+        }
     }
 
 

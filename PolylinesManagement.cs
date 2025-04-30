@@ -12,7 +12,7 @@ namespace Commodore_Repair_Toolbox
     internal class PolylinesManagement
     {
 
-        public static bool isDrawing = false;
+//        public static bool isDrawing = false;
         public static (int LineIndex, int PointIndex) selectedMarker = (-1, -1); // Tracks the selected marker
         public static int selectedPolylineIndex = -1;
         private static List<Point> currentPolyline = null; // Current polyline being drawn
@@ -24,6 +24,7 @@ namespace Commodore_Repair_Toolbox
 
         public static HashSet<(string ImageName, int PolylineIndex)> visiblePolylines = new HashSet<(string, int)>();
         public static Color LastSelectedPolylineColor { get; set; } = Color.Red; // Default to red
+        public static Dictionary<Color, bool> CheckboxStates = new Dictionary<Color, bool>();
 
         private Main main;
 
@@ -55,7 +56,7 @@ namespace Commodore_Repair_Toolbox
                             selectedMarker = (i, j);
                             selectedPolylineIndex = i;
                             Main.overlayPanel.Invalidate();
-                            main.UpdateButtonColorPolylineState();
+//                            main.UpdateButtonColorPolylineState();
                             clickedOnMarker = true;
                             return;
                         }
@@ -84,7 +85,7 @@ namespace Commodore_Repair_Toolbox
                                 selectedMarker = (i, j + 1);
 
                                 Main.overlayPanel.Invalidate();
-                                main.UpdateButtonColorPolylineState();
+//                                main.UpdateButtonColorPolylineState();
                                 return;
                             }
                         }
@@ -92,30 +93,33 @@ namespace Commodore_Repair_Toolbox
                 }
 
                 // If in drawing mode, add points to a new polyline
-                if (isDrawing)
+//                if (isDrawing)
+//                {
+                if (currentPolyline == null)
                 {
-                    if (currentPolyline == null)
-                    {
-                        currentPolyline = new List<Point>();
-                        selectedPolylineIndex = polylines.Count;
-                    }
-                    Point pointUnscaled = new Point((int)(e.Location.X / Main.zoomFactor), (int)(e.Location.Y / Main.zoomFactor));
-                    currentPolyline.Add(pointUnscaled);
-                    return;
+                    currentPolyline = new List<Point>();
+                    selectedPolylineIndex = polylines.Count;
                 }
+                Point pointUnscaled = new Point((int)(e.Location.X / Main.zoomFactor), (int)(e.Location.Y / Main.zoomFactor));
+                currentPolyline.Add(pointUnscaled);
+                return;
+//                }
 
+                /*
                 // Deselect if clicking empty space
                 selectedPolylineIndex = -1;
                 selectedMarker = (-1, -1);
                 Main.overlayPanel.Invalidate();
-                main.UpdateButtonColorPolylineState();
+//                main.UpdateButtonColorPolylineState();
+                */
             }
         }
 
 
         public void panelImageMain_MouseUp(object sender, MouseEventArgs e)
         {
-            if (isDrawing && e.Button == MouseButtons.Left)
+//            if (isDrawing && e.Button == MouseButtons.Left)
+            if (e.Button == MouseButtons.Left)
             {
                 if (currentPolyline != null && currentPolyline.Count > 1)
                 {
@@ -137,11 +141,12 @@ namespace Commodore_Repair_Toolbox
                     main.PopulatePolylineVisibilityPanel();
                 }
                 currentPolyline = null; // Reset the current polyline
+                SavePolylinesToConfig();
             }
             else if (e.Button == MouseButtons.Left)
             {
                 selectedMarker = (-1, -1); // Deselect marker
-                SavePolylinesToConfig();
+//                SavePolylinesToConfig();
             }
         }
 
@@ -168,7 +173,7 @@ namespace Commodore_Repair_Toolbox
                         selectedMarker = (-1, -1);
                         selectedPolylineIndex = -1;
                         Main.overlayPanel.Invalidate();
-                        main.UpdateButtonColorPolylineState();
+//                        main.UpdateButtonColorPolylineState();
                         SavePolylinesToConfig();
 
                         // Update the visibility panel and counters
@@ -193,7 +198,7 @@ namespace Commodore_Repair_Toolbox
                         selectedMarker = (-1, -1);
                         selectedPolylineIndex = -1;
                         Main.overlayPanel.Invalidate();
-                        main.UpdateButtonColorPolylineState();
+//                        main.UpdateButtonColorPolylineState();
                         SavePolylinesToConfig();
 
                         // Update the visibility panel and counters
@@ -239,7 +244,8 @@ namespace Commodore_Repair_Toolbox
         // MouseMove event for overlayPanel
         public void panelImageMain_MouseMove(object sender, MouseEventArgs e)
         {
-            if (isDrawing && e.Button == MouseButtons.Left && currentPolyline != null)
+//            if (isDrawing && e.Button == MouseButtons.Left && currentPolyline != null)
+            if (e.Button == MouseButtons.Left && currentPolyline != null)
             {
                 Point pointUnscaled = new Point((int)(e.Location.X / Main.zoomFactor), (int)(e.Location.Y / Main.zoomFactor));
                 if (currentPolyline.Count == 1) // Only update the second point dynamically
@@ -341,7 +347,38 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+        // Method to toggle visibility of polylines with a specific color
+        // Method to toggle visibility of polylines with a specific color
+        public void TogglePolylineVisibility(Color color, bool isVisible)
+        {
+            foreach (var imageName in imagePolylines.Keys)
+            {
+                var polylines = imagePolylines[imageName];
 
+                for (int polylineIndex = 0; polylineIndex < polylines.Count; polylineIndex++)
+                {
+                    if (polylineColors.TryGetValue((imageName, polylineIndex), out var polylineColor) && polylineColor.ToArgb() == color.ToArgb())
+                    {
+                        if (isVisible)
+                        {
+                            visiblePolylines.Add((imageName, polylineIndex));
+                        }
+                        else
+                        {
+                            visiblePolylines.Remove((imageName, polylineIndex));
+                        }
+                    }
+                }
+            }
+
+            // Save the checkbox state
+            CheckboxStates[color] = isVisible;
+
+            // Redraw the overlay panel to reflect changes
+            Main.overlayPanel.Invalidate();
+
+            SaveCheckboxStates();
+        }
 
 
         public void panelImageMain_Paint(object sender, PaintEventArgs e)
@@ -539,8 +576,8 @@ namespace Commodore_Repair_Toolbox
                         schematicColors[i] = polylineColors.ContainsKey(key) ? polylineColors[key] : Color.Red;
                     }
 
-                    // Create a key in the format: Polylines|hardware|board|schematic
-                    string configKey = $"Polylines|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{schematicName}";
+                    // Create a key in the format: Traces|hardware|board|schematic
+                    string configKey = $"Traces|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{schematicName}";
 
                     // Save polylines if they exist, otherwise remove the configuration entry
                     if (schematicPolylines.Count > 0)
@@ -577,10 +614,13 @@ namespace Commodore_Repair_Toolbox
                 var bd = hw.Boards.FirstOrDefault(b => b.Name == Main.boardSelectedName);
                 if (bd == null || bd.Files == null) return;
 
+                // Load checkbox states after loading polylines
+                LoadCheckboxStates();
+
                 foreach (var file in bd.Files)
                 {
                     string schematicName = file.Name;
-                    string configKey = $"Polylines|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{schematicName}";
+                    string configKey = $"Traces|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{schematicName}";
                     string serialized = Configuration.GetSetting(configKey, "");
 
                     if (!string.IsNullOrEmpty(serialized))
@@ -597,8 +637,11 @@ namespace Commodore_Repair_Toolbox
                                 polylineColors[key] = loadedColors[i];
                             }
 
-                            // Add all polylines to visiblePolylines by default
-                            visiblePolylines.Add(key);
+                            // Check if the checkbox for this color is checked
+                            if (loadedColors.ContainsKey(i) && CheckboxStates.TryGetValue(loadedColors[i], out bool isChecked) && isChecked)
+                            {
+                                visiblePolylines.Add(key);
+                            }
                         }
 
                         Debug.WriteLine($"Loaded {loadedPolylines.Count} polylines for {configKey}");
@@ -680,7 +723,107 @@ namespace Commodore_Repair_Toolbox
             return (polylines, colors);
         }
 
+        public static void SaveCheckboxStates()
+        {
+            // Build a unique config key from hardware and board
+            string configKey = $"TracesCheckboxStates|{Main.hardwareSelectedName}|{Main.boardSelectedName}";
 
+            // Serialize the checkbox states as "R,G,B=True/False"
+            var serializedStates = CheckboxStates
+                .ToDictionary(
+                    kvp => $"{kvp.Key.R},{kvp.Key.G},{kvp.Key.B}", // Serialize color as "R,G,B"
+                    kvp => kvp.Value.ToString()
+                );
+
+            string serializedData = string.Join(";", serializedStates.Select(kvp => $"{kvp.Key}={kvp.Value}"));
+
+            // Save to configuration
+            Configuration.SaveSetting(configKey, serializedData);
+        }
+
+        public static void LoadCheckboxStates()
+        {
+            try
+            {
+                // Build a unique config key from hardware and board
+                string configKey = $"TracesCheckboxStates|{Main.hardwareSelectedName}|{Main.boardSelectedName}";
+
+                // Retrieve the serialized data from the configuration
+                string serializedData = Configuration.GetSetting(configKey, "");
+
+                // Clear the current CheckboxStates dictionary
+                CheckboxStates.Clear();
+
+                if (!string.IsNullOrEmpty(serializedData))
+                {
+                    // Deserialize the data in the format "R,G,B=True/False;..."
+                    var entries = serializedData.Split(';');
+                    foreach (var entry in entries)
+                    {
+                        var parts = entry.Split('=');
+                        if (parts.Length == 2)
+                        {
+                            // Parse the color (R,G,B)
+                            var colorParts = parts[0].Split(',');
+                            if (colorParts.Length == 3 &&
+                                int.TryParse(colorParts[0], out int r) &&
+                                int.TryParse(colorParts[1], out int g) &&
+                                int.TryParse(colorParts[2], out int b))
+                            {
+                                Color color = Color.FromArgb(r, g, b);
+
+                                // Parse the visibility state (True/False)
+                                if (bool.TryParse(parts[1], out bool isVisible))
+                                {
+                                    CheckboxStates[color] = isVisible;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error loading checkbox states: {ex.Message}");
+            }
+        }
+
+
+        // Add this method to the PolylinesManagement class
+        public static void ClearTracesForBoard(Board selectedBoard)
+        {
+            if (selectedBoard?.Files != null)
+            {
+                foreach (var file in selectedBoard.Files)
+                {
+                    if (imagePolylines.ContainsKey(file.Name))
+                    {
+                        imagePolylines[file.Name].Clear();
+                    }
+
+                    // Remove all related visible polylines
+                    visiblePolylines.RemoveWhere(key => key.ImageName == file.Name);
+
+                    // Remove all related polyline colors
+                    var keysToRemove = polylineColors.Keys.Where(key => key.ImageName == file.Name).ToList();
+                    foreach (var key in keysToRemove)
+                    {
+                        polylineColors.Remove(key);
+                    }
+                }
+
+                // Clear CheckboxStates for colors no longer in use
+                var usedColors = polylineColors.Values.ToHashSet();
+                var unusedColors = CheckboxStates.Keys.Where(color => !usedColors.Contains(color)).ToList();
+                foreach (var color in unusedColors)
+                {
+                    CheckboxStates.Remove(color);
+                }
+
+                SavePolylinesToConfig(); // Save changes to configuration
+                SaveCheckboxStates();    // Save updated checkbox states
+            }
+        }
 
     }
 }
