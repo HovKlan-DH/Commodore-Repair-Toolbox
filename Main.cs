@@ -2774,7 +2774,7 @@ namespace Commodore_Repair_Toolbox
             }
             else
             {
-                Cursor = Cursors.Default;
+                Cursor = Cursors.Cross;
                 labelComponent.Visible = false;
             }
         }
@@ -3288,10 +3288,6 @@ namespace Commodore_Repair_Toolbox
 
         private void StartDrawingPolylines()
         {
-//            PolylinesManagement.isDrawing = true;
-            overlayPanel.Cursor = Cursors.Cross; // Change cursor to indicate drawing mode
-//            UpdateButtonColorPolylineState();
-
             // Ensure the current image has an entry in the dictionary
             if (!PolylinesManagement.imagePolylines.ContainsKey(Main.schematicSelectedName))
             {
@@ -3301,18 +3297,7 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
-        // Enable or disable the color button for polylines.
-        // Only enable when a polyline is selected.
-        // ###########################################################################################
-
-        public void UpdateButtonColorPolylineState()
-        {
-//            buttonColorPolyline.Enabled = PolylinesManagement.selectedPolylineIndex != -1;
-        }
-
-
-        // ###########################################################################################
-        // Clicking polyline color button.
+        // Clicking color button in "Traces visible" panel.
         // ###########################################################################################
 
         private void buttonColorPolyline_Click(object sender, EventArgs e)
@@ -3345,6 +3330,11 @@ namespace Commodore_Repair_Toolbox
 
 
 
+        // ###########################################################################################
+        // Update the "Traces visible" panel.
+        // Will completely recreate all panel elements.
+        // Will add/remove new colors and show/hide panel.
+        // ###########################################################################################
 
         public void PopulatePolylineVisibilityPanel()
         {
@@ -3352,14 +3342,6 @@ namespace Commodore_Repair_Toolbox
 
             SuspendDrawing(panel1);
 
-            // Check if we should minimize again
-//            bool shouldMinimize = false;
-//            if (panel1.Height == 26)
-//            {
-//                shouldMinimize = true;
-//            }
-
-            // Clear existing controls in the panel
             panel1.Controls.Clear();
 
            // Get the polyline colors for the selected schematic
@@ -3398,8 +3380,8 @@ namespace Commodore_Repair_Toolbox
 
             panel1.Controls.Add(labelHeadline);
             panel1.Controls.Add(buttonToggleTracesVisibility);
-            panel1.Controls.Add(buttonColorPolyline);
-            panel1.Controls.Add(button2);
+            panel1.Controls.Add(buttonTraceColor);
+            panel1.Controls.Add(buttonTracesDelete);
 
             yOffset += labelHeadline.Height + 9;
 
@@ -3452,10 +3434,10 @@ namespace Commodore_Repair_Toolbox
             }
 
             int buttonSize = (panel1.Width - 13) / 2;
-            buttonColorPolyline.Size = new Size(buttonSize, 23);
-            button2.Size = new Size(buttonSize, 23);
-            buttonColorPolyline.Location = new Point(5, yOffset);
-            button2.Location = new Point(panel1.Width - button2.Width - 5, yOffset);
+            buttonTraceColor.Size = new Size(buttonSize, 23);
+            buttonTracesDelete.Size = new Size(buttonSize, 23);
+            buttonTraceColor.Location = new Point(5, yOffset);
+            buttonTracesDelete.Location = new Point(panel1.Width - buttonTracesDelete.Width - 5, yOffset);
 
             // Add the label panel to "panelMain"
             panelMain.Controls.Add(panel1);
@@ -3470,14 +3452,14 @@ namespace Commodore_Repair_Toolbox
 
             if (isPanelTracesVisible)
             {
-                panel1.Height = yOffset + buttonColorPolyline.Height + 5;
+                panel1.Height = yOffset + buttonTraceColor.Height + 5;
                 panelTracesVisibleHeight = panel1.Height;
                 Configuration.SaveSetting("ShowTracesHeight", panelTracesVisibleHeight.ToString());
             } else
             {
+                // "26" pixels equals it is minimized
                 panel1.Height = 26;
             }
-
 
             int visibleHeight = panelZoom.ClientRectangle.Height;
             int visibleWidth = panelZoom.ClientRectangle.Width;
@@ -3497,6 +3479,11 @@ namespace Commodore_Repair_Toolbox
 
         }
 
+
+        // ###########################################################################################
+        // Checkbox event handler for toggling polyline visibility.
+        // ###########################################################################################
+
         private void CheckBox_CheckedChanged(object sender, EventArgs e)
         {
             var cb = sender as CheckBox;
@@ -3505,6 +3492,11 @@ namespace Commodore_Repair_Toolbox
                 polylinesManagement.TogglePolylineVisibility(selectedColor, cb.Checked);
             }
         }
+
+
+        // ###########################################################################################
+        // Clicking the color panel/bar in the "Traces visible" panel.
+        // ###########################################################################################
 
         private void ColorPanel_Click(object sender, EventArgs e)
         {
@@ -3519,7 +3511,7 @@ namespace Commodore_Repair_Toolbox
                 // Update the visibility of the polyline
                 polylinesManagement.TogglePolylineVisibility(selectedColor, !isVisible);
 
-                // Find the corresponding checkbox
+                // Find the corresponding checkbox for the color
                 foreach (Control control in panel1.Controls)
                 {
                     if (control is CheckBox checkBox && checkBox.Tag is Color color && color == selectedColor)
@@ -3533,18 +3525,11 @@ namespace Commodore_Repair_Toolbox
         }
 
 
-
-
         // ###########################################################################################
-        // Minimize and maximize the "Labels visible" panel.
+        // Minimize and maximize the "Traces visible" panel.
         // ###########################################################################################
 
         private void TogglePanelTracesVisibility_Click(object sender, EventArgs e)
-        {
-            TogglePanelTracesVisibility();
-        }
-
-        private void TogglePanelTracesVisibility()
         {
             int currentHeight = panel1.Height;
             int newHeight = 0;
@@ -3562,18 +3547,21 @@ namespace Commodore_Repair_Toolbox
 
             panel1.Height = newHeight;
 
-            //            Configuration.SaveSetting("ShowLabelsHeight", newHeight.ToString());
-
             // Reposition the panel
             int visibleHeight = panelZoom.ClientRectangle.Height;
             int visibleWidth = panelZoom.ClientRectangle.Width;
             panel1.Location = new Point(visibleWidth - panel1.Width - 2, visibleHeight - panel1.Height - 2); // bottom-left corner of the visible area
 
             Configuration.SaveSetting("ShowTraces", isPanelTracesVisible.ToString());
-
         }
 
-        private void button2_Click(object sender, EventArgs e)
+
+        // ###########################################################################################
+        // "Delete all traces" button.
+        // Will delete only for the selected hardware and board.
+        // ###########################################################################################
+
+        private void buttonTracesDelete_Click(object sender, EventArgs e)
         {
             // Confirm deletion
             var confirmResult = MessageBox.Show(
@@ -3588,7 +3576,6 @@ namespace Commodore_Repair_Toolbox
                 // Clear traces for the selected hardware and board
                 var selectedHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var selectedBoard = selectedHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-
                 if (selectedBoard != null)
                 {
                     PolylinesManagement.ClearTracesForBoard(selectedBoard);

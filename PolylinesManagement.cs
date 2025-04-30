@@ -41,7 +41,9 @@ namespace Commodore_Repair_Toolbox
                 return;
             }
 
-            if (e.Button == MouseButtons.Left)
+            bool isHoveringOverComponent = Cursor.Current == Cursors.Hand;
+
+            if (e.Button == MouseButtons.Left && !isHoveringOverComponent)
             {
                 bool clickedOnMarker = false;
 
@@ -93,8 +95,8 @@ namespace Commodore_Repair_Toolbox
                 }
 
                 // If in drawing mode, add points to a new polyline
-//                if (isDrawing)
-//                {
+                //                if (isDrawing)
+                //                {
                 if (currentPolyline == null)
                 {
                     currentPolyline = new List<Point>();
@@ -103,22 +105,21 @@ namespace Commodore_Repair_Toolbox
                 Point pointUnscaled = new Point((int)(e.Location.X / Main.zoomFactor), (int)(e.Location.Y / Main.zoomFactor));
                 currentPolyline.Add(pointUnscaled);
                 return;
-//                }
 
-                /*
+            /*
+            } else
+            {
                 // Deselect if clicking empty space
                 selectedPolylineIndex = -1;
                 selectedMarker = (-1, -1);
                 Main.overlayPanel.Invalidate();
-//                main.UpdateButtonColorPolylineState();
-                */
+            */
             }
         }
 
 
         public void panelImageMain_MouseUp(object sender, MouseEventArgs e)
         {
-//            if (isDrawing && e.Button == MouseButtons.Left)
             if (e.Button == MouseButtons.Left)
             {
                 if (currentPolyline != null && currentPolyline.Count > 1)
@@ -142,11 +143,6 @@ namespace Commodore_Repair_Toolbox
                 }
                 currentPolyline = null; // Reset the current polyline
                 SavePolylinesToConfig();
-            }
-            else if (e.Button == MouseButtons.Left)
-            {
-                selectedMarker = (-1, -1); // Deselect marker
-//                SavePolylinesToConfig();
             }
         }
 

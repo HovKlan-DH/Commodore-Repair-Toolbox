@@ -79,12 +79,12 @@
             this.buttonAll = new System.Windows.Forms.Button();
             this.buttonFullscreen = new System.Windows.Forms.Button();
             this.panelBehindTab = new System.Windows.Forms.Panel();
+            this.buttonTracesDelete = new System.Windows.Forms.Button();
+            this.label11 = new System.Windows.Forms.Label();
+            this.buttonTraceColor = new System.Windows.Forms.Button();
             this.textBoxFilterComponents = new System.Windows.Forms.TextBox();
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
-            this.buttonColorPolyline = new System.Windows.Forms.Button();
-            this.label11 = new System.Windows.Forms.Label();
-            this.button2 = new System.Windows.Forms.Button();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -170,7 +170,7 @@
             // 
             this.panel1.BackColor = System.Drawing.Color.WhiteSmoke;
             this.panel1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.panel1.Location = new System.Drawing.Point(456, 412);
+            this.panel1.Location = new System.Drawing.Point(465, 412);
             this.panel1.Name = "panel1";
             this.panel1.Size = new System.Drawing.Size(128, 100);
             this.panel1.TabIndex = 5;
@@ -185,7 +185,7 @@
             this.panelLabelsVisible.Controls.Add(this.checkBox1);
             this.panelLabelsVisible.Controls.Add(this.checkBox3);
             this.panelLabelsVisible.Controls.Add(this.checkBox2);
-            this.panelLabelsVisible.Location = new System.Drawing.Point(28, 388);
+            this.panelLabelsVisible.Location = new System.Drawing.Point(15, 417);
             this.panelLabelsVisible.Name = "panelLabelsVisible";
             this.panelLabelsVisible.Size = new System.Drawing.Size(119, 95);
             this.panelLabelsVisible.TabIndex = 4;
@@ -676,15 +676,47 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.panelBehindTab.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.panelBehindTab.Controls.Add(this.button2);
+            this.panelBehindTab.Controls.Add(this.buttonTracesDelete);
             this.panelBehindTab.Controls.Add(this.label11);
             this.panelBehindTab.Controls.Add(this.tabControl);
-            this.panelBehindTab.Controls.Add(this.buttonColorPolyline);
+            this.panelBehindTab.Controls.Add(this.buttonTraceColor);
             this.panelBehindTab.Location = new System.Drawing.Point(299, 13);
             this.panelBehindTab.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.panelBehindTab.Name = "panelBehindTab";
             this.panelBehindTab.Size = new System.Drawing.Size(782, 641);
             this.panelBehindTab.TabIndex = 14;
+            // 
+            // buttonTracesDelete
+            // 
+            this.buttonTracesDelete.Location = new System.Drawing.Point(97, 605);
+            this.buttonTracesDelete.Name = "buttonTracesDelete";
+            this.buttonTracesDelete.Size = new System.Drawing.Size(61, 23);
+            this.buttonTracesDelete.TabIndex = 19;
+            this.buttonTracesDelete.Text = "Delete";
+            this.buttonTracesDelete.UseVisualStyleBackColor = true;
+            this.buttonTracesDelete.Click += new System.EventHandler(this.buttonTracesDelete_Click);
+            // 
+            // label11
+            // 
+            this.label11.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.label11.AutoSize = true;
+            this.label11.BackColor = System.Drawing.Color.Moccasin;
+            this.label11.Location = new System.Drawing.Point(164, 607);
+            this.label11.Name = "label11";
+            this.label11.Size = new System.Drawing.Size(61, 21);
+            this.label11.TabIndex = 18;
+            this.label11.Text = "label11";
+            this.label11.Visible = false;
+            // 
+            // buttonTraceColor
+            // 
+            this.buttonTraceColor.Location = new System.Drawing.Point(30, 605);
+            this.buttonTraceColor.Name = "buttonTraceColor";
+            this.buttonTraceColor.Size = new System.Drawing.Size(61, 23);
+            this.buttonTraceColor.TabIndex = 17;
+            this.buttonTraceColor.Text = "Color";
+            this.buttonTraceColor.UseVisualStyleBackColor = true;
+            this.buttonTraceColor.Click += new System.EventHandler(this.buttonColorPolyline_Click);
             // 
             // textBoxFilterComponents
             // 
@@ -706,38 +738,6 @@
             this.checkBoxBlink.TabIndex = 15;
             this.checkBoxBlink.Text = "Blink selected components";
             this.checkBoxBlink.UseVisualStyleBackColor = true;
-            // 
-            // buttonColorPolyline
-            // 
-            this.buttonColorPolyline.Location = new System.Drawing.Point(30, 605);
-            this.buttonColorPolyline.Name = "buttonColorPolyline";
-            this.buttonColorPolyline.Size = new System.Drawing.Size(61, 23);
-            this.buttonColorPolyline.TabIndex = 17;
-            this.buttonColorPolyline.Text = "Color";
-            this.buttonColorPolyline.UseVisualStyleBackColor = true;
-            this.buttonColorPolyline.Click += new System.EventHandler(this.buttonColorPolyline_Click);
-            // 
-            // label11
-            // 
-            this.label11.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.label11.AutoSize = true;
-            this.label11.BackColor = System.Drawing.Color.Moccasin;
-            this.label11.Location = new System.Drawing.Point(164, 607);
-            this.label11.Name = "label11";
-            this.label11.Size = new System.Drawing.Size(61, 21);
-            this.label11.TabIndex = 18;
-            this.label11.Text = "label11";
-            this.label11.Visible = false;
-            // 
-            // button2
-            // 
-            this.button2.Location = new System.Drawing.Point(97, 605);
-            this.button2.Name = "button2";
-            this.button2.Size = new System.Drawing.Size(61, 23);
-            this.button2.TabIndex = 19;
-            this.button2.Text = "Delete";
-            this.button2.UseVisualStyleBackColor = true;
-            this.button2.Click += new System.EventHandler(this.button2_Click);
             // 
             // Main
             // 
@@ -847,8 +847,8 @@
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.ColorDialog colorDialog1;
         private System.Windows.Forms.Label label11;
-        private System.Windows.Forms.Button buttonColorPolyline;
+        private System.Windows.Forms.Button buttonTraceColor;
         private System.Windows.Forms.Panel panel1;
-        private System.Windows.Forms.Button button2;
+        private System.Windows.Forms.Button buttonTracesDelete;
     }
 }
