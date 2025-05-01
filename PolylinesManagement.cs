@@ -11,11 +11,10 @@ namespace Commodore_Repair_Toolbox
 {
     internal class PolylinesManagement
     {
-
         public static (int LineIndex, int PointIndex) selectedMarker = (-1, -1); // tracks the selected marker
         public static int selectedPolylineIndex = -1;
         private static List<Point> currentPolyline = null; // current polyline being drawn
-        private const int MarkerRadius = 6; // radius of the marker circle
+        private static int MarkerRadius = 5; // radius of the marker circle
         public static Dictionary<string, List<List<Point>>> imagePolylines = new Dictionary<string, List<List<Point>>>();
         public static List<List<Point>> polylines = new List<List<Point>>();
         public static Dictionary<(string ImageName, int PolylineIndex), Color> polylineColors = new Dictionary<(string, int), Color>();
@@ -25,10 +24,20 @@ namespace Commodore_Repair_Toolbox
 
         public static Color LastSelectedPolylineColor { get; set; } = Color.Red;
 
+
+        // ###########################################################################################
+        // Constructor for the PolylinesManagement class.
+        // ###########################################################################################
+
         public PolylinesManagement(Main mainForm)
         {
             main = mainForm ?? throw new ArgumentNullException(nameof(mainForm));
         }
+
+
+        // ###########################################################################################
+        // Handle mouse-down events for drawing polylines and selecting markers (for movement or new ones).
+        // ###########################################################################################
 
         public void panelImageMain_MouseDown(object sender, MouseEventArgs e)
         {
@@ -101,6 +110,10 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+        // ###########################################################################################
+        // Handle mouse-up events for completing the polyline.
+        // ###########################################################################################
+
         public void panelImageMain_MouseUp(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left)
@@ -129,6 +142,10 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
+
+        // ###########################################################################################
+        // Handle right-click events for deleting markers or entire polylines.
+        // ###########################################################################################
 
         private void HandleRightClick(MouseEventArgs e)
         {
@@ -189,7 +206,11 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        // Helper method to remove a polyline and update related data structures
+
+        // ###########################################################################################
+        // Remove a polyline and update related data structures.
+        // ###########################################################################################
+
         private void RemovePolyline(int index)
         {
             // Remove the polyline from the list
@@ -221,7 +242,11 @@ namespace Commodore_Repair_Toolbox
         }
 
 
-        // MouseMove event for overlayPanel
+        // ###########################################################################################
+        // Handle mouse-movement over the overlay panel.
+        // This is the entire "Schematics" image - not the individual overlay for components.
+        // ###########################################################################################
+
         public void panelImageMain_MouseMove(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left && currentPolyline != null)
@@ -326,7 +351,10 @@ namespace Commodore_Repair_Toolbox
         }
 
 
-        // Method to toggle visibility of polylines with a specific color
+        // ###########################################################################################
+        // Toggle visibility of polylines with a specific color.
+        // ###########################################################################################
+
         public void TogglePolylineVisibility(Color color, bool isVisible)
         {
             foreach (var imageName in imagePolylines.Keys)
@@ -359,14 +387,18 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+        // ###########################################################################################
+        // Paint event for painting polylines on the main "Schematics" image.
+        // ###########################################################################################
+
         public void panelImageMain_Paint(object sender, PaintEventArgs e)
         {
-            // Make sure we're using the correct polylines list for the current schematic
+            // Get the polylines for the selected schematic image
             polylines = imagePolylines.ContainsKey(Main.schematicSelectedName)
                 ? imagePolylines[Main.schematicSelectedName]
                 : new List<List<Point>>();
 
-            // Draw all polylines for the current image
+            // Draw all polylines
             for (int polylineIndex = 0; polylineIndex < polylines.Count; polylineIndex++)
             {
                 // Skip drawing this polyline, if it is hidden
@@ -395,6 +427,12 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
+
+        // ###########################################################################################
+        // Draw a polyline with the specified color and thickness.
+        // ###########################################################################################
+
+        /*
         private static void DrawPolyline(Graphics graphics, List<Point> polyline, Pen defaultPen, int polylineIndex)
         {
             // Use the composite key to get the color
@@ -432,7 +470,64 @@ namespace Commodore_Repair_Toolbox
                 }
             }
         }
+        */
+        private static void DrawPolyline(Graphics graphics, List<Point> polyline, Pen defaultPen, int polylineIndex)
+        {
+            // Use the composite key to get the color
+            var key = (Main.schematicSelectedName, polylineIndex);
+            Color lineColor = polylineColors.ContainsKey(key) ? polylineColors[key] : defaultPen.Color;
+            bool isSelected = (polylineIndex == selectedPolylineIndex);
 
+//            using (Pen outerBlackPen = new Pen(lineColor, 12)) // Outer black outline
+            using (Pen whitePen = new Pen(Color.White, 9)) // Middle white outline
+//            using (Pen innerBlackPen = new Pen(lineColor, 7)) // Inner black outline
+            using (Pen customPen = new Pen(lineColor, 5)) // Actual polyline color
+            {
+//                outerBlackPen.LineJoin = LineJoin.Round;
+                whitePen.LineJoin = LineJoin.Round;
+//                innerBlackPen.LineJoin = LineJoin.Round;
+                customPen.LineJoin = LineJoin.Round;
+
+                for (int i = 0; i < polyline.Count - 1; i++)
+                {
+                    Point scaledStart = ScalePoint(polyline[i]);
+                    Point scaledEnd = ScalePoint(polyline[i + 1]);
+
+                    if (isSelected)
+                    {
+                        
+                        // Draw the outer black outline
+//                        graphics.DrawLine(outerBlackPen, scaledStart, scaledEnd);
+
+                        // Draw the middle white outline
+                        graphics.DrawLine(whitePen, scaledStart, scaledEnd);
+
+                        // Draw the inner black outline
+//                        graphics.DrawLine(innerBlackPen, scaledStart, scaledEnd);
+                        
+                    }
+
+                    // Draw the actual polyline
+                    graphics.DrawLine(customPen, scaledStart, scaledEnd);
+                }
+            }
+
+            // Draw markers only if the polyline is selected
+            if (isSelected)
+            {
+                foreach (var point in polyline)
+                {
+                    Point scaledPoint = ScalePoint(point);
+                    DrawMarker(graphics, scaledPoint, lineColor);
+                }
+            }
+        }
+
+
+
+        // ###########################################################################################
+        // Draw a marker at the specified point with the given color.
+        // ###########################################################################################
 
         private static void DrawMarker(Graphics graphics, Point point, Color color)
         {
@@ -449,13 +544,35 @@ namespace Commodore_Repair_Toolbox
                 graphics.FillEllipse(brush, markerBounds);
             }
 
-            // Draw the white outline after the fill
-            using (Pen outlinePen = new Pen(Color.White, 2))
+            // Draw the "outer" outline
+            using (Pen largerBlackPen = new Pen(color, 4)) // Thickness slightly larger than the white outline
             {
-                graphics.DrawEllipse(outlinePen, markerBounds);
+                graphics.DrawEllipse(largerBlackPen, markerBounds);
+            }
+
+            // Draw the white outline
+            using (Pen whitePen = new Pen(Color.White, 2)) // Original white outline
+            {
+                graphics.DrawEllipse(whitePen, markerBounds);
+            }
+
+            // Draw the "inner" outline
+            using (Pen smallerBlackPen = new Pen(color, 1)) // Thickness slightly smaller than the white outline
+            {
+                Rectangle smallerBounds = new Rectangle(
+                    markerBounds.X + 1,
+                    markerBounds.Y + 1,
+                    markerBounds.Width - 2,
+                    markerBounds.Height - 2
+                );
+                graphics.DrawEllipse(smallerBlackPen, smallerBounds);
             }
         }
 
+
+        // ###########################################################################################
+        // Movement of polyline via keyboard arrows.
+        // ###########################################################################################
 
         public static void MovePolyline(int polylineIndex, int dx, int dy)
         {
@@ -468,6 +585,21 @@ namespace Commodore_Repair_Toolbox
                 }
             }
         }
+
+
+        // ###########################################################################################
+        // Scale a point based on zoom factor.
+        // ###########################################################################################
+
+        private static Point ScalePoint(Point point)
+        {
+            return new Point((int)(point.X * Main.zoomFactor), (int)(point.Y * Main.zoomFactor));
+        }
+
+
+        // ###########################################################################################
+        // Get the closest concrete point on a polyline from the position of the mouse cursor.
+        // ###########################################################################################
 
         private static Point GetClosestPointOnLine(Point start, Point end, Point clickPoint)
         {
@@ -482,55 +614,35 @@ namespace Commodore_Repair_Toolbox
             return new Point((int)(start.X + t * dx), (int)(start.Y + t * dy));
         }
 
-        // Helper method to check if a point is near a line
+
+        // ###########################################################################################
+        // Check if a point (mouse cursor) is near a polyline.
+        // ###########################################################################################
+
         private static bool IsPointNearLine(Point clickPoint, Point closestPoint)
         {
-            const int proximityThreshold = 5; // Adjust as needed
+            const int proximityThreshold = 5; // within 5px then it is a "hit"
             return Math.Abs(clickPoint.X - closestPoint.X) <= proximityThreshold &&
                    Math.Abs(clickPoint.Y - closestPoint.Y) <= proximityThreshold;
         }
 
-        // Helper method to scale a point based on zoom factor
-        private static Point ScalePoint(Point point)
-        {
-            return new Point((int)(point.X * Main.zoomFactor), (int)(point.Y * Main.zoomFactor));
-        }
 
-        // Helper method to check if a point is inside a marker
+        // ###########################################################################################
+        // Check if a point (mouse cursor) is inside a marker.
+        // ###########################################################################################
+
         private static bool IsPointInMarker(Point point, Point markerCenter)
         {
-            return Math.Pow(point.X - markerCenter.X, 2) + Math.Pow(point.Y - markerCenter.Y, 2) <= Math.Pow(MarkerRadius, 2);
+            const int proximityThreshold = 10;
+            int effectiveRadius = MarkerRadius + proximityThreshold;
+            return Math.Pow(point.X - markerCenter.X, 2) + Math.Pow(point.Y - markerCenter.Y, 2) <= Math.Pow(effectiveRadius, 2);
+            //return Math.Pow(point.X - markerCenter.X, 2) + Math.Pow(point.Y - markerCenter.Y, 2) <= Math.Pow(MarkerRadius, 2);
         }
 
-        private static string SerializePolylines(List<List<Point>> polylines, Dictionary<int, Color> colors)
-        {
-            StringBuilder sb = new StringBuilder();
 
-            // Format: [polylineCount];[color,points,color,points,...]
-            sb.Append(polylines.Count);
-
-            for (int i = 0; i < polylines.Count; i++)
-            {
-                sb.Append(";");
-
-                // Add color information (R,G,B)
-                Color color = colors.ContainsKey(i) ? colors[i] : Color.Red;
-                sb.Append(color.R).Append(",").Append(color.G).Append(",").Append(color.B);
-
-                // Add points for this polyline
-                sb.Append(":");
-                List<Point> polyline = polylines[i];
-                sb.Append(polyline.Count);
-
-                foreach (var point in polyline)
-                {
-                    sb.Append(",").Append(point.X).Append(",").Append(point.Y);
-                }
-            }
-
-            return sb.ToString();
-        }
-
+        // ###########################################################################################
+        // Save polylines to the configuration file.
+        // ###########################################################################################
 
         public static void SavePolylinesToConfig()
         {
@@ -573,6 +685,11 @@ namespace Commodore_Repair_Toolbox
                 Debug.WriteLine($"Error saving polylines: {ex.Message}");
             }
         }
+
+
+        // ###########################################################################################
+        // Load polylines from the configuration file.
+        // ###########################################################################################
 
         public static void LoadPolylines()
         {
@@ -638,6 +755,45 @@ namespace Commodore_Repair_Toolbox
                 Debug.WriteLine($"Error loading polylines: {ex.Message}");
             }
         }
+
+
+        // ###########################################################################################
+        // Serialize polylines to a string format for saving in the configuration file.
+        // ###########################################################################################
+
+        private static string SerializePolylines(List<List<Point>> polylines, Dictionary<int, Color> colors)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            // Format: [polylineCount];[color,points,color,points,...]
+            sb.Append(polylines.Count);
+
+            for (int i = 0; i < polylines.Count; i++)
+            {
+                sb.Append(";");
+
+                // Add color information (R,G,B)
+                Color color = colors.ContainsKey(i) ? colors[i] : Color.Red;
+                sb.Append(color.R).Append(",").Append(color.G).Append(",").Append(color.B);
+
+                // Add points for this polyline
+                sb.Append(":");
+                List<Point> polyline = polylines[i];
+                sb.Append(polyline.Count);
+
+                foreach (var point in polyline)
+                {
+                    sb.Append(",").Append(point.X).Append(",").Append(point.Y);
+                }
+            }
+
+            return sb.ToString();
+        }
+
+
+        // ###########################################################################################
+        // Deserialize polylines from a string format as received from the configuration file.
+        // ###########################################################################################
 
         private static (List<List<Point>>, Dictionary<int, Color>) DeserializePolylines(string data)
         {
@@ -715,6 +871,11 @@ namespace Commodore_Repair_Toolbox
             Configuration.SaveSetting(configKey, serializedData);
         }
 
+
+        // ###########################################################################################
+        // Load "Traces visible" checkbox states from the configuration file.
+        // ###########################################################################################
+
         public static void LoadCheckboxStates()
         {
             try
@@ -763,22 +924,27 @@ namespace Commodore_Repair_Toolbox
         }
 
 
-        // Add this method to the PolylinesManagement class
+        // ###########################################################################################
+        // Clear all traces for the selected board.
+        // ###########################################################################################
+
         public static void ClearTracesForBoard(Board selectedBoard)
         {
             if (selectedBoard?.Files != null)
             {
+                // Walkthrough all schematic images
                 foreach (var file in selectedBoard.Files)
                 {
+                    // Remove the specific schematic image from the "imagePolylines" list
                     if (imagePolylines.ContainsKey(file.Name))
                     {
                         imagePolylines[file.Name].Clear();
                     }
 
-                    // Remove all related visible polylines
+                    // Remove all visible polylines for the specific schematic image
                     visiblePolylines.RemoveWhere(key => key.ImageName == file.Name);
 
-                    // Remove all related polyline colors
+                    // Remove all related polyline colors for the specific schematic image
                     var keysToRemove = polylineColors.Keys.Where(key => key.ImageName == file.Name).ToList();
                     foreach (var key in keysToRemove)
                     {
@@ -786,7 +952,7 @@ namespace Commodore_Repair_Toolbox
                     }
                 }
 
-                // Clear CheckboxStates for colors no longer in use
+                // Clear "Traces visible" checkboxes state
                 var usedColors = polylineColors.Values.ToHashSet();
                 var unusedColors = CheckboxStates.Keys.Where(color => !usedColors.Contains(color)).ToList();
                 foreach (var color in unusedColors)
@@ -797,6 +963,8 @@ namespace Commodore_Repair_Toolbox
                 SavePolylinesToConfig();
                 SaveCheckboxStates();
             }
+
+            // ###########################################################################################
         }
 
     }

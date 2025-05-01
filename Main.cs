@@ -3578,25 +3578,24 @@ namespace Commodore_Repair_Toolbox
         private void TogglePanelTracesVisibility_Click(object sender, EventArgs e)
         {
             int currentHeight = panel1.Height;
-            int newHeight = 0;
 
             if (currentHeight > 26)
             {
-                newHeight = 26;
+                int newHeight = 26;
+                panel1.Height = newHeight;
+
+                // Reposition the panel
+                int visibleHeight = panelZoom.ClientRectangle.Height;
+                int visibleWidth = panelZoom.ClientRectangle.Width;
+                panel1.Location = new Point(visibleWidth - panel1.Width - 2, visibleHeight - panel1.Height - 2); // bottom-left corner of the visible area
+
                 isPanelTracesVisible = false;
             }
             else
             {
-                newHeight = panelTracesVisibleHeight;
                 isPanelTracesVisible = true;
+                PopulatePolylineVisibilityPanel();
             }
-
-            panel1.Height = newHeight;
-
-            // Reposition the panel
-            int visibleHeight = panelZoom.ClientRectangle.Height;
-            int visibleWidth = panelZoom.ClientRectangle.Width;
-            panel1.Location = new Point(visibleWidth - panel1.Width - 2, visibleHeight - panel1.Height - 2); // bottom-left corner of the visible area
 
             Configuration.SaveSetting("ShowTraces", isPanelTracesVisible.ToString());
         }
