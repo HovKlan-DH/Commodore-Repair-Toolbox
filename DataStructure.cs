@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -49,6 +50,13 @@ namespace Commodore_Repair_Toolbox
                         string nameHardware = worksheet.Cells[row, 2].Value?.ToString() ?? "";
                         string nameBoard = worksheet.Cells[row, 3].Value?.ToString() ?? "";
                         string datafile = worksheet.Cells[row, 4].Value?.ToString() ?? "";
+
+                        // Report a warning if path contains a backslash
+                        if (datafile.Contains("\\"))
+                        {
+                            string error = $"WARNING: Excel file [Commodore-Repair-Toolbox.xlsx] row [{row}] the path [{datafile}] contains a backslash";
+                            Main.DebugOutput(error);
+                        }
 
                         // Check if the board datafile exists
                         string filePath = Path.Combine(Application.StartupPath, datafile);
@@ -155,6 +163,13 @@ namespace Commodore_Repair_Toolbox
                                 string fileName = worksheet.Cells[row, 3].Value?.ToString() ?? "";
                                 string colorZoom = worksheet.Cells[row, 4].Value?.ToString() ?? "";
                                 string colorList = worksheet.Cells[row, 5].Value?.ToString() ?? "";
+
+                                // Report a warning if path contains a backslash
+                                if (fileName.Contains("\\"))
+                                {
+                                    string error = $"WARNING: Excel file [{board.DataFile}], worksheet [{searchHeader}] row [{row}] the path [{fileName}] contains a backslash";
+                                    Main.DebugOutput(error);
+                                }
 
                                 // Only add schematic, if it is marked as active
                                 if (active == "1")
@@ -448,6 +463,13 @@ namespace Commodore_Repair_Toolbox
                                 string name = worksheet.Cells[row, 2].Value?.ToString() ?? "";
                                 string fileName = worksheet.Cells[row, 3].Value?.ToString() ?? "";
 
+                                // Report a warning if path contains a backslash
+                                if (fileName.Contains("\\"))
+                                {
+                                    string error = $"WARNING: Excel file [{board.DataFile}], worksheet [{searchHeader}] row [{row}] the path [{fileName}] contains a backslash";
+                                    Main.DebugOutput(error);
+                                }
+
                                 // Log if file does not exists
                                 string filePath = Path.Combine(Application.StartupPath, fileName);
                                 if (!File.Exists(filePath))
@@ -715,6 +737,13 @@ namespace Commodore_Repair_Toolbox
                                 string name = worksheet.Cells[row, 2].Value?.ToString() ?? "";
                                 string fileName = worksheet.Cells[row, 3].Value?.ToString() ?? "";
 
+                                // Report a warning if path contains a backslash
+                                if (fileName.Contains("\\"))
+                                {
+                                    string error = $"WARNING: Excel file [{board.DataFile}], worksheet [{searchHeader}] row [{row}] the path [{fileName}] contains a backslash";
+                                    Main.DebugOutput(error);
+                                }
+
                                 // Log if file does not exists
                                 //                            filePath = Path.Combine(Application.StartupPath, hardware.Folder, board.Folder, fileName);
                                 string filePath = Path.Combine(Application.StartupPath, fileName);
@@ -781,6 +810,13 @@ namespace Commodore_Repair_Toolbox
                                 string pin = worksheet.Cells[row, 3].Value?.ToString() ?? "";
                                 string name = worksheet.Cells[row, 4].Value?.ToString() ?? "";
                                 string fileName = worksheet.Cells[row, 5].Value?.ToString() ?? "";
+
+                                // Report a warning if path contains a backslash
+                                if (fileName.Contains("\\"))
+                                {
+                                    string error = $"WARNING: Excel file [{board.DataFile}], worksheet [{searchHeader}] row [{row}] the path [{fileName}] contains a backslash";
+                                    Main.DebugOutput(error);
+                                }
 
                                 // Log if file does not exists
                                 string filePath = Path.Combine(Application.StartupPath, fileName);

@@ -12,21 +12,18 @@ namespace Commodore_Repair_Toolbox
     internal class PolylinesManagement
     {
 
-//        public static bool isDrawing = false;
-        public static (int LineIndex, int PointIndex) selectedMarker = (-1, -1); // Tracks the selected marker
+        public static (int LineIndex, int PointIndex) selectedMarker = (-1, -1); // tracks the selected marker
         public static int selectedPolylineIndex = -1;
-        private static List<Point> currentPolyline = null; // Current polyline being drawn
-        private const int MarkerRadius = 6; // Radius of the marker circle
-        
+        private static List<Point> currentPolyline = null; // current polyline being drawn
+        private const int MarkerRadius = 6; // radius of the marker circle
         public static Dictionary<string, List<List<Point>>> imagePolylines = new Dictionary<string, List<List<Point>>>();
-        public static List<List<Point>> polylines = new List<List<Point>>(); // List of polylines
+        public static List<List<Point>> polylines = new List<List<Point>>();
         public static Dictionary<(string ImageName, int PolylineIndex), Color> polylineColors = new Dictionary<(string, int), Color>();
-
         public static HashSet<(string ImageName, int PolylineIndex)> visiblePolylines = new HashSet<(string, int)>();
-        public static Color LastSelectedPolylineColor { get; set; } = Color.Red; // Default to red
         public static Dictionary<Color, bool> CheckboxStates = new Dictionary<Color, bool>();
+        private Main main; // instance of the "Main" form
 
-        private Main main;
+        public static Color LastSelectedPolylineColor { get; set; } = Color.Red;
 
         public PolylinesManagement(Main mainForm)
         {
@@ -58,7 +55,6 @@ namespace Commodore_Repair_Toolbox
                             selectedMarker = (i, j);
                             selectedPolylineIndex = i;
                             Main.overlayPanel.Invalidate();
-//                            main.UpdateButtonColorPolylineState();
                             clickedOnMarker = true;
                             return;
                         }
@@ -87,16 +83,12 @@ namespace Commodore_Repair_Toolbox
                                 selectedMarker = (i, j + 1);
 
                                 Main.overlayPanel.Invalidate();
-//                                main.UpdateButtonColorPolylineState();
                                 return;
                             }
                         }
                     }
                 }
 
-                // If in drawing mode, add points to a new polyline
-                //                if (isDrawing)
-                //                {
                 if (currentPolyline == null)
                 {
                     currentPolyline = new List<Point>();
@@ -105,15 +97,6 @@ namespace Commodore_Repair_Toolbox
                 Point pointUnscaled = new Point((int)(e.Location.X / Main.zoomFactor), (int)(e.Location.Y / Main.zoomFactor));
                 currentPolyline.Add(pointUnscaled);
                 return;
-
-            /*
-            } else
-            {
-                // Deselect if clicking empty space
-                selectedPolylineIndex = -1;
-                selectedMarker = (-1, -1);
-                Main.overlayPanel.Invalidate();
-            */
             }
         }
 
@@ -157,19 +140,21 @@ namespace Commodore_Repair_Toolbox
                     Point scaledMarker = ScalePoint(polylines[i][j]);
                     if (IsPointInMarker(e.Location, scaledMarker))
                     {
-                        // If the polyline has only two markers left, remove the whole polyline.
+                        // If the polyline has only two markers left, remove the whole polyline
                         if (polylines[i].Count <= 2)
                         {
                             RemovePolyline(i);
                         }
-                        else // Otherwise, remove only the clicked marker.
+
+                        // Otherwise, remove only the clicked marker
+                        else
                         {
                             polylines[i].RemoveAt(j);
                         }
+
                         selectedMarker = (-1, -1);
                         selectedPolylineIndex = -1;
                         Main.overlayPanel.Invalidate();
-//                        main.UpdateButtonColorPolylineState();
                         SavePolylinesToConfig();
 
                         // Update the visibility panel and counters
@@ -194,7 +179,6 @@ namespace Commodore_Repair_Toolbox
                         selectedMarker = (-1, -1);
                         selectedPolylineIndex = -1;
                         Main.overlayPanel.Invalidate();
-//                        main.UpdateButtonColorPolylineState();
                         SavePolylinesToConfig();
 
                         // Update the visibility panel and counters
@@ -240,7 +224,6 @@ namespace Commodore_Repair_Toolbox
         // MouseMove event for overlayPanel
         public void panelImageMain_MouseMove(object sender, MouseEventArgs e)
         {
-//            if (isDrawing && e.Button == MouseButtons.Left && currentPolyline != null)
             if (e.Button == MouseButtons.Left && currentPolyline != null)
             {
                 Point pointUnscaled = new Point((int)(e.Location.X / Main.zoomFactor), (int)(e.Location.Y / Main.zoomFactor));
@@ -343,7 +326,6 @@ namespace Commodore_Repair_Toolbox
         }
 
 
-        // Method to toggle visibility of polylines with a specific color
         // Method to toggle visibility of polylines with a specific color
         public void TogglePolylineVisibility(Color color, bool isVisible)
         {
@@ -548,10 +530,6 @@ namespace Commodore_Repair_Toolbox
 
             return sb.ToString();
         }
-
-        
-
-
 
 
         public static void SavePolylinesToConfig()
@@ -816,8 +794,8 @@ namespace Commodore_Repair_Toolbox
                     CheckboxStates.Remove(color);
                 }
 
-                SavePolylinesToConfig(); // Save changes to configuration
-                SaveCheckboxStates();    // Save updated checkbox states
+                SavePolylinesToConfig();
+                SaveCheckboxStates();
             }
         }
 

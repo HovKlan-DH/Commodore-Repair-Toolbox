@@ -215,6 +215,9 @@ namespace Commodore_Repair_Toolbox
 
             StartDrawingPolylines();
             PopulatePolylineVisibilityPanel();
+
+            // Set a "cross" cursor to visualize "drawing mode" when inside the overlay panel
+            overlayPanel.Cursor = Cursors.Cross;
         }
 
         private void Form_Closing(object sender, FormClosingEventArgs e)
@@ -995,104 +998,135 @@ namespace Commodore_Repair_Toolbox
                 <br />
 
                 <ul>
-                <li>Mouse functions:</li>
-                <ul>
-                <li><b>Left-click</b> on a component will show a information popup</li>
-                <li><b>Right-click</b> on a component will toggle highlight</li>
-                <li><b>Right-click</b> and <b>Hold</b> will pan the image</li>
-                <li><b>Scrollwheel</b> will zoom in/out</li>
-                </ul>
-                </ul>
-                <br />
-
-                <ul>
-                <li>Keyboard functions:</li>
-                <ul>
-                <li><b>F11</b> will toggle fullscreen</li>
-                <li><b>ESCAPE</b> will exit fullscreen</li>
-                <li><b>ENTER</b> will toggle blinking for selected components</li>
-                <li><b>ALT</b>+<b>A</b> will select all components in ""Component list""</li>
-                <li><b>ALT</b>+<b>C</b> will clear all selections and show all components in ""Component list""</li>
-                <li>Start typing anywhere to filter component list</li>
-                <li>Filtering supports multi-word/character searching:</li>
-                <ul>
-                <li><span style='background:lightgrey;'>&nbsp;cpu 2 85&nbsp;</span> will find e.g. the component <span style='background:lightgrey;'>&nbsp;U6 | CPU | 8502&nbsp;</span></li>
-                </ul>
-                </ul>
+                    <li>Mouse functions:</li>
+                    <ul>
+                        <li><b>Left-click</b> on a component will show a information popup</li>
+                        <li><b>Left-click</b> + <b>Hold</b> will do one of three things:</li>
+                        <ul>
+                            <li>Start a new trace, when in ""empty"" space</li>
+                            <li>Move trace marker, if mouse is on top of an existing trace marker</li>
+                            <li>Insert new trace marker, if mouse is on top of an existing trace, but not on top of a trace marker</li>
+                        </ul>
+                        <li><b>Right-click</b> will do one of three things:</li>
+                        <ul>
+                            <li>Toggle component highlight, if mouse is on top of a component</li>
+                            <li>Remove entire trace, if mouse is on top of an existing trace, but not on top of a trace marker</li>
+                            <li>Remove trace marker, if mouse is on top of an existing trace marker</li>
+                        </ul>
+                        <li><b>Right-click</b> + <b>Hold</b> will pan the image</li>
+                        <li><b>Scrollwheel</b> will zoom in/out</li>
+                    </ul>
                 </ul>
                 <br />
 
                 <ul>
-                <li>Component selection:</li>
-                <ul>
-                <li>When a component is selected, then it will visualize if component is part of thumbnail in list-view:</li>
-                <ul>
-                <li>Appending an asterisk/* as first character in thumbnail label</li>
-                <li>Background color of thumbnail label changes to blue</li>
+                    <li>Keyboard functions:</li>
+                    <ul>
+                        <li><b>F11</b> will toggle fullscreen</li>
+                        <li><b>ESCAPE</b> will exit fullscreen</li>
+                        <li><b>ENTER</b> will toggle blinking for selected components</li>
+                        <li><b>ALT</b> + <b>A</b> will select all components in ""Component list""</li>
+                        <li><b>ALT</b> + <b>C</b> will clear all selections and show all components in ""Component list""</li>
+                        <li>Start typing anywhere to filter component list</li>
+                        <li>Filtering supports multi-word/character searching, divided by whitespace:</li>
+                        <ul>
+                            <li><span style='background:lightgrey;'>&nbsp;cpu 6 85&nbsp;</span> will find e.g. the component <span style='background:lightgrey;'>&nbsp;U6 | CPU | 8502&nbsp;</span></li>
+                        </ul>
+                    </ul>
                 </ul>
-                <li>You cannot highlight a component in image, if its component category is unselected</li>
-                </ul>
+                <br />
+
+                <ul>
+                    <li>Component selection:</li>
+                    <ul>
+                        <li>When a component is selected, then it will also visualize if component is part of thumbnail in list-view:</li>
+                    <ul>
+                    <li>Appending an asterisk/* as first character in thumbnail label</li>
+                    <li>Background color of thumbnail label changes to blue</li>
+                    </ul>
+                        <li>You cannot highlight a component in image, if its component category is unselected</li>
+                    </ul>
                 </ul>
                 <br />
                 
                 <ul>
-                <li>Labels visible:</li>
-                <ul>
-                <li>If no components are selected for the specific schematic, then the panel with checkboxes will not be shown</li>
-                <li>The panel can be toggled minimized/maximized with the ""M"" button</li>
-                <li>When only one checkbox is selected, then it will replace whitespaces in text with new-lines to condense the text</li>
-                </ul>
+                    <li>Circuit tracing:</li>
+                    <ul>
+                        <li>When mouse cursor shows a ""cross"", then you can start drawing a new trace</li>
+                        <li>Holding down <b>SHIFT</b> while drawing a trace, will vertically and horizontally align the trace to its neighbour markers</li>
+                    </ul>
                 </ul>
                 <br />
 
-                <b>""Component information popup""</b>:<br />
+                <ul>
+                    <li>""Labels visible"" panel:</li>
+                    <ul>
+                        <li>If no components are selected for the specific schematic, then the panel with checkboxes will not be shown</li>
+                        <li>The panel can be toggled minimized/maximized with the ""M"" button</li>
+                        <li>When only one checkbox is selected, then it will replace whitespaces in label with new-lines to condense the text</li>
+                    </ul>
+                </ul>
+                <br />
+
+                <ul>
+                    <li>""Traces visible"" panel:</li>
+                    <ul>
+                        <li>If no traces are drawn for the specific schematic, then the panel with checkboxes will not be shown</li>
+                        <li>The panel can be toggled minimized/maximized with the ""M"" button</li>
+                        <li>Traces can be toggled hidden/shown based on their color - this applies to all traces within the selected hardware/board</li>
+                    </ul>
+                </ul>
+                <br />
+
+                <b>Component information popup</b>:<br />
                 <br />
 
                 If multiple images are available for the selected component, then it will show ""Image 1 of x"" in the top right corner.<br />
                 <br />
 
                 <ul>
-                <li>Mouse functions:</li>
-                <ul>
-                <li><b>Click</b> in the image area will change back to first image (typical the pinout)</li>
-                <li><b>Scrollwheel</b> will change image, if multiple images</li>
-                </ul>
+                    <li>Mouse functions:</li>
+                    <ul>
+                        <li><b>Click</b> in the image area will change back to first image (typically the pinout)</li>
+                        <li><b>Scrollwheel</b> will change image, if multiple images</li>
+                    </ul>
                 </ul>
                 <br />
 
                 <ul>
-                <li>Keyboard functions:</li>
-                <ul>
-                <li><b>ARROW KEYS</b> will change image, if multiple images</li>
-                <li><b>SPACE</b> will change back to first image (typical the pinout)</li>
-                <li><b>ESCAPE</b> or <b>ENTER</b> will close popup</li>
-                </ul>
+                    <li>Keyboard functions:</li>
+                    <ul>
+                        <li><b>ARROW KEYS</b> will change image, if multiple images</li>
+                        <li><b>SPACE</b> will change back to first image (typical the pinout)</li>
+                        <li><b>ESCAPE</b> or <b>ENTER</b> will close popup</li>
+                    </ul>
                 </ul>
                 <br />
 
                 <b>Misc</b>:<br />
                 <br />
 
+                When there is a newer version available online, it will be marked with an asterisk (*) in the ""About"" tab.<br />
+                Then navigate to the tab and download the new version from <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases' target='_blank'>GitHub</a>.<br />
+                <br />
+
                 <ul>
-                <li>How-to add or update your own data:</li>
-                <ul>
-                <li>View <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox?tab=readme-ov-file#software-used' target='_blank'>GitHub Documentation</a></li>
-                </ul>
+                    <li>How-to add or update your own data:</li>
+                    <ul>
+                        <li>View <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/wiki/Documentation' target='_blank'>GitHub Documentation</a></li>
+                    </ul>
                 </ul>
                 <br />
 
                 <ul>
-                <li>Report a problem or comment something from either of these places:</li>
-                <ul>
-                <li>Through the ""Feedback"" tab</li>
-                <li>Through the <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues' target='_blank'>GitHub Issues</a></li>
-                </ul>
+                    <li>Report a problem or comment something from either of these places:</li>
+                    <ul>
+                        <li>Through the ""Feedback"" tab</li>
+                        <li>Through the <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues' target='_blank'>GitHub Issues</a></li>
+                    </ul>
                 </ul>
                 <br />
                 
-                When there is a newer version available online, it will be marked with an asterisk (*) in the ""About"" tab.<br />
-                Then navigate to the tab and view or download the new version.<br />
-
                 </body>
                 </html>
             ";
@@ -1137,6 +1171,24 @@ namespace Commodore_Repair_Toolbox
 
                 Visit official project home page at <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox' target='_blank'>https://github.com/HovKlan-DH/Commodore-Repair-Toolbox</a><br />
                 <br />
+
+                <hr><br />
+
+                A comment from the developer:<br /><br />
+
+                <i>
+                I have been repairing Commodore 64/128 computers for some years, but I still consider myself as a novice in this world of hardware - I am more a software person, which you may notice having this tool here. I often forget where and what to check, and I struggle to find again all the relevant ressources and schematics, not to mention the struggle to find the components in the schematics - a pure mess and quite inefficient. I did often refer to the ""Mainboards"" section of <a href=""https://myoldcomputer.nl/technical-info/mainboards/"" target=""_blank"">My Old Computer</a>, and I noticed that Jeroen did have a prototype of an application named ""Repair Help"", and it did have the easy layout I was looking for (I did get a copy of it). However, it was never finalized from him, so I took upon myself to create something similar, and a couple of years later (including a long hiatus) I did come up with this quite similar looking application, though expanded with additional functionalities and data points.<br />
+                <br />
+
+                The longer-term goal is that the tool will cover all C64 and C128 computers, and ideally also its most used peripherals, and I will continue to add new and refine data for myself (when doing my own diagnostics and repairing), but I will most likely not be able to do this myself alone. I would really appreciate some help with this, so if you have the willingness, then please reach out to me, and I will happily explain the nitty-gritty details. It is actually quite easy when having tried it once.<br />
+                <br />
+
+                If you see anything that can be better, e.g. due to bad data quality or improvements for the tool, then do reach out to me. Of course I would also be happy, if you would send a comment from the ""Feedback"" tab - even if you do not like the tool, as constructive criticism is always welcome :-)<br />
+                <br />
+
+                // Dennis
+
+                </i>
                 
                 </body>
                 </html>
@@ -2081,14 +2133,14 @@ namespace Commodore_Repair_Toolbox
             panelImageMain.Controls.Add(overlayPanel);
             overlayPanel.BringToFront();
 
-            // Subscribe overlay events
+            // Define events for the overlay for the components
             overlayPanel.OverlayClicked += OverlayPanel_OverlayClicked;
             overlayPanel.OverlayHoverChanged += OverlayPanel_OverlayHoverChanged;
             overlayPanel.OverlayPanelMouseDown += OverlayPanel_OverlayPanelMouseDown;
             overlayPanel.OverlayPanelMouseMove += OverlayPanel_OverlayPanelMouseMove;
             overlayPanel.OverlayPanelMouseUp += OverlayPanel_OverlayPanelMouseUp;
 
-            // hest
+            // Define event for the overlay panel itself for "draw mode"
             overlayPanel.MouseDown += polylinesManagement.panelImageMain_MouseDown;
             overlayPanel.MouseMove += polylinesManagement.panelImageMain_MouseMove;
             overlayPanel.MouseUp += polylinesManagement.panelImageMain_MouseUp;
@@ -2483,7 +2535,6 @@ namespace Commodore_Repair_Toolbox
             // Ensure thumbnail border gets updated
             DrawBorderInList();
 
-            // hest
             // Make sure polylines for the new image are loaded
             if (!PolylinesManagement.imagePolylines.ContainsKey(schematicSelectedName))
             {
@@ -2497,13 +2548,7 @@ namespace Commodore_Repair_Toolbox
             PolylinesManagement.selectedPolylineIndex = -1;
             PolylinesManagement.selectedMarker = (-1, -1);
 
-            // Update button state
-//            UpdateButtonColorPolylineState();
-
             PopulatePolylineVisibilityPanel();
-
-            // Force redraw to show polylines for this schematic
-            //            overlayPanel.Invalidate();
         }
 
 
@@ -2753,9 +2798,10 @@ namespace Commodore_Repair_Toolbox
         {
             if (labelComponent == null) return;
 
+            // If hovering on a component
             if (e.IsHovering)
             {
-                Cursor = Cursors.Hand;
+                overlayPanel.Cursor = Cursors.Hand;
                 var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
                 var comp = bd?.Components.FirstOrDefault(c => c.Label == e.OverlayInfo.ComponentLabel);
@@ -2774,7 +2820,7 @@ namespace Commodore_Repair_Toolbox
             }
             else
             {
-                Cursor = Cursors.Cross;
+                overlayPanel.Cursor = Cursors.Cross;
                 labelComponent.Visible = false;
             }
         }
