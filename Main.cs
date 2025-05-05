@@ -3651,6 +3651,7 @@ namespace Commodore_Repair_Toolbox
         public string DataFile { get; set; }
         public List<BoardOverlays> Files { get; set; }
         public List<BoardComponents> Components { get; set; }
+        public List<BoardComponentUserNotes> ComponentUserNotes { get; set; }
         public List<BoardLinks> BoardLinks { get; set; }
         public List<BoardLocalFiles> BoardLocalFiles { get; set; }
     }
@@ -3668,6 +3669,13 @@ namespace Commodore_Repair_Toolbox
         public List<ComponentLocalFiles> LocalFiles { get; set; }
         public List<ComponentLinks> ComponentLinks { get; set; }
         public List<ComponentImages> ComponentImages { get; set; }
+    }
+
+    public class BoardComponentUserNotes
+    {
+        public string Label { get; set; }
+        public string OneLiner { get; set; }
+        public string Description { get; set; }
     }
 
     public class BoardOverlays

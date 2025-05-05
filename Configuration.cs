@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 //using System.Windows.Shapes;
 
@@ -16,13 +17,13 @@ namespace Commodore_Repair_Toolbox
         {
             if (File.Exists(filePath))
             {
-                settings = File.ReadAllLines(filePath)
+                settings = File.ReadAllLines(filePath, Encoding.UTF8)
                     .Select(line => line.Split(new[] { '=' }, 2))
                     .Where(parts => parts.Length == 2)
                     .ToDictionary(
-                        parts => parts[0].Trim(),  // remove trailing space
+                        parts => parts[0].Trim(),
                         parts => parts[1].Trim()
-                    );
+                );
             }
 
             Debug.WriteLine("---[Configuration file keys loaded]---");
@@ -37,7 +38,8 @@ namespace Commodore_Repair_Toolbox
         {
             // Save lines alphabetically sorted
             var sortedSettings = settings.OrderBy(kv => kv.Key).ToList();
-            File.WriteAllLines(filePath, sortedSettings.Select(kv => $"{kv.Key}={kv.Value}"));
+            //File.WriteAllLines(filePath, sortedSettings.Select(kv => $"{kv.Key}={kv.Value}"));
+            File.WriteAllLines(filePath, sortedSettings.Select(kv => $"{kv.Key}={kv.Value}"), Encoding.UTF8);
         }
 
         public static string GetSetting(string key, string defaultValue = "")
@@ -47,9 +49,31 @@ namespace Commodore_Repair_Toolbox
 
         public static void SaveSetting(string key, string value)
         {
+            if (string.IsNullOrEmpty(value))
+            {
+                // Remove the key from the dictionary if it exists
+                if (settings.ContainsKey(key))
+                {
+                    settings.Remove(key);
+                }
+            }
+            else
+            {
+                // Update or add the key-value pair
+                settings[key] = value;
+            }
+
+            // Save the updated configuration to the file
+            SaveConfig();
+        }
+
+        /*
+        public static void SaveSetting(string key, string value)
+        {
             settings[key] = value;
             SaveConfig();
         }
+        */
 
 
 

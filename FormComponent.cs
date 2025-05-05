@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+
 //using System.ComponentModel;
 using System.Drawing;
 using System.IO;
@@ -42,10 +44,17 @@ namespace Commodore_Repair_Toolbox
             label3.Text = Main.ConvertStringToLabel(component.NameFriendly);
             label4.Text = component.Type;
             label5.Text = Main.ConvertStringToLabel(component.OneLiner);
+            textBox2.Text = Main.ConvertStringToLabel(component.OneLiner);
 
             // Description box
             textBox1.Text = Main.ConvertStringToLabel(component.Description);
             textBox1.ScrollBars = ScrollBars.Vertical;
+
+            LoadComponentUserNotes(); // will override default texts, if any
+
+            // Define event for textBox1.TextChanged to save user notes
+            textBox1.TextChanged += textBox1_TextChanged; // "Description"
+            textBox2.TextChanged += textBox2_TextChanged; // "OneLiner"
 
             // Define an array with all pinout images
             imagePaths = new List<string>(); // ensure it exists by default
@@ -99,6 +108,12 @@ namespace Commodore_Repair_Toolbox
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            // Only go in here, if the input text area is NOT in focus
+            if (textBox1.Focused || textBox2.Focused)
+            {
+                return base.ProcessCmdKey(ref msg, keyData);
+            }
+
             if (keyData == Keys.Down || keyData == Keys.Right)
             {
                 // Simulate scrolling down (next image)
@@ -207,6 +222,79 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
+        private void textBox2_TextChanged(object sender, EventArgs e)
+        {
+            SaveComponentUserOneliner();
+        }
+
+        private void textBox1_TextChanged(object sender, EventArgs e)
+        {
+            SaveComponentUserNotes();
+        }
+
+        private void SaveComponentUserOneliner()
+        {
+            if (component == null) return;
+
+            // Create a base key for the configuration file
+            string key = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|Oneliner";
+
+            // Delete the configuration line, if the text in "Description" equals default text from "component.OneLiner"
+            if (textBox2.Text == component.OneLiner || textBox2.Text == "")
+            {
+                Configuration.SaveSetting(key, ""); // delete the entire line in the configuration file
+                textBox2.Text = component.OneLiner;
+                return;
+            }
+
+            // Save the OneLiner
+            Configuration.SaveSetting(key, textBox2.Text.Trim());
+        }
+
+        private void SaveComponentUserNotes()
+        {
+            if (component == null) return;
+
+            // Create a base key for the configuration file
+            string key = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|Notes";
+
+            // Delete the configuration line, if the text in "Description" equals default text from "component.Description"
+            if (textBox1.Text == component.Description || textBox1.Text == "")
+            {
+                Configuration.SaveSetting(key, ""); // delete the entire line in the configuration file
+                textBox1.Text = component.Description;
+                return;
+            }
+
+            // Save the Description (Notes)
+            string sanitizedDescription = textBox1.Text.Replace(Environment.NewLine, "\\n"); // Replace newlines
+            Configuration.SaveSetting(key, sanitizedDescription.Trim());
+        }
+
+        private void LoadComponentUserNotes()
+        {
+            if (component == null) return;
+
+            // Create a base key for the configuration file
+            string baseKey = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}";
+
+            // Load the "OneLiner"
+            string oneLinerKey = $"{baseKey}|Oneliner";
+            if (oneLinerKey != "")
+            {
+                textBox2.Text = Configuration.GetSetting(oneLinerKey, "");
+            }
+
+            // Load the "Description"
+            string notesKey = $"{baseKey}|Notes";
+            string serializedDescription = Configuration.GetSetting(notesKey, "");
+            if (serializedDescription != "")
+            {
+                textBox1.Text = serializedDescription.Replace("\\n", Environment.NewLine); // Restore newlines
+            }
+
+        }
+
 
         private void Form_KeyPress(object sender, KeyPressEventArgs e)
         {
@@ -249,5 +337,7 @@ namespace Commodore_Repair_Toolbox
             string url = links[selectedName];
             System.Diagnostics.Process.Start(url);
         }
+
+        
     }
 }
