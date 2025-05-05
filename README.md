@@ -29,7 +29,7 @@ _CRT_ does not require any installation - just download the newest ZIP file from
 
 It will run on any 64-bit Windows 10 or newer. It does require _.NET Framework 4.8.1_, but this is an integrated part of the operating system.
 
-# Built-in hardware / schematics
+# Built-in hardware / boards
 
 - **Commodore VIC-20**
   - 250403 (CR)
@@ -38,7 +38,7 @@ It will run on any 64-bit Windows 10 or newer. It does require _.NET Framework 4
   - 250425
 - **Commodore 64C**
   - 250466
-- **Commodore 128 and 128D**
+- **Commodore 128 and 128D** (plastic model, not DCR)
   - 310378
 
 # Your help would be really appreciated
