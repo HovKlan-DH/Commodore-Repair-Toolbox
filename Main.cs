@@ -2726,6 +2726,128 @@ namespace Commodore_Repair_Toolbox
 
         private void OverlayPanel_OverlayClicked(object sender, OverlayClickedEventArgs e)
         {
+            // First, check if we're clicking on a marker
+            bool clickedOnMarker = false;
+//            bool clickedOnLine = false;
+            int clickedPolylineIndex = -1;
+            int clickedPointIndex = -1;
+
+            if (e.MouseArgs.Button == MouseButtons.Left)
+            {
+                // Check if clicking on an existing marker
+                for (int i = 0; i < PolylinesManagement.polylines.Count; i++)
+                {
+                    for (int j = 0; j < PolylinesManagement.polylines[i].Count; j++)
+                    {
+                        Point scaledMarker = new Point(
+                            (int)(PolylinesManagement.polylines[i][j].X * zoomFactor),
+                            (int)(PolylinesManagement.polylines[i][j].Y * zoomFactor)
+                        );
+
+                        // Check if the click is on a marker
+                        const int proximityThreshold = 10;
+                        int effectiveRadius = 5 + proximityThreshold; // 5 is MarkerRadius from PolylinesManagement
+
+                        if (Math.Pow(e.MouseArgs.Location.X - scaledMarker.X, 2) +
+                            Math.Pow(e.MouseArgs.Location.Y - scaledMarker.Y, 2) <=
+                            Math.Pow(effectiveRadius, 2))
+                        {
+                            clickedOnMarker = true;
+                            clickedPolylineIndex = i;
+                            clickedPointIndex = j;
+                            break;
+                        }
+                    }
+                    if (clickedOnMarker) break;
+                }
+
+                // If not clicking on a marker, check if clicking on a line segment
+                if (!clickedOnMarker)
+                {
+                    for (int i = 0; i < PolylinesManagement.polylines.Count; i++)
+                    {
+                        for (int j = 0; j < PolylinesManagement.polylines[i].Count - 1; j++)
+                        {
+                            Point scaledStart = new Point(
+                                (int)(PolylinesManagement.polylines[i][j].X * zoomFactor),
+                                (int)(PolylinesManagement.polylines[i][j].Y * zoomFactor)
+                            );
+                            Point scaledEnd = new Point(
+                                (int)(PolylinesManagement.polylines[i][j + 1].X * zoomFactor),
+                                (int)(PolylinesManagement.polylines[i][j + 1].Y * zoomFactor)
+                            );
+
+                            // Get closest point on line segment
+                            float dx = scaledEnd.X - scaledStart.X;
+                            float dy = scaledEnd.Y - scaledStart.Y;
+
+                            if (dx == 0 && dy == 0) continue; // Skip if line is a point
+
+                            float t = ((e.MouseArgs.Location.X - scaledStart.X) * dx +
+                                      (e.MouseArgs.Location.Y - scaledStart.Y) * dy) /
+                                      (dx * dx + dy * dy);
+                            t = Math.Max(0, Math.Min(1, t)); // Clamp t to [0,1]
+
+                            Point closestPoint = new Point(
+                                (int)(scaledStart.X + t * dx),
+                                (int)(scaledStart.Y + t * dy)
+                            );
+
+                            // Check if click is near the line
+                            const int proximityThreshold = 5;
+                            if (Math.Abs(e.MouseArgs.Location.X - closestPoint.X) <= proximityThreshold &&
+                                Math.Abs(e.MouseArgs.Location.Y - closestPoint.Y) <= proximityThreshold)
+                            {
+//                                clickedOnLine = true;
+                                clickedPolylineIndex = i;
+                                clickedPointIndex = j;
+
+                                // Insert new marker immediately
+                                Point newPointUnscaled = new Point(
+                                    (int)(closestPoint.X / zoomFactor),
+                                    (int)(closestPoint.Y / zoomFactor)
+                                );
+                                PolylinesManagement.polylines[i].Insert(j + 1, newPointUnscaled);
+
+                                // Select the new marker
+                                PolylinesManagement.selectedPolylineIndex = i;
+                                PolylinesManagement.selectedMarker = (i, j + 1);
+
+                                // Redraw and save
+                                Main.overlayPanel.Invalidate();
+                                PolylinesManagement.SavePolylinesToConfig();
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // If clicked on marker, forward the event to polylines management
+            if (clickedOnMarker)
+            {
+                // Store which polyline and point was selected
+                PolylinesManagement.selectedPolylineIndex = clickedPolylineIndex;
+                PolylinesManagement.selectedMarker = (clickedPolylineIndex, clickedPointIndex);
+
+                // Manually trigger a mouse down event on the overlay panel to initiate marker movement
+                MouseEventArgs newArgs = new MouseEventArgs(
+                    e.MouseArgs.Button,
+                    e.MouseArgs.Clicks,
+                    e.MouseArgs.X,
+                    e.MouseArgs.Y,
+                    e.MouseArgs.Delta
+                );
+
+                // Forward the event to the polylines management
+                polylinesManagement.panelImageMain_MouseDown(overlayPanel, newArgs);
+
+                // Make sure to redraw
+                overlayPanel.Invalidate();
+                return;
+            }
+
+            // Continue with regular component overlay handling
             string componentClickedLabel = e.OverlayInfo.ComponentLabel;
 
             // Find component "display name"
@@ -2761,7 +2883,6 @@ namespace Commodore_Repair_Toolbox
             // Right-mouse click (toggle component selection)
             else if (e.MouseArgs.Button == MouseButtons.Right)
             {
-
                 if (!listBoxComponentsSelectedText.Contains(componentDisplay))
                 {
                     listBoxComponentsSelectedText.Add(componentDisplay);
@@ -2782,8 +2903,6 @@ namespace Commodore_Repair_Toolbox
                 }
                 ShowOverlaysAccordingToComponentList();
             }
-
-            listBoxComponents.EndUpdate(); // resume redrawing of this specific listBox
 
             // Refresh the highlight overlays
             ShowOverlaysAccordingToComponentList();

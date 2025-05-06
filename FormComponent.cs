@@ -43,7 +43,7 @@ namespace Commodore_Repair_Toolbox
             label2.Text = Main.ConvertStringToLabel(component.NameTechnical);
             label3.Text = Main.ConvertStringToLabel(component.NameFriendly);
             label4.Text = component.Type;
-            label5.Text = Main.ConvertStringToLabel(component.OneLiner);
+//            label5.Text = Main.ConvertStringToLabel(component.OneLiner);
             textBox2.Text = Main.ConvertStringToLabel(component.OneLiner);
 
             // Description box
@@ -55,6 +55,11 @@ namespace Commodore_Repair_Toolbox
             // Define event for textBox1.TextChanged to save user notes
             textBox1.TextChanged += textBox1_TextChanged; // "Description"
             textBox2.TextChanged += textBox2_TextChanged; // "OneLiner"
+            panel1.Paint += new PaintEventHandler(panel1_Paint);
+            panel2.Paint += new PaintEventHandler(panel2_Paint);
+
+            panel1.Invalidate(); // trigger repaint to update the border
+            panel2.Invalidate(); // trigger repaint to update the border
 
             // Define an array with all pinout images
             imagePaths = new List<string>(); // ensure it exists by default
@@ -95,6 +100,9 @@ namespace Commodore_Repair_Toolbox
             // Allow pressing Escape to close
             KeyPreview = true;
             KeyPress += Form_KeyPress;
+
+            // Focus on something that is not the first "textBox" in the form
+            ActiveControl = label1;
         }
 
         private void PictureBox1_MouseClick(object sender, MouseEventArgs e)
@@ -222,14 +230,32 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
+        private void panel1_Paint(object sender, PaintEventArgs e)
+        {
+            Rectangle rect = panel1.ClientRectangle;
+            rect.Inflate(0, 0); // shrink to avoid clipping
+            Color borderColor = (textBox1.Text != component.Description) ? Color.IndianRed: ColorTranslator.FromHtml("#96919D");
+            ControlPaint.DrawBorder(e.Graphics, rect, borderColor, ButtonBorderStyle.Solid);
+        }
+
+        private void panel2_Paint(object sender, PaintEventArgs e)
+        {
+            Rectangle rect = panel2.ClientRectangle;
+            rect.Inflate(0, 0); // shrink to avoid clipping
+            Color borderColor = (textBox2.Text != component.OneLiner) ? Color.IndianRed : ColorTranslator.FromHtml("#96919D");
+            ControlPaint.DrawBorder(e.Graphics, rect, borderColor, ButtonBorderStyle.Solid);
+        }
+
         private void textBox2_TextChanged(object sender, EventArgs e)
         {
             SaveComponentUserOneliner();
+            panel2.Invalidate(); // trigger repaint to update the border
         }
 
         private void textBox1_TextChanged(object sender, EventArgs e)
         {
             SaveComponentUserNotes();
+            panel1.Invalidate(); // trigger repaint to update the border
         }
 
         private void SaveComponentUserOneliner()
@@ -280,9 +306,10 @@ namespace Commodore_Repair_Toolbox
 
             // Load the "OneLiner"
             string oneLinerKey = $"{baseKey}|Oneliner";
-            if (oneLinerKey != "")
+            string txt = Configuration.GetSetting(oneLinerKey, "");
+            if (txt != "")
             {
-                textBox2.Text = Configuration.GetSetting(oneLinerKey, "");
+                textBox2.Text = txt;
             }
 
             // Load the "Description"

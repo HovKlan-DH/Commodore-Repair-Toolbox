@@ -52,17 +52,17 @@ namespace Commodore_Repair_Toolbox
             if (e.Button == MouseButtons.Left && !isHoveringOverComponent)
             {
                 bool clickedOnMarker = false;
+                bool clickedOnLine = false;
 
-                // Check if clicking on an existing marker
-                for (int i = 0; i < polylines.Count; i++)
+                // First pass: Check if we're clicking on a marker of the ALREADY selected polyline
+                if (selectedPolylineIndex != -1 && selectedPolylineIndex < polylines.Count)
                 {
-                    for (int j = 0; j < polylines[i].Count; j++)
+                    for (int j = 0; j < polylines[selectedPolylineIndex].Count; j++)
                     {
-                        Point scaledMarker = ScalePoint(polylines[i][j]);
+                        Point scaledMarker = ScalePoint(polylines[selectedPolylineIndex][j]);
                         if (IsPointInMarker(e.Location, scaledMarker))
                         {
-                            selectedMarker = (i, j);
-                            selectedPolylineIndex = i;
+                            selectedMarker = (selectedPolylineIndex, j);
                             Main.overlayPanel.Invalidate();
                             clickedOnMarker = true;
                             return;
@@ -70,11 +70,61 @@ namespace Commodore_Repair_Toolbox
                     }
                 }
 
-                // If not clicking on a marker, check if clicking on a line segment
+                // Second pass: If not clicking on a marker from the selected polyline, check all other polylines
                 if (!clickedOnMarker)
                 {
                     for (int i = 0; i < polylines.Count; i++)
                     {
+                        // Skip the already checked polyline
+                        if (i == selectedPolylineIndex) continue;
+
+                        for (int j = 0; j < polylines[i].Count; j++)
+                        {
+                            Point scaledMarker = ScalePoint(polylines[i][j]);
+                            if (IsPointInMarker(e.Location, scaledMarker))
+                            {
+                                selectedMarker = (i, j);
+                                selectedPolylineIndex = i;
+                                Main.overlayPanel.Invalidate();
+                                clickedOnMarker = true;
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                // If not clicking on a marker, check if clicking on a line segment
+                if (!clickedOnMarker)
+                {
+                    // First check if clicking on the selected polyline
+                    if (selectedPolylineIndex != -1 && selectedPolylineIndex < polylines.Count)
+                    {
+                        for (int j = 0; j < polylines[selectedPolylineIndex].Count - 1; j++)
+                        {
+                            Point scaledStart = ScalePoint(polylines[selectedPolylineIndex][j]);
+                            Point scaledEnd = ScalePoint(polylines[selectedPolylineIndex][j + 1]);
+                            Point closestPoint = GetClosestPointOnLine(scaledStart, scaledEnd, e.Location);
+
+                            if (IsPointNearLine(e.Location, closestPoint))
+                            {
+                                // Insert new marker immediately
+                                Point newPointUnscaled = new Point((int)(closestPoint.X / Main.zoomFactor), (int)(closestPoint.Y / Main.zoomFactor));
+                                polylines[selectedPolylineIndex].Insert(j + 1, newPointUnscaled);
+                                selectedMarker = (selectedPolylineIndex, j + 1);
+
+                                Main.overlayPanel.Invalidate();
+                                clickedOnLine = true;
+                                return;
+                            }
+                        }
+                    }
+
+                    // If not clicking on selected polyline, check all polylines
+                    for (int i = 0; i < polylines.Count; i++)
+                    {
+                        // Skip the already checked polyline
+                        if (i == selectedPolylineIndex) continue;
+
                         for (int j = 0; j < polylines[i].Count - 1; j++)
                         {
                             Point scaledStart = ScalePoint(polylines[i][j]);
@@ -92,12 +142,22 @@ namespace Commodore_Repair_Toolbox
                                 selectedMarker = (i, j + 1);
 
                                 Main.overlayPanel.Invalidate();
+                                clickedOnLine = true;
                                 return;
                             }
                         }
                     }
                 }
 
+                // If we didn't click on a marker or line, deselect the current selection
+                if (!clickedOnMarker && !clickedOnLine && selectedPolylineIndex != -1)
+                {
+                    selectedPolylineIndex = -1;
+                    selectedMarker = (-1, -1);
+                    Main.overlayPanel.Invalidate();
+                }
+
+                // Start a new polyline if one isn't already being drawn
                 if (currentPolyline == null)
                 {
                     currentPolyline = new List<Point>();
@@ -129,7 +189,10 @@ namespace Commodore_Repair_Toolbox
 
                     // Add the new polyline to the visiblePolylines set
                     visiblePolylines.Add((Main.schematicSelectedName, newPolylineIndex));
-                    Debug.WriteLine($"Adding polyline: {Main.schematicSelectedName}, Index: {newPolylineIndex}, Color: {LastSelectedPolylineColor}");
+//                    Debug.WriteLine($"Adding polyline: {Main.schematicSelectedName}, Index: {newPolylineIndex}, Color: {LastSelectedPolylineColor}");
+
+                    // Set the newly created polyline as selected
+                    selectedPolylineIndex = newPolylineIndex;
 
                     // Save the updated polylines to the configuration
                     SavePolylinesToConfig();
@@ -161,16 +224,21 @@ namespace Commodore_Repair_Toolbox
                         if (polylines[i].Count <= 2)
                         {
                             RemovePolyline(i);
+                            // Clear selection since the polyline no longer exists
+                            selectedMarker = (-1, -1);
+                            selectedPolylineIndex = -1;
                         }
-
-                        // Otherwise, remove only the clicked marker
+                        // Otherwise, remove only the clicked marker but keep the polyline selected
                         else
                         {
+                            int currentPolyline = i; // Store the polyline index before removing the marker
                             polylines[i].RemoveAt(j);
+
+                            // Keep the polyline selected but clear the marker selection
+                            selectedMarker = (-1, -1);
+                            selectedPolylineIndex = currentPolyline;
                         }
 
-                        selectedMarker = (-1, -1);
-                        selectedPolylineIndex = -1;
                         Main.overlayPanel.Invalidate();
                         SavePolylinesToConfig();
 
