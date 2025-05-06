@@ -727,8 +727,8 @@ namespace Commodore_Repair_Toolbox
                     htmlContent += "<th valign='bottom'>Component</th>";
                     htmlContent += "<th valign='bottom'>Technical name</th>";
                     htmlContent += "<th valign='bottom'>Friendly name</th>";
-                    htmlContent += "<th valign='bottom'>Short descr.</th>";
-                    htmlContent += "<th valign='bottom'>Long descr.</th>";
+                    htmlContent += "<th valign='bottom'>Short description</th>";
+                    htmlContent += "<th valign='bottom'>Notes</th>";
                     htmlContent += "<th valign='bottom'>Local files</th>";
                     htmlContent += "<th valign='bottom'>Web links</th>";
                     htmlContent += "</tr>";
@@ -743,11 +743,27 @@ namespace Commodore_Repair_Toolbox
                         string compLabel = comp.Label;
                         string compNameTechnical = comp.NameTechnical;
                         string compNameFriendly = comp.NameFriendly;
-                        string compDescrShort = comp.OneLiner;
-                        string compDescrLong = comp.Description;
-                        compDescrLong = compDescrLong.Replace("\n", "<br />");
 
                         compNameFriendly = compNameFriendly.Replace("?", "");
+
+                        // Read the potential user-modified values from configuration file
+                        string baseKey = $"UserData|{hardwareSelectedName}|{boardSelectedName}|{compLabel}";
+                        string oneLinerKey = $"{baseKey}|Oneliner";
+                        string notesKey = $"{baseKey}|Notes";
+                        string compDescrShort = Configuration.GetSetting(oneLinerKey, "");
+                        if (string.IsNullOrEmpty(compDescrShort))
+                        {
+                            compDescrShort = comp.OneLiner;
+                        }
+                        string compDescrLong = Configuration.GetSetting(notesKey, "");
+                        if (string.IsNullOrEmpty(compDescrLong))
+                        {
+                            compDescrLong = comp.Description;
+                        }
+                        else
+                        {
+                            compDescrLong = compDescrLong.Replace("\\n", "<br />");
+                        }
 
                         htmlContent += "<tr>";
 
@@ -1177,13 +1193,13 @@ namespace Commodore_Repair_Toolbox
                 A comment from the developer:<br /><br />
 
                 <i>
-                I have been repairing Commodore 64/128 computers for some years, but I still consider myself as a novice in this world of hardware - I am more a software person, which you may notice having this tool here. I often forget where and what to check, and I struggle to find again all the relevant ressources and schematics, not to mention the struggle to find the components in the schematics - a pure mess and quite inefficient. I did often refer to the ""Mainboards"" section of <a href=""https://myoldcomputer.nl/technical-info/mainboards/"" target=""_blank"">My Old Computer</a>, and I noticed that Jeroen did have a prototype of an application named ""Repair Help"", and it did have the easy layout I was looking for (I did get a copy of it). However, it was never finalized from him, so I took upon myself to create something similar, and a couple of years later (including a long hiatus) I did come up with this quite similar looking application, though expanded with additional functionalities and data points.<br />
+                I have been repairing Commodore 64/128 computers for some years, but I still consider myself as a novice in this world of hardware - I am more a software person, which you may have guessed having this tool here. I often forget where and what to check, and I struggle to find again all the relevant ressources and schematics, not to mention the struggle to find the components in the schematics - a pure mess and quite inefficient. I did often refer to the ""Mainboards"" section of <a href=""https://myoldcomputer.nl/technical-info/mainboards/"" target=""_blank"">My Old Computer</a>, and I noticed that Jeroen did have a prototype of an application named ""Repair Help"", and it did have the easy layout I was looking for (I did get a copy of it). However, it was never finalized from him, so I took upon myself to create something similar, and a couple of years later (including a long hiatus) I did come up with this quite similar looking application, though expanded with additional functionalities and data points.<br />
                 <br />
 
                 The longer-term goal is that the tool will cover all C64 and C128 computers, and ideally also its most used peripherals, and I will continue to add new and refine data for myself (when doing my own diagnostics and repairing), but I will most likely not be able to do this myself alone. I would really appreciate some help with this, so if you have the willingness, then please reach out to me, and I will happily explain the nitty-gritty details. It is actually quite easy when having tried it once.<br />
                 <br />
 
-                If you see anything that can be better, e.g. due to bad data quality or improvements for the tool, then do reach out to me. Of course I would also be happy, if you would send a comment from the ""Feedback"" tab - even if you do not like the tool, as constructive criticism is always welcome :-)<br />
+                If you see anything that can be better, e.g. bad data quality or improvements for the tool, then do reach out to me. Of course I would also be happy, if you would send a comment from the ""Feedback"" tab - even if you do not like the tool, as constructive criticism is always welcome :-)<br />
                 <br />
 
                 // Dennis
@@ -3235,6 +3251,7 @@ namespace Commodore_Repair_Toolbox
                 var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
                 string boardFile = foundBoard?.DataFile;
                 string excelFilePath = Path.Combine(Application.StartupPath, boardFile);
+
                 try
                 {
                     using (WebClient webClient = new WebClient())
@@ -3245,17 +3262,17 @@ namespace Commodore_Repair_Toolbox
 
                         // Build the data to send
                         var data = new NameValueCollection
-                            {
-                                { "version", versionThis },
-                                { "hardware", hardwareSelectedName },
-                                { "board", boardSelectedName },
-                                { "schematic", schematicSelectedName },
-                                { "filename", boardFile },
-                                { "email", email },
-                                { "feedback", feedback }
-                            };
+                {
+                    { "version", versionThis },
+                    { "hardware", hardwareSelectedName },
+                    { "board", boardSelectedName },
+                    { "schematic", schematicSelectedName },
+                    { "filename", boardFile },
+                    { "email", email },
+                    { "feedback", feedback }
+                };
 
-                        // Attach the binary file if the checkbox is checked
+                        // Attach the binary Excel file if the checkbox is checked
                         if (checkBoxAttachExcel.Checked)
                         {
                             if (!IsFileLocked(excelFilePath))
@@ -3271,6 +3288,27 @@ namespace Commodore_Repair_Toolbox
                                     MessageBoxButtons.OK,
                                     MessageBoxIcon.Error);
                             }
+                        }
+
+                        // Ensure the temporary "UserData" file is attached
+                        string userData = ExtractUserDataForSelectedBoard();
+                        if (!string.IsNullOrEmpty(userData))
+                        {
+                            // Save user data to a temporary file
+                            string tempUserDataFile = Path.Combine(Path.GetTempPath(), "UserData.txt");
+                            File.WriteAllText(tempUserDataFile, userData);
+
+                            // Attach the user data file
+                            byte[] userDataBytes = File.ReadAllBytes(tempUserDataFile);
+                            string userDataBase64 = Convert.ToBase64String(userDataBytes);
+                            data["userDataAttachment"] = userDataBase64;
+
+                            // Clean up the temporary file
+                            File.Delete(tempUserDataFile);
+                        }
+                        else
+                        {
+                            MessageBox.Show("No user data found to attach.", "INFO: No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
 
                         // Send it to the server
@@ -3307,12 +3345,11 @@ namespace Commodore_Repair_Toolbox
                 }
                 catch (WebException ex)
                 {
-                    MessageBox.Show("CRT cannot submit the feedback right now, please retry later. If the issue persists, then you can connect directly with the developer at [dennis@commodore-repair-toolbox.dk]." + Environment.NewLine + Environment.NewLine + "The exact recieved HTTP error is:" + Environment.NewLine + Environment.NewLine + ex.Message,
+                    MessageBox.Show("CRT cannot submit the feedback right now, please retry later. If the issue persists, then you can connect directly with the developer at [dennis@commodore-repair-toolbox.dk]." + Environment.NewLine + Environment.NewLine + "The exact received HTTP error is:" + Environment.NewLine + Environment.NewLine + ex.Message,
                         "ERROR: Cannot connect with server",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error);
                 }
-
             }
             else
             {
@@ -3322,6 +3359,35 @@ namespace Commodore_Repair_Toolbox
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
+        }
+
+
+        // ###########################################################################################
+        // Extract user data for the selected board.
+        // Will be attached as a file to the feedback email.
+        // ###########################################################################################
+
+        private string ExtractUserDataForSelectedBoard()
+        {
+            var userData = new StringBuilder();
+            string baseKey = $"UserData|{hardwareSelectedName}|{boardSelectedName}|";
+
+            // Iterate through all configuration keys
+            foreach (var key in Configuration.GetAllKeys())
+            {
+                if (key.StartsWith(baseKey))
+                {
+                    string value = Configuration.GetSetting(key, "");
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        // Remove only the "UserData|" prefix
+                        string trimmedKey = key.Substring("UserData|".Length);
+                        userData.AppendLine($"{trimmedKey}={value}");
+                    }
+                }
+            }
+
+            return userData.ToString();
         }
 
 

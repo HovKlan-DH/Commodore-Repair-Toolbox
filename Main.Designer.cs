@@ -385,9 +385,9 @@
             this.checkBoxAttachExcel.AutoSize = true;
             this.checkBoxAttachExcel.Location = new System.Drawing.Point(14, 464);
             this.checkBoxAttachExcel.Name = "checkBoxAttachExcel";
-            this.checkBoxAttachExcel.Size = new System.Drawing.Size(305, 25);
+            this.checkBoxAttachExcel.Size = new System.Drawing.Size(558, 25);
             this.checkBoxAttachExcel.TabIndex = 12;
-            this.checkBoxAttachExcel.Text = "Attach Excel data file for selected board";
+            this.checkBoxAttachExcel.Text = "Attach Excel data file for selected board + your own component data (if any)";
             this.checkBoxAttachExcel.UseVisualStyleBackColor = true;
             this.checkBoxAttachExcel.CheckedChanged += new System.EventHandler(this.checkBoxAttachExcel_CheckedChanged);
             // 

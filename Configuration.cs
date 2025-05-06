@@ -13,6 +13,11 @@ namespace Commodore_Repair_Toolbox
         private static readonly string filePath = Path.Combine(Application.StartupPath, "Commodore-Repair-Toolbox.cfg");
         private static Dictionary<string, string> settings = new Dictionary<string, string>();
 
+        public static IEnumerable<string> GetAllKeys()
+        {
+            return settings.Keys;
+        }
+
         public static void LoadConfig()
         {
             if (File.Exists(filePath))
