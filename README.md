@@ -33,10 +33,9 @@ It will run on any 64-bit Windows 10 or newer. It does require _.NET Framework 4
 
 - **Commodore VIC-20**
   - 250403 (CR)
-- **Commodore 64 (Breadbin)**
+- **Commodore 64**
   - 250407
   - 250425
-- **Commodore 64C**
   - 250466
 - **Commodore 128 and 128D** (plastic model, not DCR)
   - 310378
