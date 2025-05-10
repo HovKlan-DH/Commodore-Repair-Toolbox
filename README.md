@@ -8,7 +8,7 @@ This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ he
 # Screenshots
 
 Main screen with schematic view:\
-![Main screen with schematic view](https://github.com/user-attachments/assets/b6970119-f3c2-4ce3-b425-904ef98e3352)
+![Main screen with schematic view](https://github.com/user-attachments/assets/d9b17021-6a56-4e74-b484-b6275fe86ff5)
 
 Component information popup:\
 ![Component information popup](https://github.com/user-attachments/assets/fe500981-3bef-4d99-b2f5-f22406eb6e66)
