@@ -818,7 +818,7 @@
         private System.Windows.Forms.CheckBox checkBoxBlink;
         private System.Windows.Forms.TabPage tabHelp;
         private System.Windows.Forms.TextBox textBoxFilterComponents;
-        private Microsoft.Web.WebView2.WinForms.WebView2 webView2Ressources;
+        public Microsoft.Web.WebView2.WinForms.WebView2 webView2Ressources; // Dennis, made "public" from "private"
         private Microsoft.Web.WebView2.WinForms.WebView2 webView2Help;
         private Microsoft.Web.WebView2.WinForms.WebView2 webView2About;
         private System.Windows.Forms.TabPage tabFeedback;

@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -120,6 +119,8 @@ namespace Commodore_Repair_Toolbox
         private Point windowLastLocation;
         bool thumbnailsSameWidth = false;
         int thumbnailsWidth = 0;
+        //        private FormComponent formComponent;
+        //public static WebView2 webView2Ressources;
 
         // Polyline
         //        private PolylinesManagement polylinesManagement = new PolylinesManagement();
@@ -613,7 +614,8 @@ namespace Commodore_Repair_Toolbox
         // Will load new content from board data file.
         // ###########################################################################################
 
-        private async void UpdateTabOverview(Board selectedBoard)
+        // hest 
+        public async void UpdateTabOverview(Board selectedBoard)
         {
             if (webView2Overview.CoreWebView2 == null)
             {
@@ -712,6 +714,22 @@ namespace Commodore_Repair_Toolbox
                 This is a overview of all components for the selected board. Components listed, follows what is visible in the ""Component list"".<br /><br />
                 The data for this board has the revision date: <b>" + revisionDate + @"</b><br /><br />
             ";
+
+            string js = @"
+                window.updateComponentNotes = function(componentId, componentValue) {
+                    var el = document.getElementById(componentId);
+                    if (el) {
+                        el.innerText = componentValue;
+                    }
+                };
+                window.chrome.webview.addEventListener('message', function(e) {
+                    if (e.data && e.data.type === 'updateNotes') {
+                        window.updateComponentNotes(e.data.id, e.data.value);
+                    }
+                });
+            ";
+
+            htmlContent += $"<script>{js}</script>";
 
             if (foundBoard != null)
             {
@@ -860,7 +878,7 @@ namespace Commodore_Repair_Toolbox
                 BoardComponents selectedComp = foundBoard?.Components.FirstOrDefault(c => c.Label == compName);
                 if (selectedComp != null)
                 {
-                    componentInfoPopup = new FormComponent(selectedComp);
+                    componentInfoPopup = new FormComponent(selectedComp, this);
                     componentInfoPopup.Show(this);
                     componentInfoPopup.BringToFront();
                 }
@@ -1780,6 +1798,15 @@ namespace Commodore_Repair_Toolbox
                 ReadaptThumbnails();
             }
 
+            // Make sure to resize thumbnails, in case some resizing has happend in between
+            if (tabControl.SelectedTab == tabOverview)
+            {
+                // hest
+                //var selectedBoardClass = GetSelectedBoardClass();
+                //if (selectedBoardClass == null) return;
+                //UpdateTabOverview(selectedBoardClass);
+            }            
+
             previousTab = tabControl.SelectedTab;
         }
 
@@ -1881,7 +1908,8 @@ namespace Commodore_Repair_Toolbox
             SuspendLayout();
             InitializeThumbnails();
             InitializeTabMain();
-            UpdateTabOverview(selectedBoardClass);
+            // hest
+//            UpdateTabOverview(selectedBoardClass);
             UpdateTabRessources(selectedBoardClass);
 
             // Load polylines after initializing thumbnails and tabs
@@ -1917,7 +1945,7 @@ namespace Commodore_Repair_Toolbox
         // Get the class of the selected board.
         // ###########################################################################################
 
-        private Board GetSelectedBoardClass()
+        public Board GetSelectedBoardClass()
         {
             var hardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             return hardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
@@ -1931,6 +1959,10 @@ namespace Commodore_Repair_Toolbox
 
         public static string ConvertStringToLabel(string str)
         {
+            if (string.IsNullOrEmpty(str))
+            {
+                return str;
+            }
             return str.Replace("&", "&&");
         }
 
@@ -3025,10 +3057,105 @@ namespace Commodore_Repair_Toolbox
         private void ShowComponentPopup(BoardComponents comp)
         {
             string title = comp.NameDisplay;
-            componentInfoPopup = new FormComponent(comp);
+            componentInfoPopup = new FormComponent(comp, this);
             componentInfoPopup.Text = ConvertStringToLabel(title);
             componentInfoPopup.Show(this);
             componentInfoPopup.BringToFront();
+        }
+
+        private string GenerateTableContentForBoard(Board selectedBoard)
+        {
+            StringBuilder tableHtml = new StringBuilder();
+            var visibleComponents = listBoxComponents.Items.Cast<string>().ToHashSet();
+
+            tableHtml.Append("<table width='100%' border='1'>");
+            tableHtml.Append("<thead>");
+            tableHtml.Append("<tr>");
+            tableHtml.Append("<th valign='bottom'>Type</th>");
+            tableHtml.Append("<th valign='bottom'>Component</th>");
+            tableHtml.Append("<th valign='bottom'>Technical name</th>");
+            tableHtml.Append("<th valign='bottom'>Friendly name</th>");
+            tableHtml.Append("<th valign='bottom'>Short description</th>");
+            tableHtml.Append("<th valign='bottom'>Notes</th>");
+            tableHtml.Append("<th valign='bottom'>Local files</th>");
+            tableHtml.Append("<th valign='bottom'>Web links</th>");
+            tableHtml.Append("</tr>");
+            tableHtml.Append("</thead>");
+            tableHtml.Append("<tbody>");
+
+            foreach (BoardComponents comp in selectedBoard.Components)
+            {
+                if (!visibleComponents.Contains(comp.NameDisplay)) continue;
+
+                string compType = comp.Type;
+                string compLabel = comp.Label;
+                string compNameTechnical = comp.NameTechnical;
+                string compNameFriendly = comp.NameFriendly.Replace("?", "");
+
+                // Read potential user-modified values
+                string baseKey = $"UserData|{hardwareSelectedName}|{boardSelectedName}|{compLabel}";
+                string oneLinerKey = $"{baseKey}|Oneliner";
+                string notesKey = $"{baseKey}|Notes";
+
+                string compDescrShort = Configuration.GetSetting(oneLinerKey, "");
+                if (string.IsNullOrEmpty(compDescrShort))
+                {
+                    compDescrShort = comp.OneLiner;
+                }
+
+                string compDescrLong = Configuration.GetSetting(notesKey, "");
+                if (string.IsNullOrEmpty(compDescrLong))
+                {
+                    compDescrLong = comp.Description;
+                }
+                else
+                {
+                    compDescrLong = compDescrLong.Replace("\\n", "<br />");
+                }
+
+                // Generate table row
+                tableHtml.Append("<tr>");
+                tableHtml.Append($"<td valign='top'>{compType}</td>");
+                tableHtml.Append($"<td valign='top' data-compLabel='{compLabel}' class='doNotFocusFilter'>{compLabel}</td>");
+                tableHtml.Append($"<td valign='top'>{compNameTechnical}</td>");
+                tableHtml.Append($"<td valign='top'>{compNameFriendly}</td>");
+                tableHtml.Append($"<td valign='top'>{compDescrShort}</td>");
+                tableHtml.Append($"<td valign='top'>{compDescrLong}</td>");
+
+                // Local files column
+                tableHtml.Append("<td valign='top'>");
+                if (comp.LocalFiles != null && comp.LocalFiles.Count > 0)
+                {
+                    int counter = 1;
+                    foreach (ComponentLocalFiles file in comp.LocalFiles)
+                    {
+                        string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, file.FileName));
+                        string fileUri = new Uri(filePath).AbsoluteUri;
+                        tableHtml.Append($"<a href='{fileUri}' class='tooltip-link' data-title='{file.Name}' target='_blank'>#{counter}</a> ");
+                        counter++;
+                    }
+                }
+                tableHtml.Append("</td>");
+
+                // Web links column
+                tableHtml.Append("<td valign='top'>");
+                if (comp.ComponentLinks != null && comp.ComponentLinks.Count > 0)
+                {
+                    int counter = 1;
+                    foreach (ComponentLinks link in comp.ComponentLinks)
+                    {
+                        tableHtml.Append($"<a href='{link.Url}' target='_blank' class='tooltip-link' data-title='{link.Name}'>#{counter}</a> ");
+                        counter++;
+                    }
+                }
+                tableHtml.Append("</td>");
+                tableHtml.Append("</tr>");
+            }
+
+            tableHtml.Append("</tbody>");
+            tableHtml.Append("</table>");
+
+            return tableHtml.ToString();
         }
 
 

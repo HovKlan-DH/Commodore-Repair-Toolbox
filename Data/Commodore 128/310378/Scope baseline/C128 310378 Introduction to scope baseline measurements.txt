@@ -1,8 +1,8 @@
 --------------------------------------
 Hardware      : Commodore 128 and 128D
 Board         : 310378
-Revision date : 2025-April-24
------------------------------
+Revision date : 2025-May-1
+--------------------------
 
 The intention with this introduction and the following scope references, is to give a baseline with some concrete
 and hands-on scope readings, on this very specific system, for comparison with your own measurements. It is meant as
@@ -21,18 +21,18 @@ can use when comparing with your own readings.
 PAL
 System used for all PAL measurements
 ------------------------------------
-- Factory non-modified fully working C128 board 310378, with a Danish character ROM (325175-01)
+- Factory non-modified (at last I believe so) fully working C128 board 310378, with a Danish character ROM (325175-01)
 - All original components (no modern replacements)
-- In idle C128 Basic mode (cursor blinking) with no attachments connected at all, except audio/video cable (even no keyboard)
-- Using new (bought) modern PSU
+- Idle in C128 Basic mode (cursor blinking) with no attachments connected at all, except audio/video cable (even no keyboard)
+- Using new modern PSU from https://www.c64psu.com (not affiliated at all)
 - Country (Denmark) has 230V/50Hz so it is PAL (not NTSC)
 
 
 ----------------------------------------
 Scope measurements and good-to-know info
 ----------------------------------------
-- Use scope to measure all DC voltage and LOW/HIGH signals
-- Connect scope probe ground (GND) to expansion port chassis - not perfect at all, but OK to validate and with least short-circuit risks
+- Use scope to measure all DC voltages and LOW/HIGH signals
+- Connect scope probe ground (GND) to expansion port chassis - not perfect but OK to validate and with least risk of short-circuit
     - Optimal reading is gained from connecting to closest GND and not the expansion port chassis
     - Optimal reading is gained by using scope GND pin-clip instead of the probe GND wire
     - Important: There are considerable more risk of short-circuit when actively handling two pins using both hands AND simultaneously looking at the scope - this is why I personally prefer always using the expansion port chassis as scope GND!
@@ -50,8 +50,8 @@ Scope measurements and good-to-know info
     - Investigate if dominant reading is in the range 0.9V to 2.2V, as ideally this is either a nice "near 0V" or "near 5V" signal plus some noise
 - Trigger point can initially be set to ~2V, but expect to change it to get correct reading
 - Probe set to "1x" attenuation, unless mentioned otherwise
-- If reading is set as "N/A" it means the pin is not applicable, and the pin is most likely not connected to anything
-- Before images are "printed" all values are cleared and then awaiting a couple of seconds for it to settle for new averages
+- If reading is set as "N/A" it means the pin is not applicable, and it is most likely not connected to anything
+- Before scope images are "printed", all values are cleared and then awaiting a couple of seconds for it to settle for new averages
 - The reading can and will of course be very different when setup or load changes compared to the depicted setup in this documentation
 - I cannot explain the reasoning behind why the reading is as-is, and I am just the "delivery man" of the data :-)
 - You are highly encouraged to read "Sven's Techsite; Scope on the C64" from the "Resources" tab

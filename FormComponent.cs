@@ -19,12 +19,16 @@ namespace Commodore_Repair_Toolbox
         private readonly BoardComponents component;
         private Timer scrollTimer = new Timer();
         private bool isScrolling = false;
+        //        public event EventHandler ComponentNotesUpdated;
+        private Main main; // instance of the "Main" form
 
         public string PictureBoxName { get; }
 
-        public FormComponent(BoardComponents component)
+        public FormComponent(BoardComponents component, Main main)
         {
             InitializeComponent();
+
+            this.main = main; // Assign the Main instance
 
             // Assign the passed-in component to the class-level field
             this.component = component;
@@ -109,6 +113,9 @@ namespace Commodore_Repair_Toolbox
         {
             // Reset the image index to the first image
             currentImageIndex = 0;
+
+            // Give control to "pictureBox1"
+            ActiveControl = pictureBox1;
 
             // Update the image
             UpdateImage();
@@ -256,6 +263,16 @@ namespace Commodore_Repair_Toolbox
         {
             SaveComponentUserNotes();
             panel1.Invalidate(); // trigger repaint to update the border
+
+            string componentId = $"component-{component.Label}-notes";
+            string value = textBox1.Text.Replace(Environment.NewLine, "\\n");
+            // Assuming you have a reference to the WebView2 control:
+            string script = $"window.postMessage({{type:'updateNotes',id:'{componentId}',value:`{value}`}}, '*');";
+            // Call this on the main form's WebView2 instance:
+            if (main?.webView2Ressources != null)
+            {
+                main.webView2Ressources.ExecuteScriptAsync(script);
+            }
         }
 
         private void SaveComponentUserOneliner()
