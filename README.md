@@ -23,11 +23,17 @@ With _CRT_ you can easily view schematics, zoom in/out, identify components, see
 
 It is primarily dedicated to Commodore, and have a few built-in datasets for Commodore computers, but it does support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simple" and have good documentation available, like schematics, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
 
+
+# Requirements
+
+* Windows 10 (64-bit) or newer
+* .NET Framework 4.8.1 (integrated part of the operating system)
+
+
 # Installation and usage
 
 _CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file, `Commodore-Repair-Toolbox.exe`
 
-It will run on any 64-bit Windows 10 or newer. It does require _.NET Framework 4.8.1_, but this is an integrated part of the operating system.
 
 # Built-in hardware / boards
 
