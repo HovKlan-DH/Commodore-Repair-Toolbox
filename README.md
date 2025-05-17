@@ -8,7 +8,7 @@ This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ he
 # Screenshots
 
 Main screen with schematic view:\
-![Main screen with schematic view](https://github.com/user-attachments/assets/b6970119-f3c2-4ce3-b425-904ef98e3352)
+![Main screen with schematic view](https://github.com/user-attachments/assets/d9b17021-6a56-4e74-b484-b6275fe86ff5)
 
 Component information popup:\
 ![Component information popup](https://github.com/user-attachments/assets/fe500981-3bef-4d99-b2f5-f22406eb6e66)
@@ -19,24 +19,29 @@ Oscilloscope baseline measurement:\
 
 # What is it?
 
-With _CRT_ you can easily view schematics, zoom in/out, identify components, see chip pinouts, study datasheets, view oscilloscope readings, ressources and various other information, helping you diagnosing and repairing old vintage hardware.
+With _CRT_ you can easily view schematics, zoom in/out, identify components, see chip pinouts, do manual circuit tracing, study datasheets, view oscilloscope readings, ressources and various other information, helping you diagnosing and repairing old vintage hardware.
 
 It is primarily dedicated to Commodore, and have a few built-in datasets for Commodore computers, but it does support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simple" and have good documentation available, like schematics, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
+
+
+# Requirements
+
+* Windows 10 (64-bit) or newer
+* .NET Framework 4.8.1 (integrated part of the operating system)
+
 
 # Installation and usage
 
 _CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file, `Commodore-Repair-Toolbox.exe`
 
-It will run on any 64-bit Windows 10 or newer. It does require _.NET Framework 4.8.1_, but this is an integrated part of the operating system.
 
 # Built-in hardware / boards
 
 - **Commodore VIC-20**
   - 250403 (CR)
-- **Commodore 64 (Breadbin)**
+- **Commodore 64**
   - 250407
   - 250425
-- **Commodore 64C**
   - 250466
 - **Commodore 128 and 128D** (plastic model, not DCR)
   - 310378
