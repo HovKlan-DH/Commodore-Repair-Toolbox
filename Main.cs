@@ -33,6 +33,19 @@ namespace Commodore_Repair_Toolbox
             h2 { font-size: 11pt; padding: 0px; margin: 0px; }
             ul { margin: 0px; }
             a { color: #5181d0; }
+            .typewriter {
+                background-color: black;
+                color: white;
+                font-family: Consolas, ""Lucida Console"", Monaco, monospace;
+                padding-left: 0.2rem;
+                padding-right: 0.2rem;
+                padding-top: 0.1rem;
+                padding-bottom: 0.1rem;
+                white-space: pre;
+                font-size: 75%;
+                display: inline-block;
+                border-radius: 0.25rem;
+            }
             </style>
             <script>
             document.addEventListener('click', function(e) {
@@ -614,7 +627,6 @@ namespace Commodore_Repair_Toolbox
         // Will load new content from board data file.
         // ###########################################################################################
 
-        // hest 
         public async void UpdateTabOverview(Board selectedBoard)
         {
             if (webView2Overview.CoreWebView2 == null)
@@ -1034,21 +1046,21 @@ namespace Commodore_Repair_Toolbox
                 <ul>
                     <li>Mouse functions:</li>
                     <ul>
-                        <li><b>Left-click</b> on a component will show a information popup</li>
-                        <li><b>Left-click</b> + <b>Hold</b> will do one of three things:</li>
+                        <li><span class='typewriter'>Left-click</span> on a component will show a information popup</li>
+                        <li><span class='typewriter'>Left-click</span> + <span class='typewriter'>Hold</span> will do one of three things:</li>
                         <ul>
-                            <li>Start a new trace, when in ""empty"" space</li>
+                            <li>Start a new trace, when in ""empty"" space (not on top of component)</li>
                             <li>Move trace marker, if mouse is on top of an existing trace marker</li>
                             <li>Insert new trace marker, if mouse is on top of an existing trace, but not on top of a trace marker</li>
                         </ul>
-                        <li><b>Right-click</b> will do one of three things:</li>
+                        <li><span class='typewriter'>Right-click</span> will do one of three things:</li>
                         <ul>
                             <li>Toggle component highlight, if mouse is on top of a component</li>
                             <li>Remove entire trace, if mouse is on top of an existing trace, but not on top of a trace marker</li>
                             <li>Remove trace marker, if mouse is on top of an existing trace marker</li>
                         </ul>
-                        <li><b>Right-click</b> + <b>Hold</b> will pan the image</li>
-                        <li><b>Scrollwheel</b> will zoom in/out</li>
+                        <li><span class='typewriter'>Right-click</span> + <span class='typewriter'>Hold</span> will pan the image</li>
+                        <li><span class='typewriter'>Scrollwheel</span> will zoom in/out</li>
                     </ul>
                 </ul>
                 <br />
@@ -1056,15 +1068,27 @@ namespace Commodore_Repair_Toolbox
                 <ul>
                     <li>Keyboard functions:</li>
                     <ul>
-                        <li><b>F11</b> will toggle fullscreen</li>
-                        <li><b>ESCAPE</b> will exit fullscreen</li>
-                        <li><b>ENTER</b> will toggle blinking for selected components</li>
-                        <li><b>ALT</b> + <b>A</b> will select all components in ""Component list""</li>
-                        <li><b>ALT</b> + <b>C</b> will clear all selections and show all components in ""Component list""</li>
-                        <li>Start typing anywhere to filter component list</li>
-                        <li>Filtering supports multi-word/character searching, divided by whitespace:</li>
+                        <li><span class='typewriter'>F11</span> will toggle fullscreen</li>
+                        <li><span class='typewriter'>ESCAPE</span> will exit fullscreen</li>
+                        <li><span class='typewriter'>ENTER</span> will toggle blinking for selected components</li>
+                        <li><span class='typewriter'>ALT</span> + <span class='typewriter'>A</span> will select all components in ""Component list""</li>
+                        <li><span class='typewriter'>ALT</span> + <span class='typewriter'>C</span> will clear all selections and show all components in ""Component list""</li>
+                        <li>Start typing anywhere to filter component list (view ""Filtering"")</li>
+                    </ul>
+                </ul>
+                <br />
+
+                <ul>
+                    <li>Filtering:</li>
+                    <ul>
+                        <li>Filtering supports multi-word/character searching, divided by a whitespace</li>
+                        <li>When doing a multi-word searching then the order is not important</li>
+                        <li>Filtering is case-insensitive</li>
+                        <li>Examples of a multi-word/character search:</li>
                         <ul>
-                            <li><span style='background:lightgrey;'>&nbsp;cpu 6 85&nbsp;</span> will find e.g. the component <span style='background:lightgrey;'>&nbsp;U6 | CPU | 8502&nbsp;</span></li>
+                            <li>Typing <span class='typewriter'>U6 | CPU | 8502</span> will find the component <span style='background:lightgrey;'>&nbsp;U6 | CPU | 8502&nbsp;</span></li>
+                            <li>Typing <span class='typewriter'>CPU 8502 U6</span> will find the component <span style='background:lightgrey;'>&nbsp;U6 | CPU | 8502&nbsp;</span></li>
+                            <li>Typing <span class='typewriter'>5 8 U P c 6</span> will find the component <span style='background:lightgrey;'>&nbsp;U6 | CPU | 8502&nbsp;</span></li>
                         </ul>
                     </ul>
                 </ul>
@@ -1087,7 +1111,7 @@ namespace Commodore_Repair_Toolbox
                     <li>Circuit tracing:</li>
                     <ul>
                         <li>When mouse cursor shows a ""cross"", then you can start drawing a new trace</li>
-                        <li>Holding down <b>SHIFT</b> while drawing a trace, will vertically and horizontally align the trace to its neighbour markers</li>
+                        <li>Holding down <span class='typewriter'>SHIFT</span> while drawing a trace, will vertically and horizontally align the trace to its neighbour markers</li>
                     </ul>
                 </ul>
                 <br />
@@ -1112,6 +1136,8 @@ namespace Commodore_Repair_Toolbox
                 </ul>
                 <br />
 
+                <hr><br />
+
                 <b>Component information popup</b>:<br />
                 <br />
 
@@ -1121,8 +1147,8 @@ namespace Commodore_Repair_Toolbox
                 <ul>
                     <li>Mouse functions:</li>
                     <ul>
-                        <li><b>Click</b> in the image area will change back to first image (typically the pinout)</li>
-                        <li><b>Scrollwheel</b> will change image, if multiple images</li>
+                        <li><span class='typewriter'>Left-click</span> in the image area will change back to first image (typically the pinout)</li>
+                        <li><span class='typewriter'>Scrollwheel</span> will change image, if multiple images</li>
                     </ul>
                 </ul>
                 <br />
@@ -1130,12 +1156,14 @@ namespace Commodore_Repair_Toolbox
                 <ul>
                     <li>Keyboard functions:</li>
                     <ul>
-                        <li><b>ARROW KEYS</b> will change image, if multiple images</li>
-                        <li><b>SPACE</b> will change back to first image (typical the pinout)</li>
-                        <li><b>ESCAPE</b> or <b>ENTER</b> will close popup</li>
+                        <li>Arrows keys <span class='typewriter'>←</span> <span class='typewriter'>→</span> <span class='typewriter'>↑</span> <span class='typewriter'>↓</span> will change image, if multiple images</li>
+                        <li><span class='typewriter'>SPACE</span> will change back to first image (typical the pinout)</li>
+                        <li><span class='typewriter'>ESCAPE</span> will close popup</li>
                     </ul>
                 </ul>
                 <br />
+
+                <hr><br />
 
                 <b>Misc</b>:<br />
                 <br />
