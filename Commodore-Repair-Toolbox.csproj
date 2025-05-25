@@ -159,6 +159,7 @@
     <Compile Include="ControlExtensions.cs" />
     <Compile Include="ControlUpdateHelper.cs" />
     <Compile Include="DataStructure.cs" />
+    <Compile Include="DataUpdate.cs" />
     <Compile Include="FormComponent.cs">
       <SubType>Form</SubType>
     </Compile>

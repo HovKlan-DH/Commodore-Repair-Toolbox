@@ -12,6 +12,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using System.Security.Cryptography;
 
 
 namespace Commodore_Repair_Toolbox
@@ -151,6 +152,9 @@ namespace Commodore_Repair_Toolbox
         {
             InitializeComponent();
 
+            // Create or overwrite the debug output file
+            CreateDebugOutputFile();
+
             polylinesManagement = new PolylinesManagement(this);
 
             // Get build type
@@ -159,9 +163,6 @@ namespace Commodore_Repair_Toolbox
 #else
                 buildType = "Release";
 #endif
-
-            // Create or overwrite the debug output file
-            CreateDebugOutputFile();
 
             // Enable double-buffering for smoother UI rendering
             EnableDoubleBuffering();
@@ -181,6 +182,81 @@ namespace Commodore_Repair_Toolbox
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // Add this static method to your Configuration class or as a utility
+        public static List<LocalFiles> GetAllReferencedLocalFiles()
+        {
+            var localFiles = new List<LocalFiles>();
+            var checkedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // 2. Add the Excel file itself
+            if (File.Exists("Commodore-Repair-Toolbox.xlsx") && checkedFiles.Add("Commodore-Repair-Toolbox.xlsx"))
+            {
+                localFiles.Add(new LocalFiles
+                {
+                    File = Path.GetFileName("Commodore-Repair-Toolbox.xlsx"),
+                    Checksum = GetFileChecksum("Commodore-Repair-Toolbox.xlsx")
+                });
+            }
+
+            // 1. Traverse all files in the folder (recursively)
+            foreach (var filePath in Directory.GetFiles("Data", "*.*", SearchOption.AllDirectories))
+            {
+                string file = filePath.Replace("\\", "/");
+
+                if (checkedFiles.Add(file))
+                {
+                    localFiles.Add(new LocalFiles
+                    {
+                        File = file,
+                        Checksum = GetFileChecksum(file)
+                    });
+                }
+            }
+
+            return localFiles;
+        }
+
+        // Helper to compute SHA256 checksum
+        private static string GetFileChecksum(string filePath)
+        {
+            try
+            {
+                using (var sha = SHA256.Create())
+                using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    var hash = sha.ComputeHash(stream);
+                    return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                }
+            }
+            catch (IOException ex)
+            {
+                // File is locked (e.g., by Excel)
+                Debug.WriteLine($"Cannot read file {filePath}: {ex.Message}");
+                return "hest"; // Or handle as needed
+            }
+        }
+
+
+
+
+
+
+
+
 
 
         // ###########################################################################################
@@ -3968,6 +4044,112 @@ namespace Commodore_Repair_Toolbox
                 }
             }
         }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            var confirmResult = MessageBox.Show(
+                "Please confirm that you will overwrite ALL known files.",
+                "Confirm file overwrite",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning
+            );
+
+            if (confirmResult != DialogResult.Yes)
+                return;
+
+            button2.Text = "Will update data at next launch";
+            button2.Enabled = false;
+
+            // Get list of files and checksums from online source
+            var service = new DataUpdateService();
+            List<DataUpdate> checksumFromOnline = service.GetDataUpdates();
+            DebugOutput("INFO: Fetched checksum list of [" + checksumFromOnline.Count + "] files from online source");
+
+            List<LocalFiles> checksumFromLocal = GetAllReferencedLocalFiles();
+            DebugOutput("INFO: Calculated checksum list of [" + checksumFromOnline.Count + "] files from local storage");
+
+            // Find files present online but missing locally
+            var missingLocal = checksumFromOnline
+                .Where(online => !checksumFromLocal.Any(local =>
+                    string.Equals(local.File, online.File, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            // Find files present in both lists but with different checksums
+            var differingChecksums = checksumFromOnline
+                .Join(
+                    checksumFromLocal,
+                    online => online.File,
+                    local => local.File,
+                    (online, local) => new { File = online.File, OnlineChecksum = online.Checksum, LocalChecksum = local.Checksum }
+                )
+                .Where(x => !string.Equals(x.OnlineChecksum, x.LocalChecksum, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+
+            // Combine missingLocal and differingChecksums to get the list of files to transfer from online to local
+            // Only include files that are present in the online list
+            var filesToTransfer = missingLocal
+                .Select(f => f.File)
+                .Concat(differingChecksums.Select(f => f.File))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(file => checksumFromOnline.Any(online => string.Equals(online.File, file, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            // ---
+
+            bool hasExcelBeenTransferred = false;
+
+            foreach (var file in filesToTransfer)
+            {
+                hasExcelBeenTransferred = file.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? true : hasExcelBeenTransferred;
+
+                // Find the online file entry (assuming DataUpdate has File and Url or similar)
+                var onlineFile = checksumFromOnline.FirstOrDefault(f =>
+                    string.Equals(f.File, file, StringComparison.OrdinalIgnoreCase));
+                if (onlineFile == null)
+                    continue; // Skip if not found online
+
+                // Ensure the directory exists
+                string localPath = Path.Combine(Application.StartupPath, file.Replace("/", "\\"));
+                string directory = Path.GetDirectoryName(localPath);
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                // Download and overwrite the file
+                using (var client = new WebClient())
+                {
+                    string decodedUrl = WebUtility.UrlDecode(onlineFile.Url);
+
+                    // Check if the file is locked before downloading
+                    if (!IsFileLocked(localPath))
+                    {
+                        client.DownloadFile(decodedUrl, localPath);
+                    }
+                    else
+                    {
+                        MessageBox.Show("The file [" + localPath + "] currently has an exclusive lock, and cannot be updated from the online source.\r\n\r\nPlease close any application that might be using it and retry the synchronization.",
+                            "ERROR: Cannot update file",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
+                    }
+                }
+                DebugOutput($"INFO: Downloaded and replaced file [{file}] from online source");
+            }
+
+            if (filesToTransfer.Count > 0)
+            {
+                // Show a message box with the number of files transferred
+                string message = $"Transferred {filesToTransfer.Count} files from online source to local storage." +
+                    (hasExcelBeenTransferred ? "\r\n\r\nOne or more Excel files have been updated, which means you need to restart the application for its data to be shown." : "");
+                MessageBox.Show(message, "OK: Files updated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show("No files to update from online source.", "OK: No update needed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
     }
 
 
@@ -4090,4 +4272,26 @@ namespace Commodore_Repair_Toolbox
             CustomMouseWheel?.Invoke(this, e);
         }
     }
+
+    // hest
+    public class DataUpdateService
+    {
+        public List<DataUpdate> GetDataUpdates()
+        {
+            using (var client = new WebClient())
+            {
+                string json = client.DownloadString("https://commodore-repair-toolbox.dk/auto-data/dataChecksums.json");
+                var updates = DataUpdate.LoadFromJson(json);
+                return updates;
+            }
+        }
+    }
+
+    // Add this class to represent a local file entry
+    public class LocalFiles
+    {
+        public string File { get; set; }
+        public string Checksum { get; set; }
+    }
+
 }
