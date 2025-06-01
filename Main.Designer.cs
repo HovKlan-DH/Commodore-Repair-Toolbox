@@ -86,6 +86,8 @@
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
             this.button2 = new System.Windows.Forms.Button();
+            this.tabMisc = new System.Windows.Forms.TabPage();
+            this.webView2Misc = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -104,6 +106,8 @@
             this.tabAbout.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.webView2About)).BeginInit();
             this.panelBehindTab.SuspendLayout();
+            this.tabMisc.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.webView2Misc)).BeginInit();
             this.SuspendLayout();
             // 
             // tabControl
@@ -111,6 +115,7 @@
             this.tabControl.Controls.Add(this.tabSchematics);
             this.tabControl.Controls.Add(this.tabOverview);
             this.tabControl.Controls.Add(this.tabRessources);
+            this.tabControl.Controls.Add(this.tabMisc);
             this.tabControl.Controls.Add(this.tabFeedback);
             this.tabControl.Controls.Add(this.tabHelp);
             this.tabControl.Controls.Add(this.tabAbout);
@@ -742,14 +747,39 @@
             // 
             // button2
             // 
-            this.button2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.button2.Location = new System.Drawing.Point(12, 596);
+            this.button2.Location = new System.Drawing.Point(17, 74);
             this.button2.Name = "button2";
-            this.button2.Size = new System.Drawing.Size(273, 28);
+            this.button2.Size = new System.Drawing.Size(241, 28);
             this.button2.TabIndex = 16;
-            this.button2.Text = "Sync data at next launch";
+            this.button2.Text = "Update data from online source";
             this.button2.UseVisualStyleBackColor = true;
             this.button2.Click += new System.EventHandler(this.button2_Click);
+            // 
+            // tabMisc
+            // 
+            this.tabMisc.Controls.Add(this.button2);
+            this.tabMisc.Controls.Add(this.webView2Misc);
+            this.tabMisc.Location = new System.Drawing.Point(4, 30);
+            this.tabMisc.Name = "tabMisc";
+            this.tabMisc.Size = new System.Drawing.Size(720, 536);
+            this.tabMisc.TabIndex = 9;
+            this.tabMisc.Text = "Misc";
+            this.tabMisc.UseVisualStyleBackColor = true;
+            // 
+            // webView2Misc
+            // 
+            this.webView2Misc.AllowExternalDrop = true;
+            this.webView2Misc.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.webView2Misc.BackColor = System.Drawing.Color.White;
+            this.webView2Misc.CreationProperties = null;
+            this.webView2Misc.DefaultBackgroundColor = System.Drawing.Color.White;
+            this.webView2Misc.Location = new System.Drawing.Point(0, 3);
+            this.webView2Misc.Name = "webView2Misc";
+            this.webView2Misc.Size = new System.Drawing.Size(710, 530);
+            this.webView2Misc.TabIndex = 0;
+            this.webView2Misc.ZoomFactor = 1D;
             // 
             // Main
             // 
@@ -757,7 +787,6 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.WhiteSmoke;
             this.ClientSize = new System.Drawing.Size(1082, 653);
-            this.Controls.Add(this.button2);
             this.Controls.Add(this.textBoxFilterComponents);
             this.Controls.Add(this.checkBoxBlink);
             this.Controls.Add(this.panelBehindTab);
@@ -800,6 +829,8 @@
             ((System.ComponentModel.ISupportInitialize)(this.webView2About)).EndInit();
             this.panelBehindTab.ResumeLayout(false);
             this.panelBehindTab.PerformLayout();
+            this.tabMisc.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.webView2Misc)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -864,5 +895,7 @@
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Button buttonTracesDelete;
         private System.Windows.Forms.Button button2;
+        private System.Windows.Forms.TabPage tabMisc;
+        private Microsoft.Web.WebView2.WinForms.WebView2 webView2Misc;
     }
 }

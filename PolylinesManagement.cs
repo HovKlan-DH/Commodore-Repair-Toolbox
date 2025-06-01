@@ -539,7 +539,8 @@ namespace Commodore_Repair_Toolbox
             }
         }
         */
-        private static void DrawPolyline(Graphics graphics, List<Point> polyline, Pen defaultPen, int polylineIndex)
+
+        private static void DrawPolylineXXX(Graphics graphics, List<Point> polyline, Pen defaultPen, int polylineIndex)
         {
             // Use the composite key to get the color
             var key = (Main.schematicSelectedName, polylineIndex);
@@ -582,6 +583,43 @@ namespace Commodore_Repair_Toolbox
 
             // Draw markers only if the polyline is selected
             if (isSelected)
+            {
+                foreach (var point in polyline)
+                {
+                    Point scaledPoint = ScalePoint(point);
+                    DrawMarker(graphics, scaledPoint, lineColor);
+                }
+            }
+        }
+
+        private static void DrawPolyline(Graphics graphics, List<Point> polyline, Pen defaultPen, int polylineIndex)
+        {
+            var key = (Main.schematicSelectedName, polylineIndex);
+            Color lineColor = polylineColors.ContainsKey(key) ? polylineColors[key] : defaultPen.Color;
+            bool isSelected = (polylineIndex == selectedPolylineIndex);
+
+            using (Pen whitePen = new Pen(Color.White, 9))
+            using (Pen customPen = new Pen(lineColor, 5))
+            {
+                whitePen.LineJoin = LineJoin.Round;
+                customPen.LineJoin = LineJoin.Round;
+
+                // Draw lines for polylines with more than one point
+                for (int i = 0; i < polyline.Count - 1; i++)
+                {
+                    Point scaledStart = ScalePoint(polyline[i]);
+                    Point scaledEnd = ScalePoint(polyline[i + 1]);
+
+                    if (isSelected)
+                    {
+                        graphics.DrawLine(whitePen, scaledStart, scaledEnd);
+                    }
+                    graphics.DrawLine(customPen, scaledStart, scaledEnd);
+                }
+            }
+
+            // Always draw markers, even for "empty" polylines (2 identical points)
+            if (isSelected || polyline.Count == 2)
             {
                 foreach (var point in polyline)
                 {

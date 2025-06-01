@@ -155,6 +155,25 @@ namespace Commodore_Repair_Toolbox
             // Create or overwrite the debug output file
             CreateDebugOutputFile();
 
+            // Load configuration file
+            LoadConfigFile();
+
+            // Load configuration parameter "SyncDataAtNextLaunch"
+            string syncDataAtNextLaunchStr = Configuration.GetSetting("SyncDataAtNextLaunch", "False");
+            bool shouldSyncData = bool.TryParse(syncDataAtNextLaunchStr, out bool result) && result;
+            if (shouldSyncData)
+            {
+                MessageBox.Show(
+                    "\"CRT\" will now update all its Excel data files and images from the online source, and it means it will overwrite all local \"CRT\" files.\r\n\r\nDepending on the amount of updates needed, this can either be very fast (less than 10 seconds) or take a little longer time (a few minutes).\r\n\r\nCheck the logfile for details.",
+                    "Data update information",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+
+                syncFilesFromSource();
+                Configuration.SaveSetting("SyncDataAtNextLaunch", "False");
+            }
+
             polylinesManagement = new PolylinesManagement(this);
 
             // Get build type
@@ -172,12 +191,13 @@ namespace Commodore_Repair_Toolbox
             GetOnlineVersion();
 
             // Initialize relevant "WebView2" components (used in tab pages)
+            InitializeTabMisc();
             InitializeTabHelp();
             InitializeTabAbout();
 
             // Load all files (Excel and configuration)
             LoadExcelData();
-            LoadConfigFile();
+//            LoadConfigFile();
 
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
@@ -1100,6 +1120,42 @@ namespace Commodore_Repair_Toolbox
         // Initialize the tab for "Help".
         // ###########################################################################################
 
+        private async void InitializeTabMisc()
+        {
+            if (webView2Misc.CoreWebView2 == null)
+            {
+                await webView2Misc.EnsureCoreWebView2Async(null);
+            }
+
+            string htmlContent = @"
+                <html>
+                <head>
+                <meta charset='UTF-8'>
+                </head>
+                <body>
+                " + htmlForTabs + @"
+                <h1>Misc</h1><br />
+
+                </body>
+                </html>
+            ";
+
+/*
+            // Make sure we detach any current event handles, before we add a new one
+            webView2Help.CoreWebView2.WebMessageReceived -= WebView2_WebMessageReceived; // detach first
+            webView2Help.CoreWebView2.WebMessageReceived += WebView2_WebMessageReceived; // attach again
+            webView2Help.CoreWebView2.NewWindowRequested -= WebView2OpenUrl_NewWindowRequested; // detach first
+            webView2Help.CoreWebView2.NewWindowRequested += WebView2OpenUrl_NewWindowRequested; // attach again
+*/
+
+            webView2Misc.NavigateToString(htmlContent);
+        }
+
+
+        // ###########################################################################################
+        // Initialize the tab for "Help".
+        // ###########################################################################################
+
         private async void InitializeTabHelp()
         {
             if (webView2Help.CoreWebView2 == null)
@@ -1239,6 +1295,23 @@ namespace Commodore_Repair_Toolbox
                 </ul>
                 <br />
 
+                <hr><br />
+
+                <b>Data update from online source</b>:<br />
+                <br />
+
+                It is possible to fetch the newest data from the online source.<br />
+                You can do this via the ""Misc"" tab.<br />
+                <br />
+
+                If you have <i>not</i> modified any data on your own, then there is no risks in doing this - go for it.<br />
+                If you <i>do have</i> modified some data, then be aware that all Excel data files and all images will be overwritten, so do make a backup before you update.<br />
+                The update will not delete any files it does not know - e.g. if you have added some of your own files.<br />
+                <br />
+                
+                The update will happen at the <i>next</i> application launch, so you will not see the changes immediately.<br />
+                <br />
+                
                 <hr><br />
 
                 <b>Misc</b>:<br />
@@ -4048,17 +4121,26 @@ namespace Commodore_Repair_Toolbox
         private void button2_Click(object sender, EventArgs e)
         {
             var confirmResult = MessageBox.Show(
-                "Please confirm that you will overwrite ALL known files.",
-                "Confirm file overwrite",
+                "Please confirm that you will overwrite ALL \"CRT\" Excel data files and images!?\r\n\r\nData will be updated at next application launch.",
+                "Data update overwrite confirmation",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning
             );
 
             if (confirmResult != DialogResult.Yes)
+            {
                 return;
+            }
+
+            // Write a configuration file parameter that states that the files will be updated at next launch
+            Configuration.SaveSetting("SyncDataAtNextLaunch", "True");
 
             button2.Text = "Will update data at next launch";
             button2.Enabled = false;
+        }
+
+        private void syncFilesFromSource() { 
+
 
             // Get list of files and checksums from online source
             var service = new DataUpdateService();
@@ -4097,11 +4179,11 @@ namespace Commodore_Repair_Toolbox
 
             // ---
 
-            bool hasExcelBeenTransferred = false;
+//            bool hasExcelBeenTransferred = false;
 
             foreach (var file in filesToTransfer)
             {
-                hasExcelBeenTransferred = file.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? true : hasExcelBeenTransferred;
+//                hasExcelBeenTransferred = file.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? true : hasExcelBeenTransferred;
 
                 // Find the online file entry (assuming DataUpdate has File and Url or similar)
                 var onlineFile = checksumFromOnline.FirstOrDefault(f =>
@@ -4141,14 +4223,16 @@ namespace Commodore_Repair_Toolbox
             if (filesToTransfer.Count > 0)
             {
                 // Show a message box with the number of files transferred
-                string message = $"Transferred {filesToTransfer.Count} files from online source to local storage." +
-                    (hasExcelBeenTransferred ? "\r\n\r\nOne or more Excel files have been updated, which means you need to restart the application for its data to be shown." : "");
-                MessageBox.Show(message, "OK: Files updated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+//                string message = $"Transferred [{filesToTransfer.Count}] file(s) from online source to local storage." +
+//                    (hasExcelBeenTransferred ? "\r\n\r\nOne or more Excel files have been updated, which means you need to restart the application for its data to be shown." : "");
+                string message = $"Updated [{filesToTransfer.Count}] file(s) from online source to local storage.\r\n\r\nWill launch main application after this popup.";
+                MessageBox.Show(message, "Data update done", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             else
             {
-                MessageBox.Show("No files to update from online source.", "OK: No update needed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("No files were updated from online source.\r\n\r\nWill launch main application after this popup.", "Data update done", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+//            button2.Enabled = true;
         }
     }
 
