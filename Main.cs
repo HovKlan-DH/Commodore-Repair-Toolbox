@@ -158,8 +158,8 @@ namespace Commodore_Repair_Toolbox
             // Load configuration file
             LoadConfigFile();
 
-            // Load configuration parameter "SyncDataAtNextLaunch"
-            string syncDataAtNextLaunchStr = Configuration.GetSetting("SyncDataAtNextLaunch", "False");
+            // Load configuration parameter "UpdateDataAtNextLaunch"
+            string syncDataAtNextLaunchStr = Configuration.GetSetting("UpdateDataAtNextLaunch", "False");
             bool shouldSyncData = bool.TryParse(syncDataAtNextLaunchStr, out bool result) && result;
             if (shouldSyncData)
             {
@@ -171,7 +171,7 @@ namespace Commodore_Repair_Toolbox
                 );
 
                 syncFilesFromSource();
-                Configuration.SaveSetting("SyncDataAtNextLaunch", "False");
+                Configuration.SaveSetting("UpdateDataAtNextLaunch", "False");
             }
 
             polylinesManagement = new PolylinesManagement(this);
@@ -1135,7 +1135,14 @@ namespace Commodore_Repair_Toolbox
                 <body>
                 " + htmlForTabs + @"
                 <h1>Misc</h1><br />
-
+<input type='text' /><br>
+<select>
+<option value='1'>Option 1</option>
+                    <option value='2'>Option 2</option>
+                    <option value='3'>Option 3</option>
+                </select><br>
+<input type='checkbox' /> Check me<br>
+<input type='submit' value='Submit' /><br>
                 </body>
                 </html>
             ";
@@ -4133,7 +4140,7 @@ namespace Commodore_Repair_Toolbox
             }
 
             // Write a configuration file parameter that states that the files will be updated at next launch
-            Configuration.SaveSetting("SyncDataAtNextLaunch", "True");
+            Configuration.SaveSetting("UpdateDataAtNextLaunch", "True");
 
             button2.Text = "Will update data at next launch";
             button2.Enabled = false;
