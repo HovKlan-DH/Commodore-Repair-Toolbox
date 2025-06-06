@@ -45,7 +45,7 @@
             this.webView2Overview = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.tabRessources = new System.Windows.Forms.TabPage();
             this.webView2Ressources = new Microsoft.Web.WebView2.WinForms.WebView2();
-            this.tabMisc = new System.Windows.Forms.TabPage();
+            this.tabConfiguration = new System.Windows.Forms.TabPage();
             this.button2 = new System.Windows.Forms.Button();
             this.webView2Misc = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.tabFeedback = new System.Windows.Forms.TabPage();
@@ -100,7 +100,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.webView2Overview)).BeginInit();
             this.tabRessources.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.webView2Ressources)).BeginInit();
-            this.tabMisc.SuspendLayout();
+            this.tabConfiguration.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.webView2Misc)).BeginInit();
             this.tabFeedback.SuspendLayout();
             this.tabHelp.SuspendLayout();
@@ -115,7 +115,7 @@
             this.tabControl.Controls.Add(this.tabSchematics);
             this.tabControl.Controls.Add(this.tabOverview);
             this.tabControl.Controls.Add(this.tabRessources);
-            this.tabControl.Controls.Add(this.tabMisc);
+            this.tabControl.Controls.Add(this.tabConfiguration);
             this.tabControl.Controls.Add(this.tabFeedback);
             this.tabControl.Controls.Add(this.tabHelp);
             this.tabControl.Controls.Add(this.tabAbout);
@@ -313,20 +313,20 @@
             this.webView2Ressources.TabIndex = 5;
             this.webView2Ressources.ZoomFactor = 1D;
             // 
-            // tabMisc
+            // tabConfiguration
             // 
-            this.tabMisc.Controls.Add(this.button2);
-            this.tabMisc.Controls.Add(this.webView2Misc);
-            this.tabMisc.Location = new System.Drawing.Point(4, 30);
-            this.tabMisc.Name = "tabMisc";
-            this.tabMisc.Size = new System.Drawing.Size(720, 536);
-            this.tabMisc.TabIndex = 9;
-            this.tabMisc.Text = "Misc";
-            this.tabMisc.UseVisualStyleBackColor = true;
+            this.tabConfiguration.Controls.Add(this.button2);
+            this.tabConfiguration.Controls.Add(this.webView2Misc);
+            this.tabConfiguration.Location = new System.Drawing.Point(4, 30);
+            this.tabConfiguration.Name = "tabConfiguration";
+            this.tabConfiguration.Size = new System.Drawing.Size(720, 536);
+            this.tabConfiguration.TabIndex = 9;
+            this.tabConfiguration.Text = "Configuration";
+            this.tabConfiguration.UseVisualStyleBackColor = true;
             // 
             // button2
             // 
-            this.button2.Location = new System.Drawing.Point(402, 176);
+            this.button2.Location = new System.Drawing.Point(444, 45);
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(241, 28);
             this.button2.TabIndex = 16;
@@ -821,7 +821,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.webView2Overview)).EndInit();
             this.tabRessources.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.webView2Ressources)).EndInit();
-            this.tabMisc.ResumeLayout(false);
+            this.tabConfiguration.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.webView2Misc)).EndInit();
             this.tabFeedback.ResumeLayout(false);
             this.tabFeedback.PerformLayout();
@@ -895,7 +895,7 @@
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Button buttonTracesDelete;
         private System.Windows.Forms.Button button2;
-        private System.Windows.Forms.TabPage tabMisc;
+        private System.Windows.Forms.TabPage tabConfiguration;
         private Microsoft.Web.WebView2.WinForms.WebView2 webView2Misc;
     }
 }

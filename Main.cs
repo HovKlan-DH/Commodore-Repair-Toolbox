@@ -1135,27 +1135,98 @@ namespace Commodore_Repair_Toolbox
                 <body>
                 " + htmlForTabs + @"
                 <h1>Misc</h1><br />
-<input type='text' /><br>
-<select>
-<option value='1'>Option 1</option>
-                    <option value='2'>Option 2</option>
-                    <option value='3'>Option 3</option>
-                </select><br>
-<input type='checkbox' /> Check me<br>
-<input type='submit' value='Submit' /><br>
                 </body>
                 </html>
             ";
 
-/*
-            // Make sure we detach any current event handles, before we add a new one
-            webView2Help.CoreWebView2.WebMessageReceived -= WebView2_WebMessageReceived; // detach first
-            webView2Help.CoreWebView2.WebMessageReceived += WebView2_WebMessageReceived; // attach again
-            webView2Help.CoreWebView2.NewWindowRequested -= WebView2OpenUrl_NewWindowRequested; // detach first
-            webView2Help.CoreWebView2.NewWindowRequested += WebView2OpenUrl_NewWindowRequested; // attach again
-*/
+            // Create a panel per hardware
+            int y = 10; // start Y-position
+            int spacing = 10; // space between panels
+
+            foreach (var hardware in classHardware)
+            {
+                Panel hardwarePanel = new Panel
+                {
+                    Name = $"panel_{hardware.Name.Replace(" ", "_")}",
+                    BorderStyle = BorderStyle.FixedSingle,
+                    BackColor = Color.WhiteSmoke,
+                    Size = new Size(500, 100),
+                    Location = new Point(10, y),
+                    AutoScroll = true
+                };
+
+                Label label = new Label
+                {
+                    Text = hardware.Name,
+                    Dock = DockStyle.Top,
+                    Font = new Font("Calibri", 12, FontStyle.Bold)
+                };
+                hardwarePanel.Controls.Add(label);
+
+                int boardY = label.Height + 5;
+                foreach (var board in hardware.Boards)
+                {
+                    // Unique name for board checkbox
+                    string boardCheckBoxName = $"{hardware.Name}|{board.Name}";
+
+                    CheckBox boardCheckBox = new CheckBox
+                    {
+                        Name = boardCheckBoxName,
+                        Text = board.Name,
+                        Font = new Font("Calibri", 10, FontStyle.Bold),
+                        Location = new Point(10, boardY),
+                        AutoSize = true
+                    };
+                    boardCheckBox.CheckedChanged += BoardOrSchematicCheckBox_CheckedChanged;
+                    hardwarePanel.Controls.Add(boardCheckBox);
+                    boardY += boardCheckBox.Height + 2;
+
+                    // Add a checkbox for each schematic
+                    if (board.Files != null)
+                    {
+                        foreach (var schematic in board.Files)
+                        {
+                            // Unique name for schematic checkbox
+                            string schematicCheckBoxName = $"{hardware.Name}|{board.Name}|{schematic.Name}";
+
+                            CheckBox schematicCheckBox = new CheckBox
+                            {
+                                Name = schematicCheckBoxName,
+                                Text = schematic.Name,
+                                Location = new Point(30, boardY),
+                                AutoSize = true
+                            };
+                            schematicCheckBox.CheckedChanged += BoardOrSchematicCheckBox_CheckedChanged;
+                            hardwarePanel.Controls.Add(schematicCheckBox);
+                            boardY += schematicCheckBox.Height + 2;
+                        }
+                    }
+
+                    // Add extra spacing after all schematics for a board
+                    boardY += 10;
+                }
+
+                // Adjust panel height to fit all checkboxes
+                hardwarePanel.Height = Math.Max(100, boardY + 10);
+
+                // Add the panel to a parent container
+                webView2Misc.Controls.Add(hardwarePanel);
+
+                y += hardwarePanel.Height + spacing;
+            }
+
 
             webView2Misc.NavigateToString(htmlContent);
+        }
+
+        private void BoardOrSchematicCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            var checkBox = sender as CheckBox;
+            if (checkBox == null) return;
+
+            // Use the checkbox Name as the config key, or build a more descriptive key if needed
+            string configKey = $"ConfigurationCheckBoxState|{checkBox.Name}";
+            Configuration.SaveSetting(configKey, checkBox.Checked.ToString());
         }
 
 
