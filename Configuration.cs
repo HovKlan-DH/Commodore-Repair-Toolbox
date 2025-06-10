@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-//using System.Windows.Shapes;
 
 namespace Commodore_Repair_Toolbox
 {
@@ -71,19 +70,5 @@ namespace Commodore_Repair_Toolbox
             // Save the updated configuration to the file
             SaveConfig();
         }
-
-        /*
-        public static void SaveSetting(string key, string value)
-        {
-            settings[key] = value;
-            SaveConfig();
-        }
-        */
-
-
-
-
-
-
     }
 }

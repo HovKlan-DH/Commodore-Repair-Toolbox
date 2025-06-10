@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-
-//using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -19,7 +16,6 @@ namespace Commodore_Repair_Toolbox
         private readonly BoardComponents component;
         private Timer scrollTimer = new Timer();
         private bool isScrolling = false;
-        //        public event EventHandler ComponentNotesUpdated;
         private Main main; // instance of the "Main" form
 
         public string PictureBoxName { get; }
@@ -47,7 +43,6 @@ namespace Commodore_Repair_Toolbox
             label2.Text = Main.ConvertStringToLabel(component.NameTechnical);
             label3.Text = Main.ConvertStringToLabel(component.NameFriendly);
             label4.Text = component.Type;
-//            label5.Text = Main.ConvertStringToLabel(component.OneLiner);
             textBox2.Text = Main.ConvertStringToLabel(component.OneLiner);
 
             // Description box
@@ -183,7 +178,6 @@ namespace Commodore_Repair_Toolbox
 
             UpdateImage();
         }
-
 
         private void UpdateImage()
         {
@@ -339,7 +333,6 @@ namespace Commodore_Repair_Toolbox
 
         }
 
-
         private void Form_KeyPress(object sender, KeyPressEventArgs e)
         {
             if (e.KeyChar == (char)Keys.Escape)
@@ -370,7 +363,6 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-
         private void listBox2_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (listBox2.SelectedItem == null) return;
@@ -381,7 +373,6 @@ namespace Commodore_Repair_Toolbox
             string url = links[selectedName];
             System.Diagnostics.Process.Start(url);
         }
-
         
     }
 }

@@ -2,11 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
-using System.Xml.Linq;
 
 namespace Commodore_Repair_Toolbox
 {
@@ -130,7 +128,6 @@ namespace Commodore_Repair_Toolbox
                     {
                         Main.shadow_structure[hardware.Name][board.Name] = new List<string>();
                     }
-//                    Main.shadow_structure[hardware.Name][board.Name].Add(board.Name);
 
                     string filePathBoardData = Path.Combine(Application.StartupPath, board.DataFile);
                     using (var package = new ExcelPackage(new FileInfo(

@@ -498,99 +498,7 @@ namespace Commodore_Repair_Toolbox
 
         // ###########################################################################################
         // Draw a polyline with the specified color and thickness.
-        // ###########################################################################################
-
-        /*
-        private static void DrawPolyline(Graphics graphics, List<Point> polyline, Pen defaultPen, int polylineIndex)
-        {
-            // Use the composite key to get the color
-            var key = (Main.schematicSelectedName, polylineIndex);
-            Color lineColor = polylineColors.ContainsKey(key) ? polylineColors[key] : defaultPen.Color;
-            bool isSelected = (polylineIndex == selectedPolylineIndex);
-
-            using (Pen customPen = new Pen(lineColor, 5))
-            using (Pen outlinePen = new Pen(Color.Black, 9)) // 9 is thicker than 5
-            {
-                outlinePen.LineJoin = LineJoin.Round;
-                customPen.LineJoin = LineJoin.Round;
-
-                for (int i = 0; i < polyline.Count - 1; i++)
-                {
-                    Point scaledStart = ScalePoint(polyline[i]);
-                    Point scaledEnd = ScalePoint(polyline[i + 1]);
-
-                    if (isSelected)
-                    {
-                        graphics.DrawLine(outlinePen, scaledStart, scaledEnd); // Draw outline if selected
-                    }
-
-                    graphics.DrawLine(customPen, scaledStart, scaledEnd); // Draw the line
-                }
-            }
-
-            // Draw markers only if the polyline is selected
-            if (isSelected)
-            {
-                foreach (var point in polyline)
-                {
-                    Point scaledPoint = ScalePoint(point);
-                    DrawMarker(graphics, scaledPoint, lineColor);
-                }
-            }
-        }
-        */
-
-        private static void DrawPolylineXXX(Graphics graphics, List<Point> polyline, Pen defaultPen, int polylineIndex)
-        {
-            // Use the composite key to get the color
-            var key = (Main.schematicSelectedName, polylineIndex);
-            Color lineColor = polylineColors.ContainsKey(key) ? polylineColors[key] : defaultPen.Color;
-            bool isSelected = (polylineIndex == selectedPolylineIndex);
-
-//            using (Pen outerBlackPen = new Pen(lineColor, 12)) // Outer black outline
-            using (Pen whitePen = new Pen(Color.White, 9)) // Middle white outline
-//            using (Pen innerBlackPen = new Pen(lineColor, 7)) // Inner black outline
-            using (Pen customPen = new Pen(lineColor, 5)) // Actual polyline color
-            {
-//                outerBlackPen.LineJoin = LineJoin.Round;
-                whitePen.LineJoin = LineJoin.Round;
-//                innerBlackPen.LineJoin = LineJoin.Round;
-                customPen.LineJoin = LineJoin.Round;
-
-                for (int i = 0; i < polyline.Count - 1; i++)
-                {
-                    Point scaledStart = ScalePoint(polyline[i]);
-                    Point scaledEnd = ScalePoint(polyline[i + 1]);
-
-                    if (isSelected)
-                    {
-                        
-                        // Draw the outer black outline
-//                        graphics.DrawLine(outerBlackPen, scaledStart, scaledEnd);
-
-                        // Draw the middle white outline
-                        graphics.DrawLine(whitePen, scaledStart, scaledEnd);
-
-                        // Draw the inner black outline
-//                        graphics.DrawLine(innerBlackPen, scaledStart, scaledEnd);
-                        
-                    }
-
-                    // Draw the actual polyline
-                    graphics.DrawLine(customPen, scaledStart, scaledEnd);
-                }
-            }
-
-            // Draw markers only if the polyline is selected
-            if (isSelected)
-            {
-                foreach (var point in polyline)
-                {
-                    Point scaledPoint = ScalePoint(point);
-                    DrawMarker(graphics, scaledPoint, lineColor);
-                }
-            }
-        }
+        // ###########################################################################################       
 
         private static void DrawPolyline(Graphics graphics, List<Point> polyline, Pen defaultPen, int polylineIndex)
         {
@@ -628,7 +536,6 @@ namespace Commodore_Repair_Toolbox
                 }
             }
         }
-
 
 
         // ###########################################################################################

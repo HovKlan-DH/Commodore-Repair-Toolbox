@@ -48,7 +48,6 @@
             this.tabConfiguration = new System.Windows.Forms.TabPage();
             this.panel2 = new System.Windows.Forms.Panel();
             this.button2 = new System.Windows.Forms.Button();
-            this.webView2Misc = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.tabFeedback = new System.Windows.Forms.TabPage();
             this.label9 = new System.Windows.Forms.Label();
             this.buttonSendFeedback = new System.Windows.Forms.Button();
@@ -105,7 +104,6 @@
             ((System.ComponentModel.ISupportInitialize)(this.webView2Ressources)).BeginInit();
             this.tabConfiguration.SuspendLayout();
             this.panel2.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.webView2Misc)).BeginInit();
             this.tabFeedback.SuspendLayout();
             this.tabHelp.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.webView2Help)).BeginInit();
@@ -348,21 +346,6 @@
             this.button2.Text = "Update data from online source";
             this.button2.UseVisualStyleBackColor = true;
             this.button2.Click += new System.EventHandler(this.button2_Click);
-            // 
-            // webView2Misc
-            // 
-            this.webView2Misc.AllowExternalDrop = true;
-            this.webView2Misc.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.webView2Misc.BackColor = System.Drawing.Color.White;
-            this.webView2Misc.CreationProperties = null;
-            this.webView2Misc.DefaultBackgroundColor = System.Drawing.Color.White;
-            this.webView2Misc.Location = new System.Drawing.Point(689, 598);
-            this.webView2Misc.Name = "webView2Misc";
-            this.webView2Misc.Size = new System.Drawing.Size(90, 135);
-            this.webView2Misc.TabIndex = 0;
-            this.webView2Misc.ZoomFactor = 1D;
             // 
             // tabFeedback
             // 
@@ -734,7 +717,6 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.panelBehindTab.BackColor = System.Drawing.Color.WhiteSmoke;
             this.panelBehindTab.Controls.Add(this.buttonTracesDelete);
-            this.panelBehindTab.Controls.Add(this.webView2Misc);
             this.panelBehindTab.Controls.Add(this.label11);
             this.panelBehindTab.Controls.Add(this.tabControl);
             this.panelBehindTab.Controls.Add(this.buttonTraceColor);
@@ -811,7 +793,7 @@
             // 
             this.textBox3.BackColor = System.Drawing.Color.White;
             this.textBox3.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.textBox3.Location = new System.Drawing.Point(20, 109);
+            this.textBox3.Location = new System.Drawing.Point(20, 124);
             this.textBox3.Multiline = true;
             this.textBox3.Name = "textBox3";
             this.textBox3.ReadOnly = true;
@@ -862,7 +844,6 @@
             this.tabConfiguration.ResumeLayout(false);
             this.panel2.ResumeLayout(false);
             this.panel2.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.webView2Misc)).EndInit();
             this.tabFeedback.ResumeLayout(false);
             this.tabFeedback.PerformLayout();
             this.tabHelp.ResumeLayout(false);
@@ -936,7 +917,6 @@
         private System.Windows.Forms.Button buttonTracesDelete;
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.TabPage tabConfiguration;
-        private Microsoft.Web.WebView2.WinForms.WebView2 webView2Misc;
         private System.Windows.Forms.Panel panel2;
         private System.Windows.Forms.Label label12;
         private System.Windows.Forms.TextBox textBox3;

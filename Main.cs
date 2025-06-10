@@ -13,7 +13,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.Tab;
 
 
 namespace Commodore_Repair_Toolbox
@@ -139,7 +138,6 @@ namespace Commodore_Repair_Toolbox
         int thumbnailsWidth = 0;
 
         // Polyline
-        //        private PolylinesManagement polylinesManagement = new PolylinesManagement();
         private PolylinesManagement polylinesManagement;
         private int zoomLevel = 1;
         private int panelTracesVisibleHeight = 0;
@@ -194,7 +192,6 @@ namespace Commodore_Repair_Toolbox
 
             // Load all files (Excel and configuration)
             LoadExcelData();
-            //            LoadConfigFile();
 
             // Initialize relevant "WebView2" components (used in tab pages)
             InitializeTabConfiguration();
@@ -204,82 +201,7 @@ namespace Commodore_Repair_Toolbox
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        // Add this static method to your Configuration class or as a utility
-        public static List<LocalFiles> GetAllReferencedLocalFiles()
-        {
-            var localFiles = new List<LocalFiles>();
-            var checkedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            // 2. Add the Excel file itself
-            if (File.Exists("Commodore-Repair-Toolbox.xlsx") && checkedFiles.Add("Commodore-Repair-Toolbox.xlsx"))
-            {
-                localFiles.Add(new LocalFiles
-                {
-                    File = Path.GetFileName("Commodore-Repair-Toolbox.xlsx"),
-                    Checksum = GetFileChecksum("Commodore-Repair-Toolbox.xlsx")
-                });
-            }
-
-            // 1. Traverse all files in the folder (recursively)
-            foreach (var filePath in Directory.GetFiles("Data", "*.*", SearchOption.AllDirectories))
-            {
-                string file = filePath.Replace("\\", "/");
-
-                if (checkedFiles.Add(file))
-                {
-                    localFiles.Add(new LocalFiles
-                    {
-                        File = file,
-                        Checksum = GetFileChecksum(file)
-                    });
-                }
-            }
-
-            return localFiles;
-        }
-
-        // Helper to compute SHA256 checksum
-        private static string GetFileChecksum(string filePath)
-        {
-            try
-            {
-                using (var sha = SHA256.Create())
-                using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                {
-                    var hash = sha.ComputeHash(stream);
-                    return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-                }
-            }
-            catch (IOException ex)
-            {
-                // File is locked (e.g., by Excel)
-                Debug.WriteLine($"Cannot read file {filePath}: {ex.Message}");
-                return "hest"; // Or handle as needed
-            }
-        }
-
-
-
-
-
-
-
-
-
+                
 
         // ###########################################################################################
         // Event: Form load.
@@ -315,7 +237,6 @@ namespace Commodore_Repair_Toolbox
             AttachConfigurationSaveEvents();
 
             SetupNewBoard();
-            //LoadSelectedImage();
 
             UpdateComponentList("Form_Shown");
 
@@ -1127,7 +1048,7 @@ namespace Commodore_Repair_Toolbox
 
             // Create a panel per hardware
             int x = button2.Location.X; // start X-position
-            int y = 215; // start Y-position
+            int y = 230; // start Y-position
             int spacing = 15; // space between panels           
 
             foreach (var hardware in shadow_structure)
@@ -2142,15 +2063,6 @@ namespace Commodore_Repair_Toolbox
                 ReadaptThumbnails();
             }
 
-            // Make sure to resize thumbnails, in case some resizing has happend in between
-            if (tabControl.SelectedTab == tabOverview)
-            {
-                // hest
-                //var selectedBoardClass = GetSelectedBoardClass();
-                //if (selectedBoardClass == null) return;
-                //UpdateTabOverview(selectedBoardClass);
-            }            
-
             previousTab = tabControl.SelectedTab;
         }
 
@@ -2206,7 +2118,6 @@ namespace Commodore_Repair_Toolbox
             Debug.WriteLine("[SetupNewBoard] called from [" + callerName + "]");
 #endif
 
-            //            listBoxComponents.BeginUpdate(); // suspend redrawing this listBox while updating it
             listBoxComponents.Items.Clear();
 
             boardSelectedName = comboBoxBoard.SelectedItem.ToString();
@@ -2252,8 +2163,6 @@ namespace Commodore_Repair_Toolbox
             SuspendLayout();
             InitializeThumbnails();
             InitializeTabMain();
-            // hest
-//            UpdateTabOverview(selectedBoardClass);
             UpdateTabRessources(selectedBoardClass);
 
             // Load polylines after initializing thumbnails and tabs
@@ -2309,29 +2218,7 @@ namespace Commodore_Repair_Toolbox
             }
             return str.Replace("&", "&&");
         }
-
-
-        // ###########################################################################################
-        // Load the selected image, based on selected board and saved configuration setting.
-        // ###########################################################################################
-
-        /*
-        private void LoadSelectedImage()
-        {
-            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            if (bd != null)
-            {
-                var file = bd.Files.FirstOrDefault(f => f.Name == schematicSelectedName);
-                if (file != null)
-                {
-                    schematicSelectedFile = file.SchematicFileName;
-                    InitializeTabMain();
-                }
-            }
-        }
-        */
-
+                
 
         // ###########################################################################################
         // Enable double-buffering for smoother UI rendering.
@@ -3120,7 +3007,6 @@ namespace Commodore_Repair_Toolbox
         {
             // First, check if we're clicking on a marker
             bool clickedOnMarker = false;
-//            bool clickedOnLine = false;
             int clickedPolylineIndex = -1;
             int clickedPointIndex = -1;
 
@@ -3190,7 +3076,6 @@ namespace Commodore_Repair_Toolbox
                             if (Math.Abs(e.MouseArgs.Location.X - closestPoint.X) <= proximityThreshold &&
                                 Math.Abs(e.MouseArgs.Location.Y - closestPoint.Y) <= proximityThreshold)
                             {
-//                                clickedOnLine = true;
                                 clickedPolylineIndex = i;
                                 clickedPointIndex = j;
 
@@ -3405,102 +3290,7 @@ namespace Commodore_Repair_Toolbox
             componentInfoPopup.Text = ConvertStringToLabel(title);
             componentInfoPopup.Show(this);
             componentInfoPopup.BringToFront();
-        }
-
-        private string GenerateTableContentForBoard(Board selectedBoard)
-        {
-            StringBuilder tableHtml = new StringBuilder();
-            var visibleComponents = listBoxComponents.Items.Cast<string>().ToHashSet();
-
-            tableHtml.Append("<table width='100%' border='1'>");
-            tableHtml.Append("<thead>");
-            tableHtml.Append("<tr>");
-            tableHtml.Append("<th valign='bottom'>Type</th>");
-            tableHtml.Append("<th valign='bottom'>Component</th>");
-            tableHtml.Append("<th valign='bottom'>Technical name</th>");
-            tableHtml.Append("<th valign='bottom'>Friendly name</th>");
-            tableHtml.Append("<th valign='bottom'>Short description</th>");
-            tableHtml.Append("<th valign='bottom'>Notes</th>");
-            tableHtml.Append("<th valign='bottom'>Local files</th>");
-            tableHtml.Append("<th valign='bottom'>Web links</th>");
-            tableHtml.Append("</tr>");
-            tableHtml.Append("</thead>");
-            tableHtml.Append("<tbody>");
-
-            foreach (BoardComponents comp in selectedBoard.Components)
-            {
-                if (!visibleComponents.Contains(comp.NameDisplay)) continue;
-
-                string compType = comp.Type;
-                string compLabel = comp.Label;
-                string compNameTechnical = comp.NameTechnical;
-                string compNameFriendly = comp.NameFriendly.Replace("?", "");
-
-                // Read potential user-modified values
-                string baseKey = $"UserData|{hardwareSelectedName}|{boardSelectedName}|{compLabel}";
-                string oneLinerKey = $"{baseKey}|Oneliner";
-                string notesKey = $"{baseKey}|Notes";
-
-                string compDescrShort = Configuration.GetSetting(oneLinerKey, "");
-                if (string.IsNullOrEmpty(compDescrShort))
-                {
-                    compDescrShort = comp.OneLiner;
-                }
-
-                string compDescrLong = Configuration.GetSetting(notesKey, "");
-                if (string.IsNullOrEmpty(compDescrLong))
-                {
-                    compDescrLong = comp.Description;
-                }
-                else
-                {
-                    compDescrLong = compDescrLong.Replace("\\n", "<br />");
-                }
-
-                // Generate table row
-                tableHtml.Append("<tr>");
-                tableHtml.Append($"<td valign='top'>{compType}</td>");
-                tableHtml.Append($"<td valign='top' data-compLabel='{compLabel}' class='doNotFocusFilter'>{compLabel}</td>");
-                tableHtml.Append($"<td valign='top'>{compNameTechnical}</td>");
-                tableHtml.Append($"<td valign='top'>{compNameFriendly}</td>");
-                tableHtml.Append($"<td valign='top'>{compDescrShort}</td>");
-                tableHtml.Append($"<td valign='top'>{compDescrLong}</td>");
-
-                // Local files column
-                tableHtml.Append("<td valign='top'>");
-                if (comp.LocalFiles != null && comp.LocalFiles.Count > 0)
-                {
-                    int counter = 1;
-                    foreach (ComponentLocalFiles file in comp.LocalFiles)
-                    {
-                        string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, file.FileName));
-                        string fileUri = new Uri(filePath).AbsoluteUri;
-                        tableHtml.Append($"<a href='{fileUri}' class='tooltip-link' data-title='{file.Name}' target='_blank'>#{counter}</a> ");
-                        counter++;
-                    }
-                }
-                tableHtml.Append("</td>");
-
-                // Web links column
-                tableHtml.Append("<td valign='top'>");
-                if (comp.ComponentLinks != null && comp.ComponentLinks.Count > 0)
-                {
-                    int counter = 1;
-                    foreach (ComponentLinks link in comp.ComponentLinks)
-                    {
-                        tableHtml.Append($"<a href='{link.Url}' target='_blank' class='tooltip-link' data-title='{link.Name}'>#{counter}</a> ");
-                        counter++;
-                    }
-                }
-                tableHtml.Append("</td>");
-                tableHtml.Append("</tr>");
-            }
-
-            tableHtml.Append("</tbody>");
-            tableHtml.Append("</table>");
-
-            return tableHtml.ToString();
-        }
+        }      
 
 
         // ###########################################################################################
@@ -3733,15 +3523,15 @@ namespace Commodore_Repair_Toolbox
 
                         // Build the data to send
                         var data = new NameValueCollection
-                {
-                    { "version", versionThis },
-                    { "hardware", hardwareSelectedName },
-                    { "board", boardSelectedName },
-                    { "schematic", schematicSelectedName },
-                    { "filename", boardFile },
-                    { "email", email },
-                    { "feedback", feedback }
-                };
+                        {
+                            { "version", versionThis },
+                            { "hardware", hardwareSelectedName },
+                            { "board", boardSelectedName },
+                            { "schematic", schematicSelectedName },
+                            { "filename", boardFile },
+                            { "email", email },
+                            { "feedback", feedback }
+                        };
 
                         // Attach the binary Excel file if the checkbox is checked
                         if (checkBoxAttachExcel.Checked)
@@ -3868,16 +3658,19 @@ namespace Commodore_Repair_Toolbox
 
         private bool IsFileLocked(string filePath)
         {
-            try
+            if (File.Exists(filePath))
             {
-                using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.None))
+                try
                 {
-                    stream.Close();
+                    using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.None))
+                    {
+                        stream.Close();
+                    }
                 }
-            }
-            catch (IOException)
-            {
-                return true;
+                catch (IOException)
+                {
+                    return true;
+                }
             }
             return false;
         }
@@ -4285,6 +4078,13 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
+
+        // ###########################################################################################
+        // Button click for updating all (local) files with newest content from online source.
+        // Write a configuration file parameter that states that the files should be updated
+        // at next launch.
+        // ###########################################################################################
+
         private void button2_Click(object sender, EventArgs e)
         {
             var confirmResult = MessageBox.Show(
@@ -4346,12 +4146,8 @@ namespace Commodore_Repair_Toolbox
 
             // ---
 
-//            bool hasExcelBeenTransferred = false;
-
             foreach (var file in filesToTransfer)
             {
-//                hasExcelBeenTransferred = file.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? true : hasExcelBeenTransferred;
-
                 // Find the online file entry (assuming DataUpdate has File and Url or similar)
                 var onlineFile = checksumFromOnline.FirstOrDefault(f =>
                     string.Equals(f.File, file, StringComparison.OrdinalIgnoreCase));
@@ -4390,8 +4186,6 @@ namespace Commodore_Repair_Toolbox
             if (filesToTransfer.Count > 0)
             {
                 // Show a message box with the number of files transferred
-//                string message = $"Transferred [{filesToTransfer.Count}] file(s) from online source to local storage." +
-//                    (hasExcelBeenTransferred ? "\r\n\r\nOne or more Excel files have been updated, which means you need to restart the application for its data to be shown." : "");
                 string message = $"Updated [{filesToTransfer.Count}] file(s) from online source to local storage.\r\n\r\nWill launch main application after this popup.";
                 MessageBox.Show(message, "Data update done", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -4399,7 +4193,68 @@ namespace Commodore_Repair_Toolbox
             {
                 MessageBox.Show("No files were updated from online source.\r\n\r\nWill launch main application after this popup.", "Data update done", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
-//            button2.Enabled = true;
+        }
+
+
+        // ###########################################################################################
+        // Get all local files referenced in the application, including the Excel file itself.
+        // ###########################################################################################
+
+        public static List<LocalFiles> GetAllReferencedLocalFiles()
+        {
+            var localFiles = new List<LocalFiles>();
+            var checkedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // 2. Add the Excel file itself
+            if (File.Exists("Commodore-Repair-Toolbox.xlsx") && checkedFiles.Add("Commodore-Repair-Toolbox.xlsx"))
+            {
+                localFiles.Add(new LocalFiles
+                {
+                    File = Path.GetFileName("Commodore-Repair-Toolbox.xlsx"),
+                    Checksum = GetFileChecksum("Commodore-Repair-Toolbox.xlsx")
+                });
+            }
+
+            // 1. Traverse all files in the folder (recursively)
+            foreach (var filePath in Directory.GetFiles("Data", "*.*", SearchOption.AllDirectories))
+            {
+                string file = filePath.Replace("\\", "/");
+
+                if (checkedFiles.Add(file))
+                {
+                    localFiles.Add(new LocalFiles
+                    {
+                        File = file,
+                        Checksum = GetFileChecksum(file)
+                    });
+                }
+            }
+
+            return localFiles;
+        }
+
+
+        // ###########################################################################################
+        // Calculate the SHA256 checksum of a file.
+        // ###########################################################################################
+
+        private static string GetFileChecksum(string filePath)
+        {
+            try
+            {
+                using (var sha = SHA256.Create())
+                using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    var hash = sha.ComputeHash(stream);
+                    return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                }
+            }
+            catch (IOException ex)
+            {
+                // File is locked (e.g., by Excel)
+                Debug.WriteLine($"Cannot read file {filePath}: {ex.Message}");
+                return "hest";
+            }
         }
     }
 
@@ -4524,7 +4379,6 @@ namespace Commodore_Repair_Toolbox
         }
     }
 
-    // hest
     public class DataUpdateService
     {
         public List<DataUpdate> GetDataUpdates()
