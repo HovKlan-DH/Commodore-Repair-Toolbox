@@ -6,6 +6,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using System.Xml.Linq;
 
 namespace Commodore_Repair_Toolbox
 {
@@ -34,66 +35,55 @@ namespace Commodore_Repair_Toolbox
                 int row = 1;
                 while (row <= worksheet.Dimension.End.Row)
                 {
-                    // Check "row" and column 2
-                    if (worksheet.Cells[row, 2].Value?.ToString() == searchHeader) break;
+                    // Check "row" and column 1
+                    if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
                     row++;
                 }
                 row++; // skip headers
 
                 while (worksheet.Cells[row, 1].Value != null)
                 {
-                    string active = worksheet.Cells[row, 1].Value?.ToString() ?? "0";
+                    string nameHardware = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+                    string nameBoard = worksheet.Cells[row, 2].Value?.ToString() ?? "";
+                    string datafile = worksheet.Cells[row, 3].Value?.ToString() ?? "";
 
-                    // Only add hardware, if it is marked as active
-                    if (active == "1")
+                    // Report a warning if path contains a backslash
+                    if (datafile.Contains("\\"))
                     {
-                        string nameHardware = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                        string nameBoard = worksheet.Cells[row, 3].Value?.ToString() ?? "";
-                        string datafile = worksheet.Cells[row, 4].Value?.ToString() ?? "";
-
-                        // Report a warning if path contains a backslash
-                        if (datafile.Contains("\\"))
-                        {
-                            string error = $"WARNING: Excel file [Commodore-Repair-Toolbox.xlsx] row [{row}] the path [{datafile}] contains a backslash";
-                            Main.DebugOutput(error);
-                        }
-
-                        // Check if the board datafile exists
-                        string filePath = Path.Combine(Application.StartupPath, datafile);
-                        if (File.Exists(filePath))
-                        {
-                            // Create the hardware in class, if it does not already exists
-                            Hardware hw = classHardware.FirstOrDefault(h => h.Name == nameHardware);
-                            if (hw == null)
-                            {
-                                hw = new Hardware
-                                {
-                                    Name = nameHardware,
-                                    Boards = new List<Board>()
-                                };
-                                classHardware.Add(hw);
-                            }
-
-                            // Add board to hardware
-                            Board board = new Board
-                            {
-                                Name = nameBoard,
-                                DataFile = datafile
-                            };
-                            hw.Boards.Add(board);
-                        }
-                        else
-                        {
-                            string error = $"ERROR: Excel file [Commodore-Repair-Toolbox.xlsx] row [{row}] the file [" + filePath + "] does not exists";
-                            Main.DebugOutput(error);
-                        }
-                    } else
-                    {
-                        string nameHardware = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                        string nameBoard = worksheet.Cells[row, 3].Value?.ToString() ?? "";
-                        string error = $"INFO: Excel file [Commodore-Repair-Toolbox.xlsx] row [{row}] the hardware [{nameHardware}] and board [{nameBoard}] set to [not active]";
+                        string error = $"WARNING: Excel file [Commodore-Repair-Toolbox.xlsx] row [{row}] the path [{datafile}] contains a backslash";
                         Main.DebugOutput(error);
                     }
+
+                    // Check if the board datafile exists
+                    string filePath = Path.Combine(Application.StartupPath, datafile);
+                    if (File.Exists(filePath))
+                    {
+                        // Create the hardware in class, if it does not already exists
+                        Hardware hw = classHardware.FirstOrDefault(h => h.Name == nameHardware);
+                        if (hw == null)
+                        {
+                            hw = new Hardware
+                            {
+                                Name = nameHardware,
+                                Boards = new List<Board>()
+                            };
+                            classHardware.Add(hw);                        
+                        }
+
+                        // Add board to hardware
+                        Board board = new Board
+                        {
+                            Name = nameBoard,
+                            DataFile = datafile
+                        };
+                        hw.Boards.Add(board);
+                    }
+                    else
+                    {
+                        string error = $"ERROR: Excel file [Commodore-Repair-Toolbox.xlsx] row [{row}] the file [" + filePath + "] does not exists";
+                        Main.DebugOutput(error);
+                    }
+                    
                     row++;
                 }
             }
@@ -119,11 +109,29 @@ namespace Commodore_Repair_Toolbox
                 }
             }
 
+            // Shadow initialization
+            Main.shadow_structure = new Dictionary<string, Dictionary<string, List<string>>>();
+
             // 2) Load "Board" entries (schematics/images)
             foreach (Hardware hardware in classHardware)
             {
+
+                // Shadow "hardware"
+                if (!Main.shadow_structure.ContainsKey(hardware.Name))
+                {
+                    Main.shadow_structure[hardware.Name] = new Dictionary<string, List<string>>();
+                }
+
                 foreach (Board board in hardware.Boards)
                 {
+
+                    // Shadow "board"
+                    if (!Main.shadow_structure[hardware.Name].ContainsKey(board.Name))
+                    {
+                        Main.shadow_structure[hardware.Name][board.Name] = new List<string>();
+                    }
+//                    Main.shadow_structure[hardware.Name][board.Name].Add(board.Name);
+
                     string filePathBoardData = Path.Combine(Application.StartupPath, board.DataFile);
                     using (var package = new ExcelPackage(new FileInfo(
                         filePathBoardData)))
@@ -150,18 +158,17 @@ namespace Commodore_Repair_Toolbox
                                     board.RevisionDate = revisionDate;
                                 }
 
-                                // Check "row" and column 2 for the "searchHeader" (will be below the above IF-sentense)
-                                if (worksheet.Cells[row, 2].Value?.ToString() == searchHeader) break;
+                                // Check "row" and column 1 for the "searchHeader" (will be below the above IF-sentense)
+                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
                                 row++;
                             }
                             row++; // skip headers
 
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string active = worksheet.Cells[row, 1].Value?.ToString() ?? "0";
-                                string name = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                                string fileName = worksheet.Cells[row, 3].Value?.ToString() ?? "";
-                                string colorZoom = worksheet.Cells[row, 4].Value?.ToString() ?? "";
+                                string name = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+                                string fileName = worksheet.Cells[row, 2].Value?.ToString() ?? "";
+                                string colorZoom = worksheet.Cells[row, 3].Value?.ToString() ?? "";
                                 string colorList = worksheet.Cells[row, 5].Value?.ToString() ?? "";
 
                                 // Report a warning if path contains a backslash
@@ -171,18 +178,28 @@ namespace Commodore_Repair_Toolbox
                                     Main.DebugOutput(error);
                                 }
 
+                                // Shadow "board"
+                                if (!Main.shadow_structure[hardware.Name][board.Name].Contains(name))
+                                {
+                                    Main.shadow_structure[hardware.Name][board.Name].Add(name);
+                                }                                
+
+                                // Get configuration setting
+                                string boardConfigKey = $"ConfigurationCheckBoxState|{hardware.Name}|{board.Name}|{name}";
+                                bool boardCheckedInConfig = Configuration.GetSetting(boardConfigKey, "True") == "True";
+
                                 // Only add schematic, if it is marked as active
-                                if (active == "1")
+                                if (boardCheckedInConfig)
                                 {
                                     string filePath = Path.Combine(Application.StartupPath, fileName);
                                     if (File.Exists(filePath))
                                     {
                                         // Convert from fraction to 0-255
-                                        string cellValue = worksheet.Cells[row, 6].Value?.ToString() ?? "";
+                                        string cellValue = worksheet.Cells[row, 4].Value?.ToString() ?? "";
                                         int opacityZoom = (int)(double.Parse(cellValue) * 100);
                                         opacityZoom = (int)((opacityZoom / 100.0) * 255);
 
-                                        cellValue = worksheet.Cells[row, 7].Value?.ToString() ?? "";
+                                        cellValue = worksheet.Cells[row, 6].Value?.ToString() ?? "";
                                         int opacityList = (int)(double.Parse(cellValue) * 100);
                                         opacityList = (int)((opacityList / 100.0) * 255);
 
@@ -209,7 +226,12 @@ namespace Commodore_Repair_Toolbox
                                         Main.DebugOutput(error);
                                     }
                                 }
-                                row++;
+                                else
+                                {
+                                    string error = $"INFO: Excel file [{board.DataFile}] and schematic [{name}] is disabled";
+                                    Main.DebugOutput(error);
+                                }
+                                    row++;
                             }
                         }
                         else
@@ -220,6 +242,7 @@ namespace Commodore_Repair_Toolbox
                         }
                     }
                 }
+
             }
 
             // Check if any "Board.Files" are defined across all hardware and boards
@@ -313,56 +336,64 @@ namespace Commodore_Repair_Toolbox
                 foreach (Board board in hardware.Boards)
                 {
                     string sheet = "Components";
+                    
+                    // Get configuration setting
+                    string boardConfigKey = $"ConfigurationCheckBoxState|{hardware.Name}|{board.Name}";
+                    bool boardCheckedInConfig = Configuration.GetSetting(boardConfigKey, "True") == "True";
 
-                    if (board.Files != null)
+                    // Continue, if the hardware and board is checked/active
+                    if (boardCheckedInConfig)
                     {
-                        foreach (BoardOverlays bo in board.Files)
+                        if (board.Files != null)
                         {
-        
-                            string filePath = Path.Combine(Application.StartupPath, board.DataFile);
-                            using (var package = new ExcelPackage(new FileInfo(filePath)))
+                            foreach (BoardOverlays bo in board.Files)
                             {
-                                var worksheet = package.Workbook.Worksheets[sheet];
 
-                                // Break check
-                                if (worksheet != null)
+                                string filePath = Path.Combine(Application.StartupPath, board.DataFile);
+                                using (var package = new ExcelPackage(new FileInfo(filePath)))
                                 {
-                                    string searchHeader = "Components";
-                                    int row = 1;
-                                    while (row <= worksheet.Dimension.End.Row)
-                                    {
-                                        if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
-                                        row++;
-                                    }
-                                    row++; // skip headers
-                                    row++; // (need to investigate this - why is this extra row needed!?)
+                                    var worksheet = package.Workbook.Worksheets[sheet];
 
-                                    while (worksheet.Cells[row, 1].Value != null)
+                                    // Break check
+                                    if (worksheet != null)
                                     {
-                                        string name = worksheet.Cells[row, 1].Value.ToString();
-                                        ComponentBounds cb = new ComponentBounds
+                                        string searchHeader = "Components";
+                                        int row = 1;
+                                        while (row <= worksheet.Dimension.End.Row)
                                         {
-                                            Label = name
-                                        };
-                                        if (bo.Components == null) bo.Components = new List<ComponentBounds>();
-                                        bo.Components.Add(cb);
-                                        row++;
+                                            if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                                            row++;
+                                        }
+                                        row++; // skip headers
+                                        row++; // (need to investigate this - why is this extra row needed!?)
+
+                                        while (worksheet.Cells[row, 1].Value != null)
+                                        {
+                                            string name = worksheet.Cells[row, 1].Value.ToString();
+                                            ComponentBounds cb = new ComponentBounds
+                                            {
+                                                Label = name
+                                            };
+                                            if (bo.Components == null) bo.Components = new List<ComponentBounds>();
+                                            bo.Components.Add(cb);
+                                            row++;
+                                        }
                                     }
-                                }
-                                else
-                                {
-                                    string fileName = Path.GetFileName(filePath);
-                                    string error = $"ERROR: Excel file [{fileName}] the worksheet [{sheet}] is not found";
-                                    Main.DebugOutput(error);
+                                    else
+                                    {
+                                        string fileName = Path.GetFileName(filePath);
+                                        string error = $"ERROR: Excel file [{fileName}] the worksheet [{sheet}] is not found";
+                                        Main.DebugOutput(error);
+                                    }
                                 }
                             }
                         }
-                    }
-                    else
-                    {
-                        string fileName = Path.GetFileName(Path.Combine(Application.StartupPath, board.DataFile));
-                        string error = $"ERROR: Excel file [{fileName}] does not have any schematic images, so cannot create highlight bounds";
-                        Main.DebugOutput(error);
+                        else
+                        {
+                            string fileName = Path.GetFileName(Path.Combine(Application.StartupPath, board.DataFile));
+                            string error = $"ERROR: Excel file [{fileName}] does not have any schematic images, so cannot create highlight bounds";
+                            Main.DebugOutput(error);
+                        }
                     }
                 }
             }
@@ -602,30 +633,38 @@ namespace Commodore_Repair_Toolbox
 
                                 var bf = board.Files?.FirstOrDefault(f => f.Name == imageName);
 
-                                // Break check
-                                if (bf == null)
-                                {
-                                    string fileName = Path.GetFileName(filePathBoardData);
-                                    Main.DebugOutput($"ERROR: Excel file [{fileName}] worksheet [{sheet}] schematic name [{imageName}] does not exists for component [{componentName}]");
-                                }
-                                else
+                                // Get configuration setting
+                                string boardConfigKey = $"ConfigurationCheckBoxState|{hardware.Name}|{board.Name}|{imageName}";
+                                bool boardCheckedInConfig = Configuration.GetSetting(boardConfigKey, "True") == "True";
+
+                                // Continue, if the hardware and board is checked/active
+                                if (boardCheckedInConfig)
                                 {
                                     // Break check
-                                    if (bf.Components == null)
+                                    if (bf == null)
                                     {
                                         string fileName = Path.GetFileName(filePathBoardData);
-                                        Main.DebugOutput($"ERROR: Excel file [{fileName}] no components can be found in worksheet [Components]");
-                                        break;
+                                        Main.DebugOutput($"ERROR: Excel file [{fileName}] worksheet [{sheet}] schematic name [{imageName}] does not exists for component [{componentName}]");
                                     }
-
-                                    var compBounds = bf?.Components.FirstOrDefault(c => c.Label == componentName);
-                                    if (compBounds != null)
+                                    else
                                     {
-                                        if (compBounds.Overlays == null) compBounds.Overlays = new List<Overlay>();
-                                        compBounds.Overlays.Add(new Overlay
+                                        // Break check
+                                        if (bf.Components == null)
                                         {
-                                            Bounds = new Rectangle(x, y, w, h)
-                                        });
+                                            string fileName = Path.GetFileName(filePathBoardData);
+                                            Main.DebugOutput($"ERROR: Excel file [{fileName}] no components can be found in worksheet [Components]");
+                                            break;
+                                        }
+
+                                        var compBounds = bf?.Components.FirstOrDefault(c => c.Label == componentName);
+                                        if (compBounds != null)
+                                        {
+                                            if (compBounds.Overlays == null) compBounds.Overlays = new List<Overlay>();
+                                            compBounds.Overlays.Add(new Overlay
+                                            {
+                                                Bounds = new Rectangle(x, y, w, h)
+                                            });
+                                        }
                                     }
                                 }
                                 row++;
@@ -863,10 +902,18 @@ namespace Commodore_Repair_Toolbox
 
                 foreach (var board in hardware.Boards)
                 {
+                    // Get configuration setting
+                    string boardConfigKey = $"ConfigurationCheckBoxState|{hardware.Name}|{board.Name}";
+                    bool boardCheckedInConfig = Configuration.GetSetting(boardConfigKey, "True") == "True";
+
                     if (board.Files == null || board.Files.Count == 0)
                     {
-                        string error = $"ERROR: Hardware [{hardware.Name}] board [{board.Name}] does not have any schematic image files - removing board";
-                        Main.DebugOutput(error);
+                        // Only log an error, if the board is checked/active in the configuration
+                        if (boardCheckedInConfig)
+                        {
+                            string error = $"ERROR: Hardware [{hardware.Name}] board [{board.Name}] does not have any schematic image files - removing board";
+                            Main.DebugOutput(error);
+                        }
                         boardsToRemove.Add(board);
                     }
                 }

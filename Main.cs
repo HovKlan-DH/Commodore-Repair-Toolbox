@@ -9,10 +9,11 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
-using System.Security.Cryptography;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.Tab;
 
 
 namespace Commodore_Repair_Toolbox
@@ -125,6 +126,9 @@ namespace Commodore_Repair_Toolbox
         public static float zoomFactor = 1.0f;
         private Point overlayPanelLastMousePos = Point.Empty;
 
+        // "Shadow" lists for the classes - neded in "InitializeTabConfiguration()" function
+        public static Dictionary<string, Dictionary<string, List<string>>> shadow_structure;
+
         // Misc
         private Dictionary<Control, EventHandler> clickEventHandlers = new Dictionary<Control, EventHandler>();
         private TabPage previousTab;
@@ -133,8 +137,6 @@ namespace Commodore_Repair_Toolbox
         private Point windowLastLocation;
         bool thumbnailsSameWidth = false;
         int thumbnailsWidth = 0;
-        //        private FormComponent formComponent;
-        //public static WebView2 webView2Ressources;
 
         // Polyline
         //        private PolylinesManagement polylinesManagement = new PolylinesManagement();
@@ -190,14 +192,14 @@ namespace Commodore_Repair_Toolbox
             GetAssemblyVersion();
             GetOnlineVersion();
 
-            // Initialize relevant "WebView2" components (used in tab pages)
-            InitializeTabMisc();
-            InitializeTabHelp();
-            InitializeTabAbout();
-
             // Load all files (Excel and configuration)
             LoadExcelData();
-//            LoadConfigFile();
+            //            LoadConfigFile();
+
+            // Initialize relevant "WebView2" components (used in tab pages)
+            InitializeTabConfiguration();
+            InitializeTabHelp();
+            InitializeTabAbout();
 
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
@@ -1120,113 +1122,188 @@ namespace Commodore_Repair_Toolbox
         // Initialize the tab for "Help".
         // ###########################################################################################
 
-        private async void InitializeTabMisc()
+        private void InitializeTabConfiguration()
         {
-            if (webView2Misc.CoreWebView2 == null)
-            {
-                await webView2Misc.EnsureCoreWebView2Async(null);
-            }
-
-            string htmlContent = @"
-                <html>
-                <head>
-                <meta charset='UTF-8'>
-                </head>
-                <body>
-                " + htmlForTabs + @"
-                <h1>Misc</h1><br />
-                </body>
-                </html>
-            ";
 
             // Create a panel per hardware
-            int y = 10; // start Y-position
-            int spacing = 10; // space between panels
+            int x = button2.Location.X; // start X-position
+            int y = 215; // start Y-position
+            int spacing = 15; // space between panels           
 
-            foreach (var hardware in classHardware)
+            foreach (var hardware in shadow_structure)
             {
+                string hardwareName = hardware.Key;
+                var boardsDict = hardware.Value;
+
                 Panel hardwarePanel = new Panel
                 {
-                    Name = $"panel_{hardware.Name.Replace(" ", "_")}",
+                    Name = $"panel_{hardwareName.Replace(" ", "_")}",
                     BorderStyle = BorderStyle.FixedSingle,
                     BackColor = Color.WhiteSmoke,
                     Size = new Size(500, 100),
-                    Location = new Point(10, y),
+                    Location = new Point(x, y),
                     AutoScroll = true
                 };
 
                 Label label = new Label
                 {
-                    Text = hardware.Name,
+                    Text = hardwareName,
                     Dock = DockStyle.Top,
                     Font = new Font("Calibri", 12, FontStyle.Bold)
                 };
                 hardwarePanel.Controls.Add(label);
 
                 int boardY = label.Height + 5;
-                foreach (var board in hardware.Boards)
+
+                foreach (var board in boardsDict)
                 {
+                    string boardName = board.Key;
+                    List<string> schematicNames = board.Value;
+
                     // Unique name for board checkbox
-                    string boardCheckBoxName = $"{hardware.Name}|{board.Name}";
+                    string boardCheckBoxName = $"{hardwareName}|{boardName}";
+
+                    // Get configuration setting
+                    string boardConfigKey = $"ConfigurationCheckBoxState|{boardCheckBoxName}";
+                    bool boardChecked = Configuration.GetSetting(boardConfigKey, "True") == "True";
 
                     CheckBox boardCheckBox = new CheckBox
                     {
                         Name = boardCheckBoxName,
-                        Text = board.Name,
+                        Text = boardName,
                         Font = new Font("Calibri", 10, FontStyle.Bold),
                         Location = new Point(10, boardY),
-                        AutoSize = true
+                        AutoSize = true,
+                        Checked = boardChecked
                     };
                     boardCheckBox.CheckedChanged += BoardOrSchematicCheckBox_CheckedChanged;
                     hardwarePanel.Controls.Add(boardCheckBox);
                     boardY += boardCheckBox.Height + 2;
 
                     // Add a checkbox for each schematic
-                    if (board.Files != null)
+                    foreach (var schematicName in schematicNames)
                     {
-                        foreach (var schematic in board.Files)
-                        {
-                            // Unique name for schematic checkbox
-                            string schematicCheckBoxName = $"{hardware.Name}|{board.Name}|{schematic.Name}";
+                        // Unique name for schematic checkbox
+                        string schematicCheckBoxName = $"{hardwareName}|{boardName}|{schematicName}";
 
-                            CheckBox schematicCheckBox = new CheckBox
-                            {
-                                Name = schematicCheckBoxName,
-                                Text = schematic.Name,
-                                Location = new Point(30, boardY),
-                                AutoSize = true
-                            };
-                            schematicCheckBox.CheckedChanged += BoardOrSchematicCheckBox_CheckedChanged;
-                            hardwarePanel.Controls.Add(schematicCheckBox);
-                            boardY += schematicCheckBox.Height + 2;
-                        }
+                        // Get configuration setting
+                        string schematicConfigKey = $"ConfigurationCheckBoxState|{schematicCheckBoxName}";
+                        bool schematicChecked = Configuration.GetSetting(schematicConfigKey, "True") == "True";
+
+                        CheckBox schematicCheckBox = new CheckBox
+                        {
+                            Name = schematicCheckBoxName,
+                            Text = schematicName,
+                            Location = new Point(30, boardY),
+                            AutoSize = true,
+                            Checked = schematicChecked,
+                            Enabled = boardCheckBox.Checked
+                        };
+                        schematicCheckBox.CheckedChanged += BoardOrSchematicCheckBox_CheckedChanged;
+                        hardwarePanel.Controls.Add(schematicCheckBox);
+                        boardY += schematicCheckBox.Height + 2;
                     }
 
                     // Add extra spacing after all schematics for a board
                     boardY += 10;
+
                 }
 
                 // Adjust panel height to fit all checkboxes
                 hardwarePanel.Height = Math.Max(100, boardY + 10);
 
                 // Add the panel to a parent container
-                webView2Misc.Controls.Add(hardwarePanel);
+                panel2.Controls.Add(hardwarePanel);
 
                 y += hardwarePanel.Height + spacing;
             }
 
-
-            webView2Misc.NavigateToString(htmlContent);
+            // Insert a "dummy label" at the bottom of the panel, to have some space
+            Label label2 = new Label
+            {
+                Text = "",
+                Location = new Point(0, y - 25)
+            };
+            panel2.Controls.Add(label2);
         }
+
+
+        // ###########################################################################################
+        // Event handler for checkbox changes in the "Configuration" tab.
+        // ###########################################################################################
 
         private void BoardOrSchematicCheckBox_CheckedChanged(object sender, EventArgs e)
         {
             var checkBox = sender as CheckBox;
             if (checkBox == null) return;
 
-            // Use the checkbox Name as the config key, or build a more descriptive key if needed
+            // Save the state
             string configKey = $"ConfigurationCheckBoxState|{checkBox.Name}";
             Configuration.SaveSetting(configKey, checkBox.Checked.ToString());
+
+            // Split the name to determine if it is a board or schematic checkbox
+            var parts = checkBox.Name.Split('|');
+
+            // This is a board checkbox
+            if (parts.Length == 2)
+            {
+                Panel parentPanel = checkBox.Parent as Panel;
+                if (parentPanel == null) return;
+
+                // Find all schematic checkboxes for this board
+                foreach (Control ctrl in parentPanel.Controls)
+                {
+                    if (ctrl is CheckBox schematicCheckBox && schematicCheckBox != checkBox)
+                    {
+                        var schematicParts = schematicCheckBox.Name.Split('|');
+                        if (schematicParts.Length == 3 &&
+                            schematicParts[0] == parts[0] && schematicParts[1] == parts[1])
+                        {
+                            schematicCheckBox.Enabled = checkBox.Checked;
+                            if (checkBox.Checked)
+                            {
+                                schematicCheckBox.Checked = true; // Select all siblings when board is enabled
+                            }
+                            else
+                            {
+                                schematicCheckBox.Checked = false;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // This is a schematic checkbox
+            else if (parts.Length == 3)
+            {
+                Panel parentPanel = checkBox.Parent as Panel;
+                if (parentPanel == null) return;
+
+                // Find the parent board checkbox
+                CheckBox boardCheckBox = null;
+                bool anySchematicChecked = false;
+                foreach (Control ctrl in parentPanel.Controls)
+                {
+                    if (ctrl is CheckBox cb)
+                    {
+                        var cbParts = cb.Name.Split('|');
+                        if (cbParts.Length == 2 && cbParts[0] == parts[0] && cbParts[1] == parts[1])
+                        {
+                            boardCheckBox = cb;
+                        }
+                        else if (cbParts.Length == 3 && cbParts[0] == parts[0] && cbParts[1] == parts[1])
+                        {
+                            if (cb.Checked)
+                                anySchematicChecked = true;
+                        }
+                    }
+                }
+                // If no schematic is checked, uncheck the board
+                if (boardCheckBox != null && !anySchematicChecked)
+                {
+                    boardCheckBox.Checked = false;
+                }
+            }
         }
 
 
@@ -1379,7 +1456,7 @@ namespace Commodore_Repair_Toolbox
                 <br />
 
                 It is possible to fetch the newest data from the online source.<br />
-                You can do this via the ""Misc"" tab.<br />
+                You can do this via the ""Configuration"" tab.<br />
                 <br />
 
                 If you have <i>not</i> modified any data on your own, then there is no risks in doing this - go for it.<br />
@@ -1389,7 +1466,19 @@ namespace Commodore_Repair_Toolbox
                 
                 The update will happen at the <i>next</i> application launch, so you will not see the changes immediately.<br />
                 <br />
-                
+
+                <hr><br />
+
+                <b>Show or hide hardware and boards</b>:<br />
+                <br />
+
+                In ""Configuration"" you can select which hardware and boards you want to show or hide in the application.<br />
+                Per default it will show everything, but you can uncheck the ones you do not want to have in the application.<br />
+                <br />
+
+                Changing any checkbox will be effectuated at the <i>next</i> application launch, so you will not see the changes immediately.<br />
+                <br />
+
                 <hr><br />
 
                 <b>Misc</b>:<br />
