@@ -44,7 +44,7 @@ _CRT_ does not require any installation - just download the newest ZIP file from
   - 250469
 - **Commodore 128 and 128D** (C128D plastic model, not DCR)
   - 310378
-    - Has full oscilloscope baseline readings
+    - Has full oscilloscope baseline readings for a PAL system
 
 
 # Your help would be really appreciated
