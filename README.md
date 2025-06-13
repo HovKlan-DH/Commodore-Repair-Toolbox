@@ -2,8 +2,6 @@
 
 This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ hence forward) - a Windows utility tool for repairing vintage computers or peripherals.
 
-> [!CAUTION]
-> Please do note that the data files have not yet reached its final maturity level, and by then its format _could_ change in a nearby future release! Only relevant if you do your own data modification.
 
 # Screenshots
 
@@ -43,8 +41,11 @@ _CRT_ does not require any installation - just download the newest ZIP file from
   - 250407
   - 250425
   - 250466
-- **Commodore 128 and 128D** (plastic model, not DCR)
+  - 250469
+- **Commodore 128 and 128D** (C128D plastic model, not DCR)
   - 310378
+    - Has full oscilloscope baseline readings
+
 
 # Your help would be really appreciated
 
@@ -58,15 +59,18 @@ You can also help specifically with these topics:
 - I have done some oscilloscope baseline measurements on a good working **PAL** system - would you be able to assist with the same reading on a **NTSC** system?
   - Please connect with me, so we can coordinate on _what_ and _how_ to measure.
 
-You can also contribute by adding new data and send the Excel file and "label file" to me (view below for the software used for labeling).
+You can also contribute by adding new data and send the Excel file and "label file" to me (view [Wiki Documentation](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/wiki/Documentation) for how to use the labeling software).
+
 
 # Contact
 
 You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) here in the GitHub project page or use the built-in "Feedback" tab, if you want to report a problem, suggest any changes or just have a comment. I would appreciate some feedback, to know if this is actually useful for others or if you see some missing functionalities that could be benefitial for many.
 
+
 # Documentation of data
 
-Please refer to The [Wiki Documentation](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/wiki/Documentation) page for adding or modifying the data.
+Please refer to the [Wiki Documentation](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/wiki/Documentation) page for adding or modifying the data.
+
 
 # Data sources used for configurations
 
@@ -78,6 +82,7 @@ I have taken data from many places, but I do have a few _go-to_ places I frequen
 In some cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated.
 
 If you want to contribute with a major new or updated dataset, then please let me know, as I happily will show credits here for joint efforts. There is a large Commodore community, and I wish for collaboration into making this a great reference for Commodore reparing (well, on the Windows platform at least).
+
 
 # Inspiration for creating this project
 
