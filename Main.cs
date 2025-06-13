@@ -933,15 +933,15 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
-        // Initialize and update the tab for "Ressources".
+        // Initialize and update the tab for "Resources".
         // Will load new content from board data file.
         // ###########################################################################################
 
-        private async void UpdateTabRessources(Board selectedBoard)
+        private async void UpdateTabResources(Board selectedBoard)
         {
-            if (webView2Ressources.CoreWebView2 == null)
+            if (webView2Resources.CoreWebView2 == null)
             {
-                await webView2Ressources.EnsureCoreWebView2Async(null);
+                await webView2Resources.EnsureCoreWebView2Async(null);
             }
 
             string htmlContent = @"
@@ -960,7 +960,7 @@ namespace Commodore_Repair_Toolbox
                 </head>
                 <body>
                 " + htmlForTabs + @"
-                <h1>Ressources for troubleshooting and information</h1><br />
+                <h1>Resources for troubleshooting and information</h1><br />
             ";
 
             // Get the two datasets, or "null"
@@ -1019,12 +1019,12 @@ namespace Commodore_Repair_Toolbox
             htmlContent += "</html >";
 
             // Make sure we detach any current event handles, before we add a new one
-            webView2Ressources.CoreWebView2.WebMessageReceived -= WebView2_WebMessageReceived; // detach first
-            webView2Ressources.CoreWebView2.WebMessageReceived += WebView2_WebMessageReceived; // attach again
-            webView2Ressources.CoreWebView2.NewWindowRequested -= WebView2OpenUrl_NewWindowRequested; // detach first
-            webView2Ressources.CoreWebView2.NewWindowRequested += WebView2OpenUrl_NewWindowRequested; // attach again
+            webView2Resources.CoreWebView2.WebMessageReceived -= WebView2_WebMessageReceived; // detach first
+            webView2Resources.CoreWebView2.WebMessageReceived += WebView2_WebMessageReceived; // attach again
+            webView2Resources.CoreWebView2.NewWindowRequested -= WebView2OpenUrl_NewWindowRequested; // detach first
+            webView2Resources.CoreWebView2.NewWindowRequested += WebView2OpenUrl_NewWindowRequested; // attach again
 
-            webView2Ressources.NavigateToString(htmlContent);
+            webView2Resources.NavigateToString(htmlContent);
         }
 
         private void WebView2OpenUrl_NewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs args)
@@ -1476,7 +1476,7 @@ namespace Commodore_Repair_Toolbox
                 A comment from the developer:<br /><br />
 
                 <i>
-                I have been repairing Commodore 64/128 computers for some years, but I still consider myself as a novice in this world of hardware - I am more a software person, which you may have guessed having this tool here. I often forget where and what to check, and I struggle to find again all the relevant ressources and schematics, not to mention the struggle to find the components in the schematics - a pure mess and quite inefficient. I did often refer to the ""Mainboards"" section of <a href=""https://myoldcomputer.nl/technical-info/mainboards/"" target=""_blank"">My Old Computer</a>, and I noticed that Jeroen did have a prototype of an application named ""Repair Help"", and it did have the easy layout I was looking for (I did get a copy of it). However, it was never finalized from him, so I took upon myself to create something similar, and a couple of years later (including a long hiatus) I did come up with this quite similar looking application, though expanded with additional functionalities and data points.<br />
+                I have been repairing Commodore 64/128 computers for some years, but I still consider myself as a novice in this world of hardware - I am more a software person, which you may have guessed having this tool here. I often forget where and what to check, and I struggle to find again all the relevant resources and schematics, not to mention the struggle to find the components in the schematics - a pure mess and quite inefficient. I did often refer to the ""Mainboards"" section of <a href=""https://myoldcomputer.nl/technical-info/mainboards/"" target=""_blank"">My Old Computer</a>, and I noticed that Jeroen did have a prototype of an application named ""Repair Help"", and it did have the easy layout I was looking for (I did get a copy of it). However, it was never finalized from him, so I took upon myself to create something similar, and a couple of years later (including a long hiatus) I did come up with this quite similar looking application, though expanded with additional functionalities and data points.<br />
                 <br />
 
                 The longer-term goal is that the tool will cover all C64 and C128 computers, and ideally also its most used peripherals, and I will continue to add new and refine data for myself (when doing my own diagnostics and repairing), but I will most likely not be able to do this myself alone. I would really appreciate some help with this, so if you have the willingness, then please reach out to me, and I will happily explain the nitty-gritty details. It is actually quite easy when having tried it once.<br />
@@ -2163,7 +2163,7 @@ namespace Commodore_Repair_Toolbox
             SuspendLayout();
             InitializeThumbnails();
             InitializeTabMain();
-            UpdateTabRessources(selectedBoardClass);
+            UpdateTabResources(selectedBoardClass);
 
             // Load polylines after initializing thumbnails and tabs
             PolylinesManagement.LoadPolylines();

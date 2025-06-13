@@ -43,8 +43,8 @@
             this.panelThumbnails = new System.Windows.Forms.Panel();
             this.tabOverview = new System.Windows.Forms.TabPage();
             this.webView2Overview = new Microsoft.Web.WebView2.WinForms.WebView2();
-            this.tabRessources = new System.Windows.Forms.TabPage();
-            this.webView2Ressources = new Microsoft.Web.WebView2.WinForms.WebView2();
+            this.tabResources = new System.Windows.Forms.TabPage();
+            this.webView2Resources = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.tabConfiguration = new System.Windows.Forms.TabPage();
             this.panel2 = new System.Windows.Forms.Panel();
             this.textBox3 = new System.Windows.Forms.TextBox();
@@ -100,8 +100,8 @@
             this.panelLabelsVisible.SuspendLayout();
             this.tabOverview.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.webView2Overview)).BeginInit();
-            this.tabRessources.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.webView2Ressources)).BeginInit();
+            this.tabResources.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.webView2Resources)).BeginInit();
             this.tabConfiguration.SuspendLayout();
             this.panel2.SuspendLayout();
             this.tabFeedback.SuspendLayout();
@@ -116,7 +116,7 @@
             // 
             this.tabControl.Controls.Add(this.tabSchematics);
             this.tabControl.Controls.Add(this.tabOverview);
-            this.tabControl.Controls.Add(this.tabRessources);
+            this.tabControl.Controls.Add(this.tabResources);
             this.tabControl.Controls.Add(this.tabConfiguration);
             this.tabControl.Controls.Add(this.tabFeedback);
             this.tabControl.Controls.Add(this.tabHelp);
@@ -290,30 +290,30 @@
             this.webView2Overview.TabIndex = 6;
             this.webView2Overview.ZoomFactor = 1D;
             // 
-            // tabRessources
+            // tabResources
             // 
-            this.tabRessources.BackColor = System.Drawing.Color.White;
-            this.tabRessources.Controls.Add(this.webView2Ressources);
-            this.tabRessources.Location = new System.Drawing.Point(4, 30);
-            this.tabRessources.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
-            this.tabRessources.Name = "tabRessources";
-            this.tabRessources.Size = new System.Drawing.Size(720, 536);
-            this.tabRessources.TabIndex = 3;
-            this.tabRessources.Text = "Ressources";
+            this.tabResources.BackColor = System.Drawing.Color.White;
+            this.tabResources.Controls.Add(this.webView2Resources);
+            this.tabResources.Location = new System.Drawing.Point(4, 30);
+            this.tabResources.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.tabResources.Name = "tabResources";
+            this.tabResources.Size = new System.Drawing.Size(720, 536);
+            this.tabResources.TabIndex = 3;
+            this.tabResources.Text = "Resources";
             // 
-            // webView2Ressources
+            // webView2Resources
             // 
-            this.webView2Ressources.AllowExternalDrop = true;
-            this.webView2Ressources.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            this.webView2Resources.AllowExternalDrop = true;
+            this.webView2Resources.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.webView2Ressources.CreationProperties = null;
-            this.webView2Ressources.DefaultBackgroundColor = System.Drawing.Color.White;
-            this.webView2Ressources.Location = new System.Drawing.Point(0, 3);
-            this.webView2Ressources.Name = "webView2Ressources";
-            this.webView2Ressources.Size = new System.Drawing.Size(710, 530);
-            this.webView2Ressources.TabIndex = 5;
-            this.webView2Ressources.ZoomFactor = 1D;
+            this.webView2Resources.CreationProperties = null;
+            this.webView2Resources.DefaultBackgroundColor = System.Drawing.Color.White;
+            this.webView2Resources.Location = new System.Drawing.Point(0, 3);
+            this.webView2Resources.Name = "webView2Resources";
+            this.webView2Resources.Size = new System.Drawing.Size(710, 530);
+            this.webView2Resources.TabIndex = 5;
+            this.webView2Resources.ZoomFactor = 1D;
             // 
             // tabConfiguration
             // 
@@ -839,8 +839,8 @@
             this.panelLabelsVisible.PerformLayout();
             this.tabOverview.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.webView2Overview)).EndInit();
-            this.tabRessources.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.webView2Ressources)).EndInit();
+            this.tabResources.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.webView2Resources)).EndInit();
             this.tabConfiguration.ResumeLayout(false);
             this.panel2.ResumeLayout(false);
             this.panel2.PerformLayout();
@@ -861,7 +861,7 @@
 
         private System.Windows.Forms.TabControl tabControl;
         private System.Windows.Forms.TabPage tabSchematics;
-        private System.Windows.Forms.TabPage tabRessources;
+        private System.Windows.Forms.TabPage tabResources;
         private System.Windows.Forms.TabPage tabAbout;
         private System.Windows.Forms.ComboBox comboBoxHardware;
         private System.Windows.Forms.Label labelHardware;
@@ -883,7 +883,7 @@
         private System.Windows.Forms.CheckBox checkBoxBlink;
         private System.Windows.Forms.TabPage tabHelp;
         private System.Windows.Forms.TextBox textBoxFilterComponents;
-        public Microsoft.Web.WebView2.WinForms.WebView2 webView2Ressources; // Dennis, made "public" from "private"
+        public Microsoft.Web.WebView2.WinForms.WebView2 webView2Resources; // Dennis, made "public" from "private"
         private Microsoft.Web.WebView2.WinForms.WebView2 webView2Help;
         private Microsoft.Web.WebView2.WinForms.WebView2 webView2About;
         private System.Windows.Forms.TabPage tabFeedback;

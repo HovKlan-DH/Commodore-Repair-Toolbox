@@ -263,9 +263,9 @@ namespace Commodore_Repair_Toolbox
             // Assuming you have a reference to the WebView2 control:
             string script = $"window.postMessage({{type:'updateNotes',id:'{componentId}',value:`{value}`}}, '*');";
             // Call this on the main form's WebView2 instance:
-            if (main?.webView2Ressources != null)
+            if (main?.webView2Resources != null)
             {
-                main.webView2Ressources.ExecuteScriptAsync(script);
+                main.webView2Resources.ExecuteScriptAsync(script);
             }
         }
 
