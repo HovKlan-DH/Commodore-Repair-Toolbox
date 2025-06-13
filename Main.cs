@@ -171,7 +171,6 @@ namespace Commodore_Repair_Toolbox
                 );
 
                 syncFilesFromSource();
-                Configuration.SaveSetting("UpdateDataAtNextLaunch", "False");
             }
 
             polylinesManagement = new PolylinesManagement(this);
@@ -1383,6 +1382,7 @@ namespace Commodore_Repair_Toolbox
                 If you have <i>not</i> modified any data on your own, then there is no risks in doing this - go for it.<br />
                 If you <i>do have</i> modified some data, then be aware that all Excel data files and all images will be overwritten, so do make a backup before you update.<br />
                 The update will not delete any files it does not know - e.g. if you have added some of your own files.<br />
+                The update will not delete any of your own component modifications done through the component information popup.<br />
                 <br />
                 
                 The update will happen at the <i>next</i> application launch, so you will not see the changes immediately.<br />
@@ -4106,92 +4106,131 @@ namespace Commodore_Repair_Toolbox
             button2.Enabled = false;
         }
 
-        private void syncFilesFromSource() { 
+        private void syncFilesFromSource() {
 
+            // Fetch the list of files and checksums from the online source
+            List<DataUpdate> checksumFromOnline;
 
-            // Get list of files and checksums from online source
-            var service = new DataUpdateService();
-            List<DataUpdate> checksumFromOnline = service.GetDataUpdates();
-            DebugOutput("INFO: Fetched checksum list of [" + checksumFromOnline.Count + "] files from online source");
-
-            List<LocalFiles> checksumFromLocal = GetAllReferencedLocalFiles();
-            DebugOutput("INFO: Calculated checksum list of [" + checksumFromOnline.Count + "] files from local storage");
-
-            // Find files present online but missing locally
-            var missingLocal = checksumFromOnline
-                .Where(online => !checksumFromLocal.Any(local =>
-                    string.Equals(local.File, online.File, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-
-            // Find files present in both lists but with different checksums
-            var differingChecksums = checksumFromOnline
-                .Join(
-                    checksumFromLocal,
-                    online => online.File,
-                    local => local.File,
-                    (online, local) => new { File = online.File, OnlineChecksum = online.Checksum, LocalChecksum = local.Checksum }
-                )
-                .Where(x => !string.Equals(x.OnlineChecksum, x.LocalChecksum, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-
-            // Combine missingLocal and differingChecksums to get the list of files to transfer from online to local
-            // Only include files that are present in the online list
-            var filesToTransfer = missingLocal
-                .Select(f => f.File)
-                .Concat(differingChecksums.Select(f => f.File))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Where(file => checksumFromOnline.Any(online => string.Equals(online.File, file, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-
-            // ---
-
-            foreach (var file in filesToTransfer)
+            try
             {
-                // Find the online file entry (assuming DataUpdate has File and Url or similar)
-                var onlineFile = checksumFromOnline.FirstOrDefault(f =>
-                    string.Equals(f.File, file, StringComparison.OrdinalIgnoreCase));
-                if (onlineFile == null)
-                    continue; // Skip if not found online
-
-                // Ensure the directory exists
-                string localPath = Path.Combine(Application.StartupPath, file.Replace("/", "\\"));
-                string directory = Path.GetDirectoryName(localPath);
-                if (!Directory.Exists(directory))
+                using (var webClient = new WebClient())
                 {
-                    Directory.CreateDirectory(directory);
+                    ServicePointManager.Expect100Continue = true;
+                    ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+                    webClient.Headers.Add("user-agent", "CRT " + versionThis);
+
+                    string json = webClient.DownloadString("https://commodore-repair-toolbox.dk/auto-data/dataChecksums.json");
+                    checksumFromOnline = DataUpdate.LoadFromJson(json);
+                }
+                DebugOutput("INFO: Fetched checksum list of [" + checksumFromOnline.Count + "] files from online source");
+
+                /*
+                // Get list of files and checksums from online source
+                var service = new DataUpdateService();
+                List<DataUpdate> checksumFromOnline = service.GetDataUpdates();
+                DebugOutput("INFO: Fetched checksum list of [" + checksumFromOnline.Count + "] files from online source");
+                */
+
+                List<LocalFiles> checksumFromLocal = GetAllReferencedLocalFiles();
+                DebugOutput("INFO: Calculated checksum list of [" + checksumFromOnline.Count + "] files from local storage");
+
+                // Find files present online but missing locally
+                var missingLocal = checksumFromOnline
+                    .Where(online => !checksumFromLocal.Any(local =>
+                        string.Equals(local.File, online.File, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                // Find files present in both lists but with different checksums
+                var differingChecksums = checksumFromOnline
+                    .Join(
+                        checksumFromLocal,
+                        online => online.File,
+                        local => local.File,
+                        (online, local) => new { File = online.File, OnlineChecksum = online.Checksum, LocalChecksum = local.Checksum }
+                    )
+                    .Where(x => !string.Equals(x.OnlineChecksum, x.LocalChecksum, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+
+                // Combine missingLocal and differingChecksums to get the list of files to transfer from online to local
+                // Only include files that are present in the online list
+                var filesToTransfer = missingLocal
+                    .Select(f => f.File)
+                    .Concat(differingChecksums.Select(f => f.File))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Where(file => checksumFromOnline.Any(online => string.Equals(online.File, file, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                // ---
+
+                foreach (var file in filesToTransfer)
+                {
+                    // Find the online file entry (assuming DataUpdate has File and Url or similar)
+                    var onlineFile = checksumFromOnline.FirstOrDefault(f =>
+                        string.Equals(f.File, file, StringComparison.OrdinalIgnoreCase));
+                    if (onlineFile == null)
+                        continue; // Skip if not found online
+
+                    // Ensure the directory exists
+                    string localPath = Path.Combine(Application.StartupPath, file.Replace("/", "\\"));
+                    string directory = Path.GetDirectoryName(localPath);
+                    if (!Directory.Exists(directory))
+                    {
+                        Directory.CreateDirectory(directory);
+                    }
+
+                    // Download and overwrite the file
+                    try
+                    {
+                        using (var webClient = new WebClient())
+                        {
+                            ServicePointManager.Expect100Continue = true;
+                            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+                            webClient.Headers.Add("user-agent", "CRT " + versionThis);
+
+                            string decodedUrl = WebUtility.UrlDecode(onlineFile.Url);
+
+                            // Check if the file is locked before downloading
+                            if (!IsFileLocked(localPath))
+                            {
+                                webClient.DownloadFile(decodedUrl, localPath);
+                            }
+                            else
+                            {
+                                MessageBox.Show("The file [" + localPath + "] currently has an exclusive lock, and cannot be updated from the online source.\r\n\r\nPlease close any application that might be using it and retry the synchronization.",
+                                    "ERROR: Cannot update file",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Error);
+                            }
+                        }
+                        DebugOutput($"INFO: Downloaded and replaced file [{file}] from online source");
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugOutput("EXCEPTION raised for fetching a specific file from online source:");
+                        DebugOutput(ex.ToString());
+                    }
                 }
 
-                // Download and overwrite the file
-                using (var client = new WebClient())
+                if (filesToTransfer.Count > 0)
                 {
-                    string decodedUrl = WebUtility.UrlDecode(onlineFile.Url);
-
-                    // Check if the file is locked before downloading
-                    if (!IsFileLocked(localPath))
-                    {
-                        client.DownloadFile(decodedUrl, localPath);
-                    }
-                    else
-                    {
-                        MessageBox.Show("The file [" + localPath + "] currently has an exclusive lock, and cannot be updated from the online source.\r\n\r\nPlease close any application that might be using it and retry the synchronization.",
-                            "ERROR: Cannot update file",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error);
-                    }
+                    // Show a message box with the number of files transferred
+                    string message = $"Updated [{filesToTransfer.Count}] file(s) from online source to local storage.\r\n\r\nWill launch main application after this popup.";
+                    MessageBox.Show(message, "Data update done", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
-                DebugOutput($"INFO: Downloaded and replaced file [{file}] from online source");
-            }
+                else
+                {
+                    MessageBox.Show("No files were updated from online source.\r\n\r\nWill launch main application after this popup.", "Data update done", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
 
-            if (filesToTransfer.Count > 0)
-            {
-                // Show a message box with the number of files transferred
-                string message = $"Updated [{filesToTransfer.Count}] file(s) from online source to local storage.\r\n\r\nWill launch main application after this popup.";
-                MessageBox.Show(message, "Data update done", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                // Save to the configuration file, that we now have updated
+                Configuration.SaveSetting("UpdateDataAtNextLaunch", "False");
             }
-            else
+            catch (Exception ex)
             {
-                MessageBox.Show("No files were updated from online source.\r\n\r\nWill launch main application after this popup.", "Data update done", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                DebugOutput("EXCEPTION raised for fetching JSON file catalogue from online source:");
+                DebugOutput(ex.ToString());
+                MessageBox.Show(ex.ToString(), "Error fetching JSON file catalogue", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -4379,6 +4418,7 @@ namespace Commodore_Repair_Toolbox
         }
     }
 
+    /*
     public class DataUpdateService
     {
         public List<DataUpdate> GetDataUpdates()
@@ -4391,6 +4431,7 @@ namespace Commodore_Repair_Toolbox
             }
         }
     }
+    */
 
     // Add this class to represent a local file entry
     public class LocalFiles

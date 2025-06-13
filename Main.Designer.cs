@@ -47,6 +47,8 @@
             this.webView2Ressources = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.tabConfiguration = new System.Windows.Forms.TabPage();
             this.panel2 = new System.Windows.Forms.Panel();
+            this.textBox3 = new System.Windows.Forms.TextBox();
+            this.label12 = new System.Windows.Forms.Label();
             this.button2 = new System.Windows.Forms.Button();
             this.tabFeedback = new System.Windows.Forms.TabPage();
             this.label9 = new System.Windows.Forms.Label();
@@ -88,8 +90,6 @@
             this.textBoxFilterComponents = new System.Windows.Forms.TextBox();
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
-            this.label12 = new System.Windows.Forms.Label();
-            this.textBox3 = new System.Windows.Forms.TextBox();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -336,6 +336,28 @@
             this.panel2.Name = "panel2";
             this.panel2.Size = new System.Drawing.Size(720, 536);
             this.panel2.TabIndex = 17;
+            // 
+            // textBox3
+            // 
+            this.textBox3.BackColor = System.Drawing.Color.White;
+            this.textBox3.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.textBox3.Location = new System.Drawing.Point(20, 124);
+            this.textBox3.Multiline = true;
+            this.textBox3.Name = "textBox3";
+            this.textBox3.ReadOnly = true;
+            this.textBox3.Size = new System.Drawing.Size(500, 103);
+            this.textBox3.TabIndex = 19;
+            this.textBox3.Text = resources.GetString("textBox3.Text");
+            // 
+            // label12
+            // 
+            this.label12.AutoSize = true;
+            this.label12.Font = new System.Drawing.Font("Calibri", 13.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label12.Location = new System.Drawing.Point(14, 21);
+            this.label12.Name = "label12";
+            this.label12.Size = new System.Drawing.Size(139, 28);
+            this.label12.TabIndex = 17;
+            this.label12.Text = "Configuration";
             // 
             // button2
             // 
@@ -778,28 +800,6 @@
             this.checkBoxBlink.TabIndex = 15;
             this.checkBoxBlink.Text = "Blink selected components";
             this.checkBoxBlink.UseVisualStyleBackColor = true;
-            // 
-            // label12
-            // 
-            this.label12.AutoSize = true;
-            this.label12.Font = new System.Drawing.Font("Calibri", 13.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label12.Location = new System.Drawing.Point(14, 21);
-            this.label12.Name = "label12";
-            this.label12.Size = new System.Drawing.Size(139, 28);
-            this.label12.TabIndex = 17;
-            this.label12.Text = "Configuration";
-            // 
-            // textBox3
-            // 
-            this.textBox3.BackColor = System.Drawing.Color.White;
-            this.textBox3.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.textBox3.Location = new System.Drawing.Point(20, 124);
-            this.textBox3.Multiline = true;
-            this.textBox3.Name = "textBox3";
-            this.textBox3.ReadOnly = true;
-            this.textBox3.Size = new System.Drawing.Size(500, 103);
-            this.textBox3.TabIndex = 19;
-            this.textBox3.Text = resources.GetString("textBox3.Text");
             // 
             // Main
             // 
