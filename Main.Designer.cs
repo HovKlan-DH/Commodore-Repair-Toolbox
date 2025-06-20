@@ -42,7 +42,15 @@
             this.checkBox2 = new System.Windows.Forms.CheckBox();
             this.panelThumbnails = new System.Windows.Forms.Panel();
             this.tabOverview = new System.Windows.Forms.TabPage();
-            this.webView2Overview = new Microsoft.Web.WebView2.WinForms.WebView2();
+            this.dataGridView1 = new System.Windows.Forms.DataGridView();
+            this.GridType = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.GridComponent = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.GridTechnicalName = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.GridFriendlyName = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.GridShortDescr = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.GridNotes = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.GridLocalFiles = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.GridWebLinks = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.tabResources = new System.Windows.Forms.TabPage();
             this.webView2Resources = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.tabConfiguration = new System.Windows.Forms.TabPage();
@@ -90,6 +98,7 @@
             this.textBoxFilterComponents = new System.Windows.Forms.TextBox();
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
+            this.richTextBox1 = new System.Windows.Forms.RichTextBox();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -99,7 +108,7 @@
             this.panelMain.SuspendLayout();
             this.panelLabelsVisible.SuspendLayout();
             this.tabOverview.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.webView2Overview)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             this.tabResources.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.webView2Resources)).BeginInit();
             this.tabConfiguration.SuspendLayout();
@@ -267,7 +276,7 @@
             // 
             // tabOverview
             // 
-            this.tabOverview.Controls.Add(this.webView2Overview);
+            this.tabOverview.Controls.Add(this.dataGridView1);
             this.tabOverview.Location = new System.Drawing.Point(4, 30);
             this.tabOverview.Name = "tabOverview";
             this.tabOverview.Size = new System.Drawing.Size(720, 536);
@@ -275,24 +284,96 @@
             this.tabOverview.Text = "Overview";
             this.tabOverview.UseVisualStyleBackColor = true;
             // 
-            // webView2Overview
+            // dataGridView1
             // 
-            this.webView2Overview.AllowExternalDrop = true;
-            this.webView2Overview.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.webView2Overview.BackColor = System.Drawing.Color.White;
-            this.webView2Overview.CreationProperties = null;
-            this.webView2Overview.DefaultBackgroundColor = System.Drawing.Color.White;
-            this.webView2Overview.Location = new System.Drawing.Point(0, 3);
-            this.webView2Overview.Name = "webView2Overview";
-            this.webView2Overview.Size = new System.Drawing.Size(710, 530);
-            this.webView2Overview.TabIndex = 6;
-            this.webView2Overview.ZoomFactor = 1D;
+            this.dataGridView1.AllowUserToAddRows = false;
+            this.dataGridView1.AllowUserToDeleteRows = false;
+            this.dataGridView1.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
+            this.dataGridView1.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dataGridView1.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+            this.GridType,
+            this.GridComponent,
+            this.GridTechnicalName,
+            this.GridFriendlyName,
+            this.GridShortDescr,
+            this.GridNotes,
+            this.GridLocalFiles,
+            this.GridWebLinks});
+            this.dataGridView1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.dataGridView1.EditMode = System.Windows.Forms.DataGridViewEditMode.EditProgrammatically;
+            this.dataGridView1.Location = new System.Drawing.Point(0, 0);
+            this.dataGridView1.MultiSelect = false;
+            this.dataGridView1.Name = "dataGridView1";
+            this.dataGridView1.ReadOnly = true;
+            this.dataGridView1.RowHeadersWidth = 51;
+            this.dataGridView1.RowTemplate.Height = 24;
+            this.dataGridView1.ShowCellErrors = false;
+            this.dataGridView1.ShowEditingIcon = false;
+            this.dataGridView1.ShowRowErrors = false;
+            this.dataGridView1.Size = new System.Drawing.Size(720, 536);
+            this.dataGridView1.TabIndex = 9;
+            // 
+            // GridType
+            // 
+            this.GridType.HeaderText = "Type";
+            this.GridType.MinimumWidth = 6;
+            this.GridType.Name = "GridType";
+            this.GridType.ReadOnly = true;
+            // 
+            // GridComponent
+            // 
+            this.GridComponent.HeaderText = "Component";
+            this.GridComponent.MinimumWidth = 6;
+            this.GridComponent.Name = "GridComponent";
+            this.GridComponent.ReadOnly = true;
+            this.GridComponent.Resizable = System.Windows.Forms.DataGridViewTriState.False;
+            // 
+            // GridTechnicalName
+            // 
+            this.GridTechnicalName.HeaderText = "Technical name";
+            this.GridTechnicalName.MinimumWidth = 6;
+            this.GridTechnicalName.Name = "GridTechnicalName";
+            this.GridTechnicalName.ReadOnly = true;
+            // 
+            // GridFriendlyName
+            // 
+            this.GridFriendlyName.HeaderText = "Friendly name";
+            this.GridFriendlyName.MinimumWidth = 6;
+            this.GridFriendlyName.Name = "GridFriendlyName";
+            this.GridFriendlyName.ReadOnly = true;
+            // 
+            // GridShortDescr
+            // 
+            this.GridShortDescr.HeaderText = "Short description";
+            this.GridShortDescr.MinimumWidth = 6;
+            this.GridShortDescr.Name = "GridShortDescr";
+            this.GridShortDescr.ReadOnly = true;
+            // 
+            // GridNotes
+            // 
+            this.GridNotes.HeaderText = "Notes";
+            this.GridNotes.MinimumWidth = 6;
+            this.GridNotes.Name = "GridNotes";
+            this.GridNotes.ReadOnly = true;
+            // 
+            // GridLocalFiles
+            // 
+            this.GridLocalFiles.HeaderText = "Local files";
+            this.GridLocalFiles.MinimumWidth = 6;
+            this.GridLocalFiles.Name = "GridLocalFiles";
+            this.GridLocalFiles.ReadOnly = true;
+            // 
+            // GridWebLinks
+            // 
+            this.GridWebLinks.HeaderText = "Web links";
+            this.GridWebLinks.MinimumWidth = 6;
+            this.GridWebLinks.Name = "GridWebLinks";
+            this.GridWebLinks.ReadOnly = true;
             // 
             // tabResources
             // 
             this.tabResources.BackColor = System.Drawing.Color.White;
+            this.tabResources.Controls.Add(this.richTextBox1);
             this.tabResources.Controls.Add(this.webView2Resources);
             this.tabResources.Location = new System.Drawing.Point(4, 30);
             this.tabResources.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
@@ -309,9 +390,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.webView2Resources.CreationProperties = null;
             this.webView2Resources.DefaultBackgroundColor = System.Drawing.Color.White;
-            this.webView2Resources.Location = new System.Drawing.Point(0, 3);
+            this.webView2Resources.Location = new System.Drawing.Point(4, 284);
             this.webView2Resources.Name = "webView2Resources";
-            this.webView2Resources.Size = new System.Drawing.Size(710, 530);
+            this.webView2Resources.Size = new System.Drawing.Size(706, 249);
             this.webView2Resources.TabIndex = 5;
             this.webView2Resources.ZoomFactor = 1D;
             // 
@@ -388,7 +469,7 @@
             this.tabFeedback.Controls.Add(this.label1);
             this.tabFeedback.Location = new System.Drawing.Point(4, 30);
             this.tabFeedback.Name = "tabFeedback";
-            this.tabFeedback.Size = new System.Drawing.Size(720, 536);
+            this.tabFeedback.Size = new System.Drawing.Size(715, 536);
             this.tabFeedback.TabIndex = 7;
             this.tabFeedback.Text = "Feedback";
             this.tabFeedback.UseVisualStyleBackColor = true;
@@ -438,7 +519,7 @@
             this.textBoxFeedback.Location = new System.Drawing.Point(14, 267);
             this.textBoxFeedback.Multiline = true;
             this.textBoxFeedback.Name = "textBoxFeedback";
-            this.textBoxFeedback.Size = new System.Drawing.Size(684, 194);
+            this.textBoxFeedback.Size = new System.Drawing.Size(679, 194);
             this.textBoxFeedback.TabIndex = 13;
             // 
             // checkBoxAttachExcel
@@ -536,7 +617,7 @@
             this.tabHelp.Location = new System.Drawing.Point(4, 30);
             this.tabHelp.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabHelp.Name = "tabHelp";
-            this.tabHelp.Size = new System.Drawing.Size(720, 536);
+            this.tabHelp.Size = new System.Drawing.Size(715, 536);
             this.tabHelp.TabIndex = 6;
             this.tabHelp.Text = "Help";
             // 
@@ -548,9 +629,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.webView2Help.CreationProperties = null;
             this.webView2Help.DefaultBackgroundColor = System.Drawing.Color.White;
-            this.webView2Help.Location = new System.Drawing.Point(0, 3);
+            this.webView2Help.Location = new System.Drawing.Point(519, 491);
             this.webView2Help.Name = "webView2Help";
-            this.webView2Help.Size = new System.Drawing.Size(710, 530);
+            this.webView2Help.Size = new System.Drawing.Size(179, 174);
             this.webView2Help.TabIndex = 6;
             this.webView2Help.ZoomFactor = 1D;
             // 
@@ -562,7 +643,7 @@
             this.tabAbout.Location = new System.Drawing.Point(4, 30);
             this.tabAbout.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabAbout.Name = "tabAbout";
-            this.tabAbout.Size = new System.Drawing.Size(720, 536);
+            this.tabAbout.Size = new System.Drawing.Size(715, 536);
             this.tabAbout.TabIndex = 5;
             this.tabAbout.Text = "About";
             // 
@@ -576,7 +657,7 @@
             this.webView2About.DefaultBackgroundColor = System.Drawing.Color.White;
             this.webView2About.Location = new System.Drawing.Point(0, 3);
             this.webView2About.Name = "webView2About";
-            this.webView2About.Size = new System.Drawing.Size(710, 530);
+            this.webView2About.Size = new System.Drawing.Size(705, 530);
             this.webView2About.TabIndex = 7;
             this.webView2About.ZoomFactor = 1D;
             // 
@@ -801,6 +882,14 @@
             this.checkBoxBlink.Text = "Blink selected components";
             this.checkBoxBlink.UseVisualStyleBackColor = true;
             // 
+            // richTextBox1
+            // 
+            this.richTextBox1.Location = new System.Drawing.Point(4, 13);
+            this.richTextBox1.Name = "richTextBox1";
+            this.richTextBox1.Size = new System.Drawing.Size(706, 265);
+            this.richTextBox1.TabIndex = 6;
+            this.richTextBox1.Text = "";
+            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 21F);
@@ -838,7 +927,7 @@
             this.panelLabelsVisible.ResumeLayout(false);
             this.panelLabelsVisible.PerformLayout();
             this.tabOverview.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.webView2Overview)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();
             this.tabResources.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.webView2Resources)).EndInit();
             this.tabConfiguration.ResumeLayout(false);
@@ -903,7 +992,6 @@
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.TabPage tabOverview;
-        private Microsoft.Web.WebView2.WinForms.WebView2 webView2Overview;
         private System.Windows.Forms.CheckBox checkBox2;
         private System.Windows.Forms.CheckBox checkBox3;
         private System.Windows.Forms.CheckBox checkBox1;
@@ -920,5 +1008,15 @@
         private System.Windows.Forms.Panel panel2;
         private System.Windows.Forms.Label label12;
         private System.Windows.Forms.TextBox textBox3;
+        private System.Windows.Forms.DataGridView dataGridView1;
+        private System.Windows.Forms.DataGridViewTextBoxColumn GridType;
+        private System.Windows.Forms.DataGridViewTextBoxColumn GridComponent;
+        private System.Windows.Forms.DataGridViewTextBoxColumn GridTechnicalName;
+        private System.Windows.Forms.DataGridViewTextBoxColumn GridFriendlyName;
+        private System.Windows.Forms.DataGridViewTextBoxColumn GridShortDescr;
+        private System.Windows.Forms.DataGridViewTextBoxColumn GridNotes;
+        private System.Windows.Forms.DataGridViewTextBoxColumn GridLocalFiles;
+        private System.Windows.Forms.DataGridViewTextBoxColumn GridWebLinks;
+        private System.Windows.Forms.RichTextBox richTextBox1;
     }
 }

@@ -194,13 +194,104 @@ namespace Commodore_Repair_Toolbox
 
             // Initialize relevant "WebView2" components (used in tab pages)
             InitializeTabConfiguration();
-            InitializeTabHelp();
-            InitializeTabAbout();
+//            InitializeTabHelp();
+//            InitializeTabAbout();
 
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
+
+
+
+
+
+
+
+
+
+            // Add this event handler once (e.g. in your form's constructor or initialization)
+            dataGridView1.DoubleBuffered(true);
+            dataGridView1.CellClick += dataGridView1_CellClick;
+            dataGridView1.Columns["GridType"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            dataGridView1.Columns["GridComponent"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            dataGridView1.Columns["GridTechnicalName"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            dataGridView1.Columns["GridFriendlyName"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            dataGridView1.Columns["GridShortDescr"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            dataGridView1.Columns["GridLocalFiles"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            dataGridView1.Columns["GridWebLinks"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            dataGridView1.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+            dataGridView1.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
+            dataGridView1.DefaultCellStyle.Alignment = DataGridViewContentAlignment.TopLeft;
+            dataGridView1.RowHeadersVisible = false;
+            foreach (DataGridViewColumn col in dataGridView1.Columns)
+            {
+                col.SortMode = DataGridViewColumnSortMode.NotSortable;
+            }
+
+
+            richTextBox1.Rtf =
+      @"{\rtf1\ansi
+\b Resources for troubleshooting and information\b0\par
+\par
+\b Local files\b0\par
+\par
+\b Resources\b0\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/service""}}{\fldrslt C128/C128D Service Manual}}\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/mapping""}}{\fldrslt Mapping the Commodore 128}}\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/memory""}}{\fldrslt Memory map}}\par
+\par
+\b Troubleshooting\b0\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/diag""}}{\fldrslt C128 Diagnostic Instruction and Troubleshooting Manual}}\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/sams""}}{\fldrslt SAMS Commodore 128 Troubleshooting & Repair}}\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/ray""}}{\fldrslt Ray Carlsen; C128 Chips & Common Symptoms}}\par
+\par
+\b Scope measurements\b0\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/scope1""}}{\fldrslt Introduction to C128/C128D scope measurements}}\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/scope2""}}{\fldrslt References for basic must-have voltages and signals}}\par
+\par
+\b Links\b0\par
+\par
+\b Resources\b0\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/zimmers""}}{\fldrslt Zimmers; Commodore 128}}\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/myold""}}{\fldrslt My Old Computer; Commodore 128 (310379)}}\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/raycbm""}}{\fldrslt Ray Carlsen; CBM}}\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/wiki""}}{\fldrslt Wikipedia; Commodore 128}}\par
+{\pntext\f0\'B7\tab}{\field{\*\fldinst{HYPERLINK ""https://example.com/neo""}}{\fldrslt C128 Neo; Bill of Material List}}\par
+}";
+
+            richTextBox1.LinkClicked += richTextBox1_LinkClicked;
+
         }
-                
+
+        private void richTextBox1_LinkClicked(object sender, LinkClickedEventArgs e)
+        {
+            string url = e.LinkText;
+
+            if (Uri.TryCreate(url, UriKind.Absolute, out Uri uri))
+            {
+                if (uri.IsFile)
+                {
+                    Process.Start(new ProcessStartInfo(uri.LocalPath) { UseShellExecute = true });
+                }
+                else
+                {
+                    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                }
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         // ###########################################################################################
         // Event: Form load.
@@ -645,6 +736,8 @@ namespace Commodore_Repair_Toolbox
         // Will load new content from board data file.
         // ###########################################################################################
 
+       
+        /*
         public async void UpdateTabOverview(Board selectedBoard)
         {
             if (webView2Overview.CoreWebView2 == null)
@@ -870,8 +963,231 @@ namespace Commodore_Repair_Toolbox
 
             webView2Overview.NavigateToString(htmlContent);
         }
+        */
+
+        private void UpdateTabOverviewTemporary()
+        {
+
+            // Clear existing rows in the DataGridView
+            dataGridView1.Rows.Clear();
+
+            /*
+            // Ensure the DataGridView has the correct columns
+            if (dataGridView1.Columns.Count < 3)
+            {
+                dataGridView1.Columns.Clear();
+                dataGridView1.Columns.Add("ComponentType", "Type");
+                dataGridView1.Columns.Add("ComponentName", "Component Name");
+                dataGridView1.Columns.Add("TechnicalName", "Technical Name");
+            }
+            */
+
+            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+
+            if (foundBoard != null)
+            {
+                if (foundBoard?.Components != null)
+                {
+
+                    // Filter components based on what is visible in "listBoxComponents"
+                    var visibleComponents = listBoxComponents.Items.Cast<string>().ToHashSet();
+
+                    foreach (BoardComponents comp in foundBoard.Components)
+                    {
+                        if (!visibleComponents.Contains(comp.NameDisplay)) continue; // skip component if it is not visible in "listBoxComponents"
+
+                        string compType = comp.Type;
+                        string compLabel = comp.Label;
+                        string compNameTechnical = comp.NameTechnical;
+                        string compNameFriendly = comp.NameFriendly;
+
+                        compNameFriendly = compNameFriendly.Replace("?", "");
+
+                        // Read the potential user-modified values from configuration file
+                        string baseKey = $"UserData|{hardwareSelectedName}|{boardSelectedName}|{compLabel}";
+                        string oneLinerKey = $"{baseKey}|Oneliner";
+                        string notesKey = $"{baseKey}|Notes";
+                        string compDescrShort = Configuration.GetSetting(oneLinerKey, "");
+                        if (string.IsNullOrEmpty(compDescrShort))
+                        {
+                            compDescrShort = comp.OneLiner;
+                        }
+                        string compDescrLong = Configuration.GetSetting(notesKey, "");
+                        if (string.IsNullOrEmpty(compDescrLong))
+                        {
+                            compDescrLong = comp.Description;
+                        }
+                        compDescrLong = compDescrLong.Replace("\\n", Environment.NewLine);
+                        
+                        // Local files
+                        string localFilesDisplay = "";
+                        List<(string Display, string FilePath)> localFilesList = new List<(string, string)>();
+                        if (comp.LocalFiles != null && comp.LocalFiles.Count > 0)
+                        {
+                            int counter = 1;
+                            foreach (ComponentLocalFiles file in comp.LocalFiles)
+                            {
+                                string fileFriendlyName = file.Name;
+                                string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, file.FileName));
+                                localFilesDisplay += $"#{counter} ";
+                                localFilesList.Add(($"#{counter} {fileFriendlyName}", filePath));
+                                counter++;
+                            }
+                        }
+
+                        // Web links
+                        string webLinksDisplay = "";
+                        List<(string Display, string Url)> webLinksList = new List<(string, string)>();
+                        if (comp.ComponentLinks != null && comp.ComponentLinks.Count > 0)
+                        {
+                            int counter = 1;
+                            foreach (ComponentLinks link in comp.ComponentLinks)
+                            {
+                                webLinksDisplay += $"#{counter} ";
+                                webLinksList.Add(($"#{counter} {link.Name}", link.Url));
+                                counter++;
+                            }
+                        }
+
+                        int rowIndex = dataGridView1.Rows.Add(
+                            compType,
+                            compLabel,
+                            compNameTechnical,
+                            compNameFriendly,
+                            compDescrShort,
+                            compDescrLong,
+                            localFilesDisplay,
+                            webLinksDisplay
+                        );
+
+                        dataGridView1.Rows[rowIndex].Cells["GridLocalFiles"].Tag = localFilesList;
+                        dataGridView1.Rows[rowIndex].Cells["GridWebLinks"].Tag = webLinksList;
+
+                        /*
+
+                        // Include component links
+                        htmlContent += "<td valign='top'>";
+                        if (comp.ComponentLinks != null && comp.ComponentLinks.Count > 0)
+                        {
+                            int counter = 1;
+                            foreach (ComponentLinks link in comp.ComponentLinks)
+                            {
+                                htmlContent += "<a href='" + link.Url + "' target='_blank' class='tooltip-link' data-title='" + link.Name + "'>#" + counter + "</a> ";
+                                counter++;
+                            }
+                        }
+                        */
+                    }
+                }
+            }
+        }
+
+        // Handler to open the file when a cell in "GridLocalFiles" is clicked
+        // New event handler: reacts to any click in the cell, not just on a link
+        private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            // GridLocalFiles
+            if (e.RowIndex >= 0 && dataGridView1.Columns[e.ColumnIndex].Name == "GridLocalFiles")
+            {
+                var cell = dataGridView1.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                if (cell.Tag is List<(string Display, string FilePath)> files && files.Count > 0)
+                {
+                    if (files.Count == 1)
+                    {
+                        System.Diagnostics.Process.Start(new ProcessStartInfo(files[0].FilePath) { UseShellExecute = true });
+                    }
+                    else
+                    {
+                        var menu = new ContextMenuStrip();
+                        foreach (var file in files)
+                        {
+                            menu.Items.Add(file.Display, null, (s, ea) =>
+                            {
+                                System.Diagnostics.Process.Start(new ProcessStartInfo(file.FilePath) { UseShellExecute = true });
+                            });
+                        }
+                        var mousePosition = dataGridView1.PointToClient(Cursor.Position);
+                        //menu.Show(dataGridView1, mousePosition);
+                        // Show menu to the left of the cursor
+                        menu.Show(dataGridView1, new Point(
+                            Math.Max(0, mousePosition.X - menu.Width),
+                            mousePosition.Y
+                        ));
+                    }
+                }
+            }
+
+            // GridWebLinks
+            if (e.RowIndex >= 0 && dataGridView1.Columns[e.ColumnIndex].Name == "GridWebLinks")
+            {
+                var cell = dataGridView1.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                if (cell.Tag is List<(string Display, string Url)> links && links.Count > 0)
+                {
+                    if (links.Count == 1)
+                    {
+//                        System.Diagnostics.Process.Start(new ProcessStartInfo(files[0].FilePath) { UseShellExecute = true });
+                        Process.Start(new ProcessStartInfo(links[0].Url) { UseShellExecute = true });
+                    }
+                    else
+                    {
+                        var menu = new ContextMenuStrip();
+                        foreach (var link in links)
+                        {
+                            /* HEST */
+                            /* DELETE U18 LINK in C128 */
+                            /* DELETE U18 LINK in C128 */
+                            /* DELETE U18 LINK in C128 */
+                            /* DELETE U18 LINK in C128 */
+                            /* DELETE U18 LINK in C128 */
+                            /* HEST */
+                            menu.Items.Add(link.Display, null, (s, ea) =>
+                            {
+//                                System.Diagnostics.Process.Start(new ProcessStartInfo(file.FilePath) { UseShellExecute = true });
+                                Process.Start(new ProcessStartInfo(link.Url) { UseShellExecute = true });
+                            });
+                        }
+                        var mousePosition = dataGridView1.PointToClient(Cursor.Position);
+                        //menu.Show(dataGridView1, mousePosition);
+                        menu.Show(dataGridView1, new Point(
+                            Math.Max(0, mousePosition.X - menu.Width),
+                            mousePosition.Y
+                        ));
+                    }
+                }
+            }
+        }
+
+        private void dataGridView1_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
+        {
+            if (e.RowIndex >= 0 && dataGridView1.Columns[e.ColumnIndex].Name == "GridLocalFiles")
+                e.ToolTipText = "Test tooltip";
+
+            if (e.RowIndex >= 0 && dataGridView1.Columns[e.ColumnIndex].Name == "GridLocalFiles")
+            {
+                var cell = dataGridView1.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                if (cell.Tag is List<(string Display, string FilePath)> files && files.Count > 0)
+                {
+                    e.ToolTipText = string.Join(Environment.NewLine, files.Select(f => $"{f.Display}: {f.FilePath}"));
+                }
+                else
+                {
+                    e.ToolTipText = null;
+                }
+            }
+            else
+            {
+                e.ToolTipText = null;
+            }
+        }
 
 
+
+
+
+
+
+        
         private void WebView2_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
             var message = e.TryGetWebMessageAsString();
@@ -921,22 +1237,14 @@ namespace Commodore_Repair_Toolbox
                 // NOP (it has this event to close the component popup)
             }
         }
-
-        private void CloseComponentPopup()
-        {
-            if (componentInfoPopup != null && !componentInfoPopup.IsDisposed)
-            {
-                componentInfoPopup.Close();
-                componentInfoPopup = null;
-            }
-        }
-
+        
 
         // ###########################################################################################
         // Initialize and update the tab for "Resources".
         // Will load new content from board data file.
         // ###########################################################################################
 
+        
         private async void UpdateTabResources(Board selectedBoard)
         {
             if (webView2Resources.CoreWebView2 == null)
@@ -1026,7 +1334,9 @@ namespace Commodore_Repair_Toolbox
 
             webView2Resources.NavigateToString(htmlContent);
         }
+        
 
+        
         private void WebView2OpenUrl_NewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs args)
         {
             // Open URL in default web browser
@@ -1036,6 +1346,20 @@ namespace Commodore_Repair_Toolbox
             // Set focus back to the "textBoxFilterComponents"
             textBoxFilterComponents.Focus();
         }
+        
+        
+
+
+
+        private void CloseComponentPopup()
+        {
+            if (componentInfoPopup != null && !componentInfoPopup.IsDisposed)
+            {
+                componentInfoPopup.Close();
+                componentInfoPopup = null;
+            }
+        }
+
 
 
         // ###########################################################################################
@@ -1231,6 +1555,7 @@ namespace Commodore_Repair_Toolbox
         // Initialize the tab for "Help".
         // ###########################################################################################
 
+        /*
         private async void InitializeTabHelp()
         {
             if (webView2Help.CoreWebView2 == null)
@@ -1501,6 +1826,7 @@ namespace Commodore_Repair_Toolbox
 
             webView2About.NavigateToString(htmlContent);
         }
+        */
 
 
         // ###########################################################################################
@@ -1646,7 +1972,8 @@ namespace Commodore_Repair_Toolbox
 
             UpdateShowOfSelectedComponents();
             ShowOverlaysAccordingToComponentList();
-            UpdateTabOverview(GetSelectedBoardClass());
+            UpdateTabOverviewTemporary();
+//            UpdateTabOverview(GetSelectedBoardClass());
 
             listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
         }
@@ -2163,6 +2490,7 @@ namespace Commodore_Repair_Toolbox
             SuspendLayout();
             InitializeThumbnails();
             InitializeTabMain();
+            UpdateTabOverviewTemporary();
             UpdateTabResources(selectedBoardClass);
 
             // Load polylines after initializing thumbnails and tabs
