@@ -72,6 +72,21 @@ You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Tool
 Please refer to the [Wiki Documentation](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/wiki/Documentation) page for adding or modifying the data.
 
 
+# FAQ
+
+* **Will it work on Linux with Wine or Mono?**
+  - Short answer is "_no_".
+  - Due to various reasons _CRT_ uses a newer _WebView2_ component, which gives all kind of issues when not running on a native Windows 10 or newer. It can start on Linux, but it then comes with a ton of warnings, which does make it very troublesome to work with.
+* **Will it work on Windows 7?**
+  - No - same reason as with Linux.
+  - The _WebView2_ component requires a certain newer .NET Framework version, which cannot run on Windows 7.
+* **Why not creating this as a web page instead?**
+  - Because I like the responsiveness and feel of a real native Windows application :-)
+  - A web page would be for someone else to create, as that would be very heavy on the client-side, and this is not my favorite way of coding.
+* **Will you port this to Windows or Linux?**
+  - Not any day soon. Maybe one day when AI becomes better at handling complex tasks, then I could look in to this, but here-and-now I will only focus on the Windows application as-is.
+
+
 # Data sources used for configurations
 
 I have taken data from many places, but I do have a few _go-to_ places I frequently visit:
