@@ -41,17 +41,21 @@
             this.label7 = new System.Windows.Forms.Label();
             this.label8 = new System.Windows.Forms.Label();
             this.textBox1 = new System.Windows.Forms.TextBox();
-            this.label9 = new System.Windows.Forms.Label();
-            this.label10 = new System.Windows.Forms.Label();
-            this.label11 = new System.Windows.Forms.Label();
-            this.label12 = new System.Windows.Forms.Label();
-            this.label13 = new System.Windows.Forms.Label();
+            this.labelPin = new System.Windows.Forms.Label();
+            this.labelRegion = new System.Windows.Forms.Label();
+            this.labelName = new System.Windows.Forms.Label();
+            this.labelReading = new System.Windows.Forms.Label();
+            this.labelImageX = new System.Windows.Forms.Label();
             this.textBox2 = new System.Windows.Forms.TextBox();
             this.panel1 = new System.Windows.Forms.Panel();
             this.panel2 = new System.Windows.Forms.Panel();
+            this.panel3 = new System.Windows.Forms.Panel();
+            this.buttonRegionPal = new System.Windows.Forms.Button();
+            this.buttonRegionNtsc = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             this.panel1.SuspendLayout();
             this.panel2.SuspendLayout();
+            this.panel3.SuspendLayout();
             this.SuspendLayout();
             // 
             // pictureBox1
@@ -60,10 +64,9 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.pictureBox1.BackColor = System.Drawing.Color.White;
-            this.pictureBox1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.pictureBox1.Location = new System.Drawing.Point(12, 9);
+            this.pictureBox1.Location = new System.Drawing.Point(3, 3);
             this.pictureBox1.Name = "pictureBox1";
-            this.pictureBox1.Size = new System.Drawing.Size(646, 814);
+            this.pictureBox1.Size = new System.Drawing.Size(652, 644);
             this.pictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.pictureBox1.TabIndex = 0;
             this.pictureBox1.TabStop = false;
@@ -155,9 +158,9 @@
             this.label6.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label6.Location = new System.Drawing.Point(667, 156);
             this.label6.Name = "label6";
-            this.label6.Size = new System.Drawing.Size(286, 21);
+            this.label6.Size = new System.Drawing.Size(246, 21);
             this.label6.TabIndex = 100;
-            this.label6.Text = "Component notes (you can modify this)";
+            this.label6.Text = "Image notes (you can modify this)";
             // 
             // label7
             // 
@@ -194,66 +197,71 @@
             this.textBox1.Size = new System.Drawing.Size(430, 327);
             this.textBox1.TabIndex = 3;
             // 
-            // label9
+            // labelPin
             // 
-            this.label9.AutoSize = true;
-            this.label9.BackColor = System.Drawing.Color.Khaki;
-            this.label9.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.label9.Font = new System.Drawing.Font("Calibri", 10.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label9.Location = new System.Drawing.Point(20, 19);
-            this.label9.Name = "label9";
-            this.label9.Size = new System.Drawing.Size(56, 24);
-            this.label9.TabIndex = 100;
-            this.label9.Text = "label9";
+            this.labelPin.AutoSize = true;
+            this.labelPin.BackColor = System.Drawing.Color.Khaki;
+            this.labelPin.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.labelPin.Font = new System.Drawing.Font("Calibri", 10.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelPin.Location = new System.Drawing.Point(15, 15);
+            this.labelPin.Name = "labelPin";
+            this.labelPin.Padding = new System.Windows.Forms.Padding(2);
+            this.labelPin.Size = new System.Drawing.Size(38, 28);
+            this.labelPin.TabIndex = 100;
+            this.labelPin.Text = "Pin";
             // 
-            // label10
+            // labelRegion
             // 
-            this.label10.AutoSize = true;
-            this.label10.BackColor = System.Drawing.Color.Khaki;
-            this.label10.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.label10.Font = new System.Drawing.Font("Calibri", 10.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label10.Location = new System.Drawing.Point(153, 19);
-            this.label10.Name = "label10";
-            this.label10.Size = new System.Drawing.Size(65, 24);
-            this.label10.TabIndex = 100;
-            this.label10.Text = "label10";
+            this.labelRegion.AutoSize = true;
+            this.labelRegion.BackColor = System.Drawing.Color.IndianRed;
+            this.labelRegion.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.labelRegion.Font = new System.Drawing.Font("Calibri", 10.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelRegion.ForeColor = System.Drawing.Color.White;
+            this.labelRegion.Location = new System.Drawing.Point(125, 14);
+            this.labelRegion.Name = "labelRegion";
+            this.labelRegion.Padding = new System.Windows.Forms.Padding(2);
+            this.labelRegion.Size = new System.Drawing.Size(66, 28);
+            this.labelRegion.TabIndex = 100;
+            this.labelRegion.Text = "Region";
             // 
-            // label11
+            // labelName
             // 
-            this.label11.AutoSize = true;
-            this.label11.BackColor = System.Drawing.Color.Khaki;
-            this.label11.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.label11.Font = new System.Drawing.Font("Calibri", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label11.Location = new System.Drawing.Point(82, 19);
-            this.label11.Name = "label11";
-            this.label11.Size = new System.Drawing.Size(66, 24);
-            this.label11.TabIndex = 100;
-            this.label11.Text = "label11";
+            this.labelName.AutoSize = true;
+            this.labelName.BackColor = System.Drawing.Color.Khaki;
+            this.labelName.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.labelName.Font = new System.Drawing.Font("Calibri", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelName.Location = new System.Drawing.Point(58, 14);
+            this.labelName.Name = "labelName";
+            this.labelName.Padding = new System.Windows.Forms.Padding(2);
+            this.labelName.Size = new System.Drawing.Size(61, 28);
+            this.labelName.TabIndex = 100;
+            this.labelName.Text = "Name";
             // 
-            // label12
+            // labelReading
             // 
-            this.label12.AutoSize = true;
-            this.label12.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.label12.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.label12.Font = new System.Drawing.Font("Calibri", 10.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label12.Location = new System.Drawing.Point(20, 48);
-            this.label12.Name = "label12";
-            this.label12.Size = new System.Drawing.Size(65, 24);
-            this.label12.TabIndex = 100;
-            this.label12.Text = "label12";
+            this.labelReading.AutoSize = true;
+            this.labelReading.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.labelReading.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.labelReading.Font = new System.Drawing.Font("Calibri", 10.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelReading.Location = new System.Drawing.Point(197, 14);
+            this.labelReading.Name = "labelReading";
+            this.labelReading.Padding = new System.Windows.Forms.Padding(2);
+            this.labelReading.Size = new System.Drawing.Size(74, 28);
+            this.labelReading.TabIndex = 100;
+            this.labelReading.Text = "Reading";
             // 
-            // label13
+            // labelImageX
             // 
-            this.label13.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.label13.AutoSize = true;
-            this.label13.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.label13.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.label13.Font = new System.Drawing.Font("Calibri", 10.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label13.Location = new System.Drawing.Point(584, 19);
-            this.label13.Name = "label13";
-            this.label13.Size = new System.Drawing.Size(65, 24);
-            this.label13.TabIndex = 100;
-            this.label13.Text = "label13";
+            this.labelImageX.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.labelImageX.AutoSize = true;
+            this.labelImageX.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.labelImageX.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.labelImageX.Font = new System.Drawing.Font("Calibri", 10.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelImageX.Location = new System.Drawing.Point(19, 612);
+            this.labelImageX.Name = "labelImageX";
+            this.labelImageX.Size = new System.Drawing.Size(66, 24);
+            this.labelImageX.TabIndex = 100;
+            this.labelImageX.Text = "ImageX";
             // 
             // textBox2
             // 
@@ -287,18 +295,54 @@
             this.panel2.Size = new System.Drawing.Size(434, 28);
             this.panel2.TabIndex = 2;
             // 
+            // panel3
+            // 
+            this.panel3.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.panel3.BackColor = System.Drawing.Color.White;
+            this.panel3.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.panel3.Controls.Add(this.labelRegion);
+            this.panel3.Controls.Add(this.labelName);
+            this.panel3.Controls.Add(this.labelReading);
+            this.panel3.Controls.Add(this.labelImageX);
+            this.panel3.Controls.Add(this.pictureBox1);
+            this.panel3.Location = new System.Drawing.Point(0, 0);
+            this.panel3.Name = "panel3";
+            this.panel3.Size = new System.Drawing.Size(660, 826);
+            this.panel3.TabIndex = 101;
+            // 
+            // buttonRegionPal
+            // 
+            this.buttonRegionPal.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.buttonRegionPal.Location = new System.Drawing.Point(671, 785);
+            this.buttonRegionPal.Name = "buttonRegionPal";
+            this.buttonRegionPal.Size = new System.Drawing.Size(93, 30);
+            this.buttonRegionPal.TabIndex = 102;
+            this.buttonRegionPal.Text = "PAL (123)";
+            this.buttonRegionPal.UseVisualStyleBackColor = true;
+            // 
+            // buttonRegionNtsc
+            // 
+            this.buttonRegionNtsc.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.buttonRegionNtsc.Location = new System.Drawing.Point(770, 786);
+            this.buttonRegionNtsc.Name = "buttonRegionNtsc";
+            this.buttonRegionNtsc.Size = new System.Drawing.Size(93, 30);
+            this.buttonRegionNtsc.TabIndex = 103;
+            this.buttonRegionNtsc.Text = "NTSC (123)";
+            this.buttonRegionNtsc.UseVisualStyleBackColor = true;
+            // 
             // FormComponent
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1117, 827);
+            this.Controls.Add(this.buttonRegionNtsc);
+            this.Controls.Add(this.buttonRegionPal);
+            this.Controls.Add(this.labelPin);
+            this.Controls.Add(this.panel3);
             this.Controls.Add(this.panel2);
             this.Controls.Add(this.panel1);
-            this.Controls.Add(this.label13);
-            this.Controls.Add(this.label12);
-            this.Controls.Add(this.label11);
-            this.Controls.Add(this.label10);
-            this.Controls.Add(this.label9);
             this.Controls.Add(this.label8);
             this.Controls.Add(this.label7);
             this.Controls.Add(this.label6);
@@ -309,7 +353,6 @@
             this.Controls.Add(this.label2);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.button1);
-            this.Controls.Add(this.pictureBox1);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MinimizeBox = false;
             this.MinimumSize = new System.Drawing.Size(600, 678);
@@ -320,6 +363,8 @@
             this.panel1.PerformLayout();
             this.panel2.ResumeLayout(false);
             this.panel2.PerformLayout();
+            this.panel3.ResumeLayout(false);
+            this.panel3.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -339,13 +384,16 @@
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.TextBox textBox1;
-        private System.Windows.Forms.Label label9;
-        private System.Windows.Forms.Label label10;
-        private System.Windows.Forms.Label label11;
-        private System.Windows.Forms.Label label12;
-        private System.Windows.Forms.Label label13;
+        private System.Windows.Forms.Label labelPin;
+        private System.Windows.Forms.Label labelRegion;
+        private System.Windows.Forms.Label labelName;
+        private System.Windows.Forms.Label labelReading;
+        private System.Windows.Forms.Label labelImageX;
         private System.Windows.Forms.TextBox textBox2;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Panel panel2;
+        private System.Windows.Forms.Panel panel3;
+        private System.Windows.Forms.Button buttonRegionPal;
+        private System.Windows.Forms.Button buttonRegionNtsc;
     }
 }

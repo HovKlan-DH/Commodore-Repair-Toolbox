@@ -136,6 +136,7 @@ namespace Commodore_Repair_Toolbox
         private Point windowLastLocation;
         bool thumbnailsSameWidth = false;
         int thumbnailsWidth = 0;
+        public static string selectedRegion = ""; // "", "PAL" or "NTSC"
 
         // Polyline
         private PolylinesManagement polylinesManagement;
@@ -436,6 +437,7 @@ namespace Commodore_Repair_Toolbox
             string showTraces = Configuration.GetSetting("ShowTraces", defaultShowTraces);
             string showTracesHeight = Configuration.GetSetting("ShowTracesHeight", defaultShowTracesHeight);
             string userEmail = Configuration.GetSetting("UserEmail", "");
+            selectedRegion = Configuration.GetSetting("SelectedRegion", "PAL");
 
             textBoxEmail.Text = userEmail; // set email address in "Feedback" tab
 
@@ -483,6 +485,8 @@ namespace Commodore_Repair_Toolbox
 
             panelTracesVisibleHeight = Convert.ToInt32(showTracesHeight);
             isPanelTracesVisible = bool.TryParse(showTraces, out bool result) && result;
+
+            SetRegionButtonColors();
         }
 
 
@@ -531,6 +535,8 @@ namespace Commodore_Repair_Toolbox
             tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
             splitContainerSchematics.SplitterMoved += SplitContainer1_SplitterMoved;
             listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
+            buttonRegionPal.Click += ButtonRegionPal_Click;
+            buttonRegionNtsc.Click += ButtonRegionNtsc_Click;
             windowMoveStopTimer.Interval = 200;
             windowMoveStopTimer.Tick += MoveStopTimer_Tick;
             Move += Form_Move;
@@ -806,12 +812,27 @@ namespace Commodore_Repair_Toolbox
                         string compDescrLong = Configuration.GetSetting(notesKey, "");
                         if (string.IsNullOrEmpty(compDescrLong))
                         {
-                            compDescrLong = comp.Description;
+                            // Get the first non-empty Note from ComponentImages, if available
+                            if (comp.ComponentImages != null && comp.ComponentImages.Count > 0)
+                            {
+                                var firstNote = comp.ComponentImages
+                                    .Select(img => img.Note)
+                                    .FirstOrDefault(note => !string.IsNullOrEmpty(note));
+                                compDescrLong = firstNote ?? "";
+//                                compDescrLong = compDescrLong.Replace("\\n", "<br />");
+                            }
+                            else
+                            {
+                                compDescrLong = "";
+                            }
                         }
-                        else
-                        {
-                            compDescrLong = compDescrLong.Replace("\\n", "<br />");
-                        }
+//                        else
+//                        {
+//                            compDescrLong = compDescrLong.Replace("\\n", "<br />");
+//                        }
+                        compDescrLong = compDescrLong.Replace("\\n", "<br />");
+                        compDescrLong = compDescrLong.Replace("\n", "<br />");
+                        compDescrLong = compDescrLong.Replace(Environment.NewLine, "<br />");
 
                         htmlContent += "<tr>";
 
@@ -1302,6 +1323,22 @@ namespace Commodore_Repair_Toolbox
                 <br />
 
                 <ul>
+                    <li>PAL/NTSC:</li>
+                    <ul>
+                        <li>PAL</li>
+                        <ul>
+                            <li>Filters all components and images where the region is either empty or set to PAL</li>
+                        </ul>
+                        <li>NTSC</li>
+                        <ul>
+                            <li>Filters all components and images where the region is either empty or set to NTSC</li>
+                        </ul>
+                        <li>The component information popup shows a counter on the two region buttons for the number of images relevant for this region or generic</li>
+                    </ul>
+                </ul>
+                <br />
+
+                <ul>
                     <li>Component selection:</li>
                     <ul>
                         <li>When a component is selected, then it will also visualize if component is part of thumbnail in list-view:</li>
@@ -1603,6 +1640,14 @@ namespace Commodore_Repair_Toolbox
                 {
                     string componentCategory = comp.Type;
                     string componentDisplay = comp.NameDisplay;
+
+                    // Region filtering
+                    bool regionMatches = string.IsNullOrEmpty(comp.Region) ||
+                                         string.IsNullOrEmpty(Main.selectedRegion) ||
+                                         string.Equals(comp.Region, Main.selectedRegion, StringComparison.OrdinalIgnoreCase);
+
+                    if (!regionMatches)
+                        continue; // skip this component if region does not match
 
                     if (listBoxCategories.SelectedItems.Contains(componentCategory))
                     {
@@ -2895,6 +2940,8 @@ namespace Commodore_Repair_Toolbox
             // Always enforce scrollbars to avoid the weird "first zoom-in" flickering
             panelZoom.AutoScroll = true;
             panelZoom.AutoScrollMinSize = new Size(panelZoom.Width + 1, panelZoom.Height + 1);
+
+            PopulatePolylineVisibilityPanel();
 
             HighlightOverlays("tab");
         }
@@ -4295,6 +4342,50 @@ namespace Commodore_Repair_Toolbox
                 return "hest";
             }
         }
+
+
+        public void SetRegionButtonColors()
+        {
+            if (selectedRegion == "NTSC")
+            {
+                buttonRegionPal.FlatStyle = FlatStyle.Standard;
+                buttonRegionPal.FlatAppearance.BorderColor = SystemColors.ControlDark;
+                buttonRegionPal.FlatAppearance.BorderSize = 1;
+                buttonRegionPal.BackColor = SystemColors.Control;
+                buttonRegionPal.ForeColor = SystemColors.ControlText;
+                buttonRegionNtsc.BackColor = Color.LightSteelBlue;
+                buttonRegionNtsc.ForeColor = Color.Black;
+            }
+            else
+            {
+                buttonRegionPal.FlatStyle = FlatStyle.Flat;
+                buttonRegionPal.FlatAppearance.BorderColor = Color.DarkRed;
+                buttonRegionPal.FlatAppearance.BorderSize = 1;
+                buttonRegionPal.BackColor = Color.IndianRed;
+                buttonRegionPal.ForeColor = Color.White;
+                buttonRegionNtsc.BackColor = SystemColors.Control;
+                buttonRegionNtsc.ForeColor = SystemColors.ControlText;
+            }
+        }
+
+        private void ButtonRegionPal_Click(object sender, EventArgs e)
+        {
+            selectedRegion = "PAL";
+            Configuration.SaveSetting("SelectedRegion", "PAL");
+//            FilterImagesByRegion();
+            SetRegionButtonColors();
+            UpdateComponentList("ButtonRegionPal_Click");
+        }
+
+        private void ButtonRegionNtsc_Click(object sender, EventArgs e)
+        {
+            selectedRegion = "NTSC";
+            Configuration.SaveSetting("SelectedRegion", "NTSC");
+//            FilterImagesByRegion();
+            SetRegionButtonColors();
+            UpdateComponentList("ButtonRegionNtsc_Click");
+        }
+
     }
 
 
@@ -4330,9 +4421,8 @@ namespace Commodore_Repair_Toolbox
         public string NameFriendly { get; set; }
         public string NameDisplay { get; set; }
         public string Type { get; set; }
+        public string Region { get; set; }
         public string OneLiner { get; set; }
-        public string Description { get; set; }
-        public List<ComponentOscilloscope> Oscilloscope { get; set; }
         public List<ComponentLocalFiles> LocalFiles { get; set; }
         public List<ComponentLinks> ComponentLinks { get; set; }
         public List<ComponentImages> ComponentImages { get; set; }
@@ -4398,9 +4488,13 @@ namespace Commodore_Repair_Toolbox
         public string Region { get; set; }
         public string Pin { get; set; }
         public string Name { get; set; }
+        public string Reading { get; set; }
+
         public string FileName { get; set; }
+        public string Note { get; set; }
     }
 
+    /*
     public class ComponentOscilloscope
     {
         public string Name { get; set; }
@@ -4408,6 +4502,7 @@ namespace Commodore_Repair_Toolbox
         public string Pin { get; set; }
         public string Reading { get; set; }
     }
+    */
 
     public class CustomPanel : Panel
     {

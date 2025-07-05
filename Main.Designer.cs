@@ -90,6 +90,8 @@
             this.textBoxFilterComponents = new System.Windows.Forms.TextBox();
             this.checkBoxBlink = new System.Windows.Forms.CheckBox();
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
+            this.buttonRegionPal = new System.Windows.Forms.Button();
+            this.buttonRegionNtsc = new System.Windows.Forms.Button();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -635,7 +637,7 @@
             this.listBoxComponents.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.listBoxComponents.Name = "listBoxComponents";
             this.listBoxComponents.SelectionMode = System.Windows.Forms.SelectionMode.MultiSimple;
-            this.listBoxComponents.Size = new System.Drawing.Size(273, 235);
+            this.listBoxComponents.Size = new System.Drawing.Size(273, 256);
             this.listBoxComponents.TabIndex = 7;
             // 
             // labelComponents
@@ -652,10 +654,10 @@
             // 
             this.buttonClear.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.buttonClear.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonClear.Location = new System.Drawing.Point(12, 580);
+            this.buttonClear.Location = new System.Drawing.Point(12, 588);
             this.buttonClear.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.buttonClear.Name = "buttonClear";
-            this.buttonClear.Size = new System.Drawing.Size(62, 30);
+            this.buttonClear.Size = new System.Drawing.Size(62, 25);
             this.buttonClear.TabIndex = 9;
             this.buttonClear.Text = "Clear";
             this.buttonClear.UseVisualStyleBackColor = true;
@@ -710,10 +712,10 @@
             // 
             this.buttonAll.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.buttonAll.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonAll.Location = new System.Drawing.Point(80, 580);
+            this.buttonAll.Location = new System.Drawing.Point(80, 588);
             this.buttonAll.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.buttonAll.Name = "buttonAll";
-            this.buttonAll.Size = new System.Drawing.Size(71, 30);
+            this.buttonAll.Size = new System.Drawing.Size(71, 25);
             this.buttonAll.TabIndex = 12;
             this.buttonAll.Text = "Mark all";
             this.buttonAll.UseVisualStyleBackColor = true;
@@ -723,10 +725,10 @@
             // 
             this.buttonFullscreen.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.buttonFullscreen.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonFullscreen.Location = new System.Drawing.Point(157, 579);
+            this.buttonFullscreen.Location = new System.Drawing.Point(157, 587);
             this.buttonFullscreen.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.buttonFullscreen.Name = "buttonFullscreen";
-            this.buttonFullscreen.Size = new System.Drawing.Size(128, 30);
+            this.buttonFullscreen.Size = new System.Drawing.Size(128, 25);
             this.buttonFullscreen.TabIndex = 13;
             this.buttonFullscreen.Text = "Fullscreen";
             this.buttonFullscreen.UseVisualStyleBackColor = true;
@@ -783,7 +785,7 @@
             // textBoxFilterComponents
             // 
             this.textBoxFilterComponents.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.textBoxFilterComponents.Location = new System.Drawing.Point(12, 544);
+            this.textBoxFilterComponents.Location = new System.Drawing.Point(12, 556);
             this.textBoxFilterComponents.Name = "textBoxFilterComponents";
             this.textBoxFilterComponents.Size = new System.Drawing.Size(273, 28);
             this.textBoxFilterComponents.TabIndex = 1;
@@ -793,13 +795,37 @@
             this.checkBoxBlink.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.checkBoxBlink.AutoSize = true;
             this.checkBoxBlink.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.checkBoxBlink.Location = new System.Drawing.Point(12, 615);
+            this.checkBoxBlink.Location = new System.Drawing.Point(158, 618);
             this.checkBoxBlink.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.checkBoxBlink.Name = "checkBoxBlink";
-            this.checkBoxBlink.Size = new System.Drawing.Size(218, 25);
+            this.checkBoxBlink.Size = new System.Drawing.Size(127, 25);
             this.checkBoxBlink.TabIndex = 15;
-            this.checkBoxBlink.Text = "Blink selected components";
+            this.checkBoxBlink.Text = "Blink selected";
             this.checkBoxBlink.UseVisualStyleBackColor = true;
+            // 
+            // buttonRegionPal
+            // 
+            this.buttonRegionPal.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.buttonRegionPal.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.buttonRegionPal.Location = new System.Drawing.Point(12, 619);
+            this.buttonRegionPal.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.buttonRegionPal.Name = "buttonRegionPal";
+            this.buttonRegionPal.Size = new System.Drawing.Size(62, 25);
+            this.buttonRegionPal.TabIndex = 16;
+            this.buttonRegionPal.Text = "PAL";
+            this.buttonRegionPal.UseVisualStyleBackColor = true;
+            // 
+            // buttonRegionNtsc
+            // 
+            this.buttonRegionNtsc.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.buttonRegionNtsc.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.buttonRegionNtsc.Location = new System.Drawing.Point(80, 619);
+            this.buttonRegionNtsc.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.buttonRegionNtsc.Name = "buttonRegionNtsc";
+            this.buttonRegionNtsc.Size = new System.Drawing.Size(62, 25);
+            this.buttonRegionNtsc.TabIndex = 17;
+            this.buttonRegionNtsc.Text = "NTSC";
+            this.buttonRegionNtsc.UseVisualStyleBackColor = true;
             // 
             // Main
             // 
@@ -807,6 +833,8 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.WhiteSmoke;
             this.ClientSize = new System.Drawing.Size(1082, 653);
+            this.Controls.Add(this.buttonRegionNtsc);
+            this.Controls.Add(this.buttonRegionPal);
             this.Controls.Add(this.textBoxFilterComponents);
             this.Controls.Add(this.checkBoxBlink);
             this.Controls.Add(this.panelBehindTab);
@@ -920,5 +948,7 @@
         private System.Windows.Forms.Panel panel2;
         private System.Windows.Forms.Label label12;
         private System.Windows.Forms.TextBox textBox3;
+        private System.Windows.Forms.Button buttonRegionPal;
+        private System.Windows.Forms.Button buttonRegionNtsc;
     }
 }

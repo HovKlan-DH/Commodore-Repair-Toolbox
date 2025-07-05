@@ -294,9 +294,8 @@ namespace Commodore_Repair_Toolbox
                                 string nameTechnical = worksheet.Cells[row, 2].Value?.ToString() ?? "";
                                 string nameFriendly = worksheet.Cells[row, 3].Value?.ToString() ?? "";
                                 string type = worksheet.Cells[row, 4].Value?.ToString() ?? "Misc";
-                                string oneliner = worksheet.Cells[row, 5].Value?.ToString() ?? "";
-                                string description = worksheet.Cells[row, 6].Text ?? "";
-                                description = description.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", Environment.NewLine);
+                                string region = worksheet.Cells[row, 5].Value?.ToString() ?? "";
+                                string oneliner = worksheet.Cells[row, 6].Value?.ToString() ?? "";
 
                                 string nameDisplay = label;
                                 nameDisplay += nameTechnical != "" ? " | " + nameTechnical : "";
@@ -309,8 +308,8 @@ namespace Commodore_Repair_Toolbox
                                     NameFriendly = nameFriendly,
                                     NameDisplay = nameDisplay,
                                     Type = type,
+                                    Region = region,
                                     OneLiner = oneliner,
-                                    Description = description
                                 };
                                 if (board.Components == null) board.Components = new List<BoardComponents>();
                                 board.Components.Add(comp);
@@ -395,6 +394,7 @@ namespace Commodore_Repair_Toolbox
                 }
             }
 
+            /*
             // 6) Load "component oscilliscope"
             foreach (Hardware hardware in classHardware)
             {
@@ -458,6 +458,7 @@ namespace Commodore_Repair_Toolbox
                     }
                 }
             }
+            */
             
             // 6) Load "component local files" (datasheets)
             foreach (Hardware hardware in classHardware)
@@ -845,7 +846,9 @@ namespace Commodore_Repair_Toolbox
                                 string region = worksheet.Cells[row, 2].Value?.ToString() ?? "";
                                 string pin = worksheet.Cells[row, 3].Value?.ToString() ?? "";
                                 string name = worksheet.Cells[row, 4].Value?.ToString() ?? "";
-                                string fileName = worksheet.Cells[row, 5].Value?.ToString() ?? "";
+                                string reading = worksheet.Cells[row, 5].Value?.ToString() ?? "";
+                                string fileName = worksheet.Cells[row, 6].Value?.ToString() ?? "";
+                                string note = worksheet.Cells[row, 7].Value?.ToString() ?? "";
 
                                 // Report a warning if path contains a backslash
                                 if (fileName.Contains("\\"))
@@ -856,7 +859,7 @@ namespace Commodore_Repair_Toolbox
 
                                 // Log if file does not exists
                                 string filePath = Path.Combine(Application.StartupPath, fileName);
-                                if (!File.Exists(filePath))
+                                if (fileName != "" && !File.Exists(filePath))
                                 {
                                     string fileName1 = Path.GetFileName(filePathBoardData);
                                     string error = $"ERROR: Excel file [{fileName1}] worksheet [{sheet}] the file [{fileName}] does not exists";
@@ -874,7 +877,9 @@ namespace Commodore_Repair_Toolbox
                                             Region = region,
                                             Pin = pin,
                                             Name = name,
-                                            FileName = fileName
+                                            Reading = reading,
+                                            FileName = fileName,
+                                            Note = note
                                         });
                                     }
                                 }
