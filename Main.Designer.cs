@@ -92,6 +92,7 @@
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
             this.buttonRegionPal = new System.Windows.Forms.Button();
             this.buttonRegionNtsc = new System.Windows.Forms.Button();
+            this.label13 = new System.Windows.Forms.Label();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -740,6 +741,7 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.panelBehindTab.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.panelBehindTab.Controls.Add(this.label13);
             this.panelBehindTab.Controls.Add(this.buttonTracesDelete);
             this.panelBehindTab.Controls.Add(this.label11);
             this.panelBehindTab.Controls.Add(this.tabControl);
@@ -826,6 +828,18 @@
             this.buttonRegionNtsc.TabIndex = 17;
             this.buttonRegionNtsc.Text = "NTSC";
             this.buttonRegionNtsc.UseVisualStyleBackColor = true;
+            // 
+            // label13
+            // 
+            this.label13.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.label13.AutoSize = true;
+            this.label13.BackColor = System.Drawing.Color.IndianRed;
+            this.label13.ForeColor = System.Drawing.Color.White;
+            this.label13.Location = new System.Drawing.Point(470, 5);
+            this.label13.Name = "label13";
+            this.label13.Size = new System.Drawing.Size(190, 21);
+            this.label13.TabIndex = 6;
+            this.label13.Text = "Newer version is available";
             // 
             // Main
             // 
@@ -950,5 +964,6 @@
         private System.Windows.Forms.TextBox textBox3;
         private System.Windows.Forms.Button buttonRegionPal;
         private System.Windows.Forms.Button buttonRegionNtsc;
+        private System.Windows.Forms.Label label13;
     }
 }

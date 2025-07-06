@@ -196,7 +196,7 @@ namespace Commodore_Repair_Toolbox
             // Initialize relevant "WebView2" components (used in tab pages)
             InitializeTabConfiguration();
             InitializeTabHelp();
-            InitializeTabAbout();
+//            InitializeTabAbout();
 
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
@@ -251,6 +251,9 @@ namespace Commodore_Repair_Toolbox
 
             // Set a "cross" cursor to visualize "drawing mode" when inside the overlay panel
             overlayPanel.Cursor = Cursors.Cross;
+
+            label13.Location = new Point(panelBehindTab.Width - label13.Width - 3, 0);
+            label13.TextAlign = ContentAlignment.MiddleCenter;
         }
 
         private void Form_Closing(object sender, FormClosingEventArgs e)
@@ -547,6 +550,7 @@ namespace Commodore_Repair_Toolbox
         // ###########################################################################################
         // Attach event handlers for saving configuration settings.
         // ###########################################################################################
+        
         private void AttachConfigurationSaveEvents()
         {
             // Selection of new hardware
@@ -1327,13 +1331,13 @@ namespace Commodore_Repair_Toolbox
                     <ul>
                         <li>PAL</li>
                         <ul>
-                            <li>Filters all components and images where the region is either empty or set to PAL</li>
+                            <li>Filters all components and images where the region is either set to PAL or not relevant (generic)</li>
                         </ul>
                         <li>NTSC</li>
                         <ul>
-                            <li>Filters all components and images where the region is either empty or set to NTSC</li>
+                            <li>Filters all components and images where the region is either set to NTSC or not relevant (generic)</li>
                         </ul>
-                        <li>The component information popup shows a counter on the two region buttons for the number of images relevant for this region or generic</li>
+                        <li>The component information popup shows a counter on the two region buttons for the number of images relevant specifically for this region or if images are generic</li>
                     </ul>
                 </ul>
                 <br />
@@ -1481,11 +1485,81 @@ namespace Commodore_Repair_Toolbox
         // Initialize the tab for "About".
         // ###########################################################################################
 
-        private async void InitializeTabAbout()
+        private async void UpdateTabAbout()
         {
             if (webView2About.CoreWebView2 == null)
             {
                 await webView2About.EnsureCoreWebView2Async(null);
+            }
+
+            // Create HTML for the "boardCredits" class
+            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+
+            string htmlCredits = "";
+            if (foundBoard?.BoardCredits != null && foundBoard.BoardCredits.Count > 0)
+            {
+                var grouped = foundBoard.BoardCredits
+                    .GroupBy(c => c.Category)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.GroupBy(c2 => string.IsNullOrWhiteSpace(c2.SubCategory) ? "Unnamed" : c2.SubCategory)
+                              .ToDictionary(
+                                  sg => sg.Key,
+                                  sg => sg.ToList()
+                              )
+                    );
+
+                var sb = new StringBuilder();
+                sb.AppendLine("<ul>");
+                foreach (var category in grouped)
+                {
+                    sb.AppendLine($"<li><b>{category.Key}</b>");
+                    sb.AppendLine("<ul>");
+                    foreach (var subcat in category.Value)
+                    {
+                        if (subcat.Key != "Unnamed")
+                        {
+                            sb.AppendLine($"<li><b>{subcat.Key}</b>");
+                            sb.AppendLine("<ul>");
+                            foreach (var credit in subcat.Value)
+                            {
+                                if (credit.Contact == "")
+                                {
+                                    sb.AppendLine($"<li>{credit.Name}</li>");
+                                } else
+                                {
+                                    sb.AppendLine($"<li>{credit.Name}, {credit.Contact}</li>");
+                                }
+                            }
+                            sb.AppendLine("</ul>");
+                            sb.AppendLine("</li>");
+                        }
+                        else
+                        {
+                            foreach (var credit in subcat.Value)
+                            {
+                                if (credit.Contact == "")
+                                {
+                                    sb.AppendLine($"<li>{credit.Name}</li>");
+                                }
+                                else
+                                {
+                                    sb.AppendLine($"<li>{credit.Name}, {credit.Contact}</li>");
+                                }
+                            }
+                        }
+                    }
+                    sb.AppendLine("</ul>");
+                    sb.AppendLine("</li>");
+                }
+                sb.AppendLine("</ul>");
+                sb.AppendLine("<br />");
+                sb.AppendLine("When people contribute a substantial amount of data, they can choose to be listed here.<br />");
+                sb.AppendLine("Either the real name or a handle can be chosen and contact address is optional (email, GitHub or personal web page).<br />");
+                sb.AppendLine("<br />");
+
+                htmlCredits = sb.ToString();
             }
 
             string htmlContent = @"
@@ -1509,6 +1583,11 @@ namespace Commodore_Repair_Toolbox
                 <br />
 
                 <hr><br />
+                Credits and recognition for this board data go to:<br /><br />
+
+                " + htmlCredits + @"
+
+                <hr><br />
 
                 A comment from the developer:<br /><br />
 
@@ -1523,7 +1602,6 @@ namespace Commodore_Repair_Toolbox
                 <br />
 
                 // Dennis
-
                 </i>
                 
                 </body>
@@ -2171,10 +2249,14 @@ namespace Commodore_Repair_Toolbox
             var selectedBoardClass = GetSelectedBoardClass();
             if (selectedBoardClass == null) return;
 
+            // Save the selected board for the hardware
+            string configKey = $"SelectedBoard|{hardwareSelectedName}";
+            Configuration.SaveSetting(configKey, boardSelectedName);
+
             boardSelectedFilename = selectedBoardClass.DataFile;
 
             // Load selected thumbnail from configuration file, if already set
-            string configKey = $"SelectedThumbnail|{hardwareSelectedName}|{boardSelectedName}";
+            configKey = $"SelectedThumbnail|{hardwareSelectedName}|{boardSelectedName}";
             schematicSelectedName = Configuration.GetSetting(configKey, null);
 
             // Select the schematic - check if we can find the current selection, but otherwise default to first schematic
@@ -2209,6 +2291,7 @@ namespace Commodore_Repair_Toolbox
             InitializeThumbnails();
             InitializeTabMain();
             UpdateTabResources(selectedBoardClass);
+            UpdateTabAbout();
 
             // Load polylines after initializing thumbnails and tabs
             PolylinesManagement.LoadPolylines();
@@ -3410,11 +3493,32 @@ namespace Commodore_Repair_Toolbox
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             if (hw != null)
             {
+
+                string defaultBoardSelectedName = hw.Boards.FirstOrDefault()?.Name ?? "";
+
+                // Load the saved "selected board" from the configuration file
+                string configKey = $"SelectedBoard|{hardwareSelectedName}";
+                boardSelectedName = Configuration.GetSetting(configKey, defaultBoardSelectedName);
+
                 foreach (var board in hw.Boards)
                 {
                     comboBoxBoard.Items.Add(board.Name);
                 }
-                comboBoxBoard.SelectedIndex = 0;
+
+                // Find the index of "boardSelectedName" in the combobox
+                int boardIndex = comboBoxBoard.Items.IndexOf(boardSelectedName);
+
+                // Set the selected board
+                if (boardIndex != -1)
+                {
+                    comboBoxBoard.SelectedIndex = boardIndex;
+                }
+                else
+                {
+                    // If not found, select the first item
+                    comboBoxBoard.SelectedIndex = 0;
+                }
+//                comboBoxBoard.SelectedIndex = 0;
             }
         }
 
@@ -3933,15 +4037,20 @@ namespace Commodore_Repair_Toolbox
                 var count = colorEntry.Value;
 
                 // Create the checkbox
-                bool isChecked = PolylinesManagement.CheckboxStates.ContainsKey(color) ? PolylinesManagement.CheckboxStates[color] : true;
                 CheckBox checkBox = new CheckBox
                 {
                     Text = "", // No text, as the color is visualized
-                    Checked = isChecked,
+                    Checked = false,
                     Tag = color,
                     AutoSize = true,
                     Location = new Point(5, yOffset) // Position next to the color panel
                 };
+
+                // Attach an event handler to toggle visibility
+                checkBox.CheckedChanged += CheckBox_CheckedChanged;
+
+                bool isChecked = PolylinesManagement.CheckboxStates.ContainsKey(color) ? PolylinesManagement.CheckboxStates[color] : true;
+                checkBox.Checked = isChecked;
 
                 // Create a panel to display the color
                 Panel colorPanel = new Panel
@@ -3952,6 +4061,9 @@ namespace Commodore_Repair_Toolbox
                     Location = new Point(25, yOffset) // Align with the checkbox
                 };
 
+                // Attach an event handler to the panel
+                colorPanel.Click += ColorPanel_Click;
+
                 // Create a label to display the counter
                 Label counterLabel = new Label
                 {
@@ -3961,10 +4073,6 @@ namespace Commodore_Repair_Toolbox
                     Font = new Font("Calibri", 9, FontStyle.Regular)
                 };
                 counterLabel.Location = new Point(colorPanel.Right + 2, yOffset - 1);
-
-                // Attach an event handler to toggle visibility
-                checkBox.CheckedChanged += CheckBox_CheckedChanged;
-                colorPanel.Click += ColorPanel_Click;
 
                 // Add the color panel, checkbox, and counter label to the manual panel
                 panel1.Controls.Add(colorPanel);
@@ -4412,6 +4520,7 @@ namespace Commodore_Repair_Toolbox
         public List<BoardComponentUserNotes> ComponentUserNotes { get; set; }
         public List<BoardLinks> BoardLinks { get; set; }
         public List<BoardLocalFiles> BoardLocalFiles { get; set; }
+        public List<BoardCredits> BoardCredits { get; set; }
     }
 
     public class BoardComponents
@@ -4533,6 +4642,14 @@ namespace Commodore_Repair_Toolbox
     {
         public string File { get; set; }
         public string Checksum { get; set; }
+    }
+
+    public class BoardCredits
+    {
+        public string Category { get; set; }
+        public string SubCategory { get; set; }
+        public string Name { get; set; }
+        public string Contact { get; set; }
     }
 
 }

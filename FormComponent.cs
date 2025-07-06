@@ -156,8 +156,18 @@ namespace Commodore_Repair_Toolbox
                 labelRegion.BackColor = Color.IndianRed;
                 labelRegion.ForeColor = Color.White;
             }
-            int palCount = component.ComponentImages.Count(img => string.IsNullOrEmpty(img.Region) || string.Equals(img.Region, "PAL", StringComparison.OrdinalIgnoreCase));
-            int ntscCount = component.ComponentImages.Count(img => string.IsNullOrEmpty(img.Region) || string.Equals(img.Region, "NTSC", StringComparison.OrdinalIgnoreCase));
+            //            int palCount = component.ComponentImages.Count(img => string.IsNullOrEmpty(img.Region) || string.Equals(img.Region, "PAL", StringComparison.OrdinalIgnoreCase));
+            //            int ntscCount = component.ComponentImages.Count(img => string.IsNullOrEmpty(img.Region) || string.Equals(img.Region, "NTSC", StringComparison.OrdinalIgnoreCase));
+            int palCount = component.ComponentImages?
+                .Count(img =>
+                    (string.IsNullOrEmpty(img.Region) || string.Equals(img.Region, "PAL", StringComparison.OrdinalIgnoreCase))
+                    && !string.IsNullOrEmpty(img.FileName)
+                ) ?? 0;
+            int ntscCount = component.ComponentImages?
+                .Count(img =>
+                    (string.IsNullOrEmpty(img.Region) || string.Equals(img.Region, "NTSC", StringComparison.OrdinalIgnoreCase))
+                    && !string.IsNullOrEmpty(img.FileName)
+                ) ?? 0;
             buttonRegionPal.Text = $"PAL ({palCount})";
             buttonRegionNtsc.Text = $"NTSC ({ntscCount})";
         }
@@ -182,6 +192,7 @@ namespace Commodore_Repair_Toolbox
 
         private void FilterImagesByRegion()
         {
+
             if (component.ComponentImages != null && component.ComponentImages.Count > 0)
             {
                 filteredComponentImages = component.ComponentImages
@@ -197,15 +208,20 @@ namespace Commodore_Repair_Toolbox
                     .Where(File.Exists)
                     .ToList();
 
-                // Remove any filteredComponentImages whose file doesn't exist
+//                // Remove any filteredComponentImages whose file doesn't exist
+//                filteredComponentImages = filteredComponentImages
+//                    .Where((img, idx) => File.Exists(Path.Combine(Application.StartupPath, img.FileName)))
+//                    .ToList();
+                // Remove any filteredComponentImages whose file doesn't exist, but keep if FileName is empty
                 filteredComponentImages = filteredComponentImages
-                    .Where((img, idx) => File.Exists(Path.Combine(Application.StartupPath, img.FileName)))
+                    .Where((img, idx) => string.IsNullOrWhiteSpace(img.FileName) || File.Exists(Path.Combine(Application.StartupPath, img.FileName)))
                     .ToList();
             }
             else
             {
                 imagePaths = new List<string>();
-                filteredComponentImages = new List<ComponentImages>();
+//                filteredComponentImages = new List<ComponentImages>();
+                filteredComponentImages = new List<ComponentImages> { new ComponentImages() };
             }
 
             if (currentImageIndex >= imagePaths.Count)
@@ -524,7 +540,31 @@ namespace Commodore_Repair_Toolbox
             labelReading.Visible = false;
             labelImageX.Visible = false;
 
-            if (imagePaths.Count == 0) return;
+            // Special handling, if the "image" actually has no file - if it is just "Info"
+            if (imagePaths.Count == 0)
+            {
+                // Set default text from Excel data to the textBox
+                string loadedTxt = "";
+                if (filteredComponentImages != null
+                    && filteredComponentImages.Count > 0
+                    && currentImageIndex >= 0
+                    && currentImageIndex < filteredComponentImages.Count)
+                {
+                    loadedTxt = filteredComponentImages[currentImageIndex].Note ?? "";
+                }
+                loadedTxt = loadedTxt.Replace("\n", Environment.NewLine);
+                textBox1.Text = loadedTxt;
+
+                LoadImageUserNotes(); // will override default texts, if any
+
+                // Define event for textBox1.TextChanged to save user notes
+                textBox1.TextChanged += textBox1_TextChanged; // "Description"
+                textBox2.TextChanged += textBox2_TextChanged; // "OneLiner"
+                panel1.Paint += new PaintEventHandler(panel1_Paint);
+                panel2.Paint += new PaintEventHandler(panel2_Paint);
+
+                return;
+            }
 
             // Update the image
             pictureBox1.Image = Image.FromFile(imagePaths[currentImageIndex]);
@@ -631,8 +671,8 @@ namespace Commodore_Repair_Toolbox
             Rectangle rect = panel1.ClientRectangle;
             rect.Inflate(0, 0); // shrink to avoid clipping
             string textBox1_org = textBox1.Text.Replace(Environment.NewLine, "\n");
-//            Color borderColor = (textBox1_org != component.ComponentImages[currentImageIndex].Note) ? Color.IndianRed : ColorTranslator.FromHtml("#96919D");
-            Color borderColor = (textBox1_org != filteredComponentImages[currentImageIndex].Note) ? Color.IndianRed : ColorTranslator.FromHtml("#96919D");
+            string excelData = filteredComponentImages[currentImageIndex].Note ?? "";
+            Color borderColor = textBox1_org != excelData ? Color.IndianRed : ColorTranslator.FromHtml("#96919D");
             ControlPaint.DrawBorder(e.Graphics, rect, borderColor, ButtonBorderStyle.Solid);
         }
 
@@ -640,7 +680,8 @@ namespace Commodore_Repair_Toolbox
         {
             Rectangle rect = panel2.ClientRectangle;
             rect.Inflate(0, 0); // shrink to avoid clipping
-            Color borderColor = (textBox2.Text != component.OneLiner) ? Color.IndianRed : ColorTranslator.FromHtml("#96919D");
+            string excelData = component.OneLiner ?? "";
+            Color borderColor = textBox2.Text != excelData ? Color.IndianRed : ColorTranslator.FromHtml("#96919D");
             ControlPaint.DrawBorder(e.Graphics, rect, borderColor, ButtonBorderStyle.Solid);
         }
 
@@ -652,6 +693,7 @@ namespace Commodore_Repair_Toolbox
 
         private void textBox1_TextChanged(object sender, EventArgs e)
         {
+            
             SaveImageUserNotes();
             panel1.Invalidate(); // trigger repaint to update the border
 
@@ -688,6 +730,7 @@ namespace Commodore_Repair_Toolbox
         private void SaveImageUserNotes()
         {
             if (component == null) return;
+            if (textBox1.Text == filteredComponentImages[currentImageIndex].Note) return;
 
             string key = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{filteredComponentImages[currentImageIndex].Name}|{filteredComponentImages[currentImageIndex].Pin}|{filteredComponentImages[currentImageIndex].Region}|Notes";
 

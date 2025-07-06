@@ -895,6 +895,69 @@ namespace Commodore_Repair_Toolbox
                 }
             } // 11) Load "component images" (datasheets)
 
+            // 12) Load "Credits"
+            foreach (Hardware hardware in classHardware)
+            {
+                foreach (Board board in hardware.Boards)
+                {
+                    string filePath = Path.Combine(Application.StartupPath, board.DataFile);
+                    using (var package = new ExcelPackage(new FileInfo(
+                        filePath)))
+                    {
+                        string sheet = "Credits";
+                        var worksheet = package.Workbook.Worksheets[sheet];
+
+                        // Break check
+                        if (worksheet != null)
+                        {
+
+                            string searchHeader = "Board credits";
+                            int row = 1;
+                            while (row <= worksheet.Dimension.End.Row)
+                            {
+                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                                row++;
+                            }
+                            row++; // skip headers
+                            row++;
+
+                            // Initialize the BoardCredits list if it's null
+                            if (board.BoardCredits == null)
+                            {
+                                board.BoardCredits = new List<BoardCredits>();
+                            }
+
+                            while (worksheet.Cells[row, 1].Value != null)
+                            {
+                                string category = worksheet.Cells[row, 1].Value?.ToString() ?? "";
+                                string subCategory = worksheet.Cells[row, 2].Value?.ToString() ?? "";
+                                string name = worksheet.Cells[row, 3].Value?.ToString() ?? "";
+                                string contact = worksheet.Cells[row, 4].Value?.ToString() ?? "";
+
+                                // Create a new BoardLink instance and add it to the BoardLinks list
+                                BoardCredits boardCredits = new BoardCredits
+                                {
+                                    Category = category,
+                                    SubCategory = subCategory,
+                                    Name = name,
+                                    Contact = contact
+                                };
+                                board.BoardCredits.Add(boardCredits);
+
+                                row++;
+                            }
+                        }
+                        else
+                        {
+                            string fileName = Path.GetFileName(filePath);
+                            string error = $"ERROR: Excel file [{fileName}] the worksheet [{sheet}] is not found";
+                            Main.DebugOutput(error);
+                        }
+                    }
+                }
+            } // 12) Load "Credits"
+
+
             // Check if classHardware has schematic files for all boards - if not, remove the board
             var hardwareToRemove = new List<Hardware>();
 
