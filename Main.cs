@@ -12,7 +12,9 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Windows.Media.TextFormatting;
 
 
 namespace Commodore_Repair_Toolbox
@@ -149,6 +151,7 @@ namespace Commodore_Repair_Toolbox
         // Main form constructor.
         // ###########################################################################################
 
+
         public Main()
         {
             InitializeComponent();
@@ -225,7 +228,7 @@ namespace Commodore_Repair_Toolbox
             Shown += Form_Shown;
         }
 
-        private void Form_Shown(object sender, EventArgs e)
+        private async void Form_Shown(object sender, EventArgs e)
         {
             Debug.WriteLine("Form_Shown()");
 
@@ -252,8 +255,11 @@ namespace Commodore_Repair_Toolbox
             // Set a "cross" cursor to visualize "drawing mode" when inside the overlay panel
             overlayPanel.Cursor = Cursors.Cross;
 
-            label13.Location = new Point(panelBehindTab.Width - label13.Width - 3, 0);
+            // Wait 10 seconds before starting the background check
             label13.TextAlign = ContentAlignment.MiddleCenter;
+            await Task.Delay(10000);
+            await Task.Run(() => checkFilesFromSource());
+
         }
 
         private void Form_Closing(object sender, FormClosingEventArgs e)
@@ -351,6 +357,13 @@ namespace Commodore_Repair_Toolbox
                             versionOnlineTxt += "View the <i>Changelog</i> and download the new version from here, <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases' target='_blank'> https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases</a><br />";
                             versionOnlineTxt += "<br />";
                             versionOnlineTxt += "</font>";
+
+                            string newText = "Newer version is available; view \"About\" tab";
+                            Size textSize = TextRenderer.MeasureText(newText, label13.Font);
+                            label13.Text = newText;
+                            label13.Width = textSize.Width + 2;
+                            label13.Visible = true;
+                            label13.Location = new Point(panelBehindTab.Width - label13.Width - 2, 3);
                         }
                         else
                         {
@@ -933,9 +946,10 @@ namespace Commodore_Repair_Toolbox
                 BoardComponents selectedComp = foundBoard?.Components.FirstOrDefault(c => c.Label == compName);
                 if (selectedComp != null)
                 {
-                    componentInfoPopup = new FormComponent(selectedComp, this);
-                    componentInfoPopup.Show(this);
-                    componentInfoPopup.BringToFront();
+                    //hest
+//                    componentInfoPopup = new FormComponent(selectedComp, this);
+//                    componentInfoPopup.Show(this);
+//                    componentInfoPopup.BringToFront();
                 }
             }
 
@@ -3281,9 +3295,15 @@ namespace Commodore_Repair_Toolbox
                 var hardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var board = hardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
                 var comp = board?.Components.FirstOrDefault(c => c.Label == componentClickedLabel);
-                if (comp != null)
-                {
-                    ShowComponentPopup(comp);
+                var comps = board?.Components.Where(c => c.Label == componentClickedLabel).ToList();
+//                if (comps != null && comps.Count > 0)
+//                if (comp != null)
+                    if (comp != null && comps != null && comps.Count > 0)
+                    {
+//                    ShowComponentPopup(comp);
+                    //ShowComponentPopup(comps);
+                    ShowComponentPopup(comp, comps);
+
                 }
             }
 
@@ -3413,11 +3433,16 @@ namespace Commodore_Repair_Toolbox
         // Show the component information popup.
         // ###########################################################################################
 
-        private void ShowComponentPopup(BoardComponents comp)
+//        private void ShowComponentPopup(List<BoardComponents> comps)
+//        private void ShowComponentPopup(BoardComponents comp)
+            private void ShowComponentPopup(BoardComponents comp, List<BoardComponents> comps)
+
         {
             string title = comp.NameDisplay;
-            componentInfoPopup = new FormComponent(comp, this);
-            componentInfoPopup.Text = ConvertStringToLabel(title);
+//            componentInfoPopup = new FormComponent(comp, this);
+//            componentInfoPopup = new FormComponent(comp, comps, this);
+            componentInfoPopup = new FormComponent(comps, this);
+            //componentInfoPopup.Text = ConvertStringToLabel(title);
             componentInfoPopup.Show(this);
             componentInfoPopup.BringToFront();
         }      
@@ -4261,6 +4286,97 @@ namespace Commodore_Repair_Toolbox
             button2.Enabled = false;
         }
 
+
+        private void checkFilesFromSource()
+        {
+
+            // Fetch the list of files and checksums from the online source
+            List<DataUpdate> checksumFromOnline;
+
+            try
+            {
+                using (var webClient = new WebClient())
+                {
+                    ServicePointManager.Expect100Continue = true;
+                    ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+                    webClient.Headers.Add("user-agent", "CRT " + versionThis);
+
+                    string json = webClient.DownloadString("https://commodore-repair-toolbox.dk/auto-data/dataChecksums.json");
+                    checksumFromOnline = DataUpdate.LoadFromJson(json);
+                }
+                DebugOutput("INFO: Fetched checksum list of [" + checksumFromOnline.Count + "] files from online source");
+
+                List<LocalFiles> checksumFromLocal = GetAllReferencedLocalFiles();
+                DebugOutput("INFO: Calculated checksum list of [" + checksumFromOnline.Count + "] files from local storage");
+
+                // Find files present online but missing locally
+                var missingLocal = checksumFromOnline
+                    .Where(online => !checksumFromLocal.Any(local =>
+                        string.Equals(local.File, online.File, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                // Find files present in both lists but with different checksums
+                var differingChecksums = checksumFromOnline
+                    .Join(
+                        checksumFromLocal,
+                        online => online.File,
+                        local => local.File,
+                        (online, local) => new { File = online.File, OnlineChecksum = online.Checksum, LocalChecksum = local.Checksum }
+                    )
+                    .Where(x => !string.Equals(x.OnlineChecksum, x.LocalChecksum, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+
+                // Combine missingLocal and differingChecksums to get the list of files to transfer from online to local
+                // Only include files that are present in the online list
+                var filesToTransfer = missingLocal
+                    .Select(f => f.File)
+                    .Concat(differingChecksums.Select(f => f.File))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Where(file => checksumFromOnline.Any(online => string.Equals(online.File, file, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                // ---
+
+                if (filesToTransfer.Count > 0)
+                {
+                    foreach (var file in filesToTransfer)
+                    {
+                        Debug.WriteLine($"INFO: File to transfer: {file}");
+                    }
+
+                    // Only show the data label, if there is no newer version available (this is more important)
+                    if (!label13.Visible)
+                    {
+                        string newText = "Newer data available; update from \"Configuration\" tab";
+                        Size textSize = TextRenderer.MeasureText(newText, label13.Font);
+                        Action updateLabel = () =>
+                        {
+                            label13.Text = newText;
+                            label13.Width = textSize.Width + 2;
+                            label13.Visible = true;
+                            label13.Location = new Point(panelBehindTab.Width - label13.Width - 2, 3);
+                        };
+                        if (label13.InvokeRequired)
+                        {
+                            label13.Invoke(updateLabel);
+                        }
+                        else
+                        {
+                            updateLabel();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugOutput("EXCEPTION raised for fetching JSON file catalogue from online source:");
+                DebugOutput(ex.ToString());
+                MessageBox.Show(ex.ToString(), "Error fetching JSON file catalogue", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+
         private void syncFilesFromSource() {
 
             // Fetch the list of files and checksums from the online source
@@ -4452,6 +4568,8 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+        // ###########################################################################################
+
         public void SetRegionButtonColors()
         {
             if (selectedRegion == "NTSC")
@@ -4476,20 +4594,24 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
+
+        // ###########################################################################################
+
         private void ButtonRegionPal_Click(object sender, EventArgs e)
         {
             selectedRegion = "PAL";
             Configuration.SaveSetting("SelectedRegion", "PAL");
-//            FilterImagesByRegion();
             SetRegionButtonColors();
             UpdateComponentList("ButtonRegionPal_Click");
         }
+
+
+        // ###########################################################################################
 
         private void ButtonRegionNtsc_Click(object sender, EventArgs e)
         {
             selectedRegion = "NTSC";
             Configuration.SaveSetting("SelectedRegion", "NTSC");
-//            FilterImagesByRegion();
             SetRegionButtonColors();
             UpdateComponentList("ButtonRegionNtsc_Click");
         }
@@ -4603,16 +4725,6 @@ namespace Commodore_Repair_Toolbox
         public string Note { get; set; }
     }
 
-    /*
-    public class ComponentOscilloscope
-    {
-        public string Name { get; set; }
-        public string Region { get; set; }
-        public string Pin { get; set; }
-        public string Reading { get; set; }
-    }
-    */
-
     public class CustomPanel : Panel
     {
         public event MouseEventHandler CustomMouseWheel;
@@ -4621,21 +4733,6 @@ namespace Commodore_Repair_Toolbox
             CustomMouseWheel?.Invoke(this, e);
         }
     }
-
-    /*
-    public class DataUpdateService
-    {
-        public List<DataUpdate> GetDataUpdates()
-        {
-            using (var client = new WebClient())
-            {
-                string json = client.DownloadString("https://commodore-repair-toolbox.dk/auto-data/dataChecksums.json");
-                var updates = DataUpdate.LoadFromJson(json);
-                return updates;
-            }
-        }
-    }
-    */
 
     // Add this class to represent a local file entry
     public class LocalFiles

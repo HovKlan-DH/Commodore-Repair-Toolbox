@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 using System.Windows.Forms;
 
 namespace Commodore_Repair_Toolbox
@@ -16,6 +15,7 @@ namespace Commodore_Repair_Toolbox
         private List<string> imagePaths = new List<string>();
         private int currentImageIndex = 0;
         private readonly BoardComponents component;
+        private readonly List<BoardComponents> componentList;
         private Timer scrollTimer = new Timer();
         private bool isScrolling = false;
         private Main main; // instance of the "Main" form
@@ -26,17 +26,43 @@ namespace Commodore_Repair_Toolbox
 
         public string PictureBoxName { get; }
 
-        public FormComponent(BoardComponents component, Main main)
+//        public FormComponent(BoardComponents component, Main main)
+        public FormComponent(List<BoardComponents> components, Main main)
+//        public FormComponent(BoardComponents component, List<BoardComponents> components, Main main)
         {
             InitializeComponent();
 
             this.main = main; // assign the Main instance
 
-            // Assign the passed-in component to the class-level field
-            this.component = component;
+            this.component = components[0]; // first one will always have the images (if any)
 
-            buttonRegionPal.Click += ButtonRegionPal_Click;
-            buttonRegionNtsc.Click += ButtonRegionNtsc_Click;
+            /*
+            // "Manually" walkthrough all "components" to find the one matching the selected region
+            foreach (var comp in components)
+            {
+                if (comp.Region == Main.selectedRegion)
+                {
+                    this.component = comp;
+                    break;
+                }
+            }
+            */
+
+            /*
+            // Defensive copy to avoid nulls and preserve data
+            this.component = components
+                .FirstOrDefault(c =>
+                    (string.IsNullOrEmpty(Main.selectedRegion) && c.ComponentImages != null) ||
+                    (string.IsNullOrEmpty(c.Region) && c.ComponentImages != null) ||
+                    (string.Equals(c.Region, Main.selectedRegion, StringComparison.OrdinalIgnoreCase) && c.ComponentImages != null)
+                )
+                ?? components.FirstOrDefault(c => c.ComponentImages != null)
+                ?? components.First(); // fallback to first if all else fails
+            */
+
+            // Assign the passed-in component to the class-level field
+//            this.component = component;
+            componentList = components;
 
             // Initialize the scroll timer
             scrollTimer.Interval = 1;
@@ -50,37 +76,23 @@ namespace Commodore_Repair_Toolbox
 
             PictureBoxName = component.Label;
 
+
             // Basic labels
-            label1.Text = Main.ConvertStringToLabel(component.Label);
-            label2.Text = Main.ConvertStringToLabel(component.NameTechnical);
-            label3.Text = Main.ConvertStringToLabel(component.NameFriendly);
             label4.Text = component.Type;
-            textBox2.Text = Main.ConvertStringToLabel(component.OneLiner);
-
-            // Description box
-            //            textBox1.Text = "";
-            //            if (component.ComponentImages != null && component.ComponentImages.Count > currentImageIndex)
-            //            {
-            //                textBox1.Text = component.ComponentImages[currentImageIndex].Note ?? "";
-            //            }
-            //            textBox1.ScrollBars = ScrollBars.Vertical;
-
-            //            LoadImageUserNotes(); // will override default texts, if any
-
-            // Define an array with all pinout images
-            /*
-            imagePaths = new List<string>(); // ensure it exists by default
-            if (component.ComponentImages != null && component.ComponentImages.Count > 0)
+/*
+            foreach (var comp in components)
             {
-                // Ensure the imagePaths list is populated in the same order as component.ComponentImages
-                imagePaths = component.ComponentImages
-                    .Select(image => Path.Combine(Application.StartupPath, image.FileName))
-                    .Where(File.Exists)
-                    .ToList();
+                if (comp.Region == Main.selectedRegion || comp.Region == "")
+                {
+                    textBox2.Text = Main.ConvertStringToLabel(comp.OneLiner);
+                    break;
+                }
             }
-            */
+*/
+            
 
-            Main.selectedRegion = Configuration.GetSetting("SelectedRegion", "PAL");
+            // Filter on the region
+//            Main.selectedRegion = Configuration.GetSetting("SelectedRegion", "PAL");
             FilterImagesByRegion();
 
             LayoutThumbnails();
@@ -120,18 +132,20 @@ namespace Commodore_Repair_Toolbox
             Resize += Form_Resize;
 
             Shown += Form_Shown;
+
         }
 
         private void Form_Shown(object sender, EventArgs e)
         {
             SetRegionButtonColors();
+//            label1.Text = this.Text;
 
+            buttonRegionPal.Click += ButtonRegionPal_Click;
+            buttonRegionNtsc.Click += ButtonRegionNtsc_Click;
         }
 
         private void SetRegionButtonColors()
         {
-            // Example: Set focus to buttonRegionPal if selectedRegion is "PAL"
-            //            Debug.WriteLine(selectedRegion);
             if (Main.selectedRegion == "NTSC")
             {
                 buttonRegionPal.FlatStyle = FlatStyle.Standard;
@@ -156,8 +170,6 @@ namespace Commodore_Repair_Toolbox
                 labelRegion.BackColor = Color.IndianRed;
                 labelRegion.ForeColor = Color.White;
             }
-            //            int palCount = component.ComponentImages.Count(img => string.IsNullOrEmpty(img.Region) || string.Equals(img.Region, "PAL", StringComparison.OrdinalIgnoreCase));
-            //            int ntscCount = component.ComponentImages.Count(img => string.IsNullOrEmpty(img.Region) || string.Equals(img.Region, "NTSC", StringComparison.OrdinalIgnoreCase));
             int palCount = component.ComponentImages?
                 .Count(img =>
                     (string.IsNullOrEmpty(img.Region) || string.Equals(img.Region, "PAL", StringComparison.OrdinalIgnoreCase))
@@ -179,6 +191,12 @@ namespace Commodore_Repair_Toolbox
             FilterImagesByRegion();
             SetRegionButtonColors();
             main.SetRegionButtonColors();
+
+            textBox2.TextChanged -= textBox2_TextChanged; // "OneLiner"
+//            panel2.Paint -= new PaintEventHandler(panel2_Paint);
+            PopulateOneLiner();
+            textBox2.TextChanged += textBox2_TextChanged; // "OneLiner"
+//            panel2.Paint += new PaintEventHandler(panel2_Paint);
         }
 
         private void ButtonRegionNtsc_Click(object sender, EventArgs e)
@@ -188,6 +206,61 @@ namespace Commodore_Repair_Toolbox
             FilterImagesByRegion();
             SetRegionButtonColors();
             main.SetRegionButtonColors();
+
+            textBox2.TextChanged -= textBox2_TextChanged; // "OneLiner"
+//            panel2.Paint -= new PaintEventHandler(panel2_Paint);
+            PopulateOneLiner();
+            textBox2.TextChanged += textBox2_TextChanged; // "OneLiner"
+//            panel2.Paint += new PaintEventHandler(panel2_Paint);
+        }
+
+        private void PopulateOneLiner()
+        {
+            // Get the "technical name"
+            string technicalName = "";
+            foreach (var comp in componentList)
+            {
+                if (comp.Region == Main.selectedRegion || comp.Region == "")
+                {
+                    technicalName = comp.NameTechnical ?? "";
+                    break;
+                }
+            }
+
+            // Get the default text from Excel
+            foreach (var comp in componentList)
+            {
+                // Set default text from Excel
+                if (comp.NameTechnical == technicalName || comp.NameTechnical == "")
+                {
+                    textBox2.Text = Main.ConvertStringToLabel(comp.OneLiner);
+                    break;
+                }
+            }
+
+            // Load the "Oneliner" from configuration file
+            string baseKey = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{technicalName}|Oneliner";
+            string txt = Configuration.GetSetting(baseKey, "");
+            if (txt != "")
+            {
+                textBox2.Text = txt;
+            }
+
+            panel2.Invalidate(); // trigger repaint to update the border
+        }
+
+        private void SetFormTitles()
+        {
+            foreach (var comp in componentList)
+            {
+                if (comp.Region == Main.selectedRegion || comp.Region == "")
+                {
+                    string formTitle = comp.NameDisplay ?? "Component Information";
+                    this.Text = formTitle;
+                    label1.Text = formTitle;
+                    break;
+                }
+            }
         }
 
         private void FilterImagesByRegion()
@@ -227,8 +300,8 @@ namespace Commodore_Repair_Toolbox
             if (currentImageIndex >= imagePaths.Count)
                 currentImageIndex = 0;
 
-            LayoutThumbnails();
-            UpdateImage();
+//            LayoutThumbnails();
+//            UpdateImage();
         }
 
         private void Form_Resize(object sender, EventArgs e)
@@ -294,12 +367,6 @@ namespace Commodore_Repair_Toolbox
                     };
                     thumbnailPictureBoxes.Add(pictureBox);
 
-
-
-
-
-//                    Skal til at den skal gemme REGION
-//UserData | Commodore 128 and 128D | 310378 | U21 | DB6 | 1 | PAL | Notes = Default text aaaa NTSC
 
 
 
@@ -555,7 +622,10 @@ namespace Commodore_Repair_Toolbox
                 loadedTxt = loadedTxt.Replace("\n", Environment.NewLine);
                 textBox1.Text = loadedTxt;
 
+                PopulateOneLiner();
                 LoadImageUserNotes(); // will override default texts, if any
+
+                SetFormTitles();
 
                 // Define event for textBox1.TextChanged to save user notes
                 textBox1.TextChanged += textBox1_TextChanged; // "Description"
@@ -632,8 +702,6 @@ namespace Commodore_Repair_Toolbox
             }
 
 
-
-
             // Show the Note for the current image
             if (component.ComponentImages != null && component.ComponentImages.Count > currentImageIndex)
             {
@@ -648,7 +716,10 @@ namespace Commodore_Repair_Toolbox
                 textBox1.Text = "";
             }
 
+            PopulateOneLiner();
             LoadImageUserNotes(); // will override default texts, if any
+
+            SetFormTitles();
 
             // Define event for textBox1.TextChanged to save user notes
             textBox1.TextChanged += textBox1_TextChanged; // "Description"
@@ -680,7 +751,31 @@ namespace Commodore_Repair_Toolbox
         {
             Rectangle rect = panel2.ClientRectangle;
             rect.Inflate(0, 0); // shrink to avoid clipping
+
+            // Get the "technical name"
+            string technicalName = "";
+            foreach (var comp in componentList)
+            {
+                if (comp.Region == Main.selectedRegion || comp.Region == "")
+                {
+                    technicalName = comp.NameTechnical ?? "";
+                    break;
+                }
+            }
+
             string excelData = component.OneLiner ?? "";
+
+            // Get the default text from Excel
+            foreach (var comp in componentList)
+            {
+                // Set default text from Excel
+                if (comp.NameTechnical == technicalName || comp.NameTechnical == "")
+                {
+                    excelData = Main.ConvertStringToLabel(comp.OneLiner);
+                    break;
+                }
+            }
+
             Color borderColor = textBox2.Text != excelData ? Color.IndianRed : ColorTranslator.FromHtml("#96919D");
             ControlPaint.DrawBorder(e.Graphics, rect, borderColor, ButtonBorderStyle.Solid);
         }
@@ -712,15 +807,34 @@ namespace Commodore_Repair_Toolbox
         {
             if (component == null) return;
 
-            // Create a base key for the configuration file
-            string key = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|Oneliner";
+            // Get the "technical name"
+            string technicalName = "";
+            foreach (var comp in componentList)
+            {
+                if (comp.Region == Main.selectedRegion || comp.Region == "")
+                {
+                    technicalName = comp.NameTechnical ?? "";
+                    break;
+                }
+            }
+
+            string key = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{technicalName}|Oneliner";
 
             // Delete the configuration line, if the text in "Description" equals default text from "component.OneLiner"
             if (textBox2.Text == component.OneLiner || textBox2.Text == "")
             {
                 Configuration.SaveSetting(key, ""); // delete the entire line in the configuration file
-                textBox2.Text = component.OneLiner;
-                return;
+
+                // Get the default text from Excel
+                foreach (var comp in componentList)
+                {
+                    // Set default text from Excel
+                    if (comp.NameTechnical == technicalName || comp.NameTechnical == "")
+                    {
+                        textBox2.Text = Main.ConvertStringToLabel(comp.OneLiner);
+                        return;
+                    }
+                }                
             }
 
             // Save the OneLiner
@@ -752,16 +866,30 @@ namespace Commodore_Repair_Toolbox
         {
             if (component == null) return;
 
+            
+/*
             // Load the "OneLiner"
-            string baseKey = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|Oneliner";
+            // ---
+            // Get the "technical name"
+            string technicalName = "";
+            foreach (var comp in componentList)
+            {
+                if (comp.Region == Main.selectedRegion || comp.Region == "")
+                {
+                    technicalName = comp.NameTechnical ?? "";
+                    break;
+                }
+            }
+            string baseKey = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{technicalName}|Oneliner";
             string txt = Configuration.GetSetting(baseKey, "");
             if (txt != "")
             {
                 textBox2.Text = txt;
             }
+*/
 
             // Load the "Description"
-            baseKey = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{filteredComponentImages[currentImageIndex].Name}|{filteredComponentImages[currentImageIndex].Pin}|{filteredComponentImages[currentImageIndex].Region}|Notes";
+            string baseKey = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{filteredComponentImages[currentImageIndex].Name}|{filteredComponentImages[currentImageIndex].Pin}|{filteredComponentImages[currentImageIndex].Region}|Notes";
             string serializedDescription = Configuration.GetSetting(baseKey, "");
             if (!string.IsNullOrEmpty(serializedDescription))
             {

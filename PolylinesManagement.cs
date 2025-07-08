@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
 
@@ -317,12 +318,22 @@ namespace Commodore_Repair_Toolbox
 
         public void panelImageMain_MouseMove(object sender, MouseEventArgs e)
         {
+            
             if (e.Button == MouseButtons.Left && currentPolyline != null)
             {
                 Point pointUnscaled = new Point((int)(e.Location.X / Main.zoomFactor), (int)(e.Location.Y / Main.zoomFactor));
                 if (currentPolyline.Count == 1) // Only update the second point dynamically
                 {
-                    currentPolyline.Add(pointUnscaled);
+                    int x_polyline = currentPolyline[0].X;
+                    int y_polyline = currentPolyline[0].Y;
+                    int x_pointUnscaled = pointUnscaled.X;
+                    int y_pointUnscaled = pointUnscaled.Y;
+
+                    // Do not allow that we insert an empty polyline
+                    if (x_polyline != x_pointUnscaled || y_polyline != y_pointUnscaled)
+                    {
+                        currentPolyline.Add(pointUnscaled);
+                    }
                 }
                 else
                 {
@@ -659,6 +670,14 @@ namespace Commodore_Repair_Toolbox
 
         public static void SavePolylinesToConfig()
         {
+#if DEBUG
+            StackTrace stackTrace = new StackTrace();
+            StackFrame callerFrame = stackTrace.GetFrame(1);
+            MethodBase callerMethod = callerFrame.GetMethod();
+            string callerName = callerMethod.Name;
+            Debug.WriteLine("[SavePolylinesToConfig] called from [" + callerName + "]");
+#endif
+
             try
             {
                 foreach (var entry in imagePolylines)

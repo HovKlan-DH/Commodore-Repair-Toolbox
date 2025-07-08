@@ -84,6 +84,7 @@
             this.buttonAll = new System.Windows.Forms.Button();
             this.buttonFullscreen = new System.Windows.Forms.Button();
             this.panelBehindTab = new System.Windows.Forms.Panel();
+            this.label13 = new System.Windows.Forms.Label();
             this.buttonTracesDelete = new System.Windows.Forms.Button();
             this.label11 = new System.Windows.Forms.Label();
             this.buttonTraceColor = new System.Windows.Forms.Button();
@@ -92,7 +93,6 @@
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
             this.buttonRegionPal = new System.Windows.Forms.Button();
             this.buttonRegionNtsc = new System.Windows.Forms.Button();
-            this.label13 = new System.Windows.Forms.Label();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -752,6 +752,19 @@
             this.panelBehindTab.Size = new System.Drawing.Size(782, 641);
             this.panelBehindTab.TabIndex = 14;
             // 
+            // label13
+            // 
+            this.label13.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.label13.BackColor = System.Drawing.Color.IndianRed;
+            this.label13.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label13.ForeColor = System.Drawing.Color.White;
+            this.label13.Location = new System.Drawing.Point(470, 5);
+            this.label13.Name = "label13";
+            this.label13.Size = new System.Drawing.Size(190, 21);
+            this.label13.TabIndex = 6;
+            this.label13.Text = "Newer version is available";
+            this.label13.Visible = false;
+            // 
             // buttonTracesDelete
             // 
             this.buttonTracesDelete.Location = new System.Drawing.Point(97, 605);
@@ -828,18 +841,6 @@
             this.buttonRegionNtsc.TabIndex = 17;
             this.buttonRegionNtsc.Text = "NTSC";
             this.buttonRegionNtsc.UseVisualStyleBackColor = true;
-            // 
-            // label13
-            // 
-            this.label13.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.label13.AutoSize = true;
-            this.label13.BackColor = System.Drawing.Color.IndianRed;
-            this.label13.ForeColor = System.Drawing.Color.White;
-            this.label13.Location = new System.Drawing.Point(470, 5);
-            this.label13.Name = "label13";
-            this.label13.Size = new System.Drawing.Size(190, 21);
-            this.label13.TabIndex = 6;
-            this.label13.Text = "Newer version is available";
             // 
             // Main
             // 
