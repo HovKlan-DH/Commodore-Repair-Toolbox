@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -16,133 +15,123 @@ namespace Commodore_Repair_Toolbox
         private int currentImageIndex = 0;
         private readonly BoardComponents component;
         private readonly List<BoardComponents> componentList;
-        private Timer scrollTimer = new Timer();
+        private Timer scrollWheelTimer = new Timer();
         private bool isScrolling = false;
         private Main main; // instance of the "Main" form
         private List<PictureBox> thumbnailPictureBoxes = new List<PictureBox>();
-        private int thumbnailWindowStart = 0; // Index in imagePaths for the first visible thumbnail
+        private int thumbnailWindowStart = 0; // index in "imagePaths" for the first visible thumbnail
         private DateTime lastArrowKeyTime = DateTime.MinValue;
         private List<ComponentImages> filteredComponentImages = new List<ComponentImages>();
+//        private string windowState = "Normal";
+//        private Timer windowMoveStopTimer = new Timer();
 
-        public string PictureBoxName { get; }
 
-//        public FormComponent(BoardComponents component, Main main)
         public FormComponent(List<BoardComponents> components, Main main)
-//        public FormComponent(BoardComponents component, List<BoardComponents> components, Main main)
         {
             InitializeComponent();
 
             this.main = main; // assign the Main instance
 
-            this.component = components[0]; // first one will always have the images (if any)
+            this.component = components[0]; // first instance will always have the images (if any)
 
-            /*
-            // "Manually" walkthrough all "components" to find the one matching the selected region
-            foreach (var comp in components)
-            {
-                if (comp.Region == Main.selectedRegion)
-                {
-                    this.component = comp;
-                    break;
-                }
-            }
-            */
-
-            /*
-            // Defensive copy to avoid nulls and preserve data
-            this.component = components
-                .FirstOrDefault(c =>
-                    (string.IsNullOrEmpty(Main.selectedRegion) && c.ComponentImages != null) ||
-                    (string.IsNullOrEmpty(c.Region) && c.ComponentImages != null) ||
-                    (string.Equals(c.Region, Main.selectedRegion, StringComparison.OrdinalIgnoreCase) && c.ComponentImages != null)
-                )
-                ?? components.FirstOrDefault(c => c.ComponentImages != null)
-                ?? components.First(); // fallback to first if all else fails
-            */
-
-            // Assign the passed-in component to the class-level field
-//            this.component = component;
+            // Assign the form-input "components" - not sure why this is required... but it is
             componentList = components;
 
-            // Initialize the scroll timer
-            scrollTimer.Interval = 1;
-            scrollTimer.Tick += (s, e) => { 
+            // Initialize the scrollwheel timer
+            scrollWheelTimer.Interval = 1;
+            scrollWheelTimer.Tick += (s, e) => { 
                 isScrolling = false; 
-                scrollTimer.Stop(); 
+                scrollWheelTimer.Stop(); 
             };
 
-            // Bind the MouseClick event to reset the image index
-            pictureBox1.MouseClick += PictureBox1_MouseClick;
+            // Set the "Type", which is static for the entire popup
+            labelType.Text = component.Type;
 
-            PictureBoxName = component.Label;
-
-
-            // Basic labels
-            label4.Text = component.Type;
-/*
-            foreach (var comp in components)
-            {
-                if (comp.Region == Main.selectedRegion || comp.Region == "")
-                {
-                    textBox2.Text = Main.ConvertStringToLabel(comp.OneLiner);
-                    break;
-                }
-            }
-*/
-            
-
-            // Filter on the region
-//            Main.selectedRegion = Configuration.GetSetting("SelectedRegion", "PAL");
+            // Filter based on region
             FilterImagesByRegion();
 
-            LayoutThumbnails();
-            UpdateImage();
-
-            // Bind the MouseWheel event
-            pictureBox1.MouseWheel += PictureBox1_MouseWheel;
-
-            // Local files (datasheets, etc.)
+            // Set variable with links for "local files"
             if (component.LocalFiles != null)
             {
                 foreach (var localFile in component.LocalFiles)
                 {
-                    listBox1.Items.Add(localFile.Name);
+                    listBoxLocalFiles.Items.Add(localFile.Name);
                     localFiles[localFile.Name] = localFile.FileName;
                 }
             }
 
-            // Links (URLs)
+            // Set variable with "links" (URLs)
             if (component.ComponentLinks != null)
             {
                 foreach (var linkItem in component.ComponentLinks)
                 {
-                    listBox2.Items.Add(linkItem.Name);
+                    listBoxLinks.Items.Add(linkItem.Name);
                     links[linkItem.Name] = linkItem.Url;
                 }
             }
 
-            // Allow pressing Escape to close
+            // Allow pressing "Escape" to close
             KeyPreview = true;
             KeyPress += Form_KeyPress;
 
             // Focus on something that is not the first "textBox" in the form
-            ActiveControl = label1;
-
-            //ResizeEnd += Form_ResizeEnd;
+            ActiveControl = labelDisplayName;
+            
+            // Define events
             Resize += Form_Resize;
+            panelNote.Paint += new PaintEventHandler(panelNote_Paint);
+            panelOneliner.Paint += new PaintEventHandler(panelOneliner_Paint);
+            pictureBoxImage.MouseWheel += PictureBox1_MouseWheel;
+            pictureBoxImage.MouseClick += PictureBox1_MouseClick;
+            buttonRegionPal.Click += ButtonsRegion_Click;
+            buttonRegionNtsc.Click += ButtonsRegion_Click;
+
+            // Attach "form load" event, which is triggered just before form is shown
+            Load += Form_Load;
+        }
+
+        private void Form_Load(object sender, EventArgs e)
+        {
+            /*
+            windowState = Configuration.GetSetting("WindowStatePopup", "Normal");
+            if (Enum.TryParse(windowState, out FormWindowState state) && state != FormWindowState.Minimized)
+            {
+                this.WindowState = state;
+            }
+
+            windowMoveStopTimer.Interval = 200;
+            windowMoveStopTimer.Tick += MoveStopTimer_Tick;
+            */
 
             Shown += Form_Shown;
-
         }
 
         private void Form_Shown(object sender, EventArgs e)
         {
             SetRegionButtonColors();
-//            label1.Text = this.Text;
-
-            buttonRegionPal.Click += ButtonRegionPal_Click;
-            buttonRegionNtsc.Click += ButtonRegionNtsc_Click;
         }
+
+        private void Form_Resize(object sender, EventArgs e)
+        {
+            LayoutThumbnails();
+
+            /*
+            // Enable/reset the time to detect when the movement has stopped
+            windowMoveStopTimer.Stop();
+            windowMoveStopTimer.Start();
+            */
+        }
+
+        /*
+        private void MoveStopTimer_Tick(object sender, EventArgs e)
+        {
+            windowMoveStopTimer.Stop();
+
+            // Save the new "window state" and load and apply the splitter position for the new state
+            windowState = this.WindowState.ToString();
+            Configuration.SaveSetting("WindowStatePopup", windowState);
+        }
+        */
 
         private void SetRegionButtonColors()
         {
@@ -170,83 +159,98 @@ namespace Commodore_Repair_Toolbox
                 labelRegion.BackColor = Color.IndianRed;
                 labelRegion.ForeColor = Color.White;
             }
+
             int palCount = component.ComponentImages?
                 .Count(img =>
                     (string.IsNullOrEmpty(img.Region) || string.Equals(img.Region, "PAL", StringComparison.OrdinalIgnoreCase))
                     && !string.IsNullOrEmpty(img.FileName)
                 ) ?? 0;
+
             int ntscCount = component.ComponentImages?
                 .Count(img =>
                     (string.IsNullOrEmpty(img.Region) || string.Equals(img.Region, "NTSC", StringComparison.OrdinalIgnoreCase))
                     && !string.IsNullOrEmpty(img.FileName)
                 ) ?? 0;
+
             buttonRegionPal.Text = $"PAL ({palCount})";
             buttonRegionNtsc.Text = $"NTSC ({ntscCount})";
         }
 
-        private void ButtonRegionPal_Click(object sender, EventArgs e)
+        private void ButtonsRegion_Click(object sender, EventArgs e)
         {
-            Main.selectedRegion = "PAL";
-            Configuration.SaveSetting("SelectedRegion", "PAL");
+            // Get the region from the button's "Tag" property
+            var button = sender as Button;
+            if (button == null || button.Tag == null) return;
+            string region = button.Tag.ToString();
+
+            Main.selectedRegion = region;
+            Configuration.SaveSetting("SelectedRegion", region);
             FilterImagesByRegion();
             SetRegionButtonColors();
             main.SetRegionButtonColors();
-
-            textBox2.TextChanged -= textBox2_TextChanged; // "OneLiner"
-//            panel2.Paint -= new PaintEventHandler(panel2_Paint);
-            PopulateOneLiner();
-            textBox2.TextChanged += textBox2_TextChanged; // "OneLiner"
-//            panel2.Paint += new PaintEventHandler(panel2_Paint);
+            PopulateComponentOneliner();
         }
 
-        private void ButtonRegionNtsc_Click(object sender, EventArgs e)
+        private void PopulateComponentOneliner()
         {
-            Main.selectedRegion = "NTSC";
-            Configuration.SaveSetting("SelectedRegion", "NTSC");
-            FilterImagesByRegion();
-            SetRegionButtonColors();
-            main.SetRegionButtonColors();
+            // We must ensure it will not trigger this event, as that would cause it to save when changed.
+            // We only want it to save when user manually changes it.
+            textBoxOneliner.TextChanged -= textBoxOneliner_TextChanged;
 
-            textBox2.TextChanged -= textBox2_TextChanged; // "OneLiner"
-//            panel2.Paint -= new PaintEventHandler(panel2_Paint);
-            PopulateOneLiner();
-            textBox2.TextChanged += textBox2_TextChanged; // "OneLiner"
-//            panel2.Paint += new PaintEventHandler(panel2_Paint);
-        }
+            // Get the component "technical name"
+            string technicalName = GetDefaultTechnicalName();
 
-        private void PopulateOneLiner()
-        {
-            // Get the "technical name"
-            string technicalName = "";
+            // Get the default "oneliner" text from Excel
             foreach (var comp in componentList)
             {
-                if (comp.Region == Main.selectedRegion || comp.Region == "")
-                {
-                    technicalName = comp.NameTechnical ?? "";
-                    break;
-                }
-            }
-
-            // Get the default text from Excel
-            foreach (var comp in componentList)
-            {
-                // Set default text from Excel
                 if (comp.NameTechnical == technicalName || comp.NameTechnical == "")
                 {
-                    textBox2.Text = Main.ConvertStringToLabel(comp.OneLiner);
+                    // Set default text from Excel
+                    textBoxOneliner.Text = Main.ConvertStringToLabel(comp.OneLiner);
                     break;
                 }
             }
 
-            // Load the "Oneliner" from configuration file
+            // Load the "oneliner" from configuration file
             string baseKey = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{technicalName}|Oneliner";
             string txt = Configuration.GetSetting(baseKey, "");
             if (txt != "")
             {
-                textBox2.Text = txt;
+                textBoxOneliner.Text = txt;
             }
 
-            panel2.Invalidate(); // trigger repaint to update the border
+            textBoxOneliner.TextChanged += textBoxOneliner_TextChanged;
+            panelOneliner.Invalidate(); // trigger repaint to update the border
+        }
+
+        private void PopulateImageNote()
+        {
+            // We must ensure it will not trigger this event, as that would cause it to save when changed.
+            // We only want it to save when user manually changes it.
+            textBoxNote.TextChanged -= textBoxNote_TextChanged;
+
+            string pin = filteredComponentImages[currentImageIndex].Pin ?? "";
+            string pinName = filteredComponentImages[currentImageIndex].Name ?? "";
+            string pinRegion = filteredComponentImages[currentImageIndex].Region ?? "";
+            string pinNote = filteredComponentImages[currentImageIndex].Note ?? "";
+
+            pinName = pinName == "" ? "Pinout" : pinName; // default to "Pinout" if empty
+
+            textBoxNote.Text = Main.ConvertStringToLabel(pinNote).Replace("\n", Environment.NewLine);
+
+            // Load the "note" from configuration file
+            string baseKey = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{pin}|{pinName}|{pinRegion}|Note";
+            string serializedDescription = Configuration.GetSetting(baseKey, "");
+            if (!string.IsNullOrEmpty(serializedDescription))
+            {
+                // Normalize all \r\n, \r, \n to Environment.NewLine after unescaping
+                string restored = serializedDescription.Replace("\\n", Environment.NewLine);
+                textBoxNote.Text = restored;
+
+            }
+
+            textBoxNote.TextChanged += textBoxNote_TextChanged;
+            panelNote.Invalidate(); // trigger repaint to update the border
         }
 
         private void SetFormTitles()
@@ -257,7 +261,7 @@ namespace Commodore_Repair_Toolbox
                 {
                     string formTitle = comp.NameDisplay ?? "Component Information";
                     this.Text = formTitle;
-                    label1.Text = formTitle;
+                    labelDisplayName.Text = formTitle;
                     break;
                 }
             }
@@ -265,7 +269,6 @@ namespace Commodore_Repair_Toolbox
 
         private void FilterImagesByRegion()
         {
-
             if (component.ComponentImages != null && component.ComponentImages.Count > 0)
             {
                 filteredComponentImages = component.ComponentImages
@@ -281,11 +284,7 @@ namespace Commodore_Repair_Toolbox
                     .Where(File.Exists)
                     .ToList();
 
-//                // Remove any filteredComponentImages whose file doesn't exist
-//                filteredComponentImages = filteredComponentImages
-//                    .Where((img, idx) => File.Exists(Path.Combine(Application.StartupPath, img.FileName)))
-//                    .ToList();
-                // Remove any filteredComponentImages whose file doesn't exist, but keep if FileName is empty
+                // Remove any "filteredComponentImages" whose file does not exist, but keep if "FileName" is empty
                 filteredComponentImages = filteredComponentImages
                     .Where((img, idx) => string.IsNullOrWhiteSpace(img.FileName) || File.Exists(Path.Combine(Application.StartupPath, img.FileName)))
                     .ToList();
@@ -293,35 +292,30 @@ namespace Commodore_Repair_Toolbox
             else
             {
                 imagePaths = new List<string>();
-//                filteredComponentImages = new List<ComponentImages>();
                 filteredComponentImages = new List<ComponentImages> { new ComponentImages() };
             }
 
             if (currentImageIndex >= imagePaths.Count)
+            {
                 currentImageIndex = 0;
+            }
 
-//            LayoutThumbnails();
-//            UpdateImage();
-        }
-
-        private void Form_Resize(object sender, EventArgs e)
-        {
             LayoutThumbnails();
+            UpdateImage();
         }
-
 
         private void RemoveThumbnails ()
         {
-            // Remove old thumbnails and their labels from panel3
+            // Remove old thumbnails and their labels
             foreach (var pb in thumbnailPictureBoxes)
             {
-                // Remove and dispose all child controls (labels) from the PictureBox
+                // Remove and dispose all child controls (labels)
                 foreach (Control ctrl in pb.Controls.OfType<Label>().ToList())
                 {
                     pb.Controls.Remove(ctrl);
                     ctrl.Dispose();
                 }
-                panel3.Controls.Remove(pb);
+                panelImageAndThumbnails.Controls.Remove(pb);
                 pb.Dispose();
             }
             thumbnailPictureBoxes.Clear();
@@ -329,19 +323,16 @@ namespace Commodore_Repair_Toolbox
 
         private void LayoutThumbnails()
         {
+            labelImageX.Location = new Point(10, pictureBoxImage.Height - labelImageX.Height - 5);
 
-            labelImageX.Location = new Point(10, pictureBox1.Height - labelImageX.Height - 5);
-
-            // Define width of "panel3"
+            // Define width of "panelImageAndThumbnails"
             int panelThumbnailHeight = 80;
             int panelThumbnailWidth = 120;
-            int panelWidth = panel3.Width;
+            int panelWidth = panelImageAndThumbnails.Width;
 
             if (imagePaths.Count > 1)
-            {
-                            
+            {                            
                 RemoveThumbnails();
-
 
                 // Find how many panels we can show with width of "panelWidth"
                 int panels = panelWidth / panelThumbnailWidth;
@@ -351,7 +342,9 @@ namespace Commodore_Repair_Toolbox
                 int dynamicThumbnailWidth = panelWidth / panels;
                 int dynamicThumbnailHeight = panelThumbnailHeight; // Keep height as before
 
-                int y = panel3.Height - dynamicThumbnailHeight;
+                int y = panelImageAndThumbnails.Height - dynamicThumbnailHeight;
+
+                // Create the amount of thumbnails we can fit in the panel
                 for (int i = 0; i < panels; i++)
                 {
                     PictureBox pictureBox = new PictureBox
@@ -367,12 +360,7 @@ namespace Commodore_Repair_Toolbox
                     };
                     thumbnailPictureBoxes.Add(pictureBox);
 
-
-
-
-
-
-                    // Add label9 (Pin)
+                    string pinText = i < filteredComponentImages?.Count ? "Pin "+filteredComponentImages[i].Pin : "";
                     Label labelPin = new Label
                     {
                         AutoSize = true,
@@ -381,19 +369,10 @@ namespace Commodore_Repair_Toolbox
                         Font = new Font("Calibri", 8, FontStyle.Regular),
                         BackColor = Color.Khaki,
                         ForeColor = Color.Black,
-//                        Text = (i < component.ComponentImages?.Count)
-                        Text = (i < filteredComponentImages?.Count)
-//                            ? "Pin " + component.ComponentImages[i].Pin
-                            ? "Pin " + filteredComponentImages[i].Pin
-                            : "",
+                        Text = pinText,
                         Location = new Point(5, 5)
                     };
                     pictureBox.Controls.Add(labelPin);
-                    // Now that labelPin.Width is correct, center it horizontally
-    //                labelPin.Location = new Point(
-    //                    (pictureBox.Width - labelPin.Width) / 2,
-    //                    5
-    //                );
 
                     if (i < imagePaths.Count)
                     {
@@ -420,25 +399,25 @@ namespace Commodore_Repair_Toolbox
                         }
                     };
 
-                    panel3.Controls.Add(pictureBox);
+                    panelImageAndThumbnails.Controls.Add(pictureBox);
                     pictureBox.Controls.Add(labelPin);
                 }
 
-                // Invalidate all thumbnails
+                // Invalidate all thumbnails (redraw)
                 foreach (var pb in thumbnailPictureBoxes)
+                {
                     pb.Invalidate();
-
+                }
             }
 
             // Resize the main picture box to fill the remaining space
             if (imagePaths.Count > 1)
             {
-                pictureBox1.Size = new Size(panel3.Width, panel3.Height - panelThumbnailHeight - 5);
+                pictureBoxImage.Size = new Size(panelImageAndThumbnails.Width, panelImageAndThumbnails.Height - panelThumbnailHeight - 5);
             } else
             {
-                pictureBox1.Size = new Size(panel3.Width, panel3.Height);
+                pictureBoxImage.Size = new Size(panelImageAndThumbnails.Width, panelImageAndThumbnails.Height);
             }
-             
         }
 
         private void UpdateThumbnails()
@@ -446,18 +425,27 @@ namespace Commodore_Repair_Toolbox
             int panels = thumbnailPictureBoxes.Count;
             int imagesCount = imagePaths.Count;
 
-            // Adjust window so currentImageIndex is always visible
+            // Adjust window so "currentImageIndex" is always visible
             if (currentImageIndex < thumbnailWindowStart)
+            {
                 thumbnailWindowStart = currentImageIndex;
+            }
             else if (currentImageIndex >= thumbnailWindowStart + panels)
+            {
                 thumbnailWindowStart = currentImageIndex - panels + 1;
+            }
 
             // Clamp window start
-            if (thumbnailWindowStart < 0) thumbnailWindowStart = 0;
+            if (thumbnailWindowStart < 0)
+            {
+                thumbnailWindowStart = 0;
+            }                
             if (thumbnailWindowStart > Math.Max(0, imagesCount - panels))
+            {
                 thumbnailWindowStart = Math.Max(0, imagesCount - panels);
+            }
 
-            // Update images, tags, and labels for each thumbnail PictureBox
+            // Update images, tags, and labels for each thumbnail
             for (int i = 0; i < panels; i++)
             {
                 int imgIdx = thumbnailWindowStart + i;
@@ -468,13 +456,14 @@ namespace Commodore_Repair_Toolbox
                     pb.Image = Image.FromFile(imagePaths[imgIdx]);
                     pb.Visible = true;
 
-                    // Update labels inside the PictureBox
+                    // Update labels inside the "PictureBox"
                     var labels = pb.Controls.OfType<Label>().ToList();
-                    if (labels.Count >= 1 && component.ComponentImages != null && imgIdx < component.ComponentImages.Count)
+                    if (
+                        labels.Count >= 1 && component.ComponentImages != null && 
+                        imgIdx < component.ComponentImages.Count
+                        )
                     {
-//                        var pinValue = component.ComponentImages[imgIdx].Pin;
                         var pinValue = filteredComponentImages[imgIdx].Pin;
-//                        var nameValue = component.ComponentImages[imgIdx].Name;
                         var nameValue = filteredComponentImages[imgIdx].Name;
                         int pinInt;
                         if (int.TryParse(pinValue, out pinInt))
@@ -485,6 +474,7 @@ namespace Commodore_Repair_Toolbox
                         {
                             labels[0].Text = nameValue;
                         }
+                            
                     }
                 }
                 else
@@ -492,7 +482,7 @@ namespace Commodore_Repair_Toolbox
                     pb.Image = null;
                     pb.Visible = false;
 
-                    // Optionally clear label text if out of range
+                    // Clear label text if out of range
                     var labels = pb.Controls.OfType<Label>().ToList();
                     if (labels.Count >= 1)
                     {
@@ -503,16 +493,13 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-
-
-
         private void PictureBox1_MouseClick(object sender, MouseEventArgs e)
         {
             // Reset the image index to the first image
             currentImageIndex = 0;
 
             // Give control to "pictureBox1"
-            ActiveControl = pictureBox1;
+            ActiveControl = pictureBoxImage;
 
             // Update the image
             UpdateImage();
@@ -521,7 +508,7 @@ namespace Commodore_Repair_Toolbox
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             // Only go in here, if the input text area is NOT in focus
-            if (textBox1.Focused || textBox2.Focused)
+            if (textBoxNote.Focused || textBoxOneliner.Focused)
             {
                 return base.ProcessCmdKey(ref msg, keyData);
             }
@@ -565,27 +552,31 @@ namespace Commodore_Repair_Toolbox
         protected override void OnMouseWheel(MouseEventArgs e)
         {
             base.OnMouseWheel(e);
-            PictureBox1_MouseWheel(pictureBox1, e);
+            PictureBox1_MouseWheel(pictureBoxImage, e);
         }
-
 
         private void PictureBox1_MouseWheel(object sender, MouseEventArgs e)
         {
-            if (isScrolling) return; // Ignore if already scrolling
+            // Return if already scrolling
+            if (isScrolling)
+            {
+                return;
+            }
+
             isScrolling = true;
-            scrollTimer.Start();
+            scrollWheelTimer.Start();
 
             if (imagePaths.Count == 0) return;
 
             // Determine the scroll direction
             if (e.Delta > 0)
             {
-                // Scroll up: move to the previous image
+                // Scroll up: move to the PREVIOUS image
                 currentImageIndex = (currentImageIndex - 1 + imagePaths.Count) % imagePaths.Count;
             }
             else if (e.Delta < 0)
             {
-                // Scroll down: move to the next image
+                // Scroll down: move to the NEXT image
                 currentImageIndex = (currentImageIndex + 1) % imagePaths.Count;
             }
 
@@ -594,12 +585,6 @@ namespace Commodore_Repair_Toolbox
 
         private void UpdateImage()
         {
-
-            textBox1.TextChanged -= textBox1_TextChanged; // "Description"
-            textBox2.TextChanged -= textBox2_TextChanged; // "OneLiner"
-            panel1.Paint -= new PaintEventHandler(panel1_Paint);
-            panel2.Paint -= new PaintEventHandler(panel2_Paint);
-            
             // Default hide all labels
             labelPin.Visible = false;
             labelRegion.Visible = false;
@@ -607,168 +592,118 @@ namespace Commodore_Repair_Toolbox
             labelReading.Visible = false;
             labelImageX.Visible = false;
 
-            // Special handling, if the "image" actually has no file - if it is just "Info"
-            if (imagePaths.Count == 0)
-            {
-                // Set default text from Excel data to the textBox
-                string loadedTxt = "";
-                if (filteredComponentImages != null
-                    && filteredComponentImages.Count > 0
-                    && currentImageIndex >= 0
-                    && currentImageIndex < filteredComponentImages.Count)
+            // Show more, if there are thumbnails
+            if (imagePaths.Count > 0) 
+            { 
+                // Update the image
+                pictureBoxImage.Image = Image.FromFile(imagePaths[currentImageIndex]);
+
+                // Update labels
+                string region = filteredComponentImages[currentImageIndex].Region;
+                string pin = filteredComponentImages[currentImageIndex].Pin;
+                string name = filteredComponentImages[currentImageIndex].Name;
+                string reading = filteredComponentImages[currentImageIndex].Reading;
+
+                labelPin.Text = "Pin " + pin;
+                labelName.Text = name;
+                labelRegion.Text = region;
+                labelPin.Visible = pin != "" ? true : false;
+                labelName.Visible = name != "" ? true : false;
+                labelRegion.Visible = region != "" ? true : false;
+
+                if (labelPin.Visible)
                 {
-                    loadedTxt = filteredComponentImages[currentImageIndex].Note ?? "";
+                    labelName.Location = new Point(labelPin.Location.X + labelPin.Width + 3, labelName.Location.Y);
                 }
-                loadedTxt = loadedTxt.Replace("\n", Environment.NewLine);
-                textBox1.Text = loadedTxt;
+                else
+                {
+                    labelName.Location = new Point(labelPin.Location.X, labelName.Location.Y);
+                }                
 
-                PopulateOneLiner();
-                LoadImageUserNotes(); // will override default texts, if any
+                if (labelName.Visible)
+                {
+                    labelRegion.Location = new Point(labelName.Location.X + labelName.Width + 3, labelRegion.Location.Y);
+                }                
+                else
+                {
+                    labelRegion.Location = new Point(labelPin.Location.X + labelPin.Width + 3, labelRegion.Location.Y);
+                }                
 
-                SetFormTitles();
+                if (labelRegion.Visible)
+                {
+                    labelReading.Location = new Point(labelRegion.Location.X + labelRegion.Width + 3, labelReading.Location.Y);
+                }
+                else if (labelName.Visible)
+                {
+                    labelReading.Location = new Point(labelName.Location.X + labelName.Width + 3, labelReading.Location.Y);
+                }                
+                else
+                {
+                    labelReading.Location = new Point(labelPin.Location.X + labelPin.Width + 3, labelReading.Location.Y);
+                }                
 
-                // Define event for textBox1.TextChanged to save user notes
-                textBox1.TextChanged += textBox1_TextChanged; // "Description"
-                textBox2.TextChanged += textBox2_TextChanged; // "OneLiner"
-                panel1.Paint += new PaintEventHandler(panel1_Paint);
-                panel2.Paint += new PaintEventHandler(panel2_Paint);
+                // Find the "Description" from the "component.Oscilloscope" list, based on the component name and pin
+                labelReading.Text = reading;
+                labelReading.Visible = reading != "" ? true : false;
 
-                return;
-            }
+                // Count the number of images, and show a counter in "label13"
+                if (imagePaths.Count > 1)
+                {
+                    labelImageX.Text = $"Image {currentImageIndex + 1} of {imagePaths.Count}";
+                
+                    // Place "labelImageX" at bottom left corner
+                    labelImageX.Location = new Point(10, pictureBoxImage.Height - labelImageX.Height - 5);
+                    labelImageX.Visible = true;
+                } else
+                {
+                    labelImageX.Visible = false;
+                }                
 
-            // Update the image
-            pictureBox1.Image = Image.FromFile(imagePaths[currentImageIndex]);
-
-            // Update labels
-//            string region = component.ComponentImages[currentImageIndex].Region;
-//            string pin = component.ComponentImages[currentImageIndex].Pin;
-//            string name = component.ComponentImages[currentImageIndex].Name;
-            string region = filteredComponentImages[currentImageIndex].Region;
-            string pin = filteredComponentImages[currentImageIndex].Pin;
-            string name = filteredComponentImages[currentImageIndex].Name;
-            string reading = filteredComponentImages[currentImageIndex].Reading;
-            labelPin.Text = "Pin " + pin;
-            labelName.Text = name;
-            labelRegion.Text = region;
-            labelPin.Visible = pin != "" ? true : false;
-            labelName.Visible = name != "" ? true : false;
-            labelRegion.Visible = region != "" ? true : false;
-            if (labelPin.Visible)
-            {
-                labelName.Location = new Point(labelPin.Location.X + labelPin.Width + 3, labelName.Location.Y); 
+                UpdateThumbnails();
             }
-            else
-            {
-                labelName.Location = new Point(labelPin.Location.X, labelName.Location.Y);
-            }
-            if (labelName.Visible)
-            {
-                labelRegion.Location = new Point(labelName.Location.X + labelName.Width + 3, labelRegion.Location.Y);
-            }
-            else
-            {
-                labelRegion.Location = new Point(labelPin.Location.X + labelPin.Width + 3, labelRegion.Location.Y);
-            }
-//            labelRegion.Location = new Point(labelName.Location.X + labelName.Width + 3, labelRegion.Location.Y);
-            if (labelRegion.Visible)
-            {
-                labelReading.Location = new Point(labelRegion.Location.X + labelRegion.Width + 3, labelReading.Location.Y);
-            }
-            else if (labelName.Visible)
-            {
-                labelReading.Location = new Point(labelName.Location.X + labelName.Width + 3, labelReading.Location.Y);
-            }
-            else
-            {
-                labelReading.Location = new Point(labelPin.Location.X + labelPin.Width + 3, labelReading.Location.Y);
-            }
-
-            // Find the "Description" from the "component.Oscilloscope" list, based on the component name and pin
-//            var oscilloscopeItem = component.Oscilloscope?.FirstOrDefault(item => item.Name == name && item.Pin == pin);
-//            string reading = oscilloscopeItem?.Reading ?? string.Empty;
-            labelReading.Text = reading;
-            labelReading.Visible = reading != "" ? true : false;
-
-            // Count the number of images, and show a counter in "label13"
-            if (imagePaths.Count > 1)
-            {
-                labelImageX.Text = $"Image {currentImageIndex + 1} of {imagePaths.Count}";
-                // Place labelImageX at bottom left corner, alike labelPin in top left corner
-                labelImageX.Location = new Point(10, pictureBox1.Height - labelImageX.Height - 5);
-                labelImageX.Visible = true;
-            } else
-            {
-                labelImageX.Visible = false;
-            }
-
-
-            // Show the Note for the current image
-            if (component.ComponentImages != null && component.ComponentImages.Count > currentImageIndex)
-            {
-//                string loadedTxt = component.ComponentImages[currentImageIndex].Note ?? "";
-                string loadedTxt = filteredComponentImages[currentImageIndex].Note ?? "";
-                loadedTxt = loadedTxt.Replace("\n", Environment.NewLine);
-                textBox1.Text = loadedTxt;
-                //hest1
-            }
-            else
-            {
-                textBox1.Text = "";
-            }
-
-            PopulateOneLiner();
-            LoadImageUserNotes(); // will override default texts, if any
 
             SetFormTitles();
-
-            // Define event for textBox1.TextChanged to save user notes
-            textBox1.TextChanged += textBox1_TextChanged; // "Description"
-            textBox2.TextChanged += textBox2_TextChanged; // "OneLiner"
-            panel1.Paint += new PaintEventHandler(panel1_Paint);
-            panel2.Paint += new PaintEventHandler(panel2_Paint);
-
-            // Trigger repaints to update the border
-            panel1.Invalidate();
-            panel2.Invalidate();
-
-
-
-            UpdateThumbnails();
-
+            PopulateComponentOneliner();
+            PopulateImageNote();
         }
 
-        private void panel1_Paint(object sender, PaintEventArgs e)
+        private string GetDefaultTechnicalName()
         {
-            Rectangle rect = panel1.ClientRectangle;
+            // Get default component "technical name"
+            foreach (var comp in componentList)
+            {
+                if (comp.Region == Main.selectedRegion || comp.Region == "")
+                {
+                    string technicalName = comp.NameTechnical ?? "";
+                    return technicalName;
+                }
+            }
+            return "";
+        }
+
+        private void panelNote_Paint(object sender, PaintEventArgs e)
+        {
+            Rectangle rect = panelNote.ClientRectangle;
             rect.Inflate(0, 0); // shrink to avoid clipping
-            string textBox1_org = textBox1.Text.Replace(Environment.NewLine, "\n");
+            string textBox1_org = textBoxNote.Text.Replace(Environment.NewLine, "\n");
             string excelData = filteredComponentImages[currentImageIndex].Note ?? "";
             Color borderColor = textBox1_org != excelData ? Color.IndianRed : ColorTranslator.FromHtml("#96919D");
             ControlPaint.DrawBorder(e.Graphics, rect, borderColor, ButtonBorderStyle.Solid);
         }
 
-        private void panel2_Paint(object sender, PaintEventArgs e)
+        private void panelOneliner_Paint(object sender, PaintEventArgs e)
         {
-            Rectangle rect = panel2.ClientRectangle;
+            Rectangle rect = panelOneliner.ClientRectangle;
             rect.Inflate(0, 0); // shrink to avoid clipping
 
-            // Get the "technical name"
-            string technicalName = "";
-            foreach (var comp in componentList)
-            {
-                if (comp.Region == Main.selectedRegion || comp.Region == "")
-                {
-                    technicalName = comp.NameTechnical ?? "";
-                    break;
-                }
-            }
+            // Get the component "technical name"
+            string technicalName = GetDefaultTechnicalName();
 
             string excelData = component.OneLiner ?? "";
 
-            // Get the default text from Excel
+            // Get the default "oneliner" text from Excel
             foreach (var comp in componentList)
             {
-                // Set default text from Excel
                 if (comp.NameTechnical == technicalName || comp.NameTechnical == "")
                 {
                     excelData = Main.ConvertStringToLabel(comp.OneLiner);
@@ -776,27 +711,32 @@ namespace Commodore_Repair_Toolbox
                 }
             }
 
-            Color borderColor = textBox2.Text != excelData ? Color.IndianRed : ColorTranslator.FromHtml("#96919D");
+            Color borderColor = textBoxOneliner.Text != excelData ? Color.IndianRed : ColorTranslator.FromHtml("#96919D");
             ControlPaint.DrawBorder(e.Graphics, rect, borderColor, ButtonBorderStyle.Solid);
         }
 
-        private void textBox2_TextChanged(object sender, EventArgs e)
+        private void textBoxOneliner_TextChanged(object sender, EventArgs e)
         {
+            textBoxOneliner.TextChanged -= textBoxOneliner_TextChanged;
             SaveComponentUserOneliner();
-            panel2.Invalidate(); // trigger repaint to update the border
+            textBoxOneliner.TextChanged += textBoxOneliner_TextChanged;
+            panelOneliner.Invalidate(); // trigger repaint to update the border
         }
 
-        private void textBox1_TextChanged(object sender, EventArgs e)
+        private void textBoxNote_TextChanged(object sender, EventArgs e)
         {
-            
+            textBoxNote.TextChanged -= textBoxNote_TextChanged;
             SaveImageUserNotes();
-            panel1.Invalidate(); // trigger repaint to update the border
+            textBoxNote.TextChanged += textBoxNote_TextChanged;
+            panelNote.Invalidate(); // trigger repaint to update the border
 
             string componentId = $"component-{component.Label}-notes";
-            string value = textBox1.Text.Replace(Environment.NewLine, "\\n");
-            // Assuming there is a reference to the WebView2 control:
+            string value = textBoxNote.Text.Replace(Environment.NewLine, "\\n");
+            
+            // Assuming there is a reference to the "WebView2" control:
             string script = $"window.postMessage({{type:'updateNotes',id:'{componentId}',value:`{value}`}}, '*');";
-            // Call this on the main form's WebView2 instance:
+            
+            // Call this on the main form "WebView2" instance:
             if (main?.webView2Resources != null)
             {
                 main.webView2Resources.ExecuteScriptAsync(script);
@@ -807,21 +747,13 @@ namespace Commodore_Repair_Toolbox
         {
             if (component == null) return;
 
-            // Get the "technical name"
-            string technicalName = "";
-            foreach (var comp in componentList)
-            {
-                if (comp.Region == Main.selectedRegion || comp.Region == "")
-                {
-                    technicalName = comp.NameTechnical ?? "";
-                    break;
-                }
-            }
+            // Get the component "technical name"
+            string technicalName = GetDefaultTechnicalName();
 
             string key = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{technicalName}|Oneliner";
 
             // Delete the configuration line, if the text in "Description" equals default text from "component.OneLiner"
-            if (textBox2.Text == component.OneLiner || textBox2.Text == "")
+            if (textBoxOneliner.Text == component.OneLiner || textBoxOneliner.Text == "")
             {
                 Configuration.SaveSetting(key, ""); // delete the entire line in the configuration file
 
@@ -831,73 +763,50 @@ namespace Commodore_Repair_Toolbox
                     // Set default text from Excel
                     if (comp.NameTechnical == technicalName || comp.NameTechnical == "")
                     {
-                        textBox2.Text = Main.ConvertStringToLabel(comp.OneLiner);
+                        textBoxOneliner.Text = Main.ConvertStringToLabel(comp.OneLiner);
+                        
+                        // Move the cursor to the end of the textbox
+                        textBoxOneliner.SelectionStart = textBoxOneliner.Text.Length;
+                        textBoxOneliner.SelectionLength = 0;
                         return;
                     }
                 }                
             }
 
             // Save the OneLiner
-            Configuration.SaveSetting(key, textBox2.Text.Trim());
+            Configuration.SaveSetting(key, textBoxOneliner.Text.Trim());
         }
 
         private void SaveImageUserNotes()
         {
             if (component == null) return;
-            if (textBox1.Text == filteredComponentImages[currentImageIndex].Note) return;
+            if (textBoxNote.Text == filteredComponentImages[currentImageIndex].Note) return;
 
-            string key = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{filteredComponentImages[currentImageIndex].Name}|{filteredComponentImages[currentImageIndex].Pin}|{filteredComponentImages[currentImageIndex].Region}|Notes";
+            string pin = filteredComponentImages[currentImageIndex].Pin ?? "";
+            string pinName = filteredComponentImages[currentImageIndex].Name ?? "Pinout";
+            string pinRegion = filteredComponentImages[currentImageIndex].Region ?? "";
+            string pinNote = filteredComponentImages[currentImageIndex].Note ?? "";
 
-            // First, restore any previously escaped newlines to real newlines
-            string rawText = textBox1.Text.Replace(Environment.NewLine, "\\n");
+            pinName = pinName == "" ? "Pinout" : pinName; // default to "Pinout" if empty
+
+            string key = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{pin}|{pinName}|{pinRegion}|Note";
+
+            string rawText = textBoxNote.Text.Replace(Environment.NewLine, "\\n");
 
             // Delete the key, if it is set to empty
-            if (textBox1.Text.Trim() == "")
+            if (textBoxNote.Text.Trim() == "")
             {
                 Configuration.SaveSetting(key, "");
-                textBox1.Text = filteredComponentImages[currentImageIndex].Note;
+                pinNote = pinNote.Replace("\n", Environment.NewLine);
+                textBoxNote.Text = pinNote;
+                
+                // Move the cursor to the end of the textbox
+                textBoxNote.SelectionStart = textBoxNote.Text.Length;
+                textBoxNote.SelectionLength = 0;
                 return;
             }
 
             Configuration.SaveSetting(key, rawText.Trim());
-        }
-
-        private void LoadImageUserNotes()
-        {
-            if (component == null) return;
-
-            
-/*
-            // Load the "OneLiner"
-            // ---
-            // Get the "technical name"
-            string technicalName = "";
-            foreach (var comp in componentList)
-            {
-                if (comp.Region == Main.selectedRegion || comp.Region == "")
-                {
-                    technicalName = comp.NameTechnical ?? "";
-                    break;
-                }
-            }
-            string baseKey = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{technicalName}|Oneliner";
-            string txt = Configuration.GetSetting(baseKey, "");
-            if (txt != "")
-            {
-                textBox2.Text = txt;
-            }
-*/
-
-            // Load the "Description"
-            string baseKey = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{filteredComponentImages[currentImageIndex].Name}|{filteredComponentImages[currentImageIndex].Pin}|{filteredComponentImages[currentImageIndex].Region}|Notes";
-            string serializedDescription = Configuration.GetSetting(baseKey, "");
-            if (!string.IsNullOrEmpty(serializedDescription))
-            {
-                // Normalize all \r\n, \r, \n to Environment.NewLine after unescaping
-                string restored = serializedDescription.Replace("\\n", Environment.NewLine);
-                textBox1.Text = restored;
-                // hest2
-            }
         }
 
         private void Form_KeyPress(object sender, KeyPressEventArgs e)
@@ -913,13 +822,11 @@ namespace Commodore_Repair_Toolbox
             Close();
         }
 
-
-        // Handle local-file selection
-        private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
+        private void listBoxLocalFiles_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (listBox1.SelectedItem == null) return;
+            if (listBoxLocalFiles.SelectedItem == null) return;
 
-            string selectedName = listBox1.SelectedItem.ToString();
+            string selectedName = listBoxLocalFiles.SelectedItem.ToString();
             if (!localFiles.ContainsKey(selectedName)) return;
 
             var filePath = Path.Combine(Application.StartupPath, localFiles[selectedName]);
@@ -930,11 +837,11 @@ namespace Commodore_Repair_Toolbox
             }
         }
 
-        private void listBox2_SelectedIndexChanged(object sender, EventArgs e)
+        private void listBoxLinks_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (listBox2.SelectedItem == null) return;
+            if (listBoxLinks.SelectedItem == null) return;
 
-            string selectedName = listBox2.SelectedItem.ToString();
+            string selectedName = listBoxLinks.SelectedItem.ToString();
             if (!links.ContainsKey(selectedName)) return;
 
             string url = links[selectedName];

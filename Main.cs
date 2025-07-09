@@ -14,7 +14,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Windows.Media.TextFormatting;
 
 
 namespace Commodore_Repair_Toolbox
@@ -943,13 +942,16 @@ namespace Commodore_Repair_Toolbox
                 string compName = message.Substring("openComp:".Length);
                 var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-                BoardComponents selectedComp = foundBoard?.Components.FirstOrDefault(c => c.Label == compName);
-                if (selectedComp != null)
+//                BoardComponents selectedComp = foundBoard?.Components.FirstOrDefault(c => c.Label == compName);
+                List<BoardComponents> comps = foundBoard?.Components.Where(c => c.Label == compName).ToList();
+                //var comps = board?.Components.Where(c => c.Label == componentClickedLabel).ToList();
+
+                if (comps != null && comps.Count > 0)
                 {
                     //hest
-//                    componentInfoPopup = new FormComponent(selectedComp, this);
-//                    componentInfoPopup.Show(this);
-//                    componentInfoPopup.BringToFront();
+                    componentInfoPopup = new FormComponent(comps, this);
+                    componentInfoPopup.Show(this);
+                    componentInfoPopup.BringToFront();
                 }
             }
 
@@ -3294,16 +3296,10 @@ namespace Commodore_Repair_Toolbox
                 // 2) SHOW the form for the clicked component
                 var hardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var board = hardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-                var comp = board?.Components.FirstOrDefault(c => c.Label == componentClickedLabel);
                 var comps = board?.Components.Where(c => c.Label == componentClickedLabel).ToList();
-//                if (comps != null && comps.Count > 0)
-//                if (comp != null)
-                    if (comp != null && comps != null && comps.Count > 0)
-                    {
-//                    ShowComponentPopup(comp);
-                    //ShowComponentPopup(comps);
-                    ShowComponentPopup(comp, comps);
-
+                if (comps != null && comps.Count > 0)
+                {
+                    ShowComponentPopup(comps);
                 }
             }
 
@@ -3433,16 +3429,9 @@ namespace Commodore_Repair_Toolbox
         // Show the component information popup.
         // ###########################################################################################
 
-//        private void ShowComponentPopup(List<BoardComponents> comps)
-//        private void ShowComponentPopup(BoardComponents comp)
-            private void ShowComponentPopup(BoardComponents comp, List<BoardComponents> comps)
-
+        private void ShowComponentPopup(List<BoardComponents> comps)
         {
-            string title = comp.NameDisplay;
-//            componentInfoPopup = new FormComponent(comp, this);
-//            componentInfoPopup = new FormComponent(comp, comps, this);
             componentInfoPopup = new FormComponent(comps, this);
-            //componentInfoPopup.Text = ConvertStringToLabel(title);
             componentInfoPopup.Show(this);
             componentInfoPopup.BringToFront();
         }      
