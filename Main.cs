@@ -198,7 +198,6 @@ namespace Commodore_Repair_Toolbox
             // Initialize relevant "WebView2" components (used in tab pages)
             InitializeTabConfiguration();
             InitializeTabHelp();
-//            InitializeTabAbout();
 
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
@@ -835,17 +834,12 @@ namespace Commodore_Repair_Toolbox
                                     .Select(img => img.Note)
                                     .FirstOrDefault(note => !string.IsNullOrEmpty(note));
                                 compDescrLong = firstNote ?? "";
-//                                compDescrLong = compDescrLong.Replace("\\n", "<br />");
                             }
                             else
                             {
                                 compDescrLong = "";
                             }
                         }
-//                        else
-//                        {
-//                            compDescrLong = compDescrLong.Replace("\\n", "<br />");
-//                        }
                         compDescrLong = compDescrLong.Replace("\\n", "<br />");
                         compDescrLong = compDescrLong.Replace("\n", "<br />");
                         compDescrLong = compDescrLong.Replace(Environment.NewLine, "<br />");
@@ -942,13 +936,10 @@ namespace Commodore_Repair_Toolbox
                 string compName = message.Substring("openComp:".Length);
                 var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-//                BoardComponents selectedComp = foundBoard?.Components.FirstOrDefault(c => c.Label == compName);
                 List<BoardComponents> comps = foundBoard?.Components.Where(c => c.Label == compName).ToList();
-                //var comps = board?.Components.Where(c => c.Label == componentClickedLabel).ToList();
 
                 if (comps != null && comps.Count > 0)
                 {
-                    //hest
                     componentInfoPopup = new FormComponent(comps, this);
                     componentInfoPopup.Show(this);
                     componentInfoPopup.BringToFront();
@@ -3532,7 +3523,6 @@ namespace Commodore_Repair_Toolbox
                     // If not found, select the first item
                     comboBoxBoard.SelectedIndex = 0;
                 }
-//                comboBoxBoard.SelectedIndex = 0;
             }
         }
 
@@ -4383,13 +4373,6 @@ namespace Commodore_Repair_Toolbox
                     checksumFromOnline = DataUpdate.LoadFromJson(json);
                 }
                 DebugOutput("INFO: Fetched checksum list of [" + checksumFromOnline.Count + "] files from online source");
-
-                /*
-                // Get list of files and checksums from online source
-                var service = new DataUpdateService();
-                List<DataUpdate> checksumFromOnline = service.GetDataUpdates();
-                DebugOutput("INFO: Fetched checksum list of [" + checksumFromOnline.Count + "] files from online source");
-                */
 
                 List<LocalFiles> checksumFromLocal = GetAllReferencedLocalFiles();
                 DebugOutput("INFO: Calculated checksum list of [" + checksumFromOnline.Count + "] files from local storage");

@@ -392,73 +392,7 @@ namespace Commodore_Repair_Toolbox
                         }
                     }
                 }
-            }
-
-            /*
-            // 6) Load "component oscilliscope"
-            foreach (Hardware hardware in classHardware)
-            {
-                foreach (Board board in hardware.Boards)
-                {
-                    string filePathBoardData = Path.Combine(Application.StartupPath, board.DataFile);
-                    using (var package = new ExcelPackage(new FileInfo(
-                        filePathBoardData)))
-                    {
-                        string sheet = "Component oscilloscope";
-                        var worksheet = package.Workbook.Worksheets[sheet];
-
-                        // Break check
-                        if (worksheet != null)
-                        {
-
-                            string searchHeader = "Component behaviour";
-                            int row = 1;
-                            while (row <= worksheet.Dimension.End.Row)
-                            {
-                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
-                                row++;
-                            }
-                            row++; // skip headers
-                            row++;
-
-                            while (worksheet.Cells[row, 1].Value != null)
-                            {
-                                string componentName = worksheet.Cells[row, 1].Value?.ToString() ?? "";
-                                string region = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                                string pin = worksheet.Cells[row, 3].Value?.ToString() ?? "";
-                                string name = worksheet.Cells[row, 4].Value?.ToString() ?? "";
-                                string reading = worksheet.Cells[row, 5].Value?.ToString() ?? "";
-
-                                // Add it, if we have some data
-                                if (pin != "" && reading != "")
-                                {
-                                    var classComponent = board?.Components?.FirstOrDefault(c => c.Label == componentName);
-                                    if (classComponent != null)
-                                    {
-                                        if (classComponent.Oscilloscope == null) classComponent.Oscilloscope = new List<ComponentOscilloscope>();
-                                        classComponent.Oscilloscope.Add(new ComponentOscilloscope
-                                        {
-                                            Name = name,
-                                            Region = region,
-                                            Pin = pin,
-                                            Reading = reading
-                                        });
-                                    }
-                                }
-                                row++;
-                            }
-                        }
-                        else
-                        {
-                            string fileName = Path.GetFileName(filePathBoardData);
-                            string error = $"ERROR: Excel file [{fileName}] the worksheet [{sheet}] is not found";
-                            Main.DebugOutput(error);
-                        }
-
-                    }
-                }
-            }
-            */
+            }          
             
             // 6) Load "component local files" (datasheets)
             foreach (Hardware hardware in classHardware)
