@@ -8,7 +8,7 @@ This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ he
 
 # Screenshots
 
-**Commodore 64**, assy **250425** schematic view with a few circuit traces:\
+**Commodore 64**, assy **250425** schematic view with a couple of circuit traces:\
 <img width="1202" height="721" alt="image" src="https://github.com/user-attachments/assets/67ec34ea-b4bf-4d79-b4c7-645c21a470d1" />
 
 **Commodore 128**, **U21** component information popup:\
