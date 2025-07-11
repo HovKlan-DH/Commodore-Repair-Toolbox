@@ -20,7 +20,7 @@ This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ he
 
 # What is it?
 
-With _CRT_ you can easily view schematics, zoom in/out, identify components, see chip pinouts, do manual circuit tracing, study datasheets, view oscilloscope readings, ressources and various other information, helping you diagnosing and repairing old vintage hardware.
+With _CRT_ you can easily view schematics, zoom in/out, identify components, see chip pinouts, do manual circuit tracing, study datasheets, view oscilloscope readings, ressources and various other information, helping you diagnosing and repairing old vintage hardware. For some parts it supports specific views for _PAL_ and _NTSC_ region.
 
 It is primarily dedicated to Commodore, and have a few built-in datasets for Commodore computers, but it does support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simple" and have good documentation available, like schematics, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
 
@@ -30,10 +30,14 @@ It is primarily dedicated to Commodore, and have a few built-in datasets for Com
 * Windows 10 (64-bit) or newer
 * .NET Framework 4.8.1 (integrated part of the operating system)
 
+This will _not_ work in Linux with Wine, Mono or alike.
+
 
 # Installation and usage
 
 _CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file, `Commodore-Repair-Toolbox.exe`
+
+When launched _CRT_ you can download newer data (if present) from its online source.
 
 
 # Built-in hardware / boards
