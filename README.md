@@ -8,11 +8,11 @@ This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ he
 
 # Screenshots
 
-Commodore 64, 250425 schematic view:\
-<img width="1200" height="719" alt="image" src="https://github.com/user-attachments/assets/2b68a705-1cf2-446a-a551-5927390ec8f4" />
+**Commodore 64**, assy **250425** schematic view:\
+<img width="1202" height="721" alt="image" src="https://github.com/user-attachments/assets/67ec34ea-b4bf-4d79-b4c7-645c21a470d1" />
 
-Component information popup:\
-![Component information popup](https://github.com/user-attachments/assets/fe500981-3bef-4d99-b2f5-f22406eb6e66)
+**Commodore 128** component information popup for **U21**:\
+<img width="902" height="756" alt="image" src="https://github.com/user-attachments/assets/dff7e7d5-c509-425b-acd2-3d9e9a9b95b6" />
 
 Oscilloscope baseline measurement:\
 ![Oscilloscope baseline measurement](https://github.com/user-attachments/assets/f318fe19-4184-4ec7-b93f-9492c704b6c1)
