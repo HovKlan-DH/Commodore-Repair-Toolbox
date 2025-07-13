@@ -233,7 +233,7 @@
             this.labelImageX.BackColor = System.Drawing.Color.WhiteSmoke;
             this.labelImageX.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.labelImageX.Font = new System.Drawing.Font("Calibri", 10.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.labelImageX.Location = new System.Drawing.Point(-15, 612);
+            this.labelImageX.Location = new System.Drawing.Point(13, 612);
             this.labelImageX.Name = "labelImageX";
             this.labelImageX.Size = new System.Drawing.Size(66, 24);
             this.labelImageX.TabIndex = 100;

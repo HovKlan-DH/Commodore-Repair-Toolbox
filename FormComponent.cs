@@ -199,20 +199,25 @@ namespace Commodore_Repair_Toolbox
 
             // Get the component "technical name"
             string technicalName = GetDefaultTechnicalName();
+            string compRegion = "";
 
             // Get the default "oneliner" text from Excel
             foreach (var comp in componentList)
             {
-                if (comp.NameTechnical == technicalName || comp.NameTechnical == "")
+                if (
+                    (comp.Region == Main.selectedRegion || comp.Region == "") &&  
+                    (comp.NameTechnical == technicalName || comp.NameTechnical == "")
+                    )
                 {
                     // Set default text from Excel
                     textBoxOneliner.Text = Main.ConvertStringToLabel(comp.OneLiner);
+                    compRegion = comp.Region;
                     break;
                 }
             }
 
             // Load the "oneliner" from configuration file
-            string baseKey = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{technicalName}|Oneliner";
+            string baseKey = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{technicalName}|{compRegion}|Oneliner";
             string txt = Configuration.GetSetting(baseKey, "");
             if (txt != "")
             {
@@ -704,7 +709,10 @@ namespace Commodore_Repair_Toolbox
             // Get the default "oneliner" text from Excel
             foreach (var comp in componentList)
             {
-                if (comp.NameTechnical == technicalName || comp.NameTechnical == "")
+                if (
+                    (comp.Region == Main.selectedRegion || comp.Region == "") &&
+                    (comp.NameTechnical == technicalName || comp.NameTechnical == "")
+                    )
                 {
                     excelData = Main.ConvertStringToLabel(comp.OneLiner);
                     break;
@@ -749,8 +757,22 @@ namespace Commodore_Repair_Toolbox
 
             // Get the component "technical name"
             string technicalName = GetDefaultTechnicalName();
+            string compRegion = "";
 
-            string key = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{technicalName}|Oneliner";
+            // Get the component region
+            foreach (var comp in componentList)
+            {
+                if (
+                    (comp.Region == Main.selectedRegion || comp.Region == "") &&
+                    (comp.NameTechnical == technicalName || comp.NameTechnical == "")
+                    )
+                {
+                    compRegion = comp.Region;
+                    break;
+                }
+            }
+
+            string key = $"UserData|{Main.hardwareSelectedName}|{Main.boardSelectedName}|{component.Label}|{technicalName}|{compRegion}|Oneliner";
 
             // Delete the configuration line, if the text in "Description" equals default text from "component.OneLiner"
             if (textBoxOneliner.Text == component.OneLiner || textBoxOneliner.Text == "")
