@@ -3,24 +3,24 @@
 This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ hence forward) - a Windows utility tool for repairing vintage computers or peripherals.
 
 > [!CAUTION]
-> Please do note that the data files have not yet reached its final maturity level, and by then its format _could_ change in a nearby future release! Only relevant if you do your own data modification.
+> Please do note that the data files have not yet reached its final maturity level, and by then its format _could_ change in a nearby future release! Only relevant if you do your own data modification or use an older version.
 
 
 # Screenshots
 
-Main screen with schematic view:\
-![Main screen with schematic view](https://github.com/user-attachments/assets/d9b17021-6a56-4e74-b484-b6275fe86ff5)
+**Commodore 64**, assy **250425** schematic view with a couple of circuit traces:\
+<img width="1202" height="721" alt="image" src="https://github.com/user-attachments/assets/67ec34ea-b4bf-4d79-b4c7-645c21a470d1" />
 
-Component information popup:\
-![Component information popup](https://github.com/user-attachments/assets/fe500981-3bef-4d99-b2f5-f22406eb6e66)
+**Commodore 128**, **U21** component information popup:\
+<img width="902" height="756" alt="image" src="https://github.com/user-attachments/assets/dff7e7d5-c509-425b-acd2-3d9e9a9b95b6" />
 
-Oscilloscope baseline measurement:\
-![Oscilloscope baseline measurement](https://github.com/user-attachments/assets/f318fe19-4184-4ec7-b93f-9492c704b6c1)
+**Commodore 128**, **U21** oscilloscope baseline measurement:\
+<img width="902" height="756" alt="image" src="https://github.com/user-attachments/assets/07e9c66f-8c2f-4155-8ba9-87911b467a50" />
 
 
 # What is it?
 
-With _CRT_ you can easily view schematics, zoom in/out, identify components, see chip pinouts, do manual circuit tracing, study datasheets, view oscilloscope readings, ressources and various other information, helping you diagnosing and repairing old vintage hardware.
+With _CRT_ you can easily view schematics, zoom in/out, identify components, see chip pinouts, do manual circuit tracing, study datasheets, view oscilloscope readings, ressources and various other information, helping you diagnosing and repairing old vintage hardware. For some parts it supports specific views for _PAL_ and _NTSC_ region.
 
 It is primarily dedicated to Commodore, and have a few built-in datasets for Commodore computers, but it does support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simple" and have good documentation available, like schematics, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
 
@@ -30,10 +30,14 @@ It is primarily dedicated to Commodore, and have a few built-in datasets for Com
 * Windows 10 (64-bit) or newer
 * .NET Framework 4.8.1 (integrated part of the operating system)
 
+This will _not_ work in Linux with Wine, Mono or alike.
+
 
 # Installation and usage
 
 _CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file, `Commodore-Repair-Toolbox.exe`
+
+When launched _CRT_ you can download newer data (if present) from its online source.
 
 
 # Built-in hardware / boards
