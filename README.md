@@ -30,7 +30,8 @@ It is primarily dedicated to Commodore, and have a few built-in datasets for Com
 * Windows 10 (64-bit) or newer
 * .NET Framework 4.8.1 (integrated part of the operating system)
 
-This will _not_ work in Linux with Wine, Mono or alike.
+This will _not_ work in Linux with Wine, Mono or alike.\
+This will _not_ work with Windows 7 or older.
 
 
 # Installation and usage
