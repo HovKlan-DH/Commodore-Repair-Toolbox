@@ -36,7 +36,7 @@ This will _not_ work with Windows 7 or older.
 
 # Installation and usage
 
-_CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file, `Commodore-Repair-Toolbox.exe`
+_CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file, `Commodore-Repair-Toolbox.exe`, The ZIP file contains a full set of data.
 
 When launched _CRT_ you can download newer data (if present) from its online source.
 
