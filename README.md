@@ -31,7 +31,7 @@ It is primarily dedicated to Commodore, and have a few built-in datasets for Com
 * .NET Framework 4.8.1 (integrated part of the operating system)
 
 This will _not_ work in Linux with Wine, Mono or alike.\
-This will _not_ work with Windows 7 or older.
+This will _not_ work with Windows 8 or older.
 
 
 # Installation and usage
