@@ -72,7 +72,7 @@ You can also contribute by adding new data and send the Excel file and "label fi
 
 # Contact
 
-You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) here in the GitHub project page or use the built-in "Feedback" tab in the application, if you want to report a problem, suggest any changes or just have a comment. I would appreciate some feedback, to know if this is actually useful for others or if you see some missing functionalities that could be benefitial for many.
+Errors or issues can be reported via [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) and questions or comments can be created in the [Discussions](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/discussions). To get in direct contact, then you can connect via the built-in "Feedback" tab in the application. I would naturally appreciate some feedback, as a lot of time has been put in to this :-)
 
 
 # Documentation of data
