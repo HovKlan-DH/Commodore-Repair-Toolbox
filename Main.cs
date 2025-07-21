@@ -3000,7 +3000,33 @@ namespace Commodore_Repair_Toolbox
                     }
                 }
             }
+            AdjustListBoxCategoriesHeight();
             listBoxCategories.EndUpdate(); // resume redrawing of this specific listBox
+        }
+
+        private void AdjustListBoxCategoriesHeight()
+        {
+            int itemCount = listBoxCategories.Items.Count;
+            if (itemCount == 0) return;
+            int itemHeight = listBoxCategories.ItemHeight;
+            int borderHeight = SystemInformation.BorderSize.Height * 2;
+            int totalHeight = (itemHeight * itemCount) + borderHeight + 15;
+            listBoxCategories.Height = totalHeight;
+
+            labelComponents.Location = new Point(
+                labelComponents.Location.X,
+                listBoxCategories.Location.Y + listBoxCategories.Height + 10
+            );
+
+            listBoxComponents.Location = new Point(
+                listBoxComponents.Location.X,
+                labelComponents.Location.Y + labelComponents.Height + 5
+            );
+
+            // Calculate the height so listBoxComponents extends down to just above textBoxFilterComponents
+            int bottomY = textBoxFilterComponents.Location.Y;
+            int topY = listBoxComponents.Location.Y;
+            listBoxComponents.Height = bottomY - topY - 5; // 5px padding, adjust as needed
         }
 
 
@@ -3341,9 +3367,10 @@ namespace Commodore_Repair_Toolbox
 
                 if (comp != null)
                 {
-                    labelComponent.Text = ConvertStringToLabel(comp.Label);
-                    labelComponent.Text += comp.NameTechnical != "?" ? " | " + ConvertStringToLabel(comp.NameTechnical) : "";
-                    labelComponent.Text += comp.NameFriendly != "?" ? " | " + ConvertStringToLabel(comp.NameFriendly) : "";
+                    labelComponent.Text = ConvertStringToLabel(comp.NameDisplay);
+                    //labelComponent.Text = ConvertStringToLabel(comp.Label);
+                    //labelComponent.Text += comp.NameTechnical != "?" ? " | " + ConvertStringToLabel(comp.NameTechnical) : "";
+                    //labelComponent.Text += comp.NameFriendly != "?" ? " | " + ConvertStringToLabel(comp.NameFriendly) : "";
                 }
                 else
                 {
