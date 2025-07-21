@@ -30,12 +30,13 @@ It is primarily dedicated to Commodore, and have a few built-in datasets for Com
 * Windows 10 (64-bit) or newer
 * .NET Framework 4.8.1 (integrated part of the operating system)
 
-This will _not_ work in Linux with Wine, Mono or alike.
+This will _not_ work in Linux with Wine, Mono or alike.\
+This will _not_ work with Windows 8 or older.
 
 
 # Installation and usage
 
-_CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file, `Commodore-Repair-Toolbox.exe`
+_CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file, `Commodore-Repair-Toolbox.exe`, The ZIP file contains a full set of data.
 
 When launched _CRT_ you can download newer data (if present) from its online source.
 
@@ -71,7 +72,7 @@ You can also contribute by adding new data and send the Excel file and "label fi
 
 # Contact
 
-You can create a new [Issue](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) here in the GitHub project page or use the built-in "Feedback" tab, if you want to report a problem, suggest any changes or just have a comment. I would appreciate some feedback, to know if this is actually useful for others or if you see some missing functionalities that could be benefitial for many.
+Errors or issues can be reported via [Issues](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) and questions or comments can be created in the [Discussions](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/discussions). To get in direct contact, then you can connect via the built-in "Feedback" tab in the application.
 
 
 # Documentation of data
@@ -90,7 +91,7 @@ Please refer to the [Wiki Documentation](https://github.com/HovKlan-DH/Commodore
 * **Why not creating this as a web page instead?**
   - Because I like the responsiveness and feel of a real native Windows application :-)
   - A web page would be for someone else to create, as that would be very heavy on the client-side, and this is not my favorite way of coding.
-* **Will you port this to Windows or Linux?**
+* **Will you port this to Mac or Linux?**
   - Not any day soon. Maybe one day when AI becomes better at handling complex tasks, then I could look in to this, but here-and-now I will only focus on the Windows application as-is.
 
 
