@@ -3368,9 +3368,6 @@ namespace Commodore_Repair_Toolbox
                 if (comp != null)
                 {
                     labelComponent.Text = ConvertStringToLabel(comp.NameDisplay);
-                    //labelComponent.Text = ConvertStringToLabel(comp.Label);
-                    //labelComponent.Text += comp.NameTechnical != "?" ? " | " + ConvertStringToLabel(comp.NameTechnical) : "";
-                    //labelComponent.Text += comp.NameFriendly != "?" ? " | " + ConvertStringToLabel(comp.NameFriendly) : "";
                 }
                 else
                 {
