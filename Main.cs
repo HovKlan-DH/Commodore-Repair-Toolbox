@@ -4310,7 +4310,7 @@ namespace Commodore_Repair_Toolbox
                 DebugOutput("INFO: Fetched checksum list of [" + checksumFromOnline.Count + "] files from online source");
 
                 List<LocalFiles> checksumFromLocal = GetAllReferencedLocalFiles();
-                DebugOutput("INFO: Calculated checksum list of [" + checksumFromOnline.Count + "] files from local storage");
+                DebugOutput("INFO: Calculated checksum list of [" + checksumFromLocal.Count + "] files from local storage");
 
                 // Find files present online but missing locally
                 var missingLocal = checksumFromOnline
