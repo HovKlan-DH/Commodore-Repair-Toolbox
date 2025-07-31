@@ -1,8 +1,9 @@
 --------------------------------------
 Hardware      : Commodore 128 and 128D
 Board         : 310378
-Revision date : 2025-May-23
----------------------------
+Region        : PAL
+Revision date : 2025-July-22
+----------------------------
 
 The intention with this introduction and the following scope references, is to give a baseline with some concrete and hands-on scope readings, on this very specific system, for comparison with your own measurements. It is meant as a way for you to do a quick lookup of what a working system looks like, and it is also my own personal basic troubleshooting guide for things to check, as I tend to forget this quickly :-)
 
@@ -13,8 +14,7 @@ This documentation and all its associated scope baseline measurements are done b
 The next logical step, after this introduction, is to open the "References for basic must-have voltages and signals" documentation, also in the "Resources" tab. Also, several (IC) components will have scope baseline measurements you can use when comparing with your own readings.
 
 
----
-PAL
+------------------------------------
 System used for all PAL measurements
 ------------------------------------
 - Assy 310381, rev. 7 board
@@ -25,9 +25,10 @@ System used for all PAL measurements
 - Country (Denmark) has 230V/50Hz so it is PAL (not NTSC)
 
 
-----------------------------------------
-Scope measurements and good-to-know info
-----------------------------------------
+-----------------------------------------
+Scope measurements and good-to-know info.
+Below text is identical to C64 text.
+-----------------------------------------
 - Use scope to measure all DC voltages and LOW/HIGH signals
 - Connect scope probe ground (GND) to expansion port chassis via an extension cable - not perfect but OK to validate and with least risk of short-circuit
     - Optimal reading is gained from connecting to closest GND and not the expansion port chassis

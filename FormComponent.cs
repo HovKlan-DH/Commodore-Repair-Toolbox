@@ -85,6 +85,7 @@ namespace Commodore_Repair_Toolbox
             pictureBoxImage.MouseClick += PictureBox1_MouseClick;
             buttonRegionPal.Click += ButtonsRegion_Click;
             buttonRegionNtsc.Click += ButtonsRegion_Click;
+            buttonToggle.Click += buttonToggle_Click;
 
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
@@ -189,6 +190,22 @@ namespace Commodore_Repair_Toolbox
             SetRegionButtonColors();
             main.SetRegionButtonColors();
             PopulateComponentOneliner();
+        }
+
+        private void buttonToggle_Click(object sender, EventArgs e)
+        {
+            // Switch to PAL
+            if (Main.selectedRegion == "PAL")
+            {
+                buttonRegionNtsc.PerformClick();
+            }
+
+            // Switch to NTSC
+            else
+            {
+                // Switch to PAL
+                buttonRegionPal.PerformClick();
+            }
         }
 
         private void PopulateComponentOneliner()
@@ -518,6 +535,13 @@ namespace Commodore_Repair_Toolbox
                 return base.ProcessCmdKey(ref msg, keyData);
             }
 
+            // CTRL + TAB or CTRL + SHIFT + TAB toggles PAL/NTSC
+            if (keyData == (Keys.Control | Keys.Tab) || keyData == (Keys.Control | Keys.Shift | Keys.Tab))
+            {
+                buttonToggle.PerformClick();
+                return true;
+            }
+
             // Delay logic for arrow keys
             if (keyData == Keys.Down || keyData == Keys.Right ||
                 keyData == Keys.Up || keyData == Keys.Left)
@@ -529,17 +553,18 @@ namespace Commodore_Repair_Toolbox
                 lastArrowKeyTime = now;
             }
 
-            if (keyData == Keys.Down || keyData == Keys.Right)
+            // Simulate scrolling up; get PREVIOUS image
+            if (keyData == Keys.Down || keyData == Keys.Left)
             {
-                // Simulate scrolling down (next image)
-                currentImageIndex = (currentImageIndex + 1) % imagePaths.Count;
+                currentImageIndex = (currentImageIndex - 1 + imagePaths.Count) % imagePaths.Count;
                 UpdateImage();
                 return true;
             }
-            else if (keyData == Keys.Up || keyData == Keys.Left)
+
+            // Simulate scrolling down; get NEXT image
+            else if (keyData == Keys.Up || keyData == Keys.Right)
             {
-                // Simulate scrolling up (previous image)
-                currentImageIndex = (currentImageIndex - 1 + imagePaths.Count) % imagePaths.Count;
+                currentImageIndex = (currentImageIndex + 1) % imagePaths.Count;
                 UpdateImage();
                 return true;
             }
@@ -573,16 +598,17 @@ namespace Commodore_Repair_Toolbox
 
             if (imagePaths.Count == 0) return;
 
-            // Determine the scroll direction
+            // Scroll down: move to the PREVIOUS image
             if (e.Delta > 0)
             {
-                // Scroll up: move to the PREVIOUS image
-                currentImageIndex = (currentImageIndex - 1 + imagePaths.Count) % imagePaths.Count;
+                currentImageIndex = (currentImageIndex + 1) % imagePaths.Count;
+
             }
+
+            // Scroll up: move to the NEXT image
             else if (e.Delta < 0)
             {
-                // Scroll down: move to the NEXT image
-                currentImageIndex = (currentImageIndex + 1) % imagePaths.Count;
+                currentImageIndex = (currentImageIndex - 1 + imagePaths.Count) % imagePaths.Count;
             }
 
             UpdateImage();

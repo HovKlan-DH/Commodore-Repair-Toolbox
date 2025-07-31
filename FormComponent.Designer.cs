@@ -51,6 +51,7 @@
             this.buttonRegionPal = new System.Windows.Forms.Button();
             this.buttonRegionNtsc = new System.Windows.Forms.Button();
             this.label2 = new System.Windows.Forms.Label();
+            this.buttonToggle = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBoxImage)).BeginInit();
             this.panelNote.SuspendLayout();
             this.panelOneliner.SuspendLayout();
@@ -321,11 +322,22 @@
             this.label2.TabIndex = 104;
             this.label2.Text = "Component one-liner description (you can modify this)";
             // 
+            // buttonToggle
+            // 
+            this.buttonToggle.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.buttonToggle.Location = new System.Drawing.Point(837, 785);
+            this.buttonToggle.Name = "buttonToggle";
+            this.buttonToggle.Size = new System.Drawing.Size(75, 30);
+            this.buttonToggle.TabIndex = 105;
+            this.buttonToggle.Text = "Toggle";
+            this.buttonToggle.UseVisualStyleBackColor = true;
+            // 
             // FormComponent
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1117, 827);
+            this.Controls.Add(this.buttonToggle);
             this.Controls.Add(this.label2);
             this.Controls.Add(this.buttonRegionNtsc);
             this.Controls.Add(this.buttonRegionPal);
@@ -382,5 +394,6 @@
         private System.Windows.Forms.Button buttonRegionPal;
         private System.Windows.Forms.Button buttonRegionNtsc;
         private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.Button buttonToggle;
     }
 }
