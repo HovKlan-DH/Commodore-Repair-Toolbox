@@ -47,32 +47,33 @@ When launched _CRT_ you can download newer data (if present) from its online sou
   - 250403 (CR)
 - **Commodore 64**
   - 250407
+    - Covers _all_ components
+    - Has full oscilloscope baseline readings for PAL and NTSC
   - 250425
   - 250466
   - 250469
 - **Commodore 128 and 128D** (C128D plastic model, not DCR)
   - 310378
-    - Has full oscilloscope baseline readings for a PAL system
+    - Has full oscilloscope baseline readings for PAL
 
 
 # Your help would be really appreciated
 
-I would really appreciate if some seasoned Commodore experts would take a brief look, and let me know of obvious factual errors or things I have missed, as ideally this tool could be used by many as a helper-tool, keeping our beloved Commodore hardware running :pray:
+I would really appreciate if some seasoned Commodore experts would take a brief look, and let me know of obvious factual errors or things I have missed, as ideally this tool could be used by many as a reference- and helper-tool, keeping our beloved Commodore hardware running :pray:
 
 You can also help specifically with these topics:
 - Do you have higher-quality images of the used schematics?
 - Do you have (better) datasheets or pinouts for any of the components?
 - Do you see missing components in either the component list or as a highlight?
 - Can you improve any data or fill in more technical details anywhere?
-- I have done some oscilloscope baseline measurements on a good working **PAL** system - would you be able to assist with the same reading on a **NTSC** system?
-  - Please connect with me, so we can coordinate on _what_ and _how_ to measure.
+- Would anyone be able to help out by doing the **NTSC** baseline oscilloscope measurements?
 
 You can also contribute by adding new data and send the Excel file and "label file" to me (view [Wiki Documentation](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/wiki/Documentation) for how to use the labeling software).
 
 
 # Contact
 
-Errors or issues can be reported via [Issues](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) and questions or comments can be created in the [Discussions](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/discussions). To get in direct contact, then you can connect via the built-in "Feedback" tab in the application.
+Errors or issues can be reported via [Issues](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) and questions or comments can be created in the [Discussions](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/discussions). To get in direct contact, then you can connect via the built-in "Feedback" tab in the _CRT_ application.
 
 
 # Documentation of data

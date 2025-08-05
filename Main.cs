@@ -1413,6 +1413,7 @@ namespace Commodore_Repair_Toolbox
                     <ul>
                         <li>Arrows keys <span class='typewriter'>←</span> <span class='typewriter'>→</span> <span class='typewriter'>↑</span> <span class='typewriter'>↓</span> will change image, if multiple images</li>
                         <li><span class='typewriter'>SPACE</span> will change back to first image (typical the pinout)</li>
+                        <li><span class='typewriter'>CTRL</span> + <span class='typewriter'>TAB</span> will toggle between PAL and NTSC</li>
                         <li><span class='typewriter'>ESCAPE</span> will close popup</li>
                     </ul>
                 </ul>
@@ -3746,10 +3747,10 @@ namespace Commodore_Repair_Toolbox
                             // Clean up the temporary file
                             File.Delete(tempUserDataFile);
                         }
-                        else
-                        {
-                            MessageBox.Show("No user data found to attach.", "INFO: No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        }
+//                        else
+//                        {
+//                            MessageBox.Show("No user data found to attach.", "INFO: No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
+//                        }
 
                         // Send it to the server
                         var response = webClient.UploadValues(crtPage + crtPageFeedback, "POST", data);
