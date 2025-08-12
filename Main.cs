@@ -1869,7 +1869,21 @@ namespace Commodore_Repair_Toolbox
                     string componentFriendlyName = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.NameFriendly ?? "";
 
                     // Check if the component is selected in component list
+                    // hest 1
                     bool highlighted = selectedComponents.Contains(overlayComponentsTab[i].Name);
+                    /*
+                    bool highlighted = false;
+                    int idx = 0;
+                    for (int i2 = 0; i2 < overlayComponentsTab.Count; i2++)
+                    {
+                        if (selectedComponents.Contains(overlayComponentsTab[i2].Name))
+                        {
+                            highlighted = true;
+                            idx = i2;
+                            break;
+                        }
+                    }
+                    */
 
                     overlayPanel.Overlays.Add(new OverlayInfo
                     {
@@ -1890,7 +1904,7 @@ namespace Commodore_Repair_Toolbox
                         labelText += checkBox2.Checked && componentTechName != "" ? Environment.NewLine + ConvertStringToLabel(componentTechName) : "";
                         labelText += checkBox3.Checked && componentFriendlyName != "" ? Environment.NewLine + ConvertStringToLabel(componentFriendlyName) : "";
 
-                        // Overwrite the label text, if we hae only one checkbox enabled
+                        // Overwrite the label text, if only one checkbox is enabled
                         labelText = checkBox1.Checked && !checkBox2.Checked && !checkBox3.Checked ? ConvertStringToLabel(componentLabel.Replace(" ", Environment.NewLine)) : labelText;
                         labelText = !checkBox1.Checked && checkBox2.Checked && !checkBox3.Checked ? ConvertStringToLabel(componentTechName.Replace(" ", Environment.NewLine)) : labelText;
                         labelText = !checkBox1.Checked && !checkBox2.Checked && checkBox3.Checked ? ConvertStringToLabel(componentFriendlyName.Replace(" ", Environment.NewLine)) : labelText;
@@ -2620,15 +2634,18 @@ namespace Commodore_Repair_Toolbox
                 if (bo?.Components != null)
                 {
                     foreach (var comp in bo.Components)
+//                    foreach (var comp in bo.Components.GroupBy(c => c.Label).Select(g => g.First()))
                     {
                         string componentDisplay = bd.Components.FirstOrDefault(cb => cb.Label == comp.Label)?.NameDisplay ?? "";
                         if (comp.Overlays == null) continue;
 
                         foreach (var ov in comp.Overlays)
                         {
+                            // hest 2
                             PictureBox overlayPictureBox = new PictureBox
                             {
                                 Name = componentDisplay,
+//                                Name = comp.Label,
                                 Location = new Point(ov.Bounds.X, ov.Bounds.Y),
                                 Size = new Size(ov.Bounds.Width, ov.Bounds.Height),
                                 Tag = bo.Name

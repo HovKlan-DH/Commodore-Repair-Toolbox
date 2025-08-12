@@ -363,6 +363,7 @@ namespace Commodore_Repair_Toolbox
                                         row++; // skip headers
                                         row++; // (need to investigate this - why is this extra row needed!?)
 
+//                                        /*
                                         while (worksheet.Cells[row, 1].Value != null)
                                         {
                                             string name = worksheet.Cells[row, 1].Value.ToString();
@@ -370,10 +371,37 @@ namespace Commodore_Repair_Toolbox
                                             {
                                                 Label = name
                                             };
-                                            if (bo.Components == null) bo.Components = new List<ComponentBounds>();
+                                            if (bo.Components == null)
+                                            {
+                                                bo.Components = new List<ComponentBounds>();
+                                            }
                                             bo.Components.Add(cb);
                                             row++;
                                         }
+//                                        */
+
+                                        /*
+                                        // Add an empty overlay to the component.
+                                        // Only add one component overlay, even if the component is represented in multiple lines (e.g. PAL and NTSC).
+                                        while (worksheet.Cells[row, 1].Value != null)
+                                        {
+                                            string name = worksheet.Cells[row, 1].Value.ToString();
+                                            if (bo.Components == null)
+                                            {
+                                                bo.Components = new List<ComponentBounds>();
+                                            }
+                                            // Only add if not already present
+                                            if (!bo.Components.Any(c => c.Label == name))
+                                            {
+                                                ComponentBounds cb = new ComponentBounds
+                                                {
+                                                    Label = name
+                                                };
+                                                bo.Components.Add(cb);
+                                            }
+                                            row++;
+                                        }
+                                        */
                                     }
                                     else
                                     {
@@ -588,6 +616,7 @@ namespace Commodore_Repair_Toolbox
                                             break;
                                         }
 
+//                                        /*
                                         var compBounds = bf?.Components.FirstOrDefault(c => c.Label == componentName);
                                         if (compBounds != null)
                                         {
@@ -597,6 +626,21 @@ namespace Commodore_Repair_Toolbox
                                                 Bounds = new Rectangle(x, y, w, h)
                                             });
                                         }
+//                                        */
+                                        /*
+                                        var matchingComponents = bf?.Components.Where(c => c.Label == componentName);
+                                        if (matchingComponents != null)
+                                        {
+                                            foreach (var compBounds in matchingComponents)
+                                            {
+                                                if (compBounds.Overlays == null) compBounds.Overlays = new List<Overlay>();
+                                                compBounds.Overlays.Add(new Overlay
+                                                {
+                                                    Bounds = new Rectangle(x, y, w, h)
+                                                });
+                                            }
+                                        }
+                                        */
                                     }
                                 }
                                 row++;
