@@ -15,7 +15,7 @@ namespace Commodore_Repair_Toolbox
         {
             ExcelPackage.License.SetNonCommercialPersonal("Dennis Helligsø");
 
-            string filePathMain = Path.Combine(Application.StartupPath, "Commodore-Repair-Toolbox.xlsx");
+            string filePathMain = Path.Combine(DataPaths.DataRoot, "Commodore-Repair-Toolbox.xlsx");
 
             // Exit check
             if (!File.Exists(filePathMain))
@@ -53,7 +53,7 @@ namespace Commodore_Repair_Toolbox
                     }
 
                     // Check if the board datafile exists
-                    string filePath = Path.Combine(Application.StartupPath, datafile);
+                    string filePath = Path.Combine(DataPaths.DataRoot, datafile);
                     if (File.Exists(filePath))
                     {
                         // Create the hardware in class, if it does not already exists
@@ -129,7 +129,7 @@ namespace Commodore_Repair_Toolbox
                         Main.shadow_structure[hardware.Name][board.Name] = new List<string>();
                     }
 
-                    string filePathBoardData = Path.Combine(Application.StartupPath, board.DataFile);
+                    string filePathBoardData = Path.Combine(DataPaths.DataRoot, board.DataFile);
                     using (var package = new ExcelPackage(new FileInfo(
                         filePathBoardData)))
                     {
@@ -188,7 +188,7 @@ namespace Commodore_Repair_Toolbox
                                 // Only add schematic, if it is marked as active
                                 if (boardCheckedInConfig)
                                 {
-                                    string filePath = Path.Combine(Application.StartupPath, fileName);
+                                    string filePath = Path.Combine(DataPaths.DataRoot, fileName);
                                     if (File.Exists(filePath))
                                     {
                                         // Convert from fraction to 0-255
@@ -268,7 +268,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    string filePath = Path.Combine(Application.StartupPath, board.DataFile);
+                    string filePath = Path.Combine(DataPaths.DataRoot, board.DataFile);
                     using (var package = new ExcelPackage(new FileInfo(filePath)))
                     {
                         string sheet = "Components";
@@ -345,7 +345,7 @@ namespace Commodore_Repair_Toolbox
                             foreach (BoardOverlays bo in board.Files)
                             {
 
-                                string filePath = Path.Combine(Application.StartupPath, board.DataFile);
+                                string filePath = Path.Combine(DataPaths.DataRoot, board.DataFile);
                                 using (var package = new ExcelPackage(new FileInfo(filePath)))
                                 {
                                     var worksheet = package.Workbook.Worksheets[sheet];
@@ -414,7 +414,7 @@ namespace Commodore_Repair_Toolbox
                         }
                         else
                         {
-                            string fileName = Path.GetFileName(Path.Combine(Application.StartupPath, board.DataFile));
+                            string fileName = Path.GetFileName(Path.Combine(DataPaths.DataRoot, board.DataFile));
                             string error = $"ERROR: Excel file [{fileName}] does not have any schematic images, so cannot create highlight bounds";
                             Main.DebugOutput(error);
                         }
@@ -427,7 +427,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    string filePathBoardData = Path.Combine(Application.StartupPath, board.DataFile);
+                    string filePathBoardData = Path.Combine(DataPaths.DataRoot, board.DataFile);
                     using (var package = new ExcelPackage(new FileInfo(
                         filePathBoardData)))
                     {
@@ -462,7 +462,7 @@ namespace Commodore_Repair_Toolbox
                                 }
 
                                 // Log if file does not exists
-                                string filePath = Path.Combine(Application.StartupPath, fileName);
+                                string filePath = Path.Combine(DataPaths.DataRoot, fileName);
                                 if (!File.Exists(filePath))
                                 {
                                     string fileName1 = Path.GetFileName(filePathBoardData);
@@ -502,7 +502,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    string filePath = Path.Combine(Application.StartupPath, board.DataFile);
+                    string filePath = Path.Combine(DataPaths.DataRoot, board.DataFile);
                     using (var package = new ExcelPackage(new FileInfo(
                         filePath)))
                     {
@@ -561,7 +561,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    string filePathBoardData = Path.Combine(Application.StartupPath, board.DataFile);
+                    string filePathBoardData = Path.Combine(DataPaths.DataRoot, board.DataFile);
                     using (var package = new ExcelPackage(new FileInfo(
                         filePathBoardData)))
                     {
@@ -660,7 +660,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    string filePath = Path.Combine(Application.StartupPath, board.DataFile);
+                    string filePath = Path.Combine(DataPaths.DataRoot, board.DataFile);
                     using (var package = new ExcelPackage(new FileInfo(
                         filePath)))
                     {
@@ -719,7 +719,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    string filePathBoardData = Path.Combine(Application.StartupPath, board.DataFile);
+                    string filePathBoardData = Path.Combine(DataPaths.DataRoot, board.DataFile);
                     using (var package = new ExcelPackage(new FileInfo(
                         filePathBoardData)))
                     {
@@ -760,8 +760,7 @@ namespace Commodore_Repair_Toolbox
                                 }
 
                                 // Log if file does not exists
-                                //                            filePath = Path.Combine(Application.StartupPath, hardware.Folder, board.Folder, fileName);
-                                string filePath = Path.Combine(Application.StartupPath, fileName);
+                                string filePath = Path.Combine(DataPaths.DataRoot, fileName);
                                 if (!File.Exists(filePath))
                                 {
                                     string fileName1 = Path.GetFileName(filePathBoardData);
@@ -797,7 +796,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    string filePathBoardData = Path.Combine(Application.StartupPath, board.DataFile);
+                    string filePathBoardData = Path.Combine(DataPaths.DataRoot, board.DataFile);
                     using (var package = new ExcelPackage(new FileInfo(
                         filePathBoardData)))
                     {
@@ -836,7 +835,7 @@ namespace Commodore_Repair_Toolbox
                                 }
 
                                 // Log if file does not exists
-                                string filePath = Path.Combine(Application.StartupPath, fileName);
+                                string filePath = Path.Combine(DataPaths.DataRoot, fileName);
                                 if (fileName != "" && !File.Exists(filePath))
                                 {
                                     string fileName1 = Path.GetFileName(filePathBoardData);
@@ -878,7 +877,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (Board board in hardware.Boards)
                 {
-                    string filePath = Path.Combine(Application.StartupPath, board.DataFile);
+                    string filePath = Path.Combine(DataPaths.DataRoot, board.DataFile);
                     using (var package = new ExcelPackage(new FileInfo(
                         filePath)))
                     {

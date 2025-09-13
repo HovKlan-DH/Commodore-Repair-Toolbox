@@ -155,9 +155,11 @@
     <Reference Include="WindowsFormsIntegration" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CommandlineHelp.cs" />
     <Compile Include="Configuration.cs" />
     <Compile Include="ControlExtensions.cs" />
     <Compile Include="ControlUpdateHelper.cs" />
+    <Compile Include="DataPaths.cs" />
     <Compile Include="DataStructure.cs" />
     <Compile Include="DataUpdate.cs" />
     <Compile Include="FormComponent.cs">
@@ -178,6 +180,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="FormComponent.resx">
       <DependentUpon>FormComponent.cs</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Main.resx">
       <DependentUpon>Main.cs</DependentUpon>

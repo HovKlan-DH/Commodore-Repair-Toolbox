@@ -27,6 +27,20 @@ namespace Commodore_Repair_Toolbox
         private string crtPageAutoUpdate = "/auto-update/";
         private string crtPageFeedback = "/feedback-app/";
 
+        private static bool _logInitialized = false;
+        private static readonly object _logSync = new object();
+
+        public static void InitializeLogging()
+        {
+            if (_logInitialized) return;
+            lock (_logSync)
+            {
+                if (_logInitialized) return;
+                CreateDebugOutputFile();
+                _logInitialized = true;
+            }
+        }
+
         // HTML code for all tabs using "WebView2" component for content
         private string htmlForTabs = @"
             <style>
@@ -154,9 +168,6 @@ namespace Commodore_Repair_Toolbox
         public Main()
         {
             InitializeComponent();
-
-            // Create or overwrite the debug output file
-            CreateDebugOutputFile();
 
             // Load configuration file
             LoadConfigFile();
@@ -508,7 +519,7 @@ namespace Commodore_Repair_Toolbox
         // Create/overwrite the debug output logfile
         // ###########################################################################################
 
-        private void CreateDebugOutputFile()
+        private static void CreateDebugOutputFile()
         {
             string filePath = Path.Combine(Application.StartupPath, "Commodore-Repair-Toolbox.log");
             using (StreamWriter writer = new StreamWriter(filePath, false))
@@ -519,12 +530,24 @@ namespace Commodore_Repair_Toolbox
 
         public static void DebugOutput(string text)
         {
+            // Ensure logging is initialized even if someone calls this early.
+            if (!_logInitialized)
+                InitializeLogging();
+
             string filePath = Path.Combine(Application.StartupPath, "Commodore-Repair-Toolbox.log");
-            using (StreamWriter writer = new StreamWriter(filePath, true))
+            try
             {
-                writer.WriteLine(text);
-                Debug.WriteLine(text);
+                lock (_logSync)
+                {
+                    using (StreamWriter writer = new StreamWriter(filePath, true))
+                    {
+                        writer.WriteLine(text);
+                    }
+                }
             }
+            catch { /* swallow logging errors to avoid impacting app */ }
+
+            Debug.WriteLine(text);
         }
 
 
@@ -861,7 +884,7 @@ namespace Commodore_Repair_Toolbox
                             foreach (ComponentLocalFiles file in comp.LocalFiles)
                             {
                                 // Translate the relative path into an absolute path
-                                string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, file.FileName));
+                                string filePath = Path.GetFullPath(DataPaths.Resolve(file.FileName));
                                 string fileUri = new Uri(filePath).AbsoluteUri;
 
                                 htmlContent += "<a href='" + fileUri + "' class='tooltip-link' data-title='" + file.Name + "' target='_blank'>#" + counter + "</a> ";
@@ -1011,7 +1034,7 @@ namespace Commodore_Repair_Toolbox
                     foreach (var file in group)
                     {
                         // Translate the relative path into an absolute path
-                        string filePath = Path.GetFullPath(Path.Combine(Application.StartupPath, file.Datafile));
+                        string filePath = Path.GetFullPath(Path.Combine(DataPaths.DataRoot, file.Datafile));
                         string fileUri = new Uri(filePath).AbsoluteUri;
 
                         htmlContent += "<li><a href='" + fileUri + "' target='_blank'>" + file.Name + "</a></li>";
@@ -1666,6 +1689,7 @@ namespace Commodore_Repair_Toolbox
             Debug.WriteLine("[UpdateComponentSelection] called from [" + callerName + "]");
 #endif
 
+            /*
             var listBoxComponentsSelectedClone = listBoxComponents.SelectedItems.Cast<object>().ToList(); // create a list of selected components
 
             foreach (var item in listBoxComponents.Items)
@@ -1677,6 +1701,35 @@ namespace Commodore_Repair_Toolbox
                 else
                 {
                     RemoveSelectedComponentIfInList(item.ToString());
+                }
+            }
+            */
+
+            // Build a Display -> Label map once (outside the loop)
+            var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+            var displayToLabel = bd?.Components
+                .Where(c => !string.IsNullOrEmpty(c.NameDisplay))
+                .GroupBy(c => c.NameDisplay)
+                .ToDictionary(g => g.Key, g => g.First().Label); // assume NameDisplay unique
+
+            var listBoxComponentsSelectedClone = listBoxComponents.SelectedItems.Cast<object>().ToList();
+
+            foreach (var item in listBoxComponents.Items)
+            {
+                string display = item.ToString();
+                // Fallback to display if no mapping (prevents null issues)
+                string label = (displayToLabel != null && displayToLabel.TryGetValue(display, out var lbl))
+                    ? lbl
+                    : display;
+
+                if (listBoxComponentsSelectedClone.Contains(item))
+                {
+                    AddSelectedComponentIfNotInList(label);
+                }
+                else
+                {
+                    RemoveSelectedComponentIfInList(label);
                 }
             }
 
@@ -1698,7 +1751,7 @@ namespace Commodore_Repair_Toolbox
 #endif
 
             // Decouple the event handler to avoid continuous recycling
-            listBoxComponents.SelectedIndexChanged -= listBoxComponents_SelectedIndexChanged;
+            listBoxComponents.SelectedIndexChanged -=   listBoxComponents_SelectedIndexChanged;
 
             var listBoxComponentsSelectedClone = listBoxComponents.SelectedItems.Cast<object>().ToList(); // create a list of selected components
             string filterText = textBoxFilterComponents.Text.ToLower();
@@ -1724,6 +1777,7 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (BoardComponents comp in foundBoard.Components)
                 {
+                    string componentLabel = comp.Label;
                     string componentCategory = comp.Type;
                     string componentDisplay = comp.NameDisplay;
 
@@ -1746,9 +1800,15 @@ namespace Commodore_Repair_Toolbox
 
                             if (listBoxComponentsSelectedClone.Contains(componentDisplay) || (from == "TextBoxFilterComponents_TextChanged" && searchTerms.Length > 0))
                             {
+                                /*
                                 if (!selectedComponents.Contains(componentDisplay))
                                 {
                                     AddSelectedComponentIfNotInList(componentDisplay);
+                                }
+                                */
+                                if (!selectedComponents.Contains(componentLabel))
+                                {
+                                    AddSelectedComponentIfNotInList(componentLabel);
                                 }
                                 int index = listBoxComponents.Items.IndexOf(componentDisplay);
                                 if (index >= 0)
@@ -1758,17 +1818,20 @@ namespace Commodore_Repair_Toolbox
                             }
                             else
                             {
-                                RemoveSelectedComponentIfInList(componentDisplay);
+                                //RemoveSelectedComponentIfInList(componentDisplay);
+                                RemoveSelectedComponentIfInList(componentLabel);
                             }
                         }
                         else
                         {
-                            RemoveSelectedComponentIfInList(componentDisplay);
+                            //RemoveSelectedComponentIfInList(componentDisplay);
+                            RemoveSelectedComponentIfInList(componentLabel);
                         }
                     }
                     else
                     {
-                        RemoveSelectedComponentIfInList(componentDisplay);
+                        //RemoveSelectedComponentIfInList(componentDisplay);
+                        RemoveSelectedComponentIfInList(componentLabel);
                     }
                 }
             }
@@ -1782,19 +1845,34 @@ namespace Commodore_Repair_Toolbox
             listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
         }
 
-        private void AddSelectedComponentIfNotInList(string componentDisplay)
+        //private void AddSelectedComponentIfNotInList(string componentDisplay)
+        private void AddSelectedComponentIfNotInList(string componentLabel)
         {
+            /*
             if (!listBoxComponentsSelectedText.Contains(componentDisplay))
             {
                 listBoxComponentsSelectedText.Add(componentDisplay);
             }
+            */
+            if (!listBoxComponentsSelectedText.Contains(componentLabel))
+            {
+                listBoxComponentsSelectedText.Add(componentLabel);
+            }
+
         }
 
-        private void RemoveSelectedComponentIfInList(string componentDisplay)
+        //private void RemoveSelectedComponentIfInList(string componentDisplay)
+        private void RemoveSelectedComponentIfInList(string componentLabel)
         {
+            /*
             if (listBoxComponentsSelectedText.Contains(componentDisplay))
             {
                 listBoxComponentsSelectedText.Remove(componentDisplay);
+            }
+            */
+            if (listBoxComponentsSelectedText.Contains(componentLabel))
+            {
+                listBoxComponentsSelectedText.Remove(componentLabel);
             }
         }
 
@@ -1864,26 +1942,51 @@ namespace Commodore_Repair_Toolbox
                     );
 
                     // Find component "label" from component "display name"
-                    string componentLabel = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.Label ?? "";
-                    string componentTechName = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.NameTechnical ?? "";
-                    string componentFriendlyName = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.NameFriendly ?? "";
+                    //string componentLabel = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.Label ?? "";
+                    //string componentTechName = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.NameTechnical ?? "";
+                    //string componentFriendlyName = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.NameFriendly ?? "";
+                    string componentLabel = bd.Components.FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name)?.Label ?? "";
+                    //string componentTechName = bd.Components.FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name)?.NameTechnical ?? "";
+//                    string componentTechName = bd.Components
+//                       .FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name
+//                        && string.Equals(cb.Region, selectedRegion, StringComparison.OrdinalIgnoreCase))
+//                        ?.NameTechnical ?? "hest";
+                    // Get "technical name" - first with region, then first or otherwise it should be empty
+                    var compTech = bd.Components
+                        .FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name &&
+                                              !string.IsNullOrEmpty(selectedRegion) &&
+                                              !string.IsNullOrEmpty(cb.Region) &&
+                                              string.Equals(cb.Region, selectedRegion, StringComparison.OrdinalIgnoreCase))
+                        ?? bd.Components
+                        .FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name &&
+                                              string.IsNullOrEmpty(cb.Region))
+                        ?? bd.Components
+                        .FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name);
+                    string componentTechName = compTech?.NameTechnical ?? "";
+                    //string componentFriendlyName = bd.Components.FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name)?.NameFriendly ?? "";
+//                    string componentFriendlyName = bd.Components
+//                        .FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name
+//                        && string.Equals(cb.Region, selectedRegion, StringComparison.OrdinalIgnoreCase))
+//                        ?.NameFriendly ?? "";
+                    // Get "friendly name" - first with region, then first or otherwise it should be empty
+                    var compFriendly = bd.Components
+                        .FirstOrDefault(c => c.Label == overlayComponentsTab[i].Name &&
+                                             !string.IsNullOrEmpty(selectedRegion) &&
+                                             !string.IsNullOrEmpty(c.Region) &&
+                                             string.Equals(c.Region, selectedRegion, StringComparison.OrdinalIgnoreCase))
+                        ?? bd.Components
+                        .FirstOrDefault(c => c.Label == overlayComponentsTab[i].Name &&
+                                             string.IsNullOrEmpty(c.Region))
+                        ?? bd.Components
+                        .FirstOrDefault(c => c.Label == overlayComponentsTab[i].Name);
+                    string componentFriendlyName = compFriendly?.NameFriendly ?? "";
+                    string componentDisplay = bd.Components
+                        .FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name
+                        && string.Equals(cb.Region, selectedRegion, StringComparison.OrdinalIgnoreCase))
+                        ?.NameDisplay ?? "";
 
                     // Check if the component is selected in component list
-                    // hest 1
                     bool highlighted = selectedComponents.Contains(overlayComponentsTab[i].Name);
-                    /*
-                    bool highlighted = false;
-                    int idx = 0;
-                    for (int i2 = 0; i2 < overlayComponentsTab.Count; i2++)
-                    {
-                        if (selectedComponents.Contains(overlayComponentsTab[i2].Name))
-                        {
-                            highlighted = true;
-                            idx = i2;
-                            break;
-                        }
-                    }
-                    */
 
                     overlayPanel.Overlays.Add(new OverlayInfo
                     {
@@ -1958,6 +2061,8 @@ namespace Commodore_Repair_Toolbox
                 {
                     panelLabelsVisible.Visible = false;
                 }
+
+                //                UpdateShowOfSelectedComponents();
             }
 
             // Thumbnail list
@@ -1988,7 +2093,8 @@ namespace Commodore_Repair_Toolbox
                                     .FirstOrDefault(cb => cb.Label == comp.Label)?.NameDisplay ?? "";
 
                                 // Check if the component is selected in component list
-                                bool highlighted = selectedComponents.Contains(componentDisplay);
+//                                bool highlighted = selectedComponents.Contains(componentDisplay);
+                                bool highlighted = selectedComponents.Contains(comp.Label);
 
                                 foreach (var ov in comp.Overlays)
                                 {
@@ -2136,7 +2242,8 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (var overlay in overlayPanel.Overlays)
                 {
-                    if (selectedComponents.Contains(overlay.ComponentDisplay))
+                    //if (selectedComponents.Contains(overlay.ComponentDisplay))
+                    if (selectedComponents.Contains(overlay.ComponentLabel))
                     {
                         overlay.Highlighted = state;
 
@@ -2155,7 +2262,8 @@ namespace Commodore_Repair_Toolbox
             {
                 foreach (var overlay in overlayPanel2.Overlays)
                 {
-                    if (selectedComponents.Contains(overlay.ComponentDisplay))
+                    //if (selectedComponents.Contains(overlay.ComponentDisplay))
+                    if (selectedComponents.Contains(overlay.ComponentLabel))
                     {
                         overlay.Highlighted = state;
                     }
@@ -2520,7 +2628,7 @@ namespace Commodore_Repair_Toolbox
             }
 
             // Load main image
-            string filePath = Path.Combine(Application.StartupPath, schematicSelectedFile);
+            string filePath = DataPaths.Resolve(schematicSelectedFile);
             image = Image.FromFile(
                 filePath
             );
@@ -2644,8 +2752,8 @@ namespace Commodore_Repair_Toolbox
                             // hest 2
                             PictureBox overlayPictureBox = new PictureBox
                             {
-                                Name = componentDisplay,
-//                                Name = comp.Label,
+//                                Name = componentDisplay,
+                                Name = comp.Label,
                                 Location = new Point(ov.Bounds.X, ov.Bounds.Y),
                                 Size = new Size(ov.Bounds.Width, ov.Bounds.Height),
                                 Tag = bo.Name
@@ -2694,7 +2802,7 @@ namespace Commodore_Repair_Toolbox
             // Walkthrough each schematic image for this board
             foreach (BoardOverlays schematic in bd.Files)
             {
-                string filename = Path.Combine(Application.StartupPath, schematic.SchematicFileName);
+                string filename = Path.Combine(DataPaths.DataRoot, schematic.SchematicFileName);
 
                 // Panel that will hold the label and the image
                 Panel panelThumbnail = new Panel
@@ -2901,8 +3009,10 @@ namespace Commodore_Repair_Toolbox
                 bool hasSelectedComponent = selectedComponents.Any(selectedComponentText =>
                 {
                     // Find component "label"
+//                    string componentLabel = bd.Components
+//                        .FirstOrDefault(cb => cb.NameDisplay == selectedComponentText)?.Label ?? "";
                     string componentLabel = bd.Components
-                        .FirstOrDefault(cb => cb.NameDisplay == selectedComponentText)?.Label ?? "";
+                        .FirstOrDefault(cb => cb.Label == selectedComponentText)?.Label ?? "";
 
                     // Find component "bounds" for the label
                     var compBounds = file.Components.FirstOrDefault(c => c.Label == componentLabel);
@@ -3311,16 +3421,29 @@ namespace Commodore_Repair_Toolbox
             // Find component "display name"
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-            string componentDisplay = bd.Components
-                .FirstOrDefault(cb => cb.Label == componentClickedLabel)?.NameDisplay ?? "";
+            string componentLabel = bd.Components.FirstOrDefault(cb => cb.Label == componentClickedLabel)?.Label ?? "";
+//            string componentDisplay = bd.Components.FirstOrDefault(cb => cb.Label == componentClickedLabel)?.NameDisplay ?? "";
+            var compEntry = bd.Components
+                .FirstOrDefault(cb => cb.Label == componentClickedLabel &&
+                                      !string.IsNullOrEmpty(Main.selectedRegion) &&
+                                      string.Equals(cb.Region, Main.selectedRegion, StringComparison.OrdinalIgnoreCase))
+                ?? bd.Components
+                .FirstOrDefault(cb => cb.Label == componentClickedLabel &&
+                                      string.IsNullOrEmpty(cb.Region));
+            string componentDisplay = compEntry?.NameDisplay ?? "";
+
 
             // Left-mouse click (select component and show popup)
             if (e.MouseArgs.Button == MouseButtons.Left)
             {
                 // 1) HIGHLIGHT the overlay
-                if (!listBoxComponentsSelectedText.Contains(componentDisplay))
+                //if (!listBoxComponentsSelectedText.Contains(componentDisplay))
+                //{
+                //    listBoxComponentsSelectedText.Add(componentDisplay);
+                //}
+                if (!listBoxComponentsSelectedText.Contains(componentLabel))
                 {
-                    listBoxComponentsSelectedText.Add(componentDisplay);
+                    listBoxComponentsSelectedText.Add(componentLabel);
                 }
                 int index = listBoxComponents.Items.IndexOf(componentDisplay);
                 if (index >= 0)
@@ -3341,9 +3464,11 @@ namespace Commodore_Repair_Toolbox
             // Right-mouse click (toggle component selection)
             else if (e.MouseArgs.Button == MouseButtons.Right)
             {
-                if (!listBoxComponentsSelectedText.Contains(componentDisplay))
+                //if (!listBoxComponentsSelectedText.Contains(componentDisplay))
+                if (!listBoxComponentsSelectedText.Contains(componentLabel))
                 {
-                    listBoxComponentsSelectedText.Add(componentDisplay);
+                    //listBoxComponentsSelectedText.Add(componentDisplay);
+                    listBoxComponentsSelectedText.Add(componentLabel);
                     int index = listBoxComponents.Items.IndexOf(componentDisplay);
                     if (index >= 0)
                     {
@@ -3352,7 +3477,8 @@ namespace Commodore_Repair_Toolbox
                 }
                 else
                 {
-                    listBoxComponentsSelectedText.Remove(componentDisplay);
+                    //listBoxComponentsSelectedText.Remove(componentDisplay);
+                    listBoxComponentsSelectedText.Remove(componentLabel);
                     int index = listBoxComponents.Items.IndexOf(componentDisplay);
                     if (index >= 0)
                     {
@@ -3708,7 +3834,7 @@ namespace Commodore_Repair_Toolbox
                 var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
                 string boardFile = foundBoard?.DataFile;
-                string excelFilePath = Path.Combine(Application.StartupPath, boardFile);
+                string excelFilePath = Path.Combine(DataPaths.DataRoot, boardFile);
 
                 try
                 {
@@ -4457,7 +4583,7 @@ namespace Commodore_Repair_Toolbox
                         continue; // Skip if not found online
 
                     // Ensure the directory exists
-                    string localPath = Path.Combine(Application.StartupPath, file.Replace("/", "\\"));
+                    string localPath = Path.Combine(DataPaths.DataRoot, file.Replace("/", "\\"));
                     string directory = Path.GetDirectoryName(localPath);
                     if (!Directory.Exists(directory))
                     {
@@ -4530,17 +4656,17 @@ namespace Commodore_Repair_Toolbox
             var checkedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             // 2. Add the Excel file itself
-            if (File.Exists("Commodore-Repair-Toolbox.xlsx") && checkedFiles.Add("Commodore-Repair-Toolbox.xlsx"))
+            if (File.Exists(DataPaths.DataRoot + "\\Commodore-Repair-Toolbox.xlsx") && checkedFiles.Add("Commodore-Repair-Toolbox.xlsx"))
             {
                 localFiles.Add(new LocalFiles
                 {
-                    File = Path.GetFileName("Commodore-Repair-Toolbox.xlsx"),
-                    Checksum = GetFileChecksum("Commodore-Repair-Toolbox.xlsx")
+                    File = Path.GetFileName(DataPaths.DataRoot + "\\Commodore-Repair-Toolbox.xlsx"),
+                    Checksum = GetFileChecksum(DataPaths.DataRoot + "\\Commodore-Repair-Toolbox.xlsx")
                 });
             }
 
             // 1. Traverse all files in the folder (recursively)
-            foreach (var filePath in Directory.GetFiles("Data", "*.*", SearchOption.AllDirectories))
+            foreach (var filePath in Directory.GetFiles(DataPaths.DataRoot, "*.*", SearchOption.AllDirectories))
             {
                 string file = filePath.Replace("\\", "/");
 
@@ -4577,7 +4703,7 @@ namespace Commodore_Repair_Toolbox
             {
                 // File is locked (e.g., by Excel)
                 Debug.WriteLine($"Cannot read file {filePath}: {ex.Message}");
-                return "hest";
+                return "Cannot set checksum of file";
             }
         }
 
@@ -4596,6 +4722,8 @@ namespace Commodore_Repair_Toolbox
                 buttonRegionNtsc.BackColor = Color.LightSteelBlue;
                 buttonRegionNtsc.ForeColor = Color.Black;
             }
+
+            // selectedRegion == "PAL"
             else
             {
                 buttonRegionPal.FlatStyle = FlatStyle.Flat;

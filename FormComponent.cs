@@ -22,9 +22,6 @@ namespace Commodore_Repair_Toolbox
         private int thumbnailWindowStart = 0; // index in "imagePaths" for the first visible thumbnail
         private DateTime lastArrowKeyTime = DateTime.MinValue;
         private List<ComponentImages> filteredComponentImages = new List<ComponentImages>();
-//        private string windowState = "Normal";
-//        private Timer windowMoveStopTimer = new Timer();
-
 
         public FormComponent(List<BoardComponents> components, Main main)
         {
@@ -302,13 +299,13 @@ namespace Commodore_Repair_Toolbox
                     .ToList();
 
                 imagePaths = filteredComponentImages
-                    .Select(img => Path.Combine(Application.StartupPath, img.FileName))
+                    .Select(img => Path.Combine(DataPaths.DataRoot, img.FileName))
                     .Where(File.Exists)
                     .ToList();
 
                 // Remove any "filteredComponentImages" whose file does not exist, but keep if "FileName" is empty
                 filteredComponentImages = filteredComponentImages
-                    .Where((img, idx) => string.IsNullOrWhiteSpace(img.FileName) || File.Exists(Path.Combine(Application.StartupPath, img.FileName)))
+                    .Where((img, idx) => string.IsNullOrWhiteSpace(img.FileName) || File.Exists(Path.Combine(DataPaths.DataRoot, img.FileName)))
                     .ToList();
             }
             else
@@ -877,7 +874,7 @@ namespace Commodore_Repair_Toolbox
             string selectedName = listBoxLocalFiles.SelectedItem.ToString();
             if (!localFiles.ContainsKey(selectedName)) return;
 
-            var filePath = Path.Combine(Application.StartupPath, localFiles[selectedName]);
+            var filePath = Path.Combine(DataPaths.DataRoot, localFiles[selectedName]);
 
             if (File.Exists(filePath))
             {
