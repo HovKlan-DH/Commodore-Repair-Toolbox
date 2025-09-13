@@ -34,7 +34,7 @@ namespace Commodore_Repair_Toolbox
                 if (Directory.Exists(cmdValue))
                 {
                     DataRoot = cmdValue;
-                    SourceDescription = "Commandline";
+                    SourceDescription = "Commandline option";
                     Persist(cmdValue);
                     FinalValidate();
                     return;
@@ -69,7 +69,7 @@ namespace Commodore_Repair_Toolbox
             {
                 DataRoot = devRoot;
                 IsDevOverride = true;
-                SourceDescription = "Visual Studio development override (../../../Data)";
+                SourceDescription = "Visual Studio development override";
                 FinalValidate();
                 return;
             }
@@ -77,11 +77,11 @@ namespace Commodore_Repair_Toolbox
             CriticalExit(
                 "Could not resolve a valid data-root.\r\n\r\n" +
                 "Checked in order:\r\n" +
-                "  1) Command line --data-root\r\n" +
+                "  1) Commandline --data-root\r\n" +
                 "  2) Config key DataRoot\r\n" +
-                "  3) <exe>\\Data (must already exist)\r\n" +
-                "  4) ../../../Data (only when debugging)\r\n\r\n" +
-                "Please specify --data-root or create an appropriate Data folder.");
+                "  3) <exe>\\Data (should exist)\r\n" +
+                "  4) ../../../Data (only when debugging in Visual Studio)\r\n\r\n" +
+                "Please specify --data-root or create an appropriate \"Data\" folder.");
         }
 
         private static void FinalValidate()
@@ -100,8 +100,8 @@ namespace Commodore_Repair_Toolbox
                     $"Ensure '{MainExcelFileName}' exists in the resolved data folder or specify another with --data-root.");
             }
 
-            Main.DebugOutput($"INFO: Data-root resolved to [{DataRoot}]");
-            Main.DebugOutput($"INFO: Data-root comes from [{SourceDescription}]");
+            Main.DebugOutput($"INFO: Data-root resolves to [{DataRoot}]");
+            Main.DebugOutput($"INFO: Data-root originates from [{SourceDescription}]");
         }
 
         private static bool TryResolveDevOverride(string exeDir, out string devRoot)
