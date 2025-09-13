@@ -4451,7 +4451,7 @@ namespace Commodore_Repair_Toolbox
                     string json = webClient.DownloadString("https://commodore-repair-toolbox.dk/auto-data/dataChecksums.json");
                     checksumFromOnline = DataUpdate.LoadFromJson(json);
                 }
-                DebugOutput("INFO: Fetched checksum list of [" + checksumFromOnline.Count + "] files from online source");
+                DebugOutput("INFO: Calculated checksum list of [" + checksumFromOnline.Count + "] files from online source");
 
                 List<LocalFiles> checksumFromLocal = GetAllReferencedLocalFiles();
                 DebugOutput("INFO: Calculated checksum list of [" + checksumFromLocal.Count + "] files from local storage");
