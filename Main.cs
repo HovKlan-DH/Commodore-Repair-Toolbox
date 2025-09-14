@@ -334,6 +334,7 @@ namespace Commodore_Repair_Toolbox
 
         private void GetOnlineVersion()
         {
+            /*
             try
             {
                 using (WebClient webClient = new WebClient())
@@ -405,6 +406,7 @@ namespace Commodore_Repair_Toolbox
                 versionOnlineTxt += "<br />";
                 versionOnlineTxt += "</font>";
             }
+            */
         }
 
 
@@ -4473,7 +4475,6 @@ namespace Commodore_Repair_Toolbox
                     .Where(x => !string.Equals(x.OnlineChecksum, x.LocalChecksum, StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
-
                 // Combine missingLocal and differingChecksums to get the list of files to transfer from online to local
                 // Only include files that are present in the online list
                 var filesToTransfer = missingLocal
@@ -4653,29 +4654,35 @@ namespace Commodore_Repair_Toolbox
         public static List<LocalFiles> GetAllReferencedLocalFiles()
         {
             var localFiles = new List<LocalFiles>();
-            var checkedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            // 2. Add the Excel file itself
-            if (File.Exists(DataPaths.DataRoot + "\\Commodore-Repair-Toolbox.xlsx") && checkedFiles.Add("Commodore-Repair-Toolbox.xlsx"))
+            // Defensive: if root not set, abort early
+            if (string.IsNullOrWhiteSpace(DataPaths.DataRoot))
+                return localFiles;
+
+            // Normalize root (absolute, no trailing slash, forward slashes)
+            string rootFull = Path.GetFullPath(DataPaths.DataRoot)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string rootFullNorm = rootFull.Replace('\\', '/');
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var filePath in Directory.GetFiles(rootFull, "*.*", SearchOption.AllDirectories))
             {
-                localFiles.Add(new LocalFiles
-                {
-                    File = Path.GetFileName(DataPaths.DataRoot + "\\Commodore-Repair-Toolbox.xlsx"),
-                    Checksum = GetFileChecksum(DataPaths.DataRoot + "\\Commodore-Repair-Toolbox.xlsx")
-                });
-            }
+                string full = Path.GetFullPath(filePath);
+                string fullNorm = full.Replace('\\', '/');
 
-            // 1. Traverse all files in the folder (recursively)
-            foreach (var filePath in Directory.GetFiles(DataPaths.DataRoot, "*.*", SearchOption.AllDirectories))
-            {
-                string file = filePath.Replace("\\", "/");
+                // Strip root prefix (case-insensitive on Windows)
+                string relative = fullNorm.StartsWith(rootFullNorm, StringComparison.OrdinalIgnoreCase)
+                    ? fullNorm.Substring(rootFullNorm.Length).TrimStart('/')
+                    : fullNorm; // fallback (shouldn't normally happen)
 
-                if (checkedFiles.Add(file))
+                // Avoid duplicates
+                if (seen.Add(relative))
                 {
                     localFiles.Add(new LocalFiles
                     {
-                        File = file,
-                        Checksum = GetFileChecksum(file)
+                        File = relative,          // Store relative path only
+                        Checksum = GetFileChecksum(full) // Use full path for hashing
                     });
                 }
             }
