@@ -334,7 +334,6 @@ namespace Commodore_Repair_Toolbox
 
         private void GetOnlineVersion()
         {
-            /*
             try
             {
                 using (WebClient webClient = new WebClient())
@@ -406,7 +405,6 @@ namespace Commodore_Repair_Toolbox
                 versionOnlineTxt += "<br />";
                 versionOnlineTxt += "</font>";
             }
-            */
         }
 
 
