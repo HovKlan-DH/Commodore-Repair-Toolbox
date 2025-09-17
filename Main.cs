@@ -7,13 +7,17 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using WinFormsTimer = System.Windows.Forms.Timer;
 
 
 namespace Commodore_Repair_Toolbox
@@ -81,7 +85,7 @@ namespace Commodore_Repair_Toolbox
         private FormComponent componentInfoPopup = null;
 
         // Blinking of components
-        private Timer blinkTimer;
+        private WinFormsTimer blinkTimer;
         private bool blinkState = false;
 
         // Fullscreen mode
@@ -147,11 +151,12 @@ namespace Commodore_Repair_Toolbox
         private Dictionary<Control, EventHandler> clickEventHandlers = new Dictionary<Control, EventHandler>();
         private TabPage previousTab;
         private int thumbnailSelectedBorderWidth = 3;
-        private Timer windowMoveStopTimer = new Timer();
+        private WinFormsTimer windowMoveStopTimer = new WinFormsTimer();
         private Point windowLastLocation;
         bool thumbnailsSameWidth = false;
         int thumbnailsWidth = 0;
         public static string selectedRegion = ""; // "", "PAL" or "NTSC"
+        private static readonly HttpClient _httpClient = CreateHttpClient();
 
         // Polyline
         private PolylinesManagement polylinesManagement;
@@ -266,8 +271,10 @@ namespace Commodore_Repair_Toolbox
 
             // Wait 10 seconds before starting the background check
             label13.TextAlign = ContentAlignment.MiddleCenter;
+//            await Task.Delay(10000);
+//            await Task.Run(() => checkFilesFromSource());
             await Task.Delay(10000);
-            await Task.Run(() => checkFilesFromSource());
+            _ = checkFilesFromSourceAsync(); // fire and forget; it marshals UI safely
 
         }
 
@@ -1655,7 +1662,7 @@ namespace Commodore_Repair_Toolbox
 
         private void InitializeBlinkTimer()
         {
-            blinkTimer = new Timer();
+            blinkTimer = new WinFormsTimer();
             blinkTimer.Interval = 500;
             blinkTimer.Tick += BlinkTimer_Tick;
         }
@@ -4434,6 +4441,7 @@ namespace Commodore_Repair_Toolbox
         }
 
 
+        /*
         private void checkFilesFromSource()
         {
 
@@ -4521,6 +4529,128 @@ namespace Commodore_Repair_Toolbox
                 MessageBox.Show(ex.ToString(), "Error fetching JSON file catalogue", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+        */
+
+
+        //--- NY NY NEw NEW
+        private static HttpClient CreateHttpClient()
+        {
+            var handler = new HttpClientHandler
+            {
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+            };
+            var client = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(10)
+            };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("CRT");
+            return client;
+        }
+
+        // New async version (retain old name for minimal external changes)
+        private async Task checkFilesFromSourceAsync()
+        {
+            const string url = "https://commodore-repair-toolbox.dk/auto-data/dataChecksums.json";
+            const int maxAttempts = 3;
+            List<DataUpdate> checksumFromOnline = null;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15)))
+                    {
+                        var resp = await _httpClient.GetAsync(url, cts.Token).ConfigureAwait(false);
+                        resp.EnsureSuccessStatusCode();
+                        string json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                        checksumFromOnline = DataUpdate.LoadFromJson(json);
+                        DebugOutput($"INFO: Fetched checksum list of [{checksumFromOnline.Count}] files from online source (attempt {attempt})");
+                    }
+                    break; // success
+                }
+                catch (Exception ex) when (IsTransient(ex) && attempt < maxAttempts)
+                {
+                    DebugOutput($"WARN: Transient error fetching checksum list (attempt {attempt}): {ex.Message}");
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt))).ConfigureAwait(false); // 2,4 sec backoff
+                }
+                catch (Exception ex)
+                {
+                    DebugOutput("ERROR: Permanent failure fetching JSON file catalogue:");
+                    DebugOutput(ex.ToString());
+                    // Defer UI notification to UI thread
+                    BeginInvoke((Action)(() =>
+                    {
+                        MessageBox.Show(
+                            ex.Message,
+                            "Error fetching JSON file catalogue",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
+                    }));
+                    return;
+                }
+            }
+            if (checksumFromOnline == null) return;
+
+            // Remainder identical logic (wrapped to avoid cross-thread violations)
+            List<LocalFiles> checksumFromLocal = GetAllReferencedLocalFiles();
+            DebugOutput("INFO: Calculated checksum list of [" + checksumFromLocal.Count + "] files from local storage");
+
+            var missingLocal = checksumFromOnline
+                .Where(online => !checksumFromLocal.Any(local =>
+                    string.Equals(local.File, online.File, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            var differingChecksums = checksumFromOnline
+                .Join(checksumFromLocal,
+                      online => online.File,
+                      local => local.File,
+                      (online, local) => new { online.File, online.Checksum, LocalChecksum = local.Checksum })
+                .Where(x => !string.Equals(x.Checksum, x.LocalChecksum, StringComparison.OrdinalIgnoreCase))
+                .Select(x => x.File)
+                .ToList();
+
+            var filesToTransfer = missingLocal.Select(f => f.File)
+                .Concat(differingChecksums)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (filesToTransfer.Count > 0)
+            {
+                foreach (var file in filesToTransfer)
+                    DebugOutput($"INFO: File to transfer: {file}");
+
+                if (!label13.Visible)
+                {
+                    BeginInvoke((Action)(() =>
+                    {
+                        string newText = "Newer data available; update from \"Configuration\" tab";
+                        Size textSize = TextRenderer.MeasureText(newText, label13.Font);
+                        label13.Text = newText;
+                        label13.Width = textSize.Width + 2;
+                        label13.Visible = true;
+                        label13.Location = new Point(panelBehindTab.Width - label13.Width - 2, 3);
+                    }));
+                }
+            }
+        }
+
+        private static bool IsTransient(Exception ex)
+        {
+            if (ex is TaskCanceledException) return true;
+            if (ex is WebException wex)
+            {
+                if (wex.Status == WebExceptionStatus.Timeout ||
+                    wex.Status == WebExceptionStatus.ConnectFailure ||
+                    wex.Status == WebExceptionStatus.NameResolutionFailure)
+                    return true;
+                if (wex.InnerException is SocketException se && se.SocketErrorCode == SocketError.NoBufferSpaceAvailable)
+                    return true;
+            }
+            if (ex is HttpRequestException hrex && hrex.InnerException is SocketException se2 &&
+                se2.SocketErrorCode == SocketError.NoBufferSpaceAvailable)
+                return true;
+            return false;
+        }
+        //---
 
 
         private void syncFilesFromSource() {
@@ -4648,7 +4778,6 @@ namespace Commodore_Repair_Toolbox
         // ###########################################################################################
         // Get all local files referenced in the application, including the Excel file itself.
         // ###########################################################################################
-
         public static List<LocalFiles> GetAllReferencedLocalFiles()
         {
             var localFiles = new List<LocalFiles>();
@@ -4664,6 +4793,18 @@ namespace Commodore_Repair_Toolbox
 
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+            // Define skip patterns (Office lock files, temp files, hidden system artifacts, etc.)
+            // We purposely skip them so they do not inflate counts or generate false “differences”.
+            bool ShouldSkip(string relativePath)
+            {
+                string fileName = Path.GetFileName(relativePath);
+                if (fileName.StartsWith("~$", StringComparison.OrdinalIgnoreCase)) return true;        // Office lock / owner file
+                if (fileName.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)) return true;        // Generic temp
+                if (fileName.EndsWith(".log", StringComparison.OrdinalIgnoreCase)) return false;       // Keep logs (example: adjust as needed)
+                                                                                                       // Add more patterns if needed
+                return false;
+            }
+
             foreach (var filePath in Directory.GetFiles(rootFull, "*.*", SearchOption.AllDirectories))
             {
                 string full = Path.GetFullPath(filePath);
@@ -4674,15 +4815,30 @@ namespace Commodore_Repair_Toolbox
                     ? fullNorm.Substring(rootFullNorm.Length).TrimStart('/')
                     : fullNorm; // fallback (shouldn't normally happen)
 
-                // Avoid duplicates
-                if (seen.Add(relative))
+                // Skip unwanted / transient files
+                if (ShouldSkip(relative))
                 {
-                    localFiles.Add(new LocalFiles
-                    {
-                        File = relative,          // Store relative path only
-                        Checksum = GetFileChecksum(full) // Use full path for hashing
-                    });
+                    DebugOutput($"WARNING: Skipping temporary/lock local file [{relative}]");
+                    continue;
                 }
+
+                // Avoid duplicates
+                if (!seen.Add(relative))
+                    continue;
+
+                string checksum = GetFileChecksum(full); // Use full path for hashing
+                if (checksum == null)
+                {
+                    // If we cannot read (locked / access denied), skip entirely to avoid “phantom delta”
+                    DebugOutput($"WARNING: Skipping locked/unreadable local file [{relative}]");
+                    continue;
+                }
+
+                localFiles.Add(new LocalFiles
+                {
+                    File = relative, // store relative path only
+                    Checksum = checksum // already normalized HEX string
+                });
             }
 
             return localFiles;
@@ -4698,7 +4854,11 @@ namespace Commodore_Repair_Toolbox
             try
             {
                 using (var sha = SHA256.Create())
-                using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var stream = new FileStream(
+                    filePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete))
                 {
                     var hash = sha.ComputeHash(stream);
                     return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
@@ -4707,8 +4867,15 @@ namespace Commodore_Repair_Toolbox
             catch (IOException ex)
             {
                 // File is locked (e.g., by Excel)
-                Debug.WriteLine($"Cannot read file {filePath}: {ex.Message}");
-                return "Cannot set checksum of file";
+                Debug.WriteLine($"Cannot read local file {filePath}: {ex.Message}");
+                // Return null so caller can decide to skip adding the entry (prevents false mismatch).
+                return null;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                // Explicit handling to treat access issues same as locked
+                Debug.WriteLine($"Unauthorized to read local file {filePath}: {ex.Message}");
+                return null;
             }
         }
 
