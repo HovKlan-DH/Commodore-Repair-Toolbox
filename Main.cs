@@ -3193,7 +3193,7 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
-        // Resize the tab image when the panel is resized by mousewheel.
+        // Resize the tab image when the panel is resized by mousewheel or keys.
         // ###########################################################################################
 
         private void panelZoom_Resize(object sender, EventArgs e)
@@ -3207,6 +3207,9 @@ namespace Commodore_Repair_Toolbox
 
         private void panelZoom_MouseWheel(object sender, MouseEventArgs e)
         {
+            PerformZoom(e.Delta, e.Location);
+
+            /*
             ControlUpdateHelper.BeginControlUpdate(panelZoom);
 
             try
@@ -3265,6 +3268,88 @@ namespace Commodore_Repair_Toolbox
                     );
 
                     // 6) Re‐highlight overlays (so they scale properly)
+                    HighlightOverlays("tab");
+
+                    label11.Text = $"{zoomLevel}";
+                }
+            }
+            finally
+            {
+                ControlUpdateHelper.EndControlUpdate(panelZoom);
+            }
+            */
+        }
+
+        private void PerformZoom(int delta, Point clientPos)
+        {
+            if (panelZoom == null || panelImageMain == null || image == null) return;
+
+            ControlUpdateHelper.BeginControlUpdate(panelZoom);
+            try
+            {
+                float oldZoomFactor = zoomFactor;
+                bool hasZoomChanged = false;
+
+                // Zoom IN
+                if (delta > 0) 
+                {
+                    if (zoomFactor <= 4.0f)
+                    {
+                        zoomFactor *= 1.5f;
+                        hasZoomChanged = true;
+                        zoomLevel++;
+                    }
+                }
+
+                // Zoom OUT
+                else
+                {
+                    // Only zoom out if the image is bigger than the container
+                    if (panelImageMain.Width > panelZoom.Width || panelImageMain.Height > panelZoom.Height)
+                    {
+                        zoomFactor /= 1.5f;
+                        hasZoomChanged = true;
+                        zoomLevel--;
+                    }
+                }
+
+                if (hasZoomChanged)
+                {
+                    isResizedByMouseWheel = true;
+
+                    // 2) Calculate new size
+                    Size newSize = new Size(
+                        (int)(image.Width * zoomFactor),
+                        (int)(image.Height * zoomFactor)
+                    );
+
+                    // If cursor is outside panelZoom, default to center
+                    if (!panelZoom.ClientRectangle.Contains(clientPos))
+                    {
+                        clientPos = new Point(panelZoom.ClientSize.Width / 2, panelZoom.ClientSize.Height / 2);
+                    }
+
+                    // 3) Figure out how to keep the same "point under mouse"
+                    Point mousePosition = new Point(
+                        clientPos.X - panelZoom.AutoScrollPosition.X,
+                        clientPos.Y - panelZoom.AutoScrollPosition.Y
+                    );
+
+                    Point newScrollPosition = new Point(
+                        (int)(mousePosition.X * (zoomFactor / oldZoomFactor)),
+                        (int)(mousePosition.Y * (zoomFactor / oldZoomFactor))
+                    );
+
+                    // 4) Apply the new size
+                    panelImageMain.Size = newSize;
+
+                    // 5) Update the scroll position
+                    panelZoom.AutoScrollPosition = new Point(
+                        newScrollPosition.X - clientPos.X,
+                        newScrollPosition.Y - clientPos.Y
+                    );
+
+                    // 6) Re-highlight overlays (so they scale properly)
                     HighlightOverlays("tab");
 
                     label11.Text = $"{zoomLevel}";
@@ -3752,6 +3837,22 @@ namespace Commodore_Repair_Toolbox
         {
             if (tabControl.SelectedTab.Text == "Schematics")
             {
+                // Handle zoom via +/-
+                // Supports main keyboard (+/-) and numpad (Add/Subtract)
+                Keys keyCode = keyData & Keys.KeyCode;
+                if (keyCode == Keys.Oemplus || keyCode == Keys.Add)
+                {
+                    var clientPos = panelZoom != null ? panelZoom.PointToClient(Cursor.Position) : Point.Empty;
+                    PerformZoom(+120, clientPos); // +120 mimics one wheel notch up
+                    return true;
+                }
+                else if (keyCode == Keys.OemMinus || keyCode == Keys.Subtract)
+                {
+                    var clientPos = panelZoom != null ? panelZoom.PointToClient(Cursor.Position) : Point.Empty;
+                    PerformZoom(-120, clientPos); // -120 mimics one wheel notch down
+                    return true;
+                }
+
                 // Fullscreen mode toggle
                 if (keyData == Keys.F11)
                 {
