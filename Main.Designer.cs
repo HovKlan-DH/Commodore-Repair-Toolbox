@@ -47,6 +47,7 @@
             this.webView2Resources = new Microsoft.Web.WebView2.WinForms.WebView2();
             this.tabConfiguration = new System.Windows.Forms.TabPage();
             this.panel2 = new System.Windows.Forms.Panel();
+            this.checkBoxKeyboardZoom = new System.Windows.Forms.CheckBox();
             this.textBox3 = new System.Windows.Forms.TextBox();
             this.label12 = new System.Windows.Forms.Label();
             this.button2 = new System.Windows.Forms.Button();
@@ -331,6 +332,7 @@
             // panel2
             // 
             this.panel2.AutoScroll = true;
+            this.panel2.Controls.Add(this.checkBoxKeyboardZoom);
             this.panel2.Controls.Add(this.textBox3);
             this.panel2.Controls.Add(this.label12);
             this.panel2.Controls.Add(this.button2);
@@ -340,11 +342,22 @@
             this.panel2.Size = new System.Drawing.Size(720, 536);
             this.panel2.TabIndex = 17;
             // 
+            // checkBoxKeyboardZoom
+            // 
+            this.checkBoxKeyboardZoom.AutoSize = true;
+            this.checkBoxKeyboardZoom.Location = new System.Drawing.Point(19, 108);
+            this.checkBoxKeyboardZoom.Name = "checkBoxKeyboardZoom";
+            this.checkBoxKeyboardZoom.Size = new System.Drawing.Size(347, 25);
+            this.checkBoxKeyboardZoom.TabIndex = 20;
+            this.checkBoxKeyboardZoom.Text = "Keyboard will zoom schematic image with +/-";
+            this.checkBoxKeyboardZoom.UseVisualStyleBackColor = true;
+            this.checkBoxKeyboardZoom.CheckedChanged += new System.EventHandler(this.checkBoxKeyboardZoom_CheckedChanged);
+            // 
             // textBox3
             // 
             this.textBox3.BackColor = System.Drawing.Color.White;
             this.textBox3.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.textBox3.Location = new System.Drawing.Point(20, 124);
+            this.textBox3.Location = new System.Drawing.Point(20, 151);
             this.textBox3.Multiline = true;
             this.textBox3.Name = "textBox3";
             this.textBox3.ReadOnly = true;
@@ -966,5 +979,6 @@
         private System.Windows.Forms.Button buttonRegionPal;
         private System.Windows.Forms.Button buttonRegionNtsc;
         private System.Windows.Forms.Label label13;
+        private System.Windows.Forms.CheckBox checkBoxKeyboardZoom;
     }
 }

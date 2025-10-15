@@ -9,10 +9,6 @@ at a specific point in time, but there may be many reasons why your readings dif
 If you know my readings are wrong, then I would appreciate feedback so I can correct it, so future
 users can benefit from it.
 
-Also, several components will have scope baseline measurements you can use when comparing with your own readings.
-The idea is that ALL (IC) components will have these baseline measurements, but it will take some time to
-compile the full list of components.
-
 
 --------------------
 Tooling requirements

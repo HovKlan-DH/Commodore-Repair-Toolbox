@@ -451,6 +451,7 @@ namespace Commodore_Repair_Toolbox
             string defaultShowLabelsHeight = "95";
             string defaultShowTraces = "True";
             string defaultShowTracesHeight = "0";
+            string defaultKeyboardZoomEnabled = "0";
 
             // Load saved settings from configuration file - or set default if none exists
             string selectedHardwareVal = Configuration.GetSetting("HardwareSelected", defaultSelectedHardware);
@@ -463,6 +464,7 @@ namespace Commodore_Repair_Toolbox
             string showTracesHeight = Configuration.GetSetting("ShowTracesHeight", defaultShowTracesHeight);
             string userEmail = Configuration.GetSetting("UserEmail", "");
             selectedRegion = Configuration.GetSetting("SelectedRegion", "PAL");
+            bool keyboardZoomEnabled = Configuration.GetSetting("KeyboardZoomEnabled", defaultKeyboardZoomEnabled) == "1" ? true : false;
 
             textBoxEmail.Text = userEmail; // set email address in "Feedback" tab
 
@@ -510,6 +512,8 @@ namespace Commodore_Repair_Toolbox
 
             panelTracesVisibleHeight = Convert.ToInt32(showTracesHeight);
             isPanelTracesVisible = bool.TryParse(showTraces, out bool result) && result;
+
+            checkBoxKeyboardZoom.Checked = keyboardZoomEnabled;
 
             SetRegionButtonColors();
         }
@@ -1102,7 +1106,7 @@ namespace Commodore_Repair_Toolbox
 
             // Create a panel per hardware
             int x = button2.Location.X; // start X-position
-            int y = 230; // start Y-position
+            int y = textBox3.Location.Y + textBox3.Height + 5; // start Y-position
             int spacing = 15; // space between panels           
 
             foreach (var hardware in shadow_structure)
@@ -3839,18 +3843,21 @@ namespace Commodore_Repair_Toolbox
             {
                 // Handle zoom via +/-
                 // Supports main keyboard (+/-) and numpad (Add/Subtract)
-                Keys keyCode = keyData & Keys.KeyCode;
-                if (keyCode == Keys.Oemplus || keyCode == Keys.Add)
+                if (checkBoxKeyboardZoom.Checked)
                 {
-                    var clientPos = panelZoom != null ? panelZoom.PointToClient(Cursor.Position) : Point.Empty;
-                    PerformZoom(+120, clientPos); // +120 mimics one wheel notch up
-                    return true;
-                }
-                else if (keyCode == Keys.OemMinus || keyCode == Keys.Subtract)
-                {
-                    var clientPos = panelZoom != null ? panelZoom.PointToClient(Cursor.Position) : Point.Empty;
-                    PerformZoom(-120, clientPos); // -120 mimics one wheel notch down
-                    return true;
+                    Keys keyCode = keyData & Keys.KeyCode;
+                    if (keyCode == Keys.Oemplus || keyCode == Keys.Add)
+                    {
+                        var clientPos = panelZoom != null ? panelZoom.PointToClient(Cursor.Position) : Point.Empty;
+                        PerformZoom(+120, clientPos); // +120 mimics one wheel notch up
+                        return true;
+                    }
+                    else if (keyCode == Keys.OemMinus || keyCode == Keys.Subtract)
+                    {
+                        var clientPos = panelZoom != null ? panelZoom.PointToClient(Cursor.Position) : Point.Empty;
+                        PerformZoom(-120, clientPos); // -120 mimics one wheel notch down
+                        return true;
+                    }
                 }
 
                 // Fullscreen mode toggle
@@ -4851,7 +4858,7 @@ namespace Commodore_Repair_Toolbox
         private void ButtonRegionPal_Click(object sender, EventArgs e)
         {
             selectedRegion = "PAL";
-            Configuration.SaveSetting("SelectedRegion", "PAL");
+            Configuration.SaveSetting("SelectedRegion", selectedRegion);
             SetRegionButtonColors();
             UpdateComponentList("ButtonRegionPal_Click");
         }
@@ -4862,11 +4869,21 @@ namespace Commodore_Repair_Toolbox
         private void ButtonRegionNtsc_Click(object sender, EventArgs e)
         {
             selectedRegion = "NTSC";
-            Configuration.SaveSetting("SelectedRegion", "NTSC");
+            Configuration.SaveSetting("SelectedRegion", selectedRegion);
             SetRegionButtonColors();
             UpdateComponentList("ButtonRegionNtsc_Click");
         }
 
+
+        // ###########################################################################################
+
+        private void checkBoxKeyboardZoom_CheckedChanged(object sender, EventArgs e)
+        {
+            // Get value from checkbox and save it to configuration file
+            string isKeyboardZoomEnabled = checkBoxKeyboardZoom.Checked ? "1" : "0";
+
+            Configuration.SaveSetting("KeyboardZoomEnabled", isKeyboardZoomEnabled);
+        }
     }
 
 
