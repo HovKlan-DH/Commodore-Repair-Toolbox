@@ -22,6 +22,7 @@ namespace Commodore_Repair_Toolbox
         private int thumbnailWindowStart = 0; // index in "imagePaths" for the first visible thumbnail
         private DateTime lastArrowKeyTime = DateTime.MinValue;
         private List<ComponentImages> filteredComponentImages = new List<ComponentImages>();
+        private FormWindowState lastWindowState;
 
         public FormComponent(List<BoardComponents> components, Main main)
         {
@@ -86,22 +87,24 @@ namespace Commodore_Repair_Toolbox
 
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
+
+            lastWindowState = this.WindowState;
         }
 
         private void Form_Load(object sender, EventArgs e)
         {
-            /*
-            windowState = Configuration.GetSetting("WindowStatePopup", "Normal");
-            if (Enum.TryParse(windowState, out FormWindowState state) && state != FormWindowState.Minimized)
+            // Restore last window state (ignore Minimized)
+            var windowState = Configuration.GetSetting("WindowStateComponent", "Normal");
+            FormWindowState state;
+            if (Enum.TryParse(windowState, out state) && state != FormWindowState.Minimized)
             {
                 this.WindowState = state;
             }
-
-            windowMoveStopTimer.Interval = 200;
-            windowMoveStopTimer.Tick += MoveStopTimer_Tick;
-            */
+            lastWindowState = this.WindowState;
 
             Shown += Form_Shown;
+
+            this.FormClosing += FormComponent_FormClosing;
         }
 
         private void Form_Shown(object sender, EventArgs e)
@@ -113,23 +116,22 @@ namespace Commodore_Repair_Toolbox
         {
             LayoutThumbnails();
 
-            /*
-            // Enable/reset the time to detect when the movement has stopped
-            windowMoveStopTimer.Stop();
-            windowMoveStopTimer.Start();
-            */
+            // Save only when state changes between Normal/Maximized
+            if (this.WindowState != FormWindowState.Minimized && this.WindowState != lastWindowState)
+            {
+                lastWindowState = this.WindowState;
+                Configuration.SaveSetting("WindowStateComponent", this.WindowState.ToString());
+            }
         }
 
-        /*
-        private void MoveStopTimer_Tick(object sender, EventArgs e)
+        private void FormComponent_FormClosing(object sender, FormClosingEventArgs e)
         {
-            windowMoveStopTimer.Stop();
-
-            // Save the new "window state" and load and apply the splitter position for the new state
-            windowState = this.WindowState.ToString();
-            Configuration.SaveSetting("WindowStatePopup", windowState);
+            // Persist state on close (ignore Minimized)
+            if (this.WindowState != FormWindowState.Minimized)
+            {
+            Configuration.SaveSetting("WindowStateComponent", this.WindowState.ToString());
+            }
         }
-        */
 
         private void SetRegionButtonColors()
         {
