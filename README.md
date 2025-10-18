@@ -50,6 +50,7 @@ When launched _CRT_ you can download newer data (if present) from its online sou
     - Covers _all_ components
     - Has full oscilloscope baseline readings for PAL and NTSC
   - 250425
+    - Has full oscilloscope baseline readings for PAL
   - 250466
   - 250469
 - **Commodore 128 and 128D** (C128D plastic model, not DCR)
