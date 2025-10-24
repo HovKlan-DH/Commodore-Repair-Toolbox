@@ -2,9 +2,6 @@
 
 This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ hence forward) - a Windows utility tool for repairing vintage computers or peripherals.
 
-> [!CAUTION]
-> Please do note that the data files have not yet reached its final maturity level, and by then its format _could_ change in a nearby future release! Only relevant if you do your own data modification or use an older version.
-
 
 # Screenshots
 
@@ -20,9 +17,9 @@ This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ he
 
 # What is it?
 
-With _CRT_ you can easily view schematics, zoom in/out, identify components, see chip pinouts, do manual circuit tracing, study datasheets, view oscilloscope readings, ressources and various other information, helping you diagnosing and repairing old vintage hardware. For some parts it supports specific views for _PAL_ and _NTSC_ region.
+With _CRT_ you can easily view schematics, zoom, identify components, view chip pinouts, do manual circuit tracing, study datasheets, view oscilloscope readings, ressources and various other information, helping you diagnosing and repairing old vintage hardware. For some Commodore boards it supports specific oscilloscope baseline measurements for the _PAL_ and _NTSC_ regions.
 
-It is primarily dedicated to Commodore, and have a few built-in datasets for Commodore computers, but it does support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simple" and have good documentation available, like schematics, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
+It is primarily dedicated to Commodore, and have a few built-in datasets for Commodore computers, but it can support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simple" and have good documentation available, like schematics, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
 
 
 # Requirements
@@ -53,14 +50,14 @@ When launched _CRT_ you can download newer data (if present) from its online sou
     - Has full oscilloscope baseline readings for PAL
   - 250466
   - 250469
-- **Commodore 128 and 128D** (C128D plastic model, not DCR)
+- **Commodore 128 and 128D** (C128D plastic model, not DCR which has the metal cabinet)
   - 310378
-    - Has full oscilloscope baseline readings for PAL
+    - Has full oscilloscope baseline readings for PAL and NTSC
 
 
 # Your help would be really appreciated
 
-I would really appreciate if some seasoned Commodore experts would take a brief look, and let me know of obvious factual errors or things I have missed, as ideally this tool could be used by many as a reference- and helper-tool, keeping our beloved Commodore hardware running :pray:
+I would really appreciate if some seasoned Commodore experts would take a look, and let me know of obvious factual errors or things I have missed, as ideally this tool could be used by many as a reference- and helper-tool, keeping our beloved Commodore hardware running :pray:
 
 You can also help specifically with these topics:
 - Do you have higher-quality images of the used schematics?
@@ -104,7 +101,7 @@ I have taken data from many places, but I do have a few _go-to_ places I frequen
 - [Zimmers](https://www.zimmers.net/anonftp/pub/cbm/schematics/computers/)
 - [Ray Carlsen](https://portcommodore.com/rcarlsen/cbm/)
 
-In some cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated.
+In many cases I provided or modified the data myself, which is why some expert facts-check would be very much appreciated.
 
 If you want to contribute with a major new or updated dataset, then please let me know, as I happily will show credits here for joint efforts. There is a large Commodore community, and I wish for collaboration into making this a great reference for Commodore reparing (well, on the Windows platform at least).
 
