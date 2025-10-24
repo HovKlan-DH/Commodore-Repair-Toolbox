@@ -1,7 +1,7 @@
 ----------------------------
 Hardware      : Commodore 64
-Board         : 250407
-Region        : PAL + NTSC
+Board         : 250425
+Region        : PAL
 Revision date : 2025-October-24
 -------------------------------
 
@@ -13,7 +13,7 @@ Some readings will be slightly different in signal shape from one system to anot
 ------------------------------------
 System used for the PAL measurements
 ------------------------------------
-- Assy 250407, artwork 251137 rev. B board
+- Assy 250425
 - Factory non-modified (at last I believe so) fully working board
 - All original components (no modern replacements)
 - Idle in C64 Basic mode (cursor blinking) with no attachments connected at all, except audio/video cable (even no keyboard)
@@ -21,18 +21,6 @@ System used for the PAL measurements
 - Using new modern PSU from https://www.c64psu.com (not affiliated at all)
 - Country (Denmark) has 230V/50Hz
 - Oscilloscope used is Rigol DS2202A
-
-
--------------------------------------
-System used for the NTSC measurements
--------------------------------------
-- Assy 250407, artwork 251137 rev. B board
-- Fully working board, and added factory prescribed protection diodes (view service manual for details)
-- All original components (no modern replacements)
-- Idle in C64 Basic mode (cursor blinking) with no attachments connected at all, except audio/video cable (even no keyboard)
-- Using new modern "RetroPower" PSU from https://www.keelog.com (not affiliated at all)
-- Country (United States) has 120V/60Hz
-- Oscilloscope used is Siglent SDS 1104X-E
 
 
 ------------------------------------------------
