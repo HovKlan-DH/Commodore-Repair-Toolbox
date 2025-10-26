@@ -28,11 +28,12 @@ System used for the PAL measurements
 -------------------------------------
 System used for the NTSC measurements
 -------------------------------------
-- Assy 310381, rev. 7 board
+- Assy 310381, rev. 7 board (sticker on board states "Rev7-1.2")
 - Factory non-modified fully working board
 - All original components (no modern replacements)
 - Idle in C128 Basic mode (cursor blinking) with no attachments connected at all, except audio/video cable (even no keyboard)
-- Using new modern PSU from https://www.c64psu.com (not affiliated at all)
+- Video cable connected only with "CN8" (Audio/Video DIN) to a CRT monitor (Magnavox CM8762)
+- Using new modern PSU from Keelog, "Modle C128" (not affiliated at all)
 - Country (United States) has 110V/60Hz
 - Oscilloscope used is Siglent SDS 1104X-E
 
