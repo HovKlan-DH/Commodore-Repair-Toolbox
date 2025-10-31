@@ -2445,14 +2445,56 @@ namespace Commodore_Repair_Toolbox
             string callerName = callerMethod.Name;
             Debug.WriteLine("[LoadAndApplySplitterPosition] called from [" + callerName + "]");
 #endif
+            
+            var splitter = splitContainerSchematics;
 
-            // Load and apply the board specific splitter position
-            string defaultSplitterPos = (splitContainerSchematics.Width * 0.9).ToString(); // 90% of full width
-            string configKey = $"SplitterPosition|{windowState}|{hardwareSelectedName}|{boardSelectedName}";
-            string splitterPosVal = Configuration.GetSetting(configKey, defaultSplitterPos);
-            if (int.TryParse(splitterPosVal, out int splitterPosition) && splitterPosition > 0)
+            // Skip if layout/handle is not ready yet
+            if (!splitter.IsHandleCreated || splitter.Width <= 0)
             {
-                splitContainerSchematics.SplitterDistance = splitterPosition;
+                return;
+            }
+
+            // Compute min/max allowed distances based on current size and constraints
+            int minDistance = splitter.Panel1MinSize;
+            int maxDistance = splitter.Width - splitter.SplitterWidth - splitter.Panel2MinSize;
+
+            // If constraints can’t be satisfied (e.g., window temporarily too small), skip now
+            if (maxDistance < minDistance)
+            {
+                Debug.WriteLine($"[LoadAndApplySplitterPosition] Skipped (min={minDistance}, max={maxDistance}, width={splitter.Width}).");
+                DebugOutput("WARNING: Failed to set [SplitterDistance]");
+                return;
+            }
+
+            // Default to 90% of width, but clamp it immediately
+            int defaultDistance = (int)Math.Round(splitter.Width * 0.9);
+            defaultDistance = Math.Max(minDistance, Math.Min(defaultDistance, maxDistance));
+
+            string configKey = $"SplitterPosition|{windowState}|{hardwareSelectedName}|{boardSelectedName}";
+            string splitterPosVal = Configuration.GetSetting(configKey, defaultDistance.ToString());
+
+            int desired = defaultDistance;
+            if (!int.TryParse(splitterPosVal, out desired) || desired <= 0)
+            { 
+                desired = defaultDistance;
+            }
+
+            // Clamp desired to the valid range for the current size
+            int clamped = Math.Max(minDistance, Math.Min(desired, maxDistance));
+
+            try
+            {
+                if (splitter.SplitterDistance != clamped)
+                {
+                    splitter.SplitterDistance = clamped;
+
+                    // Persist the clamped value to avoid future out-of-range loads
+                    Configuration.SaveSetting(configKey, clamped.ToString());
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                DebugOutput("ERROR: Failed to set SplitterDistance: " + ex.Message);
             }
         }
 
