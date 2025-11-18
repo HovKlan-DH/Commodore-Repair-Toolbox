@@ -689,16 +689,75 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
+        // Enforce WebView2 to use "Light" mode only.
+        // ###########################################################################################
+
+        private async Task EnsureWebView2LightAsync(Microsoft.Web.WebView2.WinForms.WebView2 wv)
+        {
+            // Initialize normally (no custom environment needed unless you want to disable Chromium dark forcing)
+            if (wv.CoreWebView2 == null)
+                await wv.EnsureCoreWebView2Async();
+
+            // 1. Prefer light color scheme (silent fail on older runtimes)
+            try
+            {
+                wv.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Light;
+            }
+            catch { /* ignore if not supported */ }
+
+            // 2. Set the WinForms control background explicitly (the previous code wrongly used Controller)
+            //    The property is on the WebView2 control, not on CoreWebView2.
+            wv.DefaultBackgroundColor = Color.White;
+
+            // 3. Inject defensive CSS & meta to neutralize dark-mode media queries
+            const string forceLightScript = @"
+        (function() {
+            try {
+                let meta = document.querySelector('meta[name=""color-scheme""]');
+                if (!meta) {
+                    meta = document.createElement('meta');
+                    meta.name = 'color-scheme';
+                    meta.content = 'light';
+                    document.head.appendChild(meta);
+                } else {
+                    meta.content = 'light';
+                }
+
+                if (!document.getElementById('crt-force-light')) {
+                    const style = document.createElement('style');
+                    style.id = 'crt-force-light';
+                    style.textContent = `
+                        :root, html, body {
+                            background:#ffffff !important;
+                            color:#000 !important;
+                        }
+                        @media (prefers-color-scheme: dark) {
+                            :root, html, body {
+                                background:#ffffff !important;
+                                color:#000 !important;
+                            }
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+            } catch(e) {}
+        })();";
+            try
+            {
+                await wv.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(forceLightScript);
+            }
+            catch { /* ignore if navigation not ready */ }
+        }
+
+
+        // ###########################################################################################
         // Initialize and update the tab for "Overview".
         // Will load new content from board data file.
         // ###########################################################################################
 
         public async void UpdateTabOverview(Board selectedBoard)
         {
-            if (webView2Overview.CoreWebView2 == null)
-            {
-                await webView2Overview.EnsureCoreWebView2Async(null);
-            }
+            await EnsureWebView2LightAsync(webView2Overview);
 
             var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
@@ -998,10 +1057,7 @@ namespace Commodore_Repair_Toolbox
 
         private async void UpdateTabResources(Board selectedBoard)
         {
-            if (webView2Resources.CoreWebView2 == null)
-            {
-                await webView2Resources.EnsureCoreWebView2Async(null);
-            }
+            await EnsureWebView2LightAsync(webView2Resources);
 
             string htmlContent = @"
                 <html>
@@ -1292,10 +1348,7 @@ namespace Commodore_Repair_Toolbox
 
         private async void InitializeTabHelp()
         {
-            if (webView2Help.CoreWebView2 == null)
-            {
-                await webView2Help.EnsureCoreWebView2Async(null);
-            }
+            await EnsureWebView2LightAsync(webView2Help);
 
             string htmlContent = @"
                 <html>
@@ -1522,10 +1575,7 @@ namespace Commodore_Repair_Toolbox
 
         private async void UpdateTabAbout()
         {
-            if (webView2About.CoreWebView2 == null)
-            {
-                await webView2About.EnsureCoreWebView2Async(null);
-            }
+            await EnsureWebView2LightAsync(webView2About);
 
             // Create HTML for the "boardCredits" class
             var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);

@@ -1,7 +1,7 @@
 -----------------------------------------------
 Contribution for oscilloscope baseline readings
 -----------------------------------------------
-Revision date : 2025-October-24
+Revision date : 2025-November-10
 
 
 If you want to contribute by measuring a new oscilloscope baseline for a specific board, then please read these definitions and rules, so you can understand what it implies for doing these measurements.
@@ -13,7 +13,7 @@ The intention with the baseline is actually NOT to thoroughly validate each and 
 * Use 2V/DIV for 12V rail
 * Have CH1 marker (0V) placed at second last line in grid
 * Always use "10X" probe
-* Use 1uS when measuring a clear LOW or HIGH (press "9" in numpad when using "ONC")
+* When measuring a clear LOW or HIGH, use 1uS (by pressing "9" in numpad when using "ONC")
 • Have trigger level set to ~1.5V
 * Make sure to clear statistics before saving image
 • Make sure to capture frequency for pins with frequency
