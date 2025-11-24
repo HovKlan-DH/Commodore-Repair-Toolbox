@@ -698,50 +698,50 @@ namespace Commodore_Repair_Toolbox
             if (wv.CoreWebView2 == null)
                 await wv.EnsureCoreWebView2Async();
 
-            // 1. Prefer light color scheme (silent fail on older runtimes)
+            // Use light color scheme
             try
             {
                 wv.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Light;
             }
             catch { /* ignore if not supported */ }
 
-            // 2. Set the WinForms control background explicitly (the previous code wrongly used Controller)
-            //    The property is on the WebView2 control, not on CoreWebView2.
+            // Set the WinForms control background explicitly (the previous code wrongly used Controller).
+            // The property is on the WebView2 control, not on CoreWebView2.
             wv.DefaultBackgroundColor = Color.White;
 
-            // 3. Inject defensive CSS & meta to neutralize dark-mode media queries
+            // Inject defensive CSS and meta to neutralize dark-mode media queries
             const string forceLightScript = @"
-        (function() {
-            try {
-                let meta = document.querySelector('meta[name=""color-scheme""]');
-                if (!meta) {
-                    meta = document.createElement('meta');
-                    meta.name = 'color-scheme';
-                    meta.content = 'light';
-                    document.head.appendChild(meta);
-                } else {
-                    meta.content = 'light';
-                }
+                (function() {
+                    try {
+                        let meta = document.querySelector('meta[name=""color-scheme""]');
+                        if (!meta) {
+                            meta = document.createElement('meta');
+                            meta.name = 'color-scheme';
+                            meta.content = 'light';
+                            document.head.appendChild(meta);
+                        } else {
+                            meta.content = 'light';
+                        }
 
-                if (!document.getElementById('crt-force-light')) {
-                    const style = document.createElement('style');
-                    style.id = 'crt-force-light';
-                    style.textContent = `
-                        :root, html, body {
-                            background:#ffffff !important;
-                            color:#000 !important;
+                        if (!document.getElementById('crt-force-light')) {
+                            const style = document.createElement('style');
+                            style.id = 'crt-force-light';
+                            style.textContent = `
+                                :root, html, body {
+                                    background:#ffffff !important;
+                                    color:#000 !important;
+                                }
+                                @media (prefers-color-scheme: dark) {
+                                    :root, html, body {
+                                        background:#ffffff !important;
+                                        color:#000 !important;
+                                    }
+                                }
+                            `;
+                            document.head.appendChild(style);
                         }
-                        @media (prefers-color-scheme: dark) {
-                            :root, html, body {
-                                background:#ffffff !important;
-                                color:#000 !important;
-                            }
-                        }
-                    `;
-                    document.head.appendChild(style);
-                }
-            } catch(e) {}
-        })();";
+                    } catch(e) {}
+                })();";
             try
             {
                 await wv.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(forceLightScript);
