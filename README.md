@@ -45,14 +45,25 @@ When launched _CRT_ you can download newer data (if present) from its online sou
 - **Commodore 64**
   - 250407
     - Covers _all_ components
-    - Has full oscilloscope baseline readings for PAL and NTSC
+    - Oscilloscope baseline measurements:
+      - PAL
+      - NTSC
   - 250425
-    - Has full oscilloscope baseline readings for PAL
+    - Oscilloscope baseline measurements:
+      - PAL
+      - NTSC
   - 250466
+    - Oscilloscope baseline measurements:
+      - PAL
   - 250469
+    - Oscilloscope baseline measurements:
+      - PAL (coming late November for sure)
+      - NTSC (maybe coming late November)
 - **Commodore 128 and 128D** (C128D plastic model, not DCR which has the metal cabinet)
   - 310378
-    - Has full oscilloscope baseline readings for PAL and NTSC
+    - Oscilloscope baseline measurements:
+      - PAL
+      - NTSC
 
 
 # Your help would be really appreciated
@@ -90,6 +101,7 @@ Please refer to the [Wiki Documentation](https://github.com/HovKlan-DH/Commodore
 * **Why not creating this as a web page instead?**
   - Because I like the responsiveness and feel of a real native Windows application :-)
   - A web page would be for someone else to create, as that would be very heavy on the client-side, and this is not my favorite way of coding.
+  - A web page will eventually disappear for various reasons, such as the site owner losing interest, technical problems, or simply because people eventually pass away. _CRT_ will continue to work as long as it is available on your Windows computer.
 * **Will you port this to Mac or Linux?**
   - Not any day soon. Maybe one day when AI becomes better at handling complex tasks, then I could look in to this, but here-and-now I will only focus on the Windows application as-is.
 
