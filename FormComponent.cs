@@ -1,4 +1,5 @@
-﻿using System;
+﻿using OfficeOpenXml.Export.ToDataTable;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -42,9 +43,6 @@ namespace Commodore_Repair_Toolbox
                 scrollWheelTimer.Stop(); 
             };
 
-            // Set the "Type", which is static for the entire popup
-            labelType.Text = component.Type;
-
             // Filter based on region
             FilterImagesByRegion();
 
@@ -73,7 +71,7 @@ namespace Commodore_Repair_Toolbox
             KeyPress += Form_KeyPress;
 
             // Focus on something that is not the first "textBox" in the form
-            ActiveControl = labelDisplayName;
+            ActiveControl = label2;
             
             // Define events
             Resize += Form_Resize;
@@ -274,7 +272,7 @@ namespace Commodore_Repair_Toolbox
             panelNote.Invalidate(); // trigger repaint to update the border
         }
 
-        private void SetFormTitles()
+        private void DisplayRegionalComponentData()
         {
             foreach (var comp in componentList)
             {
@@ -282,7 +280,60 @@ namespace Commodore_Repair_Toolbox
                 {
                     string formTitle = comp.NameDisplay ?? "Component Information";
                     this.Text = formTitle;
-                    labelDisplayName.Text = formTitle;
+
+                    // Set the "display name"
+                    richTextBoxNameDisplay.Clear();
+                    using (Font boldFont = new Font(richTextBoxNameDisplay.Font, FontStyle.Bold))
+                    {
+                        if (!string.IsNullOrEmpty(comp.Label))
+                        {
+                            richTextBoxNameDisplay.SelectionFont = boldFont;
+                            richTextBoxNameDisplay.AppendText(comp.Label);
+                        }
+                        if (!string.IsNullOrEmpty(comp.NameTechnical))
+                        {
+                            if (richTextBoxNameDisplay.TextLength > 0)
+                            {
+                                richTextBoxNameDisplay.SelectionFont = richTextBoxNameDisplay.Font;
+                                richTextBoxNameDisplay.AppendText(" | ");
+                            }
+                            richTextBoxNameDisplay.SelectionFont = boldFont;
+                            richTextBoxNameDisplay.AppendText(comp.NameTechnical);
+                        }
+                        if (!string.IsNullOrEmpty(comp.NameFriendly))
+                        {
+                            if (richTextBoxNameDisplay.TextLength > 0)
+                            {
+                                richTextBoxNameDisplay.SelectionFont = richTextBoxNameDisplay.Font;
+                                richTextBoxNameDisplay.AppendText(" | ");
+                            }
+                            richTextBoxNameDisplay.SelectionFont = boldFont;
+                            richTextBoxNameDisplay.AppendText(comp.NameFriendly);
+                        }
+                    }
+
+                    // Set the "type" and "part-number"
+                    richTextBoxTypePartnumber.Clear();
+                    using (Font boldFont = new Font(richTextBoxTypePartnumber.Font, FontStyle.Bold))
+                    {
+                        if (!string.IsNullOrEmpty(comp.Type))
+                        {
+                            richTextBoxTypePartnumber.SelectionFont = boldFont;
+                            richTextBoxTypePartnumber.AppendText(comp.Type);
+                        }
+
+                        if (!string.IsNullOrEmpty(comp.Partnumber))
+                        {
+                            if (richTextBoxTypePartnumber.TextLength > 0)
+                            {
+                                richTextBoxTypePartnumber.SelectionFont = richTextBoxTypePartnumber.Font;
+                                richTextBoxTypePartnumber.AppendText(" | ");
+                            }
+                            richTextBoxTypePartnumber.SelectionFont = boldFont;
+                            richTextBoxTypePartnumber.AppendText(comp.Partnumber);
+                        }
+                    }
+
                     break;
                 }
             }
@@ -692,7 +743,7 @@ namespace Commodore_Repair_Toolbox
                 UpdateThumbnails();
             }
 
-            SetFormTitles();
+            DisplayRegionalComponentData();
             PopulateComponentOneliner();
             PopulateImageNote();
         }

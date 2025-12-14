@@ -117,6 +117,7 @@ namespace Commodore_Repair_Toolbox
 
         // Data loaded from Excel
         public static List<Hardware> classHardware = new List<Hardware>();
+        public static string[] versionMismatch = {};
 
         // Overlays for main image
         private List<PictureBox> overlayComponentsTab = new List<PictureBox>();
@@ -127,7 +128,7 @@ namespace Commodore_Repair_Toolbox
         private List<string> listBoxComponentsSelectedText = new List<string>();
 
         // Version information
-        private string versionThis = "";
+        public static string versionThis = "";
         private string versionOnline = "";
         private string versionOnlineTxt = "";
 
@@ -264,10 +265,30 @@ namespace Commodore_Repair_Toolbox
             // Set a "cross" cursor to visualize "drawing mode" when inside the overlay panel
             overlayPanel.Cursor = Cursors.Cross;
 
+            // Show popup, if "versionMismatch" is not empy, that we have a version mismatch between one or more Excel data files nad the application version
+            if (versionMismatch.Length > 0)
+            {
+                string message = "There is a version compatibility mismatch between one or more of the Excel data files and this application version. Please update the application to the newest available version, and afterwards update the data from online source.\r\n\r\n" +
+                    "The following Excel data files do not match the application version:\r\n\r\n";
+                foreach (string file in versionMismatch)
+                {
+                    message += "* " + file + "\r\n";
+                }
+                message += "\r\nThis may lead to unexpected behavior in the application.";
+                MessageBox.Show(
+                    message,
+                    "WARNING: Application/data version mismatch",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+            }
+
+
             // Wait 10 seconds before starting the background check
             label13.TextAlign = ContentAlignment.MiddleCenter;
             await Task.Delay(10000);
             await Task.Run(() => checkFilesFromSource());
+
 
         }
 
@@ -703,7 +724,7 @@ namespace Commodore_Repair_Toolbox
             {
                 wv.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Light;
             }
-            catch { /* ignore if not supported */ }
+            catch { }
 
             // Set the WinForms control background explicitly (the previous code wrongly used Controller).
             // The property is on the WebView2 control, not on CoreWebView2.
@@ -746,14 +767,13 @@ namespace Commodore_Repair_Toolbox
             {
                 await wv.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(forceLightScript);
             }
-            catch { /* ignore if navigation not ready */ }
+            catch { }
         }
-
 
         // ###########################################################################################
         // Initialize and update the tab for "Overview".
         // Will load new content from board data file.
-        // ###########################################################################################
+        // ###########################################################################################     
 
         public async void UpdateTabOverview(Board selectedBoard)
         {
@@ -4069,7 +4089,7 @@ namespace Commodore_Repair_Toolbox
                             else
                             {
                                 MessageBox.Show("The Excel file currently has an exclusive lock, and cannot be read. Please close any application that might be using it and try again.",
-                                    "ERROR: Cannot read file",
+                                    "ERROR: Cannot read data file",
                                     MessageBoxButtons.OK,
                                     MessageBoxIcon.Error);
                             }
@@ -4091,10 +4111,6 @@ namespace Commodore_Repair_Toolbox
                             // Clean up the temporary file
                             File.Delete(tempUserDataFile);
                         }
-                        //                        else
-                        //                        {
-                        //                            MessageBox.Show("No user data found to attach.", "INFO: No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        //                        }
 
                         // Send it to the server
                         var response = webClient.UploadValues(crtPage + crtPageFeedback, "POST", data);
@@ -5010,6 +5026,7 @@ namespace Commodore_Repair_Toolbox
         public string Label { get; set; }
         public string NameTechnical { get; set; }
         public string NameFriendly { get; set; }
+        public string Partnumber { get; set; }
         public string NameDisplay { get; set; }
         public string Type { get; set; }
         public string Region { get; set; }

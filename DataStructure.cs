@@ -25,28 +25,66 @@ namespace Commodore_Repair_Toolbox
                 Environment.Exit(-1);
             }
 
-            // 1) Load hardware from initial data file (Commodore-Repair-Toolbox.xlsx)
+            // ---
+
+            // 1a) Load hardware from initial data file (Commodore-Repair-Toolbox.xlsx)
             using (var package = new ExcelPackage(new FileInfo(filePathMain)))
             {
-                var worksheet = package.Workbook.Worksheets[0];
-                string searchHeader = "Hardware name in drop-down";
+                var worksheet = package.Workbook.Worksheets[0]; // sheet = "Hardware & Board"
+                string searchHeader = "Hardware and boards";
                 int row = 1;
+
+                // Find the row that contains the section header ("Hardware name in drop-down") in column 1
                 while (row <= worksheet.Dimension.End.Row)
                 {
-                    // Check "row" and column 1
-                    if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                    if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader)
+                    {
+                        break;
+                    }
+
                     row++;
                 }
-                row++; // skip headers
 
+                // If we never found the header, treat as fatal misconfiguration
+                if (row > worksheet.Dimension.End.Row)
+                {
+                    string error = $"ERROR: Excel file [Commodore-Repair-Toolbox.xlsx] the header row with label [{searchHeader}] was not found";
+                    Main.DebugOutput(error);
+
+                    string logPath = Path.Combine(Application.StartupPath, "Commodore-Repair-Toolbox.log");
+                    string message = $"No valid hardware definition section found in [{filePathMain}].\r\n\r\nView troubleshoot log for details [{logPath}].";
+                    MessageBox.Show(message, "Critical error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Environment.Exit(-1);
+                }
+
+                // Next row is the "column headers" row
+                row++;
+                int headerRow = row;
+
+                // Build a header name -> column index map
+                var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                {
+                    string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                    if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                    {
+                        headerToColumn[headerValue] = col;
+                    }
+                }
+
+                // Data starts after the header row
+                row = headerRow + 1;
+
+                // Read rows until column 1 becomes empty (same sentinel pattern as elsewhere)
                 while (worksheet.Cells[row, 1].Value != null)
                 {
-                    string nameHardware = worksheet.Cells[row, 1].Value?.ToString() ?? "";
-                    string nameBoard = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                    string datafile = worksheet.Cells[row, 3].Value?.ToString() ?? "";
+                    // These header names must match the text in the Excel header row
+                    string nameHardware = GetCellString(worksheet, headerToColumn, row, "Hardware name in drop-down", string.Empty);
+                    string nameBoard = GetCellString(worksheet, headerToColumn, row, "Board name in drop-down", string.Empty);
+                    string datafile = GetCellString(worksheet, headerToColumn, row, "Excel data file", string.Empty);
 
                     // Report a warning if path contains a backslash
-                    if (datafile.Contains("\\"))
+                    if (!string.IsNullOrEmpty(datafile) && datafile.Contains("\\"))
                     {
                         string error = $"WARNING: Excel file [Commodore-Repair-Toolbox.xlsx] row [{row}] the path [{datafile}] contains a backslash";
                         Main.DebugOutput(error);
@@ -54,7 +92,7 @@ namespace Commodore_Repair_Toolbox
 
                     // Check if the board datafile exists
                     string filePath = Path.Combine(DataPaths.DataRoot, datafile);
-                    if (File.Exists(filePath))
+                    if (!string.IsNullOrEmpty(datafile) && File.Exists(filePath))
                     {
                         // Create the hardware in class, if it does not already exists
                         Hardware hw = classHardware.FirstOrDefault(h => h.Name == nameHardware);
@@ -65,7 +103,7 @@ namespace Commodore_Repair_Toolbox
                                 Name = nameHardware,
                                 Boards = new List<Board>()
                             };
-                            classHardware.Add(hw);                        
+                            classHardware.Add(hw);
                         }
 
                         // Add board to hardware
@@ -78,13 +116,100 @@ namespace Commodore_Repair_Toolbox
                     }
                     else
                     {
-                        string error = $"ERROR: Excel file [Commodore-Repair-Toolbox.xlsx] row [{row}] the file [" + filePath + "] does not exists";
-                        Main.DebugOutput(error);
+                        // Only log if a datafile value is present; empty rows will be ignored via the while-condition
+                        if (!string.IsNullOrEmpty(datafile))
+                        {
+                            string error = $"ERROR: Excel file [Commodore-Repair-Toolbox.xlsx] row [{row}] the file [{filePath}] does not exists";
+                            Main.DebugOutput(error);
+                        }
                     }
-                    
+
                     row++;
                 }
-            }
+            } // 1) Load hardware from initial data file (Commodore-Repair-Toolbox.xlsx)
+
+            // ---
+
+            // 1b) Load "version match"
+            using (var package = new ExcelPackage(new FileInfo(filePathMain)))
+            {
+                var worksheet = package.Workbook.Worksheets[1]; // sheet = "Version match"
+                string searchHeader = "CRT version(s) where this Excel will work";
+                int row = 1;
+
+                // Find the row that contains the section header in column 1
+                while (row <= worksheet.Dimension.End.Row)
+                {
+                    if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader)
+                    {
+                        break;
+                    }
+
+                    row++;
+                }
+
+                // If we never found the header, treat as fatal misconfiguration
+                if (row > worksheet.Dimension.End.Row)
+                {
+                    string error = $"ERROR: Excel file [Commodore-Repair-Toolbox.xlsx] the header row with label [{searchHeader}] was not found";
+                    Main.DebugOutput(error);
+
+                    string logPath = Path.Combine(Application.StartupPath, "Commodore-Repair-Toolbox.log");
+                    string message = $"No valid hardware definition section found in [{filePathMain}].\r\n\r\nView troubleshoot log for details [{logPath}].";
+                    MessageBox.Show(message, "Critical error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Environment.Exit(-1);
+                }
+
+                // This is the "column headers" row
+                row++;
+                int headerRow = row;
+
+                // Build a header name -> column index map
+                var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                {
+                    string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                    if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                    {
+                        headerToColumn[headerValue] = col;
+                    }
+                }
+
+                // Data starts after the header row
+                row = headerRow + 1;
+
+                // Read rows until column 1 becomes empty (same sentinel pattern as elsewhere)
+                string[] versionsFromExcel = {};
+                while (worksheet.Cells[row, 1].Value != null)
+                {
+                    // These header names must match the text in the Excel header row
+                    string version = GetCellString(worksheet, headerToColumn, row, "Version", string.Empty);
+
+                    // Add "version" to "versionsFromExcel" array
+                    Array.Resize(ref versionsFromExcel, versionsFromExcel.Length + 1);
+                    versionsFromExcel[versionsFromExcel.Length - 1] = version;
+
+                    row++;
+                }
+
+                // Check if at least one of the versions in "versionsFromExcel" matches "Main.versionThis", based on length of string for "versionsFromExcel"
+                bool versionMatchFound = false;
+                foreach (string version in versionsFromExcel)
+                {
+                    if (Main.versionThis.StartsWith(version, StringComparison.Ordinal))
+                    {
+                        versionMatchFound = true;
+                        break;
+                    }
+                }
+                if (!versionMatchFound)
+                {
+                    Array.Resize(ref Main.versionMismatch, Main.versionMismatch.Length + 1);
+                    Main.versionMismatch[Main.versionMismatch.Length - 1] = filePathMain;
+                }
+            } // 1b)
+
+            // ---
 
             // Exit check for "Hardware"
             if (classHardware.Count == 0)
@@ -110,7 +235,9 @@ namespace Commodore_Repair_Toolbox
             // Shadow initialization
             Main.shadow_structure = new Dictionary<string, Dictionary<string, List<string>>>();
 
-            // 2) Load "Board" entries (schematics/images)
+            // ---
+
+            // 2) Load "Board" entries (schematics/images) sheet for all boards
             foreach (Hardware hardware in classHardware)
             {
 
@@ -130,8 +257,7 @@ namespace Commodore_Repair_Toolbox
                     }
 
                     string filePathBoardData = Path.Combine(DataPaths.DataRoot, board.DataFile);
-                    using (var package = new ExcelPackage(new FileInfo(
-                        filePathBoardData)))
+                    using (var package = new ExcelPackage(new FileInfo(filePathBoardData)))
                     {
                         string sheet = "Board schematics";
                         var worksheet = package.Workbook.Worksheets[sheet];
@@ -140,65 +266,124 @@ namespace Commodore_Repair_Toolbox
                         {
                             string revisionDate = "(unknown)";
                             string searchRevisionDate = "# Revision date:";
-                            board.RevisionDate = revisionDate; // make sure we set some value to the board
+                            board.RevisionDate = revisionDate; // default value
 
-                            string searchHeader = "Schematic name";
+                            string sectionHeader = "Board schematic images";
+                            string columnHeaderMarker = "Schematic name";
 
                             int row = 1;
+
+                            // 1) Scan to find revision date and the section header row
                             while (row <= worksheet.Dimension.End.Row)
                             {
+                                string col1 = worksheet.Cells[row, 1].Value?.ToString();
+
                                 // Get the "revision date", if it is present
-                                if (worksheet.Cells[row, 1].Value?.ToString().StartsWith(searchRevisionDate) == true)
+                                if (!string.IsNullOrEmpty(col1) && col1.StartsWith(searchRevisionDate, StringComparison.Ordinal))
                                 {
-                                    string fullValue = worksheet.Cells[row, 1].Value.ToString();
-                                    revisionDate = fullValue.Substring(searchRevisionDate.Length).Trim(); // Extract and trim the date
+                                    string fullValue = col1;
+                                    revisionDate = fullValue.Substring(searchRevisionDate.Length).Trim();
                                     board.RevisionDate = revisionDate;
                                 }
 
-                                // Check "row" and column 1 for the "searchHeader" (will be below the above IF-sentense)
-                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                                // Find the section header row (e.g. "Board schematics")
+                                if (string.Equals(col1, sectionHeader, StringComparison.Ordinal))
+                                {
+                                    break;
+                                }
+
                                 row++;
                             }
-                            row++; // skip headers
 
-                            while (worksheet.Cells[row, 1].Value != null)
+                            // If we never found the section header, log and continue
+                            if (row > worksheet.Dimension.End.Row)
                             {
-                                string name = worksheet.Cells[row, 1].Value?.ToString() ?? "";
-                                string fileName = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                                string colorZoom = worksheet.Cells[row, 3].Value?.ToString() ?? "";
-                                string colorList = worksheet.Cells[row, 5].Value?.ToString() ?? "";
+                                string fileName = Path.GetFileName(filePathBoardData);
+                                string error = $"ERROR: Excel file [{fileName}] the section header row for worksheet [{sheet}] with label [{sectionHeader}] was not found";
+                                Main.DebugOutput(error);
+                                continue;
+                            }
+
+                            // 2) Next row should contain the column headers (including "Schematic name")
+                            row++;
+                            int headerRow = row;
+
+                            var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                            for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                            {
+                                string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                                if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                                {
+                                    headerToColumn[headerValue] = col;
+                                }
+                            }
+
+                            // Ensure we at least have the main required headers
+                            if (!headerToColumn.ContainsKey(columnHeaderMarker) ||
+                                !headerToColumn.ContainsKey("Schematic image file") ||
+                                !headerToColumn.ContainsKey("Main image highlight color") ||
+                                !headerToColumn.ContainsKey("Main highlight opacity") ||
+                                !headerToColumn.ContainsKey("Thumbnail image highlight color") ||
+                                !headerToColumn.ContainsKey("Thumbnail highlight opacity"))
+                            {
+                                string fileName = Path.GetFileName(filePathBoardData);
+                                string error = $"ERROR: Excel file [{fileName}] worksheet [{sheet}] missing one or more required headers for board schematics";
+                                Main.DebugOutput(error);
+                                continue;
+                            }
+
+                            // 3) Data starts after the header row
+                            row = headerRow + 1;
+
+                            while (worksheet.Cells[row, headerToColumn[columnHeaderMarker]].Value != null)
+                            {
+                                string name = GetCellString(worksheet, headerToColumn, row, "Schematic name", string.Empty);
+                                string fileName = GetCellString(worksheet, headerToColumn, row, "Schematic image file", string.Empty);
+                                string colorZoom = GetCellString(worksheet, headerToColumn, row, "Main image highlight color", string.Empty);
+                                string colorList = GetCellString(worksheet, headerToColumn, row, "Thumbnail image highlight color", string.Empty);
+
+                                string opacityZoomText = GetCellString(worksheet, headerToColumn, row, "Main highlight opacity", "1");
+                                string opacityListText = GetCellString(worksheet, headerToColumn, row, "Thumbnail highlight opacity", "1");
 
                                 // Report a warning if path contains a backslash
-                                if (fileName.Contains("\\"))
+                                if (!string.IsNullOrEmpty(fileName) && fileName.Contains("\\"))
                                 {
-                                    string error = $"WARNING: Excel file [{board.DataFile}], worksheet [{searchHeader}] row [{row}] the path [{fileName}] contains a backslash";
+                                    string error = $"WARNING: Excel file [{board.DataFile}], worksheet [{sectionHeader}] row [{row}] the path [{fileName}] contains a backslash";
                                     Main.DebugOutput(error);
                                 }
 
                                 // Shadow "board"
-                                if (!Main.shadow_structure[hardware.Name][board.Name].Contains(name))
+                                if (!string.IsNullOrEmpty(name) &&
+                                    !Main.shadow_structure[hardware.Name][board.Name].Contains(name))
                                 {
                                     Main.shadow_structure[hardware.Name][board.Name].Add(name);
-                                }                                
+                                }
 
                                 // Get configuration setting
                                 string boardConfigKey = $"ConfigurationCheckBoxState|{hardware.Name}|{board.Name}|{name}";
                                 bool boardCheckedInConfig = Configuration.GetSetting(boardConfigKey, "True") == "True";
 
                                 // Only add schematic, if it is marked as active
-                                if (boardCheckedInConfig)
+                                if (boardCheckedInConfig && !string.IsNullOrEmpty(fileName))
                                 {
                                     string filePath = Path.Combine(DataPaths.DataRoot, fileName);
                                     if (File.Exists(filePath))
                                     {
-                                        // Convert from fraction to 0-255
-                                        string cellValue = worksheet.Cells[row, 4].Value?.ToString() ?? "";
-                                        int opacityZoom = (int)(double.Parse(cellValue) * 100);
-                                        opacityZoom = (int)((opacityZoom / 100.0) * 255);
+                                        // Convert from fraction (0–1) to 0–255
+                                        double zoomFraction;
+                                        if (!double.TryParse(opacityZoomText, out zoomFraction))
+                                        {
+                                            zoomFraction = 1.0;
+                                        }
 
-                                        cellValue = worksheet.Cells[row, 6].Value?.ToString() ?? "";
-                                        int opacityList = (int)(double.Parse(cellValue) * 100);
-                                        opacityList = (int)((opacityList / 100.0) * 255);
+                                        double listFraction;
+                                        if (!double.TryParse(opacityListText, out listFraction))
+                                        {
+                                            listFraction = 1.0;
+                                        }
+
+                                        int opacityZoom = (int)(zoomFraction * 255.0);
+                                        int opacityList = (int)(listFraction * 255.0);
 
                                         BoardOverlays bo = new BoardOverlays
                                         {
@@ -213,6 +398,7 @@ namespace Commodore_Repair_Toolbox
                                         {
                                             board.Files = new List<BoardOverlays>();
                                         }
+
                                         board.Files.Add(bo);
                                     }
                                     else
@@ -223,12 +409,13 @@ namespace Commodore_Repair_Toolbox
                                         Main.DebugOutput(error);
                                     }
                                 }
-                                else
+                                else if (!boardCheckedInConfig && !string.IsNullOrEmpty(name))
                                 {
-                                    string error = $"INFO: Excel file [{board.DataFile}] and schematic [{name}] is disabled";
-                                    Main.DebugOutput(error);
+                                    string info = $"INFO: Excel file [{board.DataFile}] and schematic [{name}] is disabled";
+                                    Main.DebugOutput(info);
                                 }
-                                    row++;
+
+                                row++;
                             }
                         }
                         else
@@ -239,7 +426,6 @@ namespace Commodore_Repair_Toolbox
                         }
                     }
                 }
-
             }
 
             // Check if any "Board.Files" are defined across all hardware and boards
@@ -263,7 +449,9 @@ namespace Commodore_Repair_Toolbox
                 Environment.Exit(-1);
             }
 
-            // 4) Load main "Components" for each board
+            // ---
+
+            // 4) Load main "Components" sheet for all boards
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
@@ -277,25 +465,57 @@ namespace Commodore_Repair_Toolbox
                         // Break check
                         if (worksheet != null)
                         {
-
                             string searchHeader = "Components";
                             int row = 1;
+
+                            // Find the row that contains the section header ("Components") in column 1
                             while (row <= worksheet.Dimension.End.Row)
                             {
-                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader)
+                                {
+                                    break;
+                                }
                                 row++;
                             }
-                            row++; // skip headers
-                            row++; // (need to investigate this - why is this extra row needed!?)
 
+                            // If we never found the header, log and continue to next board
+                            if (row > worksheet.Dimension.End.Row)
+                            {
+                                string fileName = Path.GetFileName(filePath);
+                                string error = $"ERROR: Excel file [{fileName}] the header row for worksheet [{sheet}] with label [{searchHeader}] was not found";
+                                Main.DebugOutput(error);
+                                continue;
+                            }
+
+                            // Next row is the "column headers" row
+                            row++;
+                            int headerRow = row;
+
+                            // Build a header name -> column index map
+                            var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                            for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                            {
+                                string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                                if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                                {
+                                    headerToColumn[headerValue] = col;
+                                }
+                            }
+
+                            // Data starts after the header row.
+                            row = headerRow + 1;
+
+                            // Use first column as the "end of data" sentinel, as before
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string label = worksheet.Cells[row, 1].Value?.ToString() ?? "";
-                                string nameTechnical = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                                string nameFriendly = worksheet.Cells[row, 3].Value?.ToString() ?? "";
-                                string type = worksheet.Cells[row, 4].Value?.ToString() ?? "Misc";
-                                string region = worksheet.Cells[row, 5].Value?.ToString() ?? "";
-                                string oneliner = worksheet.Cells[row, 6].Value?.ToString() ?? "";
+                                // These header names must match the text in the Excel header row
+                                string label = GetCellString(worksheet, headerToColumn, row, "Board label", "");
+                                string nameTechnical = GetCellString(worksheet, headerToColumn, row, "Technical name or value", "");
+                                string nameFriendly = GetCellString(worksheet, headerToColumn, row, "Friendly name", "");
+                                string partnumber = GetCellString(worksheet, headerToColumn, row, "Part-number", "");
+                                string type = GetCellString(worksheet, headerToColumn, row, "Category", "Misc");
+                                string region = GetCellString(worksheet, headerToColumn, row, "Region", "");
+                                string oneliner = GetCellString(worksheet, headerToColumn, row, "Short one-liner description\n(one short line only!)", "");
 
                                 string nameDisplay = label;
                                 nameDisplay += nameTechnical != "" ? " | " + nameTechnical : "";
@@ -306,12 +526,18 @@ namespace Commodore_Repair_Toolbox
                                     Label = label,
                                     NameTechnical = nameTechnical,
                                     NameFriendly = nameFriendly,
+                                    Partnumber = partnumber,
                                     NameDisplay = nameDisplay,
                                     Type = type,
                                     Region = region,
-                                    OneLiner = oneliner,
+                                    OneLiner = oneliner
                                 };
-                                if (board.Components == null) board.Components = new List<BoardComponents>();
+
+                                if (board.Components == null)
+                                {
+                                    board.Components = new List<BoardComponents>();
+                                }
+
                                 board.Components.Add(comp);
                                 row++;
                             }
@@ -326,13 +552,15 @@ namespace Commodore_Repair_Toolbox
                 }
             }
 
+            // ---
+
             // 5) Create empty "ComponentBounds" for each BoardFile
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
                     string sheet = "Components";
-                    
+
                     // Get configuration setting
                     string boardConfigKey = $"ConfigurationCheckBoxState|{hardware.Name}|{board.Name}";
                     bool boardCheckedInConfig = Configuration.GetSetting(boardConfigKey, "True") == "True";
@@ -344,7 +572,6 @@ namespace Commodore_Repair_Toolbox
                         {
                             foreach (BoardOverlays bo in board.Files)
                             {
-
                                 string filePath = Path.Combine(DataPaths.DataRoot, board.DataFile);
                                 using (var package = new ExcelPackage(new FileInfo(filePath)))
                                 {
@@ -355,53 +582,67 @@ namespace Commodore_Repair_Toolbox
                                     {
                                         string searchHeader = "Components";
                                         int row = 1;
+
+                                        // Find the row that contains the section header ("Components") in column 1
                                         while (row <= worksheet.Dimension.End.Row)
                                         {
-                                            if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                                            if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader)
+                                            {
+                                                break;
+                                            }
+
                                             row++;
                                         }
-                                        row++; // skip headers
-                                        row++; // (need to investigate this - why is this extra row needed!?)
 
-//                                        /*
-                                        while (worksheet.Cells[row, 1].Value != null)
+                                        // If we never found the header, log and continue to next overlay/board
+                                        if (row > worksheet.Dimension.End.Row)
                                         {
-                                            string name = worksheet.Cells[row, 1].Value.ToString();
-                                            ComponentBounds cb = new ComponentBounds
-                                            {
-                                                Label = name
-                                            };
-                                            if (bo.Components == null)
-                                            {
-                                                bo.Components = new List<ComponentBounds>();
-                                            }
-                                            bo.Components.Add(cb);
-                                            row++;
+                                            string fileName = Path.GetFileName(filePath);
+                                            string error = $"ERROR: Excel file [{fileName}] the header row for worksheet [{sheet}] with label [{searchHeader}] was not found";
+                                            Main.DebugOutput(error);
+                                            continue;
                                         }
-//                                        */
 
-                                        /*
-                                        // Add an empty overlay to the component.
-                                        // Only add one component overlay, even if the component is represented in multiple lines (e.g. PAL and NTSC).
+                                        // Next row is the "column headers" row
+                                        row++;
+                                        int headerRow = row;
+
+                                        // Build a header name -> column index map
+                                        var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                                        for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                                        {
+                                            string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                                            if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                                            {
+                                                headerToColumn[headerValue] = col;
+                                            }
+                                        }
+
+                                        // Data starts after the header row
+                                        row = headerRow + 1;
+
+                                        // Create ComponentBounds entries for each component label (order-agnostic)
                                         while (worksheet.Cells[row, 1].Value != null)
                                         {
-                                            string name = worksheet.Cells[row, 1].Value.ToString();
-                                            if (bo.Components == null)
-                                            {
-                                                bo.Components = new List<ComponentBounds>();
-                                            }
-                                            // Only add if not already present
-                                            if (!bo.Components.Any(c => c.Label == name))
+                                            string label = GetCellString(worksheet, headerToColumn, row, "Board label", string.Empty);
+
+                                            if (!string.IsNullOrEmpty(label))
                                             {
                                                 ComponentBounds cb = new ComponentBounds
                                                 {
-                                                    Label = name
+                                                    Label = label
                                                 };
+
+                                                if (bo.Components == null)
+                                                {
+                                                    bo.Components = new List<ComponentBounds>();
+                                                }
+
                                                 bo.Components.Add(cb);
                                             }
+
                                             row++;
                                         }
-                                        */
                                     }
                                     else
                                     {
@@ -420,16 +661,17 @@ namespace Commodore_Repair_Toolbox
                         }
                     }
                 }
-            }          
-            
-            // 6) Load "component local files" (datasheets)
+            }
+
+            // ---
+
+            // 6) Load "component local files" (datasheets) sheet for all boards
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
                     string filePathBoardData = Path.Combine(DataPaths.DataRoot, board.DataFile);
-                    using (var package = new ExcelPackage(new FileInfo(
-                        filePathBoardData)))
+                    using (var package = new ExcelPackage(new FileInfo(filePathBoardData)))
                     {
                         string sheet = "Component local files";
                         var worksheet = package.Workbook.Worksheets[sheet];
@@ -437,22 +679,54 @@ namespace Commodore_Repair_Toolbox
                         // Break check
                         if (worksheet != null)
                         {
-
                             string searchHeader = "Component local files";
                             int row = 1;
+
+                            // Find the row that contains the section header ("Component local files") in column 1
                             while (row <= worksheet.Dimension.End.Row)
                             {
-                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader)
+                                {
+                                    break;
+                                }
+
                                 row++;
                             }
-                            row++; // skip headers
-                            row++;
 
+                            // If we never found the header, log and continue to next board
+                            if (row > worksheet.Dimension.End.Row)
+                            {
+                                string fileName = Path.GetFileName(filePathBoardData);
+                                string error = $"ERROR: Excel file [{fileName}] the header row for worksheet [{sheet}] with label [{searchHeader}] was not found";
+                                Main.DebugOutput(error);
+                                continue;
+                            }
+
+                            // Next row is the "column headers" row
+                            row++;
+                            int headerRow = row;
+
+                            // Build a header name -> column index map
+                            var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                            for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                            {
+                                string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                                if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                                {
+                                    headerToColumn[headerValue] = col;
+                                }
+                            }
+
+                            // Data starts after the header row
+                            row = headerRow + 1;
+
+                            // Read rows until column 1 becomes empty (same sentinel pattern as elsewhere)
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string componentName = worksheet.Cells[row, 1].Value?.ToString() ?? "";
-                                string name = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                                string fileName = worksheet.Cells[row, 3].Value?.ToString() ?? "";
+                                // These header names must match the text in the Excel header row
+                                string componentName = GetCellString(worksheet, headerToColumn, row, "Board label", string.Empty);
+                                string name = GetCellString(worksheet, headerToColumn, row, "Name", string.Empty);
+                                string fileName = GetCellString(worksheet, headerToColumn, row, "File", string.Empty);
 
                                 // Report a warning if path contains a backslash
                                 if (fileName.Contains("\\"))
@@ -463,19 +737,23 @@ namespace Commodore_Repair_Toolbox
 
                                 // Log if file does not exists
                                 string filePath = Path.Combine(DataPaths.DataRoot, fileName);
-                                if (!File.Exists(filePath))
+                                if (!string.IsNullOrEmpty(fileName) && !File.Exists(filePath))
                                 {
                                     string fileName1 = Path.GetFileName(filePathBoardData);
                                     string error = $"ERROR: Excel file [{fileName1}] worksheet [{sheet}] file [{fileName}] does not exists";
                                     Main.DebugOutput(error);
                                 }
-                                else
+                                else if (!string.IsNullOrEmpty(componentName))
                                 {
                                     // Add file to class
                                     var classComponent = board?.Components?.FirstOrDefault(c => c.Label == componentName);
                                     if (classComponent != null)
                                     {
-                                        if (classComponent.LocalFiles == null) classComponent.LocalFiles = new List<ComponentLocalFiles>();
+                                        if (classComponent.LocalFiles == null)
+                                        {
+                                            classComponent.LocalFiles = new List<ComponentLocalFiles>();
+                                        }
+
                                         classComponent.LocalFiles.Add(new ComponentLocalFiles
                                         {
                                             Name = name,
@@ -483,6 +761,7 @@ namespace Commodore_Repair_Toolbox
                                         });
                                     }
                                 }
+
                                 row++;
                             }
                         }
@@ -492,19 +771,19 @@ namespace Commodore_Repair_Toolbox
                             string error = $"ERROR: Excel file [{fileName}] the worksheet [{sheet}] is not found";
                             Main.DebugOutput(error);
                         }
-
                     }
                 }
             }
 
-            // 7) Load "component links"
+            // ---
+
+            // 7) Load "component links" sheet for all boards
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
                     string filePath = Path.Combine(DataPaths.DataRoot, board.DataFile);
-                    using (var package = new ExcelPackage(new FileInfo(
-                        filePath)))
+                    using (var package = new ExcelPackage(new FileInfo(filePath)))
                     {
                         string sheet = "Component links";
                         var worksheet = package.Workbook.Worksheets[sheet];
@@ -512,41 +791,80 @@ namespace Commodore_Repair_Toolbox
                         // Break check
                         if (worksheet != null)
                         {
-
                             string searchHeader = "Component links";
                             int row = 1;
+
+                            // Find the row that contains the section header ("Component links") in column 1
                             while (row <= worksheet.Dimension.End.Row)
                             {
-                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader)
+                                {
+                                    break;
+                                }
+
                                 row++;
                             }
-                            row++; // skip headers
-                            row++;
 
+                            // If we never found the header, log and continue to next board
+                            if (row > worksheet.Dimension.End.Row)
+                            {
+                                string fileName = Path.GetFileName(filePath);
+                                string error = $"ERROR: Excel file [{fileName}] the header row for worksheet [{sheet}] with label [{searchHeader}] was not found";
+                                Main.DebugOutput(error);
+                                continue;
+                            }
+
+                            // Next row is the "column headers" row
+                            row++;
+                            int headerRow = row;
+
+                            // Build a header name -> column index map
+                            var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                            for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                            {
+                                string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                                if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                                {
+                                    headerToColumn[headerValue] = col;
+                                }
+                            }
+
+                            // Data starts after the header row
+                            row = headerRow + 1;
+
+                            // Read rows until column 1 becomes empty (same sentinel pattern as elsewhere)
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string componentName = worksheet.Cells[row, 1].Value?.ToString() ?? "";
-                                string linkName = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                                string linkUrl = worksheet.Cells[row, 3].Value?.ToString() ?? "";
+                                // Header names must match the column headers in the Excel sheet
+                                string componentName = GetCellString(worksheet, headerToColumn, row, "Board label", string.Empty);
+                                string linkName = GetCellString(worksheet, headerToColumn, row, "Name", string.Empty);
+                                string linkUrl = GetCellString(worksheet, headerToColumn, row, "URL", string.Empty);
 
                                 var comp = board?.Components?.FirstOrDefault(c => c.Label == componentName);
-                                if (comp != null)
+                                if (comp != null && (!string.IsNullOrEmpty(linkName) || !string.IsNullOrEmpty(linkUrl)))
                                 {
-                                    if (comp.ComponentLinks == null) comp.ComponentLinks = new List<ComponentLinks>();
+                                    if (comp.ComponentLinks == null)
+                                    {
+                                        comp.ComponentLinks = new List<ComponentLinks>();
+                                    }
+
                                     comp.ComponentLinks.Add(new ComponentLinks
                                     {
                                         Name = linkName,
                                         Url = linkUrl
                                     });
-                                } else
+                                }
+                                else if (comp == null && !string.IsNullOrEmpty(componentName))
                                 {
                                     string fileName = Path.GetFileName(filePath);
                                     string error = $"ERROR: Excel file [{fileName}] in worksheet [{sheet}] the component [{componentName}] does not exists";
                                     Main.DebugOutput(error);
                                 }
-                                    row++;
+
+                                row++;
                             }
-                        } else
+                        }
+                        else
                         {
                             string fileName = Path.GetFileName(filePath);
                             string error = $"ERROR: Excel file [{fileName}] the worksheet [{sheet}] is not found";
@@ -556,14 +874,15 @@ namespace Commodore_Repair_Toolbox
                 }
             }
 
-            // 8) Load "component highlights" (overlay rectangles)
+            // ---
+
+            // 8) Load "component highlights" (overlay rectangles) sheet for all boards
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
                     string filePathBoardData = Path.Combine(DataPaths.DataRoot, board.DataFile);
-                    using (var package = new ExcelPackage(new FileInfo(
-                        filePathBoardData)))
+                    using (var package = new ExcelPackage(new FileInfo(filePathBoardData)))
                     {
                         string sheet = "Component highlights";
                         var worksheet = package.Workbook.Worksheets[sheet];
@@ -571,36 +890,112 @@ namespace Commodore_Repair_Toolbox
                         // Break check
                         if (worksheet != null)
                         {
-
                             string searchHeader = "Component highlights";
                             int row = 1;
+
+                            // Find the row that contains the section header ("Component highlights") in column 1
                             while (row <= worksheet.Dimension.End.Row)
                             {
-                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader)
+                                {
+                                    break;
+                                }
+
                                 row++;
                             }
-                            row++; // skip headers
-                            row++; // (need to investigate this - why is this extra row needed!?)
 
+                            // If we never found the header, log and continue to next board
+                            if (row > worksheet.Dimension.End.Row)
+                            {
+                                string fileName = Path.GetFileName(filePathBoardData);
+                                string error = $"ERROR: Excel file [{fileName}] the header row for worksheet [{sheet}] with label [{searchHeader}] was not found";
+                                Main.DebugOutput(error);
+                                continue;
+                            }
+
+                            // Next row is the "column headers" row
+                            row++;
+                            int headerRow = row;
+
+                            // Build a header name -> column index map
+                            var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                            for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                            {
+                                string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                                if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                                {
+                                    headerToColumn[headerValue] = col;
+                                }
+                            }
+
+                            // Data starts after the header row
+                            row = headerRow + 1;
+
+                            // Read rows until column 1 becomes empty (same sentinel pattern as elsewhere)
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string imageName = worksheet.Cells[row, 1].Value?.ToString() ?? "";
-                                string componentName = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                                int x = worksheet.Cells[row, 3].Value != null ? (int)(double)worksheet.Cells[row, 3].Value : 0;
-                                int y = worksheet.Cells[row, 4].Value != null ? (int)(double)worksheet.Cells[row, 4].Value : 0;
-                                int w = worksheet.Cells[row, 5].Value != null ? (int)(double)worksheet.Cells[row, 5].Value : 0;
-                                int h = worksheet.Cells[row, 6].Value != null ? (int)(double)worksheet.Cells[row, 6].Value : 0;
+                                // Header names must match the column headers in the Excel sheet
+                                string imageName = GetCellString(worksheet, headerToColumn, row, "Schematic name", string.Empty);
+                                string componentName = GetCellString(worksheet, headerToColumn, row, "Board label", string.Empty);
+
+                                int x = 0;
+                                int y = 0;
+                                int w = 0;
+                                int h = 0;
+
+                                // X coordinate
+                                string xText = GetCellString(worksheet, headerToColumn, row, "X", string.Empty);
+                                if (!string.IsNullOrEmpty(xText))
+                                {
+                                    double xVal;
+                                    if (double.TryParse(xText, out xVal))
+                                    {
+                                        x = (int)xVal;
+                                    }
+                                }
+
+                                // Y coordinate
+                                string yText = GetCellString(worksheet, headerToColumn, row, "Y", string.Empty);
+                                if (!string.IsNullOrEmpty(yText))
+                                {
+                                    double yVal;
+                                    if (double.TryParse(yText, out yVal))
+                                    {
+                                        y = (int)yVal;
+                                    }
+                                }
+
+                                // Width
+                                string wText = GetCellString(worksheet, headerToColumn, row, "Width", string.Empty);
+                                if (!string.IsNullOrEmpty(wText))
+                                {
+                                    double wVal;
+                                    if (double.TryParse(wText, out wVal))
+                                    {
+                                        w = (int)wVal;
+                                    }
+                                }
+
+                                // Height
+                                string hText = GetCellString(worksheet, headerToColumn, row, "Height", string.Empty);
+                                if (!string.IsNullOrEmpty(hText))
+                                {
+                                    double hVal;
+                                    if (double.TryParse(hText, out hVal))
+                                    {
+                                        h = (int)hVal;
+                                    }
+                                }
 
                                 var bf = board.Files?.FirstOrDefault(f => f.Name == imageName);
 
-                                // Get configuration setting
+                                // Get configuration setting for this schematic
                                 string boardConfigKey = $"ConfigurationCheckBoxState|{hardware.Name}|{board.Name}|{imageName}";
                                 bool boardCheckedInConfig = Configuration.GetSetting(boardConfigKey, "True") == "True";
 
                                 // Continue, if the hardware and board is checked/active
                                 if (boardCheckedInConfig)
                                 {
-                                    // Break check
                                     if (bf == null)
                                     {
                                         string fileName = Path.GetFileName(filePathBoardData);
@@ -608,7 +1003,6 @@ namespace Commodore_Repair_Toolbox
                                     }
                                     else
                                     {
-                                        // Break check
                                         if (bf.Components == null)
                                         {
                                             string fileName = Path.GetFileName(filePathBoardData);
@@ -616,36 +1010,26 @@ namespace Commodore_Repair_Toolbox
                                             break;
                                         }
 
-//                                        /*
-                                        var compBounds = bf?.Components.FirstOrDefault(c => c.Label == componentName);
+                                        var compBounds = bf.Components.FirstOrDefault(c => c.Label == componentName);
                                         if (compBounds != null)
                                         {
-                                            if (compBounds.Overlays == null) compBounds.Overlays = new List<Overlay>();
+                                            if (compBounds.Overlays == null)
+                                            {
+                                                compBounds.Overlays = new List<Overlay>();
+                                            }
+
                                             compBounds.Overlays.Add(new Overlay
                                             {
                                                 Bounds = new Rectangle(x, y, w, h)
                                             });
                                         }
-//                                        */
-                                        /*
-                                        var matchingComponents = bf?.Components.Where(c => c.Label == componentName);
-                                        if (matchingComponents != null)
-                                        {
-                                            foreach (var compBounds in matchingComponents)
-                                            {
-                                                if (compBounds.Overlays == null) compBounds.Overlays = new List<Overlay>();
-                                                compBounds.Overlays.Add(new Overlay
-                                                {
-                                                    Bounds = new Rectangle(x, y, w, h)
-                                                });
-                                            }
-                                        }
-                                        */
                                     }
                                 }
+
                                 row++;
                             }
-                        } else
+                        }
+                        else
                         {
                             string fileName = Path.GetFileName(filePathBoardData);
                             string error = $"ERROR: Excel file [{fileName}] the worksheet [{sheet}] is not found";
@@ -655,14 +1039,15 @@ namespace Commodore_Repair_Toolbox
                 }
             }
 
-            // 9) Load "board links"
+            // ---
+
+            // 9) Load "board links" sheet for all boards
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
                     string filePath = Path.Combine(DataPaths.DataRoot, board.DataFile);
-                    using (var package = new ExcelPackage(new FileInfo(
-                        filePath)))
+                    using (var package = new ExcelPackage(new FileInfo(filePath)))
                     {
                         string sheet = "Board links";
                         var worksheet = package.Workbook.Worksheets[sheet];
@@ -670,16 +1055,43 @@ namespace Commodore_Repair_Toolbox
                         // Break check
                         if (worksheet != null)
                         {
-
                             string searchHeader = "Board links";
                             int row = 1;
+
+                            // Find the row that contains the section header ("Board links") in column 1
                             while (row <= worksheet.Dimension.End.Row)
                             {
-                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader)
+                                {
+                                    break;
+                                }
+
                                 row++;
                             }
-                            row++; // skip headers
+
+                            // If we never found the header, log and continue to next board
+                            if (row > worksheet.Dimension.End.Row)
+                            {
+                                string fileName = Path.GetFileName(filePath);
+                                string error = $"ERROR: Excel file [{fileName}] the header row for worksheet [{sheet}] with label [{searchHeader}] was not found";
+                                Main.DebugOutput(error);
+                                continue;
+                            }
+
+                            // Next row is the "column headers" row
                             row++;
+                            int headerRow = row;
+
+                            // Build a header name -> column index map
+                            var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                            for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                            {
+                                string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                                if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                                {
+                                    headerToColumn[headerValue] = col;
+                                }
+                            }
 
                             // Initialize the BoardLinks list if it's null
                             if (board.BoardLinks == null)
@@ -687,24 +1099,35 @@ namespace Commodore_Repair_Toolbox
                                 board.BoardLinks = new List<BoardLinks>();
                             }
 
+                            // Data starts after the header row
+                            row = headerRow + 1;
+
+                            // Read rows until column 1 becomes empty (same sentinel pattern as elsewhere)
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string category = worksheet.Cells[row, 1].Value?.ToString() ?? "";
-                                string linkName = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                                string linkUrl = worksheet.Cells[row, 3].Value?.ToString() ?? "";
+                                // Header names must match the column headers in the Excel sheet
+                                string category = GetCellString(worksheet, headerToColumn, row, "Category", string.Empty);
+                                string linkName = GetCellString(worksheet, headerToColumn, row, "Name", string.Empty);
+                                string linkUrl = GetCellString(worksheet, headerToColumn, row, "URL", string.Empty);
 
-                                // Create a new BoardLink instance and add it to the BoardLinks list
-                                BoardLinks boardLink = new BoardLinks
+                                if (!string.IsNullOrEmpty(category) ||
+                                    !string.IsNullOrEmpty(linkName) ||
+                                    !string.IsNullOrEmpty(linkUrl))
                                 {
-                                    Category = category,
-                                    Name = linkName,
-                                    Url = linkUrl
-                                };
-                                board.BoardLinks.Add(boardLink);
+                                    BoardLinks boardLink = new BoardLinks
+                                    {
+                                        Category = category,
+                                        Name = linkName,
+                                        Url = linkUrl
+                                    };
+
+                                    board.BoardLinks.Add(boardLink);
+                                }
 
                                 row++;
                             }
-                        } else
+                        }
+                        else
                         {
                             string fileName = Path.GetFileName(filePath);
                             string error = $"ERROR: Excel file [{fileName}] the worksheet [{sheet}] is not found";
@@ -714,14 +1137,15 @@ namespace Commodore_Repair_Toolbox
                 }
             }
 
-            // 10) Load "Board local files"
+            // ---
+
+            // 10) Load "Board local files" sheet for all boards
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
                     string filePathBoardData = Path.Combine(DataPaths.DataRoot, board.DataFile);
-                    using (var package = new ExcelPackage(new FileInfo(
-                        filePathBoardData)))
+                    using (var package = new ExcelPackage(new FileInfo(filePathBoardData)))
                     {
                         string sheet = "Board local files";
                         var worksheet = package.Workbook.Worksheets[sheet];
@@ -729,28 +1153,60 @@ namespace Commodore_Repair_Toolbox
                         // Break check
                         if (worksheet != null)
                         {
-
                             string searchHeader = "Board local files";
                             int row = 1;
+
+                            // Find the row that contains the section header ("Board local files") in column 1
                             while (row <= worksheet.Dimension.End.Row)
                             {
-                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader)
+                                {
+                                    break;
+                                }
+
                                 row++;
                             }
-                            row++; // skip headers
-                            row++;
 
-                            // Initialize the BoardLinks list if it's null
+                            // If we never found the header, log and continue to next board
+                            if (row > worksheet.Dimension.End.Row)
+                            {
+                                string fileName = Path.GetFileName(filePathBoardData);
+                                string error = $"ERROR: Excel file [{fileName}] the header row for worksheet [{sheet}] with label [{searchHeader}] was not found";
+                                Main.DebugOutput(error);
+                                continue;
+                            }
+
+                            // Next row is the "column headers" row
+                            row++;
+                            int headerRow = row;
+
+                            // Build a header name -> column index map
+                            var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                            for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                            {
+                                string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                                if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                                {
+                                    headerToColumn[headerValue] = col;
+                                }
+                            }
+
+                            // Initialize the BoardLocalFiles list if it's null
                             if (board.BoardLocalFiles == null)
                             {
                                 board.BoardLocalFiles = new List<BoardLocalFiles>();
                             }
 
+                            // Data starts after the header row
+                            row = headerRow + 1;
+
+                            // Read rows until column 1 becomes empty (same sentinel pattern as elsewhere)
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string category = worksheet.Cells[row, 1].Value?.ToString() ?? "";
-                                string name = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                                string fileName = worksheet.Cells[row, 3].Value?.ToString() ?? "";
+                                // Header names must match the column headers in the Excel sheet
+                                string category = GetCellString(worksheet, headerToColumn, row, "Category", string.Empty);
+                                string name = GetCellString(worksheet, headerToColumn, row, "Name", string.Empty);
+                                string fileName = GetCellString(worksheet, headerToColumn, row, "File", string.Empty);
 
                                 // Report a warning if path contains a backslash
                                 if (fileName.Contains("\\"))
@@ -761,13 +1217,13 @@ namespace Commodore_Repair_Toolbox
 
                                 // Log if file does not exists
                                 string filePath = Path.Combine(DataPaths.DataRoot, fileName);
-                                if (!File.Exists(filePath))
+                                if (!string.IsNullOrEmpty(fileName) && !File.Exists(filePath))
                                 {
                                     string fileName1 = Path.GetFileName(filePathBoardData);
                                     string error = $"ERROR: Excel file [{fileName1}] worksheet [{sheet}] file [{fileName}] does not exists";
                                     Main.DebugOutput(error);
                                 }
-                                else
+                                else if (!string.IsNullOrEmpty(fileName))
                                 {
                                     // Add file to class
                                     BoardLocalFiles boardLocalFile = new BoardLocalFiles
@@ -781,7 +1237,8 @@ namespace Commodore_Repair_Toolbox
 
                                 row++;
                             }
-                        } else
+                        }
+                        else
                         {
                             string fileName = Path.GetFileName(filePathBoardData);
                             string error = $"ERROR: Excel file [{fileName}] the worksheet [{sheet}] is not found";
@@ -791,14 +1248,15 @@ namespace Commodore_Repair_Toolbox
                 }
             }
 
-            // 11) Load "component images" (datasheets)
+            // ---
+
+            // 11) Load "component images" (datasheets) sheet for all boards
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
                     string filePathBoardData = Path.Combine(DataPaths.DataRoot, board.DataFile);
-                    using (var package = new ExcelPackage(new FileInfo(
-                        filePathBoardData)))
+                    using (var package = new ExcelPackage(new FileInfo(filePathBoardData)))
                     {
                         string sheet = "Component images";
                         var worksheet = package.Workbook.Worksheets[sheet];
@@ -806,26 +1264,58 @@ namespace Commodore_Repair_Toolbox
                         // Break check
                         if (worksheet != null)
                         {
-
                             string searchHeader = "Component images";
                             int row = 1;
+
+                            // Find the row that contains the section header ("Component images") in column 1
                             while (row <= worksheet.Dimension.End.Row)
                             {
-                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader)
+                                {
+                                    break;
+                                }
+
                                 row++;
                             }
-                            row++; // skip headers
-                            row++;
 
+                            // If we never found the header, log and continue to next board
+                            if (row > worksheet.Dimension.End.Row)
+                            {
+                                string fileName = Path.GetFileName(filePathBoardData);
+                                string error = $"ERROR: Excel file [{fileName}] the header row for worksheet [{sheet}] with label [{searchHeader}] was not found";
+                                Main.DebugOutput(error);
+                                continue;
+                            }
+
+                            // Next row is the "column headers" row
+                            row++;
+                            int headerRow = row;
+
+                            // Build a header name -> column index map
+                            var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                            for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                            {
+                                string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                                if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                                {
+                                    headerToColumn[headerValue] = col;
+                                }
+                            }
+
+                            // Data starts after the header row
+                            row = headerRow + 1;
+
+                            // Read rows until column 1 becomes empty (same sentinel pattern as elsewhere)
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string componentName = worksheet.Cells[row, 1].Value?.ToString() ?? "";
-                                string region = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                                string pin = worksheet.Cells[row, 3].Value?.ToString() ?? "";
-                                string name = worksheet.Cells[row, 4].Value?.ToString() ?? "";
-                                string reading = worksheet.Cells[row, 5].Value?.ToString() ?? "";
-                                string fileName = worksheet.Cells[row, 6].Value?.ToString() ?? "";
-                                string note = worksheet.Cells[row, 7].Value?.ToString() ?? "";
+                                // Header names must match the column headers in the Excel sheet
+                                string componentName = GetCellString(worksheet, headerToColumn, row, "Board label", string.Empty);
+                                string region = GetCellString(worksheet, headerToColumn, row, "Region", string.Empty);
+                                string pin = GetCellString(worksheet, headerToColumn, row, "Pin", string.Empty);
+                                string name = GetCellString(worksheet, headerToColumn, row, "Name", string.Empty);
+                                string reading = GetCellString(worksheet, headerToColumn, row, "Expected oscilloscope reading", string.Empty);
+                                string fileName = GetCellString(worksheet, headerToColumn, row, "File", string.Empty);
+                                string note = GetCellString(worksheet, headerToColumn, row, "Note", string.Empty);
 
                                 // Report a warning if path contains a backslash
                                 if (fileName.Contains("\\"))
@@ -834,9 +1324,9 @@ namespace Commodore_Repair_Toolbox
                                     Main.DebugOutput(error);
                                 }
 
-                                // Log if file does not exists
+                                // Log if file does not exists (but only if a name is given)
                                 string filePath = Path.Combine(DataPaths.DataRoot, fileName);
-                                if (fileName != "" && !File.Exists(filePath))
+                                if (!string.IsNullOrEmpty(fileName) && !File.Exists(filePath))
                                 {
                                     string fileName1 = Path.GetFileName(filePathBoardData);
                                     string error = $"ERROR: Excel file [{fileName1}] worksheet [{sheet}] the file [{fileName}] does not exists";
@@ -848,7 +1338,11 @@ namespace Commodore_Repair_Toolbox
                                     var classComponent = board?.Components?.FirstOrDefault(c => c.Label == componentName);
                                     if (classComponent != null)
                                     {
-                                        if (classComponent.ComponentImages == null) classComponent.ComponentImages = new List<ComponentImages>();
+                                        if (classComponent.ComponentImages == null)
+                                        {
+                                            classComponent.ComponentImages = new List<ComponentImages>();
+                                        }
+
                                         classComponent.ComponentImages.Add(new ComponentImages
                                         {
                                             Region = region,
@@ -860,9 +1354,11 @@ namespace Commodore_Repair_Toolbox
                                         });
                                     }
                                 }
+
                                 row++;
                             }
-                        } else
+                        }
+                        else
                         {
                             string fileName = Path.GetFileName(filePathBoardData);
                             string error = $"ERROR: Excel file [{fileName}] the worksheet [{sheet}] is not found";
@@ -872,14 +1368,15 @@ namespace Commodore_Repair_Toolbox
                 }
             } // 11) Load "component images" (datasheets)
 
-            // 12) Load "Credits"
+            // ---
+
+            // 12) Load "Credits" sheet for all boards
             foreach (Hardware hardware in classHardware)
             {
                 foreach (Board board in hardware.Boards)
                 {
                     string filePath = Path.Combine(DataPaths.DataRoot, board.DataFile);
-                    using (var package = new ExcelPackage(new FileInfo(
-                        filePath)))
+                    using (var package = new ExcelPackage(new FileInfo(filePath)))
                     {
                         string sheet = "Credits";
                         var worksheet = package.Workbook.Worksheets[sheet];
@@ -887,16 +1384,43 @@ namespace Commodore_Repair_Toolbox
                         // Break check
                         if (worksheet != null)
                         {
-
                             string searchHeader = "Board credits";
                             int row = 1;
+
+                            // Find the row that contains the section header ("Board credits") in column 1
                             while (row <= worksheet.Dimension.End.Row)
                             {
-                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader) break;
+                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader)
+                                {
+                                    break;
+                                }
+
                                 row++;
                             }
-                            row++; // skip headers
+
+                            // If we never found the header, log and continue to next board
+                            if (row > worksheet.Dimension.End.Row)
+                            {
+                                string fileName = Path.GetFileName(filePath);
+                                string error = $"ERROR: Excel file [{fileName}] the header row for worksheet [{sheet}] with label [{searchHeader}] was not found";
+                                Main.DebugOutput(error);
+                                continue;
+                            }
+
+                            // Next row is the "column headers" row
                             row++;
+                            int headerRow = row;
+
+                            // Build a header name -> column index map
+                            var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                            for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                            {
+                                string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                                if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                                {
+                                    headerToColumn[headerValue] = col;
+                                }
+                            }
 
                             // Initialize the BoardCredits list if it's null
                             if (board.BoardCredits == null)
@@ -904,22 +1428,33 @@ namespace Commodore_Repair_Toolbox
                                 board.BoardCredits = new List<BoardCredits>();
                             }
 
+                            // Data starts after the header row
+                            row = headerRow + 1;
+
+                            // Read rows until column 1 becomes empty
                             while (worksheet.Cells[row, 1].Value != null)
                             {
-                                string category = worksheet.Cells[row, 1].Value?.ToString() ?? "";
-                                string subCategory = worksheet.Cells[row, 2].Value?.ToString() ?? "";
-                                string name = worksheet.Cells[row, 3].Value?.ToString() ?? "";
-                                string contact = worksheet.Cells[row, 4].Value?.ToString() ?? "";
+                                // Header names must match the column headers in the Excel sheet
+                                string category = GetCellString(worksheet, headerToColumn, row, "Category", string.Empty);
+                                string subCategory = GetCellString(worksheet, headerToColumn, row, "Sub-category", string.Empty);
+                                string name = GetCellString(worksheet, headerToColumn, row, "Name or handle", string.Empty);
+                                string contact = GetCellString(worksheet, headerToColumn, row, "Contact (email or web page)", string.Empty);
 
-                                // Create a new BoardLink instance and add it to the BoardLinks list
-                                BoardCredits boardCredits = new BoardCredits
+                                // Only add non-empty rows
+                                if (!string.IsNullOrEmpty(category) ||
+                                    !string.IsNullOrEmpty(subCategory) ||
+                                    !string.IsNullOrEmpty(name) ||
+                                    !string.IsNullOrEmpty(contact))
                                 {
-                                    Category = category,
-                                    SubCategory = subCategory,
-                                    Name = name,
-                                    Contact = contact
-                                };
-                                board.BoardCredits.Add(boardCredits);
+                                    BoardCredits boardCredits = new BoardCredits
+                                    {
+                                        Category = category,
+                                        SubCategory = subCategory,
+                                        Name = name,
+                                        Contact = contact
+                                    };
+                                    board.BoardCredits.Add(boardCredits);
+                                }
 
                                 row++;
                             }
@@ -934,6 +1469,110 @@ namespace Commodore_Repair_Toolbox
                 }
             } // 12) Load "Credits"
 
+            // ---
+
+            // 13) Load "Version match" sheet for all boards
+            foreach (Hardware hardware in classHardware)
+            {
+                foreach (Board board in hardware.Boards)
+                {
+                    string filePath = Path.Combine(DataPaths.DataRoot, board.DataFile);
+                    using (var package = new ExcelPackage(new FileInfo(filePath)))
+                    {
+                        string sheet = "Version match";
+                        var worksheet = package.Workbook.Worksheets[sheet];
+
+                        // Break check
+                        if (worksheet != null)
+                        {
+                            string searchHeader = "CRT version(s) where this Excel will work";
+                            int row = 1;
+
+                            // Find the row that contains the section header ("Board credits") in column 1
+                            while (row <= worksheet.Dimension.End.Row)
+                            {
+                                if (worksheet.Cells[row, 1].Value?.ToString() == searchHeader)
+                                {
+                                    break;
+                                }
+
+                                row++;
+                            }
+
+                            // If we never found the header, log and continue to next board
+                            if (row > worksheet.Dimension.End.Row)
+                            {
+                                string fileName = Path.GetFileName(filePath);
+                                string error = $"ERROR: Excel file [{fileName}] the header row for worksheet [{sheet}] with label [{searchHeader}] was not found";
+                                Main.DebugOutput(error);
+                                continue;
+                            }
+
+                            // Next row is the "column headers" row
+                            row++;
+                            int headerRow = row;
+
+                            // Build a header name -> column index map
+                            var headerToColumn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                            for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                            {
+                                string headerValue = worksheet.Cells[headerRow, col].Value?.ToString();
+                                if (!string.IsNullOrWhiteSpace(headerValue) && !headerToColumn.ContainsKey(headerValue))
+                                {
+                                    headerToColumn[headerValue] = col;
+                                }
+                            }
+
+                            // Initialize the BoardCredits list if it's null
+                            if (board.BoardCredits == null)
+                            {
+                                board.BoardCredits = new List<BoardCredits>();
+                            }
+
+                            // Data starts after the header row
+                            row = headerRow + 1;
+
+                            // Read rows until column 1 becomes empty
+                            string[] versionsFromExcel = { };
+                            while (worksheet.Cells[row, 1].Value != null)
+                            {
+                                // Header names must match the column headers in the Excel sheet
+                                string version = GetCellString(worksheet, headerToColumn, row, "Version", string.Empty);
+
+                                // Add "version" to "versionsFromExcel" array
+                                Array.Resize(ref versionsFromExcel, versionsFromExcel.Length + 1);
+                                versionsFromExcel[versionsFromExcel.Length - 1] = version;
+
+                                row++;
+                            }
+
+                            // Check if at least one of the versions in "versionsFromExcel" matches "Main.versionThis", based on length of string for "versionsFromExcel"
+                            bool versionMatchFound = false;
+                            foreach (string version in versionsFromExcel)
+                            {
+                                if (Main.versionThis.StartsWith(version, StringComparison.Ordinal))
+                                {
+                                    versionMatchFound = true;
+                                    break;
+                                }
+                            }
+                            if (!versionMatchFound)
+                            {
+                                Array.Resize(ref Main.versionMismatch, Main.versionMismatch.Length + 1);
+                                Main.versionMismatch[Main.versionMismatch.Length - 1] = filePath;
+                            }
+                        }
+                        else
+                        {
+                            string fileName = Path.GetFileName(filePath);
+                            string error = $"ERROR: Excel file [{fileName}] the worksheet [{sheet}] is not found";
+                            Main.DebugOutput(error);
+                        }
+                    }
+                }
+            } // 13) Load "Version match"
+
+            // ---
 
             // Check if classHardware has schematic files for all boards - if not, remove the board
             var hardwareToRemove = new List<Hardware>();
@@ -982,5 +1621,17 @@ namespace Commodore_Repair_Toolbox
             }
 
         }
+
+        // Get a string value by header name
+        private static string GetCellString(ExcelWorksheet ws, Dictionary<string, int> headerToColumn, int r, string headerName, string defaultValue)
+            {
+                int col;
+                if (!headerToColumn.TryGetValue(headerName, out col))
+                {
+                    return defaultValue;
+                }
+                return ws.Cells[r, col].Value?.ToString() ?? defaultValue;
+            }
+        }
+
     }
-}

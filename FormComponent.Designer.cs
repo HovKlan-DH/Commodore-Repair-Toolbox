@@ -31,8 +31,6 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormComponent));
             this.pictureBoxImage = new System.Windows.Forms.PictureBox();
             this.button1 = new System.Windows.Forms.Button();
-            this.labelDisplayName = new System.Windows.Forms.Label();
-            this.labelType = new System.Windows.Forms.Label();
             this.listBoxLocalFiles = new System.Windows.Forms.ListBox();
             this.listBoxLinks = new System.Windows.Forms.ListBox();
             this.label6 = new System.Windows.Forms.Label();
@@ -52,6 +50,8 @@
             this.buttonRegionNtsc = new System.Windows.Forms.Button();
             this.label2 = new System.Windows.Forms.Label();
             this.buttonToggle = new System.Windows.Forms.Button();
+            this.richTextBoxTypePartnumber = new System.Windows.Forms.RichTextBox();
+            this.richTextBoxNameDisplay = new System.Windows.Forms.RichTextBox();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBoxImage)).BeginInit();
             this.panelNote.SuspendLayout();
             this.panelOneliner.SuspendLayout();
@@ -82,28 +82,6 @@
             this.button1.Text = "Close";
             this.button1.UseVisualStyleBackColor = true;
             this.button1.Click += new System.EventHandler(this.button1_Click);
-            // 
-            // labelDisplayName
-            // 
-            this.labelDisplayName.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.labelDisplayName.AutoSize = true;
-            this.labelDisplayName.Font = new System.Drawing.Font("Calibri", 13.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.labelDisplayName.Location = new System.Drawing.Point(632, 9);
-            this.labelDisplayName.Name = "labelDisplayName";
-            this.labelDisplayName.Size = new System.Drawing.Size(63, 28);
-            this.labelDisplayName.TabIndex = 1;
-            this.labelDisplayName.Text = "Label";
-            // 
-            // labelType
-            // 
-            this.labelType.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.labelType.AutoSize = true;
-            this.labelType.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.labelType.Location = new System.Drawing.Point(633, 37);
-            this.labelType.Name = "labelType";
-            this.labelType.Size = new System.Drawing.Size(42, 21);
-            this.labelType.TabIndex = 100;
-            this.labelType.Text = "Type";
             // 
             // listBoxLocalFiles
             // 
@@ -332,11 +310,41 @@
             this.buttonToggle.Text = "Toggle";
             this.buttonToggle.UseVisualStyleBackColor = true;
             // 
+            // richTextBoxTypePartnumber
+            // 
+            this.richTextBoxTypePartnumber.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.richTextBoxTypePartnumber.BackColor = System.Drawing.SystemColors.Control;
+            this.richTextBoxTypePartnumber.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.richTextBoxTypePartnumber.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.richTextBoxTypePartnumber.Location = new System.Drawing.Point(633, 37);
+            this.richTextBoxTypePartnumber.Name = "richTextBoxTypePartnumber";
+            this.richTextBoxTypePartnumber.ReadOnly = true;
+            this.richTextBoxTypePartnumber.Size = new System.Drawing.Size(467, 21);
+            this.richTextBoxTypePartnumber.TabIndex = 106;
+            this.richTextBoxTypePartnumber.Text = "Type | Partnumber";
+            this.richTextBoxTypePartnumber.WordWrap = false;
+            // 
+            // richTextBoxNameDisplay
+            // 
+            this.richTextBoxNameDisplay.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.richTextBoxNameDisplay.BackColor = System.Drawing.SystemColors.Control;
+            this.richTextBoxNameDisplay.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.richTextBoxNameDisplay.Font = new System.Drawing.Font("Calibri", 13.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.richTextBoxNameDisplay.Location = new System.Drawing.Point(632, 9);
+            this.richTextBoxNameDisplay.Name = "richTextBoxNameDisplay";
+            this.richTextBoxNameDisplay.ReadOnly = true;
+            this.richTextBoxNameDisplay.Size = new System.Drawing.Size(468, 30);
+            this.richTextBoxNameDisplay.TabIndex = 107;
+            this.richTextBoxNameDisplay.Text = "Label | Technical | Friendly";
+            this.richTextBoxNameDisplay.WordWrap = false;
+            // 
             // FormComponent
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1117, 827);
+            this.Controls.Add(this.richTextBoxNameDisplay);
+            this.Controls.Add(this.richTextBoxTypePartnumber);
             this.Controls.Add(this.buttonToggle);
             this.Controls.Add(this.label2);
             this.Controls.Add(this.buttonRegionNtsc);
@@ -350,8 +358,6 @@
             this.Controls.Add(this.label6);
             this.Controls.Add(this.listBoxLinks);
             this.Controls.Add(this.listBoxLocalFiles);
-            this.Controls.Add(this.labelType);
-            this.Controls.Add(this.labelDisplayName);
             this.Controls.Add(this.button1);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MinimizeBox = false;
@@ -374,8 +380,6 @@
 
         private System.Windows.Forms.PictureBox pictureBoxImage;
         private System.Windows.Forms.Button button1;
-        private System.Windows.Forms.Label labelDisplayName;
-        private System.Windows.Forms.Label labelType;
         private System.Windows.Forms.ListBox listBoxLocalFiles;
         private System.Windows.Forms.ListBox listBoxLinks;
         private System.Windows.Forms.Label label6;
@@ -395,5 +399,7 @@
         private System.Windows.Forms.Button buttonRegionNtsc;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Button buttonToggle;
+        private System.Windows.Forms.RichTextBox richTextBoxTypePartnumber;
+        private System.Windows.Forms.RichTextBox richTextBoxNameDisplay;
     }
 }
