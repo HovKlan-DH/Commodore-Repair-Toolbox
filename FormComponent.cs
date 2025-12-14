@@ -25,6 +25,11 @@ namespace Commodore_Repair_Toolbox
         private List<ComponentImages> filteredComponentImages = new List<ComponentImages>();
         private FormWindowState lastWindowState;
 
+        // Pin Input Feature
+        private string pinInputBuffer = "";
+        private Timer pinInputTimer;
+        private Label lblPinOverlay;
+
         public FormComponent(List<BoardComponents> components, Main main)
         {
             InitializeComponent();
@@ -38,9 +43,69 @@ namespace Commodore_Repair_Toolbox
 
             // Initialize the scrollwheel timer
             scrollWheelTimer.Interval = 1;
-            scrollWheelTimer.Tick += (s, e) => { 
-                isScrolling = false; 
-                scrollWheelTimer.Stop(); 
+            scrollWheelTimer.Tick += (s, e) => {
+                isScrolling = false;
+                scrollWheelTimer.Stop();
+            };
+
+            // Initialize Pin Input Overlay
+            lblPinOverlay = new Label();
+            lblPinOverlay.AutoSize = true;
+            lblPinOverlay.Font = new Font("Calibri", 28, FontStyle.Bold);
+            lblPinOverlay.BackColor = Color.Black;
+            lblPinOverlay.ForeColor = Color.White;
+            lblPinOverlay.Padding = new Padding(10);
+            lblPinOverlay.Visible = false;
+            lblPinOverlay.TextAlign = ContentAlignment.MiddleCenter;
+
+            // Add rounded corners and border
+            lblPinOverlay.SizeChanged += (s, e) => {
+                var l = (Label)s;
+                int cornerSize = 20;
+                using (var path = new System.Drawing.Drawing2D.GraphicsPath())
+                {
+                    var rect = l.ClientRectangle;
+                    if (rect.Width == 0 || rect.Height == 0) return;
+                    path.AddArc(rect.X, rect.Y, cornerSize, cornerSize, 180, 90);
+                    path.AddArc(rect.Right - cornerSize, rect.Y, cornerSize, cornerSize, 270, 90);
+                    path.AddArc(rect.Right - cornerSize, rect.Bottom - cornerSize, cornerSize, cornerSize, 0, 90);
+                    path.AddArc(rect.X, rect.Bottom - cornerSize, cornerSize, cornerSize, 90, 90);
+                    path.CloseFigure();
+                    l.Region = new Region(path);
+                }
+            };
+
+            lblPinOverlay.Paint += (s, e) => {
+                var l = (Label)s;
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                int cornerSize = 20;
+                using (var path = new System.Drawing.Drawing2D.GraphicsPath())
+                {
+                    var rect = l.ClientRectangle;
+                    if (rect.Width == 0 || rect.Height == 0) return;
+                    path.AddArc(rect.X, rect.Y, cornerSize, cornerSize, 180, 90);
+                    path.AddArc(rect.Right - cornerSize, rect.Y, cornerSize, cornerSize, 270, 90);
+                    path.AddArc(rect.Right - cornerSize, rect.Bottom - cornerSize, cornerSize, cornerSize, 0, 90);
+                    path.AddArc(rect.X, rect.Bottom - cornerSize, cornerSize, cornerSize, 90, 90);
+                    path.CloseFigure();
+
+                    // Draw border (2px width, so ~1px is visible inside the clipped region)
+                    using (var pen = new Pen(Color.Black, 2))
+                    {
+                        e.Graphics.DrawPath(pen, path);
+                    }
+                }
+            };
+
+            pictureBoxImage.Controls.Add(lblPinOverlay); // Add to PictureBox to overlay image
+
+            // Initialize Pin Input Timer
+            pinInputTimer = new Timer();
+            pinInputTimer.Interval = 1000; // 1 second timeout
+            pinInputTimer.Tick += (s, e) => {
+                pinInputBuffer = "";
+                lblPinOverlay.Visible = false;
+                pinInputTimer.Stop();
             };
 
             // Filter based on region
@@ -72,7 +137,7 @@ namespace Commodore_Repair_Toolbox
 
             // Focus on something that is not the first "textBox" in the form
             ActiveControl = label2;
-            
+
             // Define events
             Resize += Form_Resize;
             panelNote.Paint += new PaintEventHandler(panelNote_Paint);
@@ -127,7 +192,7 @@ namespace Commodore_Repair_Toolbox
             // Persist state on close (ignore Minimized)
             if (this.WindowState != FormWindowState.Minimized)
             {
-            Configuration.SaveSetting("WindowStateComponent", this.WindowState.ToString());
+                Configuration.SaveSetting("WindowStateComponent", this.WindowState.ToString());
             }
         }
 
@@ -219,7 +284,7 @@ namespace Commodore_Repair_Toolbox
             foreach (var comp in componentList)
             {
                 if (
-                    (comp.Region == Main.selectedRegion || comp.Region == "") &&  
+                    (comp.Region == Main.selectedRegion || comp.Region == "") &&
                     (comp.NameTechnical == technicalName || comp.NameTechnical == "")
                     )
                 {
@@ -376,7 +441,7 @@ namespace Commodore_Repair_Toolbox
             UpdateImage();
         }
 
-        private void RemoveThumbnails ()
+        private void RemoveThumbnails()
         {
             // Remove old thumbnails and their labels
             foreach (var pb in thumbnailPictureBoxes)
@@ -403,7 +468,7 @@ namespace Commodore_Repair_Toolbox
             int panelWidth = panelImageAndThumbnails.Width;
 
             if (imagePaths.Count > 1)
-            {                            
+            {
                 RemoveThumbnails();
 
                 // Find how many panels we can show with width of "panelWidth"
@@ -432,7 +497,7 @@ namespace Commodore_Repair_Toolbox
                     };
                     thumbnailPictureBoxes.Add(pictureBox);
 
-                    string pinText = i < filteredComponentImages?.Count ? "Pin "+filteredComponentImages[i].Pin : "";
+                    string pinText = i < filteredComponentImages?.Count ? "Pin " + filteredComponentImages[i].Pin : "";
                     Label labelPin = new Label
                     {
                         AutoSize = true,
@@ -486,7 +551,8 @@ namespace Commodore_Repair_Toolbox
             if (imagePaths.Count > 1)
             {
                 pictureBoxImage.Size = new Size(panelImageAndThumbnails.Width, panelImageAndThumbnails.Height - panelThumbnailHeight - 5);
-            } else
+            }
+            else
             {
                 pictureBoxImage.Size = new Size(panelImageAndThumbnails.Width, panelImageAndThumbnails.Height);
             }
@@ -511,7 +577,7 @@ namespace Commodore_Repair_Toolbox
             if (thumbnailWindowStart < 0)
             {
                 thumbnailWindowStart = 0;
-            }                
+            }
             if (thumbnailWindowStart > Math.Max(0, imagesCount - panels))
             {
                 thumbnailWindowStart = Math.Max(0, imagesCount - panels);
@@ -531,7 +597,7 @@ namespace Commodore_Repair_Toolbox
                     // Update labels inside the "PictureBox"
                     var labels = pb.Controls.OfType<Label>().ToList();
                     if (
-                        labels.Count >= 1 && component.ComponentImages != null && 
+                        labels.Count >= 1 && component.ComponentImages != null &&
                         imgIdx < component.ComponentImages.Count
                         )
                     {
@@ -546,7 +612,7 @@ namespace Commodore_Repair_Toolbox
                         {
                             labels[0].Text = nameValue;
                         }
-                            
+
                     }
                 }
                 else
@@ -674,8 +740,8 @@ namespace Commodore_Repair_Toolbox
             labelImageX.Visible = false;
 
             // Show more, if there are thumbnails
-            if (imagePaths.Count > 0) 
-            { 
+            if (imagePaths.Count > 0)
+            {
                 // Update the image
                 pictureBoxImage.Image = Image.FromFile(imagePaths[currentImageIndex]);
 
@@ -699,16 +765,16 @@ namespace Commodore_Repair_Toolbox
                 else
                 {
                     labelName.Location = new Point(labelPin.Location.X, labelName.Location.Y);
-                }                
+                }
 
                 if (labelName.Visible)
                 {
                     labelRegion.Location = new Point(labelName.Location.X + labelName.Width + 3, labelRegion.Location.Y);
-                }                
+                }
                 else
                 {
                     labelRegion.Location = new Point(labelPin.Location.X + labelPin.Width + 3, labelRegion.Location.Y);
-                }                
+                }
 
                 if (labelRegion.Visible)
                 {
@@ -717,11 +783,11 @@ namespace Commodore_Repair_Toolbox
                 else if (labelName.Visible)
                 {
                     labelReading.Location = new Point(labelName.Location.X + labelName.Width + 3, labelReading.Location.Y);
-                }                
+                }
                 else
                 {
                     labelReading.Location = new Point(labelPin.Location.X + labelPin.Width + 3, labelReading.Location.Y);
-                }                
+                }
 
                 // Find the "Description" from the "component.Oscilloscope" list, based on the component name and pin
                 labelReading.Text = reading;
@@ -731,14 +797,15 @@ namespace Commodore_Repair_Toolbox
                 if (imagePaths.Count > 1)
                 {
                     labelImageX.Text = $"Image {currentImageIndex + 1} of {imagePaths.Count}";
-                
+
                     // Place "labelImageX" at bottom left corner
                     labelImageX.Location = new Point(10, pictureBoxImage.Height - labelImageX.Height - 5);
                     labelImageX.Visible = true;
-                } else
+                }
+                else
                 {
                     labelImageX.Visible = false;
-                }                
+                }
 
                 UpdateThumbnails();
             }
@@ -816,10 +883,10 @@ namespace Commodore_Repair_Toolbox
 
             string componentId = $"component-{component.Label}-notes";
             string value = textBoxNote.Text.Replace(Environment.NewLine, "\\n");
-            
+
             // Assuming there is a reference to the "WebView2" control:
             string script = $"window.postMessage({{type:'updateNotes',id:'{componentId}',value:`{value}`}}, '*');";
-            
+
             // Call this on the main form "WebView2" instance:
             if (main?.webView2Resources != null)
             {
@@ -862,13 +929,13 @@ namespace Commodore_Repair_Toolbox
                     if (comp.NameTechnical == technicalName || comp.NameTechnical == "")
                     {
                         textBoxOneliner.Text = Main.ConvertStringToLabel(comp.OneLiner);
-                        
+
                         // Move the cursor to the end of the textbox
                         textBoxOneliner.SelectionStart = textBoxOneliner.Text.Length;
                         textBoxOneliner.SelectionLength = 0;
                         return;
                     }
-                }                
+                }
             }
 
             // Save the OneLiner
@@ -897,7 +964,7 @@ namespace Commodore_Repair_Toolbox
                 Configuration.SaveSetting(key, "");
                 pinNote = pinNote.Replace("\n", Environment.NewLine);
                 textBoxNote.Text = pinNote;
-                
+
                 // Move the cursor to the end of the textbox
                 textBoxNote.SelectionStart = textBoxNote.Text.Length;
                 textBoxNote.SelectionLength = 0;
@@ -909,10 +976,73 @@ namespace Commodore_Repair_Toolbox
 
         private void Form_KeyPress(object sender, KeyPressEventArgs e)
         {
+            if (textBoxNote.Focused || textBoxOneliner.Focused) return;
+
             if (e.KeyChar == (char)Keys.Escape)
             {
                 Close();
+                return;
             }
+
+            // Handle numeric input for Pin navigation
+            if (char.IsDigit(e.KeyChar))
+            {
+                pinInputBuffer += e.KeyChar;
+                HandlePinInput();
+                e.Handled = true;
+            }
+            else if (e.KeyChar == (char)Keys.Back && pinInputBuffer.Length > 0)
+            {
+                pinInputBuffer = pinInputBuffer.Substring(0, pinInputBuffer.Length - 1);
+                if (pinInputBuffer.Length == 0)
+                {
+                    lblPinOverlay.Visible = false;
+                    pinInputTimer.Stop();
+                }
+                else
+                {
+                    HandlePinInput();
+                }
+                e.Handled = true;
+            }
+        }
+
+        private void HandlePinInput()
+        {
+            // Find image with matching Pin
+            var index = filteredComponentImages.FindIndex(img => img.Pin == pinInputBuffer);
+
+            if (index != -1)
+            {
+                // Pin found
+                lblPinOverlay.BackColor = Color.Green;
+                lblPinOverlay.Text = pinInputBuffer;
+
+                currentImageIndex = index;
+                UpdateImage();
+            }
+            else
+            {
+                // Pin not found
+                lblPinOverlay.BackColor = Color.IndianRed;
+                lblPinOverlay.Text = $"Pin {pinInputBuffer} does not exist";
+            }
+
+            if (!lblPinOverlay.Visible) lblPinOverlay.Visible = true;
+            lblPinOverlay.BringToFront();
+
+            // Center the overlay on the PictureBox
+            if (pictureBoxImage.Width > 0 && pictureBoxImage.Height > 0)
+            {
+                lblPinOverlay.Location = new Point(
+                    (pictureBoxImage.Width - lblPinOverlay.Width) / 2,
+                    (pictureBoxImage.Height - lblPinOverlay.Height) / 2
+                );
+            }
+
+            // Restart Timer
+            pinInputTimer.Stop();
+            pinInputTimer.Start();
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -945,6 +1075,6 @@ namespace Commodore_Repair_Toolbox
             string url = links[selectedName];
             System.Diagnostics.Process.Start(url);
         }
-        
+
     }
 }
