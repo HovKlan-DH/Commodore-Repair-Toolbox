@@ -555,7 +555,7 @@ namespace Commodore_Repair_Toolbox
 
         public static void DebugOutput(string text)
         {
-            // Ensure logging is initialized even if someone calls this early.
+            // Ensure logging is initialized even if this is called early
             if (!_logInitialized)
                 InitializeLogging();
 
