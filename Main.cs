@@ -101,6 +101,7 @@ namespace Commodore_Repair_Toolbox
         // "Main" schematics (left-side of SplitContainer)
         private Label labelFile;
         private Label labelComponent;
+        private Label labelRegion;
         public static OverlayPanel overlayPanel;
         private Dictionary<string, Control> overlayLabelMap = new Dictionary<string, Control>();
 
@@ -252,6 +253,8 @@ namespace Commodore_Repair_Toolbox
             SetupNewBoard();
 
             UpdateComponentList("Form_Shown");
+
+            SetRegionButtonColors();
 
             // Set initial focus to "textBoxFilterComponents"
             textBoxFilterComponents.Focus();
@@ -536,7 +539,7 @@ namespace Commodore_Repair_Toolbox
 
             checkBoxKeyboardZoom.Checked = keyboardZoomEnabled;
 
-            SetRegionButtonColors();
+//            SetRegionButtonColors();
         }
 
 
@@ -2808,6 +2811,34 @@ namespace Commodore_Repair_Toolbox
             panelMain.Controls.Add(labelFile);
             labelFile.BringToFront();
 
+            // Top-left label: region
+            Color regionColorBack = Color.IndianRed;
+            Color regionColorText = Color.White;
+            if (selectedRegion == "NTSC")
+            {
+                regionColorBack = Color.LightSteelBlue;
+                regionColorText = Color.Black;
+            }
+            int regionStartX = 5 + labelFile.PreferredWidth + 5;
+            labelRegion = new Label
+            {
+                Name = "labelRegion",
+                Text = selectedRegion,
+                AutoSize = true,
+                //Width = TextRenderer.MeasureText("NTSC", new Font("Calibri", 11)).Width + 5,
+                //Height = labelFile.PreferredHeight,
+                BackColor = regionColorBack,
+                ForeColor = regionColorText,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Calibri", 11),
+                Location = new Point(regionStartX, 5),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left,
+
+            };
+            labelRegion.DoubleBuffered(true);
+            panelMain.Controls.Add(labelRegion);
+            labelRegion.BringToFront();
+
             // Top-left label: hovered component name
             labelComponent = new Label
             {
@@ -4955,6 +4986,8 @@ namespace Commodore_Repair_Toolbox
                 buttonRegionPal.ForeColor = SystemColors.ControlText;
                 buttonRegionNtsc.BackColor = Color.LightSteelBlue;
                 buttonRegionNtsc.ForeColor = Color.Black;
+                labelRegion.BackColor = Color.LightSteelBlue;
+                labelRegion.ForeColor = Color.Black;
             }
 
             // selectedRegion == "PAL"
@@ -4967,7 +5000,10 @@ namespace Commodore_Repair_Toolbox
                 buttonRegionPal.ForeColor = Color.White;
                 buttonRegionNtsc.BackColor = SystemColors.Control;
                 buttonRegionNtsc.ForeColor = SystemColors.ControlText;
+                labelRegion.BackColor = Color.IndianRed;
+                labelRegion.ForeColor = Color.White;
             }
+            labelRegion.Text = selectedRegion;
         }
 
 

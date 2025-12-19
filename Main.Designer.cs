@@ -281,7 +281,6 @@
             // 
             // webView2Overview
             // 
-
             this.webView2Overview.AllowExternalDrop = true;
             this.webView2Overview.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
