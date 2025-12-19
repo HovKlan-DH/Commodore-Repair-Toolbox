@@ -3,6 +3,8 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+.github/
+
 # User-specific files
 *.rsuser
 *.suo
@@ -15,6 +17,7 @@
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
+obj/
 bin/
 x64/
 x86/
