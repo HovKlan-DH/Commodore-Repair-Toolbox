@@ -902,6 +902,7 @@ namespace Commodore_Repair_Toolbox
                     htmlContent += "<th valign='bottom'>Component</th>";
                     htmlContent += "<th valign='bottom'>Technical name</th>";
                     htmlContent += "<th valign='bottom'>Friendly name</th>";
+                    htmlContent += "<th valign='bottom'>Part-number</th>";
                     htmlContent += "<th valign='bottom'>Short description</th>";
                     htmlContent += "<th valign='bottom'>Notes</th>";
                     htmlContent += "<th valign='bottom'>Local files</th>";
@@ -918,6 +919,7 @@ namespace Commodore_Repair_Toolbox
                         string compLabel = comp.Label;
                         string compNameTechnical = comp.NameTechnical;
                         string compNameFriendly = comp.NameFriendly;
+                        string compPartnumber = comp.Partnumber;
 
                         compNameFriendly = compNameFriendly.Replace("?", "");
 
@@ -956,6 +958,7 @@ namespace Commodore_Repair_Toolbox
                         htmlContent += $"<td valign='top' data-compLabel='{compLabel}' class='doNotFocusFilter'>{compLabel}</td>";
                         htmlContent += $"<td valign='top'>{compNameTechnical}</td>";
                         htmlContent += $"<td valign='top'>{compNameFriendly}</td>";
+                        htmlContent += $"<td valign='top'>{compPartnumber}</td>";
                         htmlContent += $"<td valign='top'>{compDescrShort}</td>";
                         htmlContent += $"<td valign='top'>{compDescrLong}</td>";
 
@@ -2016,16 +2019,8 @@ namespace Commodore_Repair_Toolbox
                         (int)(overlayComponentsTabOriginalSizes[i].Height * zoomFactor)
                     );
 
-                    // Find component "label" from component "display name"
-                    //string componentLabel = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.Label ?? "";
-                    //string componentTechName = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.NameTechnical ?? "";
-                    //string componentFriendlyName = bd.Components.FirstOrDefault(cb => cb.NameDisplay == overlayComponentsTab[i].Name)?.NameFriendly ?? "";
                     string componentLabel = bd.Components.FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name)?.Label ?? "";
-                    //string componentTechName = bd.Components.FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name)?.NameTechnical ?? "";
-                    //                    string componentTechName = bd.Components
-                    //                       .FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name
-                    //                        && string.Equals(cb.Region, selectedRegion, StringComparison.OrdinalIgnoreCase))
-                    //                        ?.NameTechnical ?? "hest";
+
                     // Get "technical name" - first with region, then first or otherwise it should be empty
                     var compTech = bd.Components
                         .FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name &&
@@ -2038,11 +2033,7 @@ namespace Commodore_Repair_Toolbox
                         ?? bd.Components
                         .FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name);
                     string componentTechName = compTech?.NameTechnical ?? "";
-                    //string componentFriendlyName = bd.Components.FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name)?.NameFriendly ?? "";
-                    //                    string componentFriendlyName = bd.Components
-                    //                        .FirstOrDefault(cb => cb.Label == overlayComponentsTab[i].Name
-                    //                        && string.Equals(cb.Region, selectedRegion, StringComparison.OrdinalIgnoreCase))
-                    //                        ?.NameFriendly ?? "";
+
                     // Get "friendly name" - first with region, then first or otherwise it should be empty
                     var compFriendly = bd.Components
                         .FirstOrDefault(c => c.Label == overlayComponentsTab[i].Name &&
@@ -3709,7 +3700,26 @@ namespace Commodore_Repair_Toolbox
                 overlayPanel.Cursor = Cursors.Hand;
                 var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
                 var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-                var comp = bd?.Components.FirstOrDefault(c => c.Label == e.OverlayInfo.ComponentLabel);
+
+                // Get the "display name" based on selected region
+                var comp = bd?.Components
+                    .FirstOrDefault(c => c.Label == e.OverlayInfo.ComponentLabel &&
+                                         !string.IsNullOrEmpty(selectedRegion) &&
+                                         string.Equals(c.Region, selectedRegion, StringComparison.OrdinalIgnoreCase))
+                    ?? bd?.Components
+                    .FirstOrDefault(c => c.Label == e.OverlayInfo.ComponentLabel &&
+                                         string.IsNullOrEmpty(c.Region))
+                    ?? bd?.Components
+                    .FirstOrDefault(c => c.Label == e.OverlayInfo.ComponentLabel);
+
+                if (comp != null)
+                {
+                    labelComponent.Text = ConvertStringToLabel(comp.NameDisplay);
+                }
+                else
+                {
+                    labelComponent.Text = ConvertStringToLabel(e.OverlayInfo.ComponentLabel);
+                }
 
                 if (comp != null)
                 {
