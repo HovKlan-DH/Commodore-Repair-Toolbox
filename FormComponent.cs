@@ -684,7 +684,7 @@ namespace Commodore_Repair_Toolbox
                 UpdateImage();
                 return true;
             }
-            else if (keyData == Keys.Space)
+            else if (keyData == Keys.Space || keyData == Keys.Enter)
             {
                 // Reset to the first image
                 currentImageIndex = 0;

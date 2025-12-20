@@ -1,0 +1,71 @@
+----------------------------
+Hardware      : Commodore 64
+Board(s)      : 250407 + 250425 + 250466
+Revision date : 2025-December-19
+--------------------------------
+
+Below is my default troubleshooting guide for myself, so I do not forget. In most cases it covers the basics only, and it is for sure not a methodotical checklist that will check everything.
+
+
+--------------------
+Tooling requirements
+--------------------
+- Oscilloscope
+- Multimeter
+
+
+-----------------
+Voltages : Step 1
+-----------------
+Recommended reading for understanding C64 voltages:
+https://refurbished-commodore.com/checking-c64-voltages
+
+User port:
+    +5VDC between pin 1+2 (one on each side of gap)
+    9VAC between pin 10+11 (one on each side of gap)
+CPU:
+    +5VDC (PSU) pin 6
+VIC-II:
+    +5VDC (CAN) pin 40
+    +12VDC pin 13
+
+
+-----------------
+Voltages : Step 2
+-----------------
+If any of the above voltages fails or looks off, then check fuse and the power switch (SW1).
+Power switch:
+    +5VDC between pin 5 and GND when C64 is off
+    +5VDC between pin 4 and GND when C64 is on
+Also check the two power supplies:
+    7805:
+        +5VDC pin 2
+    7812:
+        +12VDC pin 2
+
+
+-----------
+Frequencies
+-----------
+CPU:
+    pin 1 = 985 kHz: "Φ0" clock input)
+    pin 39 = 985 kHz: "Φ2" clock output from CPU
+VIC-II:
+    pin 17 = 985 kHz: "Φ0" clock output from VIC-II
+    pin 21 = 17.72 MHz: ΦCOLOR clock input
+    pin 22 = 7.88 MHz: ΦDOT clock input
+
+
+-------
+Signals
+-------
+Reset:
+    CPU:
+        pin 40 = at power-on it stays LOW for ~100–500ms, then goes HIGH and stays HIGH
+Video output:
+    VIC-II:
+        pin 15 = view "SYNC/LUN explanation" in CRT for pin 15 (the next image after)
+
+
+This is written by the "Commodore Repair Toolbox" developer.
+Connect with me via the "Feedback" tab.
