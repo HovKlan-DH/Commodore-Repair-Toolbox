@@ -1,12 +1,13 @@
 ----------------------------
 Hardware      : Commodore 64
-Board(s)      : 250407 + 250425 + 250466 (all "longboards")
+Board(s)      : 250469 ("shortboard")
 Revision date : 2025-December-20
 --------------------------------
 
 Below is my default troubleshooting guide for myself, so I do not forget. In most cases it covers the basics only, and it is for sure not a methodotical checklist that will check everything. I will add or change, once I repair more.
 
-There is a slight change between the longboards and the shortboard. In the "longboards" there are two different "rails" for +5VDC - one directly from the external power supply and one from the "CAN".
+There is a slight change between the longboards and the shortboard. In the shortboard there is no "CAN" +5VDC rail, and all +5VDC comes from the external power supply.
+
 
 --------------------
 Tooling requirements
@@ -21,15 +22,16 @@ Voltages : Step 1
 Recommended reading for understanding C64 voltages:
 https://refurbished-commodore.com/checking-c64-voltages
 
+There are two different "rails" for +5VDC - one directly from the external power supply and one from the "CAN".
 
 User port:
     +5VDC between pin 1+2 (one on each side of gap)
     9VAC between pin 10+11 (one on each side of gap)
 CPU:
-    +5VDC (PSU) pin 6
+    +5VDC pin 6
 VIC-II:
-    +5VDC (CAN) pin 40
-    +12VDC pin 13
+    +5VDC pin 40
+    +5VDC pin 13
 
 Also, traces or components could be broken elsewhere, so it is of course not bullet-proof, and you may need to check other places also, but above gives a good indication if the power rails are in good shape.
 
@@ -45,12 +47,6 @@ Fuse:
 Power switch:
     +5VDC between pin 5 and GND when C64 is off (it is expected voltage can be slightly higher due to no load)
     +5VDC between pin 4 and GND when C64 is on
-Also check the two power supplies:
-    7805:
-        +5VDC pin 2 (right-most pin): this is "CAN" source
-    7812:
-        +12VDC pin 2 (right-most pin)
-
 
 
 -----------
