@@ -45,30 +45,20 @@ When launched _CRT_ you can download newer data (if present) from its online sou
 - **Commodore 64**
   - 250407
     - Covers _all_ components
-    - Oscilloscope baseline measurements:
-      - PAL
-      - NTSC
+    - Oscilloscope baseline measurements for PAL and NTSC
   - 250425
     - Covers _all_ components
-    - Oscilloscope baseline measurements:
-      - PAL
-      - NTSC
+    - Oscilloscope baseline measurements for PAL and NTSC
   - 250466
     - Covers _all_ components
-    - Oscilloscope baseline measurements:
-      - PAL
-      - NTSC
+    - Oscilloscope baseline measurements for PAL and NTSC
   - 250469
     - Covers _all_ components
-    - Oscilloscope baseline measurements:
-      - PAL
-      - NTSC
+    - Oscilloscope baseline measurements for PAL and NTSC
 - **Commodore 128 and 128D** (C128D plastic model, not DCR which has the metal cabinet)
   - 310378
     - Covers _all_ components
-    - Oscilloscope baseline measurements:
-      - PAL
-      - NTSC
+    - Oscilloscope baseline measurements for PAL and NTSC
 
 
 # Your help would be really appreciated
