@@ -45,25 +45,20 @@ When launched _CRT_ you can download newer data (if present) from its online sou
 - **Commodore 64**
   - 250407
     - Covers _all_ components
-    - Oscilloscope baseline measurements:
-      - PAL
-      - NTSC
+    - Oscilloscope baseline measurements for PAL and NTSC
   - 250425
-    - Oscilloscope baseline measurements:
-      - PAL
-      - NTSC
+    - Covers _all_ components
+    - Oscilloscope baseline measurements for PAL and NTSC
   - 250466
-    - Oscilloscope baseline measurements:
-      - PAL
+    - Covers _all_ components
+    - Oscilloscope baseline measurements for PAL and NTSC
   - 250469
-    - Oscilloscope baseline measurements:
-      - PAL (coming late November for sure)
-      - NTSC (maybe coming late November)
+    - Covers _all_ components
+    - Oscilloscope baseline measurements for PAL and NTSC
 - **Commodore 128 and 128D** (C128D plastic model, not DCR which has the metal cabinet)
   - 310378
-    - Oscilloscope baseline measurements:
-      - PAL
-      - NTSC
+    - Covers _all_ components
+    - Oscilloscope baseline measurements for PAL and NTSC
 
 
 # Your help would be really appreciated
@@ -75,7 +70,6 @@ You can also help specifically with these topics:
 - Do you have (better) datasheets or pinouts for any of the components?
 - Do you see missing components in either the component list or as a highlight?
 - Can you improve any data or fill in more technical details anywhere?
-- Would anyone be able to help out by doing the **NTSC** baseline oscilloscope measurements?
 
 You can also contribute by adding new data and send the Excel file and "label file" to me (view [Wiki Documentation](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/wiki/Documentation) for how to use the labeling software).
 
