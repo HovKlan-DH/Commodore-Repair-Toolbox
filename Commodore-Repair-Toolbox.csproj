@@ -233,7 +233,9 @@
 REM --------------------------
 REM Pack EXE with ILRepack
 REM --------------------------
-"D:\Data\Development\Visual Studio\Commodore-Repair-Toolbox\packages\ILRepack.2.0.44\tools\ILRepack.exe" /out:"$(TargetPath)" "$(TargetPath)" "$(TargetDir)EPPlus.dll" "$(TargetDir)EPPlus.Interfaces.dll" "$(TargetDir)EPPlus.System.Drawing.dll" "$(TargetDir)Microsoft.Bcl.Cryptography.dll" "$(TargetDir)Microsoft.IO.RecyclableMemoryStream.dll" "$(TargetDir)Microsoft.Web.WebView2.Core.dll" "$(TargetDir)Microsoft.Web.WebView2.WinForms.dll" "$(TargetDir)Microsoft.Web.WebView2.Wpf.dll" "$(TargetDir)Newtonsoft.Json.dll" "$(TargetDir)System.Buffers.dll" "$(TargetDir)System.ComponentModel.Annotations.dll" "$(TargetDir)System.Drawing.Common.dll" "$(TargetDir)System.Formats.Asn1.dll" "$(TargetDir)System.Memory.dll" "$(TargetDir)System.Numerics.Vectors.dll" "$(TargetDir)System.Runtime.CompilerServices.Unsafe.dll" "$(TargetDir)System.Security.Cryptography.Xml.dll" "$(TargetDir)System.ValueTuple.dll"
+"D:\Data\Development\Visual Studio\Commodore-Repair-Toolbox\packages\ILRepack.2.0.44\tools\ILRepack.exe" /out:"$(TargetPath)" "$(TargetPath)" "$(TargetDir)EPPlus.dll" "$(TargetDir)EPPlus.Interfaces.dll" "$(TargetDir)EPPlus.System.Drawing.dll" "$(TargetDir)Microsoft.Bcl.Cryptography.dll" "$(TargetDir)Microsoft.IO.RecyclableMemoryStream.dll" "$(TargetDir)Microsoft.Web.WebView2.Core.dll" "$(TargetDir)Microsoft.Web.WebView2.WinForms.dll" "$(TargetDir)Microsoft.Web.WebView2.Wpf.dll" "$(TargetDir)Newtonsoft.Json.dll" "$(TargetDir)System.Buffers.dll" "$(TargetDir)System.Drawing.Common.dll" "$(TargetDir)System.Formats.Asn1.dll" "$(TargetDir)System.Memory.dll" "$(TargetDir)System.Numerics.Vectors.dll" "$(TargetDir)System.Runtime.CompilerServices.Unsafe.dll" "$(TargetDir)System.Security.Cryptography.Xml.dll"
+rem "$(TargetDir)System.ComponentModel.Annotations.dll"
+rem "$(TargetDir)System.ValueTuple.dll"
 
 
 REM ------------------------
