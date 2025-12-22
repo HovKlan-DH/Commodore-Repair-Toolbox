@@ -1,4 +1,4 @@
-﻿using Microsoft.Web.WebView2.Core;
+﻿//using Microsoft.Web.WebView2.Core;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -15,7 +15,6 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-
 namespace Commodore_Repair_Toolbox
 {
     public partial class Main : Form
@@ -29,6 +28,29 @@ namespace Commodore_Repair_Toolbox
 
         private static bool _logInitialized = false;
         private static readonly object _logSync = new object();
+
+        // For "Resources" tab
+        private Panel _resourcesPanel;
+        private ListView _resourcesLocalFiles;
+        private ListView _resourcesWebLinks;
+        private const int ResourcesNameColumnIndex = 1;
+        private ListViewItem _hoverItem;
+        private int _hoverSubItemIndex = -1;
+        private Font _resourcesLinkFont;
+        private Font _resourcesNormalFont;
+        private static readonly Color _resourcesLocalHeaderBackColor = Color.LightGray;
+        private static readonly Color _resourcesLinksHeaderBackColor = Color.LightGray;
+        private Rectangle _hoverItemBounds = Rectangle.Empty;
+        private bool _suppressResourcesSelection;
+
+        // For "Help" tab
+        private Panel _helpNewPanel;
+        private RichTextBox _helpNewRtb;
+        private const int HelpIndentLevel1 = 18;  // bullet text start
+        private const int HelpIndentLevel2 = 40;  // sub-bullet text start
+        private const int HelpIndentLevel3 = 62;  // sub-sub-bullet (if you need it)
+        private const int EM_SETRECT = 0x00B3;
+
 
         public static void InitializeLogging()
         {
@@ -102,6 +124,7 @@ namespace Commodore_Repair_Toolbox
         private Label labelFile;
         private Label labelComponent;
         private Label labelRegion;
+        private Label labelZoom;
         public static OverlayPanel overlayPanel;
         private Dictionary<string, Control> overlayLabelMap = new Dictionary<string, Control>();
 
@@ -130,8 +153,8 @@ namespace Commodore_Repair_Toolbox
 
         // Version information
         public static string versionThis = "";
-        private string versionOnline = "";
-        private string versionOnlineTxt = "";
+        private static string versionOnline = "";
+        private static string versionOnlineTxt = "";
 
         // Current user selection
         public static string hardwareSelectedName;
@@ -210,10 +233,20 @@ namespace Commodore_Repair_Toolbox
 
             // Initialize relevant "WebView2" components (used in tab pages)
             InitializeTabConfiguration();
-            InitializeTabHelp();
+//            InitializeTabHelp();
+
+            // TEMPORARY, HEST
+            InitializeTabOverviewNewOverviewGrid();
+            InitializeTabHelpNew();
+            // TEMPORARY remove the "Overview" tab, until we decide this is the way to go or not
+            tabControl.TabPages.Remove(tabOverview);
+            tabControl.TabPages.Remove(tabResources);
+            tabControl.TabPages.Remove(tabHelp);
+            tabControl.TabPages.Remove(tabAbout);
 
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
+
         }
 
 
@@ -259,8 +292,8 @@ namespace Commodore_Repair_Toolbox
             // Set initial focus to "textBoxFilterComponents"
             textBoxFilterComponents.Focus();
 
-            // Initialize "label11" with the initial zoom level
-            label11.Text = $"{zoomLevel}";
+            // Initialize zoom level
+            labelZoom.Text = $"Z:{zoomLevel}";
 
             StartDrawingPolylines();
             PopulatePolylineVisibilityPanel();
@@ -384,6 +417,7 @@ namespace Commodore_Repair_Toolbox
                         if (onlineAvailableVersion != versionThis)
                         {
                             tabAbout.Text = "About*";
+                            tabAboutNew.Text = "About*";
                             versionOnline = onlineAvailableVersion;
                             versionOnlineTxt = "<font color='IndianRed'>";
                             versionOnlineTxt += $"There is a newer version available online: <b>" + versionOnline + @"</b ><br />";
@@ -406,6 +440,7 @@ namespace Commodore_Repair_Toolbox
                     else
                     {
                         tabAbout.Text = "About*";
+                        tabAboutNew.Text = "About*";
                         versionOnlineTxt = "<font color='IndianRed'>";
                         versionOnlineTxt += "<hr>";
                         versionOnlineTxt += "ERROR:<br />";
@@ -421,6 +456,7 @@ namespace Commodore_Repair_Toolbox
                 DebugOutput("EXCEPTION in \"GetOnlineVersion()\":");
                 DebugOutput(ex.ToString());
                 tabAbout.Text = "About*";
+                tabAboutNew.Text = "About*";
                 versionOnlineTxt = "<font color='IndianRed'>";
                 versionOnlineTxt += "<hr>";
                 versionOnlineTxt += "ERROR:<br />";
@@ -637,6 +673,7 @@ namespace Commodore_Repair_Toolbox
         private void AttachClickEventsToFocusFilterComponents(Control parent)
         {
             if (!(parent is ComboBox))
+//            if (!(parent is ComboBox) && !(parent is ListView)) // HEST
             {
                 EventHandler handler = (s, e) => textBoxFilterComponents.Focus();
                 parent.Click += handler;
@@ -713,12 +750,288 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
+        // Overview tab
+        // ###########################################################################################
+
+        private void InitializeTabOverviewNewOverviewGrid()
+        {
+            // Hide the left row-header column entirely
+            dataGridViewOverview.RowHeadersVisible = false;
+
+            dataGridViewOverview.DefaultCellStyle.Font = new Font("Calibri", 11F);
+            dataGridViewOverview.ColumnHeadersDefaultCellStyle.Font = new Font("Calibri", 11F, FontStyle.Bold);
+            dataGridViewOverview.EnableHeadersVisualStyles = false;
+            dataGridViewOverview.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(0xDD, 0xDD, 0xDD);
+            dataGridViewOverview.ColumnHeadersDefaultCellStyle.ForeColor = Color.Black;
+
+            dataGridViewOverview.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+            dataGridViewOverview.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.DisplayedCells;
+            dataGridViewOverview.RowTemplate.Resizable = DataGridViewTriState.False;
+
+            // Prevent any visible selection/highlight (WITHOUT breaking LinkColumn clicks)
+            dataGridViewOverview.MultiSelect = false;
+            dataGridViewOverview.SelectionMode = DataGridViewSelectionMode.CellSelect;
+            dataGridViewOverview.DefaultCellStyle.SelectionBackColor = dataGridViewOverview.DefaultCellStyle.BackColor;
+            dataGridViewOverview.DefaultCellStyle.SelectionForeColor = dataGridViewOverview.DefaultCellStyle.ForeColor;
+
+            // Clear selection immediately after it changes, but keep CurrentCell intact
+            dataGridViewOverview.SelectionChanged -= DataGridViewOverview_SelectionChanged_Clear;
+            dataGridViewOverview.SelectionChanged += DataGridViewOverview_SelectionChanged_Clear;
+
+            dataGridViewOverview.Columns.Clear();
+
+            dataGridViewOverview.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "Type",
+                HeaderText = "Type",
+                DataPropertyName = "Type",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+            });
+
+            dataGridViewOverview.Columns.Add(new DataGridViewLinkColumn
+            {
+                Name = "Component",
+                HeaderText = "Component",
+                DataPropertyName = "ComponentLabel",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells,
+                LinkColor = Color.FromArgb(0x06, 0x45, 0xAD),
+                ActiveLinkColor = Color.FromArgb(0x0B, 0x00, 0x80),
+                VisitedLinkColor = Color.FromArgb(0x06, 0x45, 0xAD)
+            });
+
+            dataGridViewOverview.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "TechnicalName",
+                HeaderText = "Technical name",
+                DataPropertyName = "TechnicalName",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells,
+                DefaultCellStyle = { WrapMode = DataGridViewTriState.True }
+            });
+
+            dataGridViewOverview.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "FriendlyName",
+                HeaderText = "Friendly name",
+                DataPropertyName = "FriendlyName",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells,
+                DefaultCellStyle = { WrapMode = DataGridViewTriState.True }
+            });
+
+            dataGridViewOverview.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "PartNumber",
+                HeaderText = "Part-number",
+                DataPropertyName = "PartNumber",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+            });
+
+            dataGridViewOverview.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "ShortDescription",
+                HeaderText = "Short description",
+                DataPropertyName = "ShortDescription",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                MinimumWidth = 150,
+                DefaultCellStyle = { WrapMode = DataGridViewTriState.True }
+            });
+
+            dataGridViewOverview.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "Notes",
+                HeaderText = "Notes",
+                DataPropertyName = "Notes",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                MinimumWidth = 200,
+                DefaultCellStyle = { WrapMode = DataGridViewTriState.True }
+            });
+
+            dataGridViewOverview.Columns.Add(new DataGridViewLinkColumn
+            {
+                Name = "LocalFiles",
+                HeaderText = "Local files",
+                DataPropertyName = "LocalFilesText",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+            });
+
+            dataGridViewOverview.Columns.Add(new DataGridViewLinkColumn
+            {
+                Name = "WebLinks",
+                HeaderText = "Web links",
+                DataPropertyName = "WebLinksText",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+            });
+
+            dataGridViewOverview.CellContentClick -= DataGridViewOverview_CellContentClick;
+            dataGridViewOverview.CellContentClick += DataGridViewOverview_CellContentClick;
+        }
+
+        private void DataGridViewOverview_SelectionChanged_Clear(object sender, EventArgs e)
+        {
+            if (!dataGridViewOverview.IsHandleCreated) return;
+
+            // Keep link-click functionality: do NOT set CurrentCell = null here
+            dataGridViewOverview.ClearSelection();
+        }
+
+        private void UpdateTabOverviewNew(Board selectedBoard)
+        {
+            if (selectedBoard == null)
+            {
+                dataGridViewOverview.DataSource = null;
+                return;
+            }
+
+            var visibleDisplays = listBoxComponents.Items.Cast<string>().ToHashSet();
+
+            var rows = new List<OverviewRow>();
+
+            foreach (var comp in selectedBoard.Components ?? Enumerable.Empty<BoardComponents>())
+            {
+                if (!visibleDisplays.Contains(comp.NameDisplay)) continue;
+
+                string compLabel = comp.Label;
+
+                string baseKey = $"UserData|{hardwareSelectedName}|{boardSelectedName}|{compLabel}";
+                string oneLinerKey = $"{baseKey}|Oneliner";
+                string notesKey = $"{baseKey}|Notes";
+
+                string shortDescr = Configuration.GetSetting(oneLinerKey, "");
+                if (string.IsNullOrEmpty(shortDescr))
+                {
+                    shortDescr = comp.OneLiner;
+                }
+
+                string notes = Configuration.GetSetting(notesKey, "");
+                if (string.IsNullOrEmpty(notes))
+                {
+                    if (comp.ComponentImages != null && comp.ComponentImages.Count > 0)
+                    {
+                        var firstNote = comp.ComponentImages
+                            .Select(img => img.Note)
+                            .FirstOrDefault(note => !string.IsNullOrEmpty(note));
+                        notes = firstNote ?? "";
+                    }
+                    else
+                    {
+                        notes = "";
+                    }
+                }
+
+                var localFilePaths = new List<string>();
+                if (comp.LocalFiles != null)
+                {
+                    foreach (var f in comp.LocalFiles)
+                    {
+                        string filePath = Path.GetFullPath(DataPaths.Resolve(f.FileName));
+                        localFilePaths.Add(filePath);
+                    }
+                }
+
+                var webUrls = new List<string>();
+                if (comp.ComponentLinks != null)
+                {
+                    foreach (var link in comp.ComponentLinks)
+                    {
+                        if (!string.IsNullOrWhiteSpace(link.Url))
+                        {
+                            webUrls.Add(link.Url);
+                        }
+                    }
+                }
+
+                rows.Add(new OverviewRow
+                {
+                    Type = comp.Type,
+                    ComponentLabel = compLabel,
+                    TechnicalName = comp.NameTechnical,
+                    FriendlyName = (comp.NameFriendly ?? "").Replace("?", ""),
+                    PartNumber = comp.Partnumber,
+                    ShortDescription = shortDescr,
+                    Notes = notes,
+
+                    LocalFilesText = localFilePaths.Count > 0 ? $"#{localFilePaths.Count}" : "",
+                    WebLinksText = webUrls.Count > 0 ? $"#{webUrls.Count}" : "",
+
+                    LocalFilePaths = localFilePaths,
+                    WebUrls = webUrls
+                });
+            }
+
+            dataGridViewOverview.DataSource = rows;
+        }
+
+        private sealed class OverviewRow
+        {
+            public string Type { get; set; }
+            public string ComponentLabel { get; set; }
+            public string TechnicalName { get; set; }
+            public string FriendlyName { get; set; }
+            public string PartNumber { get; set; }
+            public string ShortDescription { get; set; }
+            public string Notes { get; set; }
+
+            // Display text in grid
+            public string LocalFilesText { get; set; }
+            public string WebLinksText { get; set; }
+
+            // Targets used when clicking
+            public List<string> LocalFilePaths { get; set; }
+            public List<string> WebUrls { get; set; }
+        }                
+
+        private void DataGridViewOverview_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            var row = dataGridViewOverview.Rows[e.RowIndex];
+            var model = row.DataBoundItem as OverviewRow;
+            if (model == null) return;
+
+            string col = dataGridViewOverview.Columns[e.ColumnIndex].Name;
+
+            if (col == "Component")
+            {
+                var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+                var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+                var comps = foundBoard?.Components.Where(c => c.Label == model.ComponentLabel).ToList();
+
+                if (comps != null && comps.Count > 0)
+                {
+                    ShowComponentPopup(comps);
+                }
+                return;
+            }
+
+            if (col == "LocalFiles" && model.LocalFilePaths != null && model.LocalFilePaths.Count > 0)
+            {
+                string filePath = model.LocalFilePaths[0]; // simple: open first; can be enhanced to choose
+                if (File.Exists(filePath))
+                {
+                    Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
+                }
+                else
+                {
+                    DebugOutput("File [" + filePath + "] does not exists!");
+                }
+                return;
+            }
+
+            if (col == "WebLinks" && model.WebUrls != null && model.WebUrls.Count > 0)
+            {
+                Process.Start(new ProcessStartInfo(model.WebUrls[0]) { UseShellExecute = true });
+                return;
+            }
+        }
+
+
+        // ###########################################################################################
         // Enforce WebView2 to use "Light" mode only.
         // ###########################################################################################
 
+        /*
         private async Task EnsureWebView2LightAsync(Microsoft.Web.WebView2.WinForms.WebView2 wv)
         {
-            // Initialize normally (no custom environment needed unless you want to disable Chromium dark forcing)
+            // Initialize normally
             if (wv.CoreWebView2 == null)
                 await wv.EnsureCoreWebView2Async();
 
@@ -772,12 +1085,19 @@ namespace Commodore_Repair_Toolbox
             }
             catch { }
         }
+        */
 
         // ###########################################################################################
         // Initialize and update the tab for "Overview".
         // Will load new content from board data file.
         // ###########################################################################################     
 
+        public async void UpdateTabNewOverview(Board selectedBoard)
+        {
+            UpdateTabOverviewNew(selectedBoard);
+        }
+
+/*
         public async void UpdateTabOverview(Board selectedBoard)
         {
             await EnsureWebView2LightAsync(webView2Overview);
@@ -1013,8 +1333,9 @@ namespace Commodore_Repair_Toolbox
 
             webView2Overview.NavigateToString(htmlContent);
         }
+*/
 
-
+        /*
         private void WebView2_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
             var message = e.TryGetWebMessageAsString();
@@ -1065,6 +1386,7 @@ namespace Commodore_Repair_Toolbox
                 // NOP (it has this event to close the component popup)
             }
         }
+        */
 
         private void CloseComponentPopup()
         {
@@ -1081,6 +1403,574 @@ namespace Commodore_Repair_Toolbox
         // Will load new content from board data file.
         // ###########################################################################################
 
+
+        private void InitializeTabResourcesNew()
+        {
+            if (_resourcesPanel != null)
+            {
+                return;
+            }
+
+            _resourcesPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                BackColor = Color.White
+            };
+
+            var header = new Label
+            {
+                Text = "Resources for troubleshooting and information",
+                Font = new Font("Calibri", 14, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(12, 12)
+            };
+
+            var localHeader = new Label
+            {
+                Text = "Local files",
+                Font = new Font("Calibri", 12, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(12, header.Bottom + 14)
+            };
+
+            _resourcesNormalFont = new Font("Calibri", 11F, FontStyle.Regular);
+            _resourcesLinkFont = new Font(_resourcesNormalFont, FontStyle.Underline);
+
+            _resourcesLocalFiles = new ListView
+            {
+                View = View.Details,
+                FullRowSelect = false,
+                HideSelection = true,
+                Location = new Point(12, localHeader.Bottom + 6),
+                Width = tabResourcesNew.ClientSize.Width - 24,
+                Height = 220,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                HeaderStyle = ColumnHeaderStyle.Nonclickable,
+                Font = _resourcesNormalFont,
+                BorderStyle = BorderStyle.None
+            };
+            _resourcesLocalFiles.Columns.Add("Category", 200);
+            _resourcesLocalFiles.Columns.Add("Name", 700);
+            _resourcesLocalFiles.HotTracking = false;
+            _resourcesLocalFiles.HoverSelection = false;
+            _resourcesLocalFiles.DoubleBuffered(true);
+
+            var linksHeader = new Label
+            {
+                Text = "Links",
+                Font = new Font("Calibri", 12, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(12, _resourcesLocalFiles.Bottom + 18)
+            };
+
+            _resourcesWebLinks = new ListView
+            {
+                View = View.Details,
+                FullRowSelect = false,
+                HideSelection = true,
+                Location = new Point(12, linksHeader.Bottom + 6),
+                Width = tabResourcesNew.ClientSize.Width - 24,
+                Height = 220,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                HeaderStyle = ColumnHeaderStyle.Nonclickable,
+                Font = _resourcesNormalFont,
+                BorderStyle = BorderStyle.None
+            };
+            _resourcesWebLinks.Columns.Add("Category", 200);
+            _resourcesWebLinks.Columns.Add("Name", 700);
+            _resourcesWebLinks.HotTracking = false;
+            _resourcesWebLinks.HoverSelection = false;
+            _resourcesWebLinks.DoubleBuffered(true);
+
+            ApplyResourcesListViewLinkBehavior(_resourcesLocalFiles);
+            ApplyResourcesListViewLinkBehavior(_resourcesWebLinks);
+
+            tabResourcesNew.Resize += (s, e) =>
+            {
+                LayoutResourcesControls();
+            };
+
+            _resourcesPanel.Controls.Add(header);
+            _resourcesPanel.Controls.Add(localHeader);
+            _resourcesPanel.Controls.Add(_resourcesLocalFiles);
+            _resourcesPanel.Controls.Add(linksHeader);
+            _resourcesPanel.Controls.Add(_resourcesWebLinks);
+
+            tabResourcesNew.Controls.Add(_resourcesPanel);
+
+            ApplyResourcesListViewHeaderStyle(_resourcesLocalFiles, _resourcesLocalHeaderBackColor);
+            ApplyResourcesListViewHeaderStyle(_resourcesWebLinks, _resourcesLinksHeaderBackColor);
+        }
+
+        private void ApplyResourcesListViewLinkBehavior(ListView lv)
+        {
+            lv.MouseDown -= ResourcesListView_MouseDown;
+            lv.MouseDown += ResourcesListView_MouseDown;
+
+            lv.MouseUp -= ResourcesListView_MouseUp;
+            lv.MouseUp += ResourcesListView_MouseUp;
+
+            lv.MouseMove -= ResourcesListView_MouseMove;
+            lv.MouseMove += ResourcesListView_MouseMove;
+
+            lv.MouseLeave -= ResourcesListView_MouseLeave;
+            lv.MouseLeave += ResourcesListView_MouseLeave;
+
+            // Important: don't use ItemActivate when using MouseUp
+            lv.ItemActivate -= ResourcesListView_ItemActivate;
+        }
+
+        private void ResourcesListView_ItemActivate(object sender, EventArgs e)
+        {
+            var lv = (ListView)sender;
+
+            // Must have a focused/activated item
+            var item = lv.FocusedItem;
+            if (item == null)
+            {
+                return;
+            }
+
+            string target = item.Tag as string;
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                DebugOutput("[Resources] Target is empty/null");
+                return;
+            }
+
+            ResourcesOpenTarget(target, lv == _resourcesLocalFiles);
+
+            // Prevent the row from staying selected
+            lv.SelectedIndices.Clear();
+            lv.FocusedItem = null;
+
+            FocusFilterTextBox();
+        }
+
+        private void ResourcesListView_ItemSelectionChanged(object sender, ListViewItemSelectionChangedEventArgs e)
+        {
+            if (!_suppressResourcesSelection) return;
+
+            if (e.IsSelected)
+            {
+                e.Item.Selected = false;
+                e.Item.Focused = false;
+
+                var lv = (ListView)sender;
+                lv.Invalidate(e.Item.Bounds);
+            }
+        }
+
+        private void FocusFilterTextBox()
+        {
+            if (tabControl.SelectedTab == tabSchematics)
+            {
+                // When on Schematics, focus should stay on the filter textbox by design
+                textBoxFilterComponents.Focus();
+                return;
+            }
+
+            // Also allow focus behavior on other tabs if you want it globally:
+            textBoxFilterComponents.Focus();
+        }
+
+        private void ResourcesListView_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left) return;
+
+            FocusFilterTextBox();
+
+            var lv = (ListView)sender;
+            var hit = lv.HitTest(e.Location);
+
+            int subIndex = hit.Item != null && hit.SubItem != null
+                ? hit.Item.SubItems.IndexOf(hit.SubItem)
+                : -1;
+
+            _suppressResourcesSelection = (hit.Item != null && subIndex == ResourcesNameColumnIndex);
+
+            if (_suppressResourcesSelection)
+            {
+                lv.SelectedIndices.Clear();
+                lv.FocusedItem = null;
+            }
+        }
+
+        private static void SetListViewColumnWidths(ListView lv, int categoryWidth)
+        {
+            if (lv == null) return;
+            if (lv.Columns.Count < 2) return;
+
+            // Keep first column fixed
+            lv.Columns[0].Width = categoryWidth;
+
+            // Remaining space goes to column 1 ("Name")
+            int scrollbarWidth = lv.Items.Count > 0 ? SystemInformation.VerticalScrollBarWidth : 0;
+
+            // Leave a bit of padding for borders/owner-draw artifacts
+            int padding = 6;
+
+            int available = lv.ClientSize.Width - categoryWidth - scrollbarWidth - padding;
+            lv.Columns[1].Width = Math.Max(50, available);
+        }
+
+
+        private void ResourcesListView_MouseMove(object sender, MouseEventArgs e)
+        {
+            var lv = (ListView)sender;
+            var hit = lv.HitTest(e.Location);
+
+            int subIndex = hit.Item != null && hit.SubItem != null
+                ? hit.Item.SubItems.IndexOf(hit.SubItem)
+                : -1;
+
+            lv.Cursor = (hit.Item != null && subIndex == ResourcesNameColumnIndex)
+                ? Cursors.Hand
+                : Cursors.Default;
+
+            // Only repaint rows when the hovered item changes (avoid full Invalidate flicker)
+            if (!ReferenceEquals(_hoverItem, hit.Item) || _hoverSubItemIndex != subIndex)
+            {
+                // repaint previous hovered row
+                if (!_hoverItemBounds.IsEmpty)
+                {
+                    lv.Invalidate(_hoverItemBounds);
+                }
+
+                _hoverItem = hit.Item;
+                _hoverSubItemIndex = subIndex;
+
+                // repaint new hovered row
+                _hoverItemBounds = hit.Item != null ? hit.Item.Bounds : Rectangle.Empty;
+                if (!_hoverItemBounds.IsEmpty)
+                {
+                    lv.Invalidate(_hoverItemBounds);
+                }
+            }
+        }
+
+        private void ResourcesListView_MouseLeave(object sender, EventArgs e)
+        {
+            var lv = (ListView)sender;
+            lv.Cursor = Cursors.Default;
+
+            if (!_hoverItemBounds.IsEmpty)
+            {
+                lv.Invalidate(_hoverItemBounds);
+            }
+
+            _hoverItem = null;
+            _hoverSubItemIndex = -1;
+            _hoverItemBounds = Rectangle.Empty;
+        }
+
+        private void ResourcesListView_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left) return;
+
+            DebugOutput("[Resources] MouseUp fired");
+
+            FocusFilterTextBox();
+
+            _suppressResourcesSelection = false;
+
+            var lv = (ListView)sender;
+            var hit = lv.HitTest(e.Location);
+
+            int subIndex = hit.Item != null && hit.SubItem != null
+                ? hit.Item.SubItems.IndexOf(hit.SubItem)
+                : -1;
+
+            if (hit.Item == null || subIndex != ResourcesNameColumnIndex)
+            {
+                return;
+            }
+
+            // Prevent the row from staying selected when clicking the "Name" link column
+            if (hit.Item.Selected)
+            {
+                hit.Item.Selected = false;
+                if (hit.Item.Focused)
+                {
+                    hit.Item.Focused = false;
+                }
+
+                lv.HideSelection = true;
+                lv.Invalidate(hit.Item.Bounds);
+            }
+
+            string target = hit.Item.Tag as string;
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                DebugOutput("[Resources] Target is empty/null");
+                return;
+            }
+
+            ResourcesOpenTarget(target, lv == _resourcesLocalFiles);
+        }
+
+        private void ResourcesOpenTarget(string target, bool isLocalFile)
+        {
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                DebugOutput("[Resources] Target is empty/null");
+                return;
+            }
+
+            target = target.Trim();
+            DebugOutput("[Resources] Open: isLocalFile=" + isLocalFile + " target=[" + target + "]");
+
+            if (isLocalFile)
+            {
+                if (File.Exists(target))
+                {
+                    Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+                }
+                else
+                {
+                    DebugOutput("File [" + target + "] does not exists!");
+                }
+
+                textBoxFilterComponents.Focus();
+                return;
+            }
+
+            if (!target.Contains("://"))
+            {
+                target = "https://" + target;
+            }
+
+            if (!Uri.TryCreate(target, UriKind.Absolute, out Uri uri))
+            {
+                DebugOutput("[Resources] Invalid URL (TryCreate failed): [" + target + "]");
+                textBoxFilterComponents.Focus();
+                return;
+            }
+
+            DebugOutput("[Resources] Launching URL: [" + uri.AbsoluteUri + "]");
+
+            try
+            {
+                Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                DebugOutput("ERROR: Failed opening URL [" + uri.AbsoluteUri + "]: " + ex);
+            }
+
+            textBoxFilterComponents.Focus();
+        }
+
+
+        private void ApplyResourcesListViewHeaderStyle(ListView lv, Color headerBackColor)
+        {
+            lv.OwnerDraw = true;
+
+            lv.DrawColumnHeader -= ResourcesListView_DrawColumnHeader;
+            lv.DrawColumnHeader += ResourcesListView_DrawColumnHeader;
+
+            lv.DrawItem -= ResourcesListView_DrawItem;
+            lv.DrawItem += ResourcesListView_DrawItem;
+
+            lv.DrawSubItem -= ResourcesListView_DrawSubItem;
+            lv.DrawSubItem += ResourcesListView_DrawSubItem;
+
+            lv.Tag = headerBackColor; // store per-list header color
+        }
+
+        private void ResourcesListView_DrawColumnHeader(object sender, DrawListViewColumnHeaderEventArgs e)
+        {
+            var lv = (ListView)sender;
+            Color backColor = lv.Tag is Color c ? c : SystemColors.Control;
+
+            using (var backBrush = new SolidBrush(backColor))
+            using (var textBrush = new SolidBrush(Color.Black))
+            using (var borderPen = new Pen(Color.FromArgb(0xAA, 0xAA, 0xAA)))
+            {
+                e.Graphics.FillRectangle(backBrush, e.Bounds);
+                e.Graphics.DrawRectangle(borderPen, new Rectangle(e.Bounds.X, e.Bounds.Y, e.Bounds.Width - 1, e.Bounds.Height - 1));
+
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    e.Header.Text,
+                    e.Font,
+                    e.Bounds,
+                    Color.Black,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            }
+        }
+
+        private void ResourcesListView_DrawItem(object sender, DrawListViewItemEventArgs e)
+        {
+            // Intentionally empty.
+            // We draw full background + text in DrawSubItem to avoid OS hot/hover painting conflicts.
+        }
+
+        private void ResourcesListView_DrawSubItem(object sender, DrawListViewSubItemEventArgs e)
+        {
+            var lv = (ListView)sender;
+
+            // Detect "hot" (hovered) item so we can paint a stable background
+            Point clientPos = lv.PointToClient(Cursor.Position);
+            var hit = lv.HitTest(clientPos);
+            bool isHotItem = hit != null && hit.Item == e.Item;
+
+            // IMPORTANT: do not render selection at all (prevents "row marked" effect)
+            Color backColor = isHotItem
+                ? Color.FromArgb(0xF2, 0xF2, 0xF2)
+                : (e.SubItem.BackColor.IsEmpty ? lv.BackColor : e.SubItem.BackColor);
+
+            Color foreColor = e.SubItem.ForeColor.IsEmpty ? lv.ForeColor : e.SubItem.ForeColor;
+
+            using (var backBrush = new SolidBrush(backColor))
+            {
+                e.Graphics.FillRectangle(backBrush, e.Bounds);
+            }
+
+            Font font = e.SubItem.Font ?? e.Item.Font;
+
+            TextRenderer.DrawText(
+                e.Graphics,
+                e.SubItem.Text,
+                font,
+                e.Bounds,
+                foreColor,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        }
+
+        private void UpdateTabResourcesNew(Board selectedBoard)
+        {
+            InitializeTabResourcesNew();
+
+            _resourcesLocalFiles.BeginUpdate();
+            _resourcesWebLinks.BeginUpdate();
+            try
+            {
+                _resourcesLocalFiles.Items.Clear();
+                _resourcesWebLinks.Items.Clear();
+
+                if (selectedBoard == null)
+                {
+                    return;
+                }
+
+                if (selectedBoard.BoardLocalFiles != null)
+                {
+                    foreach (var f in selectedBoard.BoardLocalFiles)
+                    {
+                        string filePath = Path.GetFullPath(Path.Combine(DataPaths.DataRoot, f.Datafile));
+
+                        var item = new ListViewItem(f.Category ?? "")
+                        {
+                            Tag = filePath
+                        };
+                        item.UseItemStyleForSubItems = false;
+
+                        var nameSub = item.SubItems.Add(f.Name ?? "");
+                        nameSub.ForeColor = Color.FromArgb(0x06, 0x45, 0xAD);
+                        nameSub.Font = _resourcesLinkFont;
+
+                        _resourcesLocalFiles.Items.Add(item);
+                    }
+                }
+
+                if (selectedBoard.BoardLinks != null)
+                {
+                    foreach (var l in selectedBoard.BoardLinks)
+                    {
+                        var item = new ListViewItem(l.Category ?? "")
+                        {
+                            Tag = l.Url
+                        };
+                        item.UseItemStyleForSubItems = false;
+
+                        var nameSub = item.SubItems.Add(l.Name ?? "");
+                        nameSub.ForeColor = Color.FromArgb(0x06, 0x45, 0xAD);
+                        nameSub.Font = _resourcesLinkFont;
+
+                        _resourcesWebLinks.Items.Add(item);
+                    }
+                }
+
+//                _resourcesLocalFiles.AutoResizeColumns(ColumnHeaderAutoResizeStyle.ColumnContent);
+//                _resourcesWebLinks.AutoResizeColumns(ColumnHeaderAutoResizeStyle.ColumnContent);
+
+                LayoutResourcesControls();
+            }
+            finally
+            {
+                _resourcesLocalFiles.EndUpdate();
+                _resourcesWebLinks.EndUpdate();
+            }
+        }
+
+        private void LayoutResourcesControls()
+        {
+            if (_resourcesPanel == null || _resourcesLocalFiles == null || _resourcesWebLinks == null)
+            {
+                return;
+            }
+
+            var header = _resourcesPanel.Controls.OfType<Label>()
+                .FirstOrDefault(l => l.Text == "Resources for troubleshooting and information");
+
+            var localHeader = _resourcesPanel.Controls.OfType<Label>()
+                .FirstOrDefault(l => l.Text == "Local files");
+
+            var linksHeader = _resourcesPanel.Controls.OfType<Label>()
+                .FirstOrDefault(l => l.Text == "Links");
+
+            if (header == null || localHeader == null || linksHeader == null)
+            {
+                return;
+            }
+
+            int width = tabResourcesNew.ClientSize.Width - 24;
+            _resourcesLocalFiles.Width = width;
+            _resourcesWebLinks.Width = width;
+
+            SetListViewColumnWidths(_resourcesLocalFiles, 200);
+            SetListViewColumnWidths(_resourcesWebLinks, 200);
+
+            _resourcesLocalFiles.Height = CalculateListViewHeight(_resourcesLocalFiles);
+            _resourcesWebLinks.Height = CalculateListViewHeight(_resourcesWebLinks);
+
+            linksHeader.Location = new Point(12, _resourcesLocalFiles.Bottom + 18);
+            _resourcesWebLinks.Location = new Point(12, linksHeader.Bottom + 6);
+        }
+
+        private static int CalculateListViewHeight(ListView lv)
+        {
+            const int minHeight = 60;     // don’t collapse too far when empty
+            const int maxHeight = 600;    // cap; beyond this user scrolls the panel, not the list
+
+            // Height = header + rows + a little padding for borders
+            int headerHeight = lv.Font.Height + 10; // simple approximation for ColumnHeader height
+            int rowHeight = lv.Font.Height + 6;     // simple approximation for Item height
+            int rows = Math.Max(1, lv.Items.Count);
+
+            int desired = headerHeight + (rowHeight * rows) + 6;
+            if (desired < minHeight) return minHeight;
+            if (desired > maxHeight) return maxHeight;
+            return desired;
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        /*
         private async void UpdateTabResources(Board selectedBoard)
         {
             await EnsureWebView2LightAsync(webView2Resources);
@@ -1177,6 +2067,7 @@ namespace Commodore_Repair_Toolbox
             // Set focus back to the "textBoxFilterComponents"
             textBoxFilterComponents.Focus();
         }
+        */
 
 
         // ###########################################################################################
@@ -1372,6 +2263,228 @@ namespace Commodore_Repair_Toolbox
         // Initialize the tab for "Help".
         // ###########################################################################################
 
+        private void InitializeTabHelpNew()
+        {
+            try
+            {
+                richTextBoxHelp.LinkClicked -= RichTextBoxHelp_LinkClicked;
+                richTextBoxHelp.LinkClicked += RichTextBoxHelp_LinkClicked;
+
+                richTextBoxHelp.Rtf = BuildHelpRtf();
+
+                // "Padding" inside the control
+                SetRichTextBoxPadding(richTextBoxHelp, new Padding(10, 10, 10, 10));
+                richTextBoxHelp.Resize -= RichTextBoxHelp_Resize_SetPadding;
+                richTextBoxHelp.Resize += RichTextBoxHelp_Resize_SetPadding;
+            }
+            catch { /* best-effort */ }
+        }
+
+        private static string BuildHelpRtf()
+        {
+            var sb = new StringBuilder();
+
+            // RTF header with font and color tables
+            sb.Append(@"{\rtf1\ansi\deff0");
+            sb.Append(@"{\fonttbl{\f0 Calibri;}{\f1 Consolas;}}");
+            // colortbl: [0]=auto; [1]=text (black); [2]=keycap bg (light gray)
+            sb.Append(@"{\colortbl ;\red0\green0\blue0;\red230\green234\blue238;}");
+            sb.Append(@"\f0\fs22 "); // Calibri 11pt
+
+            sb.Append(@"{\fs28{\b Help for application usage}}\line\line ");
+
+            sb.Append(@"{{\b ""Schematics"" tab}\line\line ");
+
+            sb.Append(@"{\b Mouse functions:}\line ");
+            sb.Append(@"    * "+ KeycapRtf("Left-click") +@" on a component will show a information popup\line ");
+            sb.Append(@"    * "+ KeycapRtf("Left-click") + @" + "+ KeycapRtf("Hold") +@" on a component will do one of three things:\line ");
+            sb.Append(@"        - Start a new trace, when in ""empty"" space (not on top of component)\line ");
+            sb.Append(@"        - Move trace marker, if mouse is on top of an existing trace marker\line ");
+            sb.Append(@"        - Insert new trace marker, if mouse is on top of an existing trace, but not on top of a trace marker\line ");
+            sb.Append(@"    * " + KeycapRtf("Right-click") + @" on a component will do one of three things:\line ");
+            sb.Append(@"        - Toggle component highlight, if mouse is on top of a component\line ");
+            sb.Append(@"        - Remove entire trace, if mouse is on top of an existing trace, but not on top of a trace marker\line ");
+            sb.Append(@"        - Remove trace marker, if mouse is on top of an existing trace marker\line ");
+            sb.Append(@"    * " + KeycapRtf("Right-click") + @" + " + KeycapRtf("Hold") + @" will pan the image\line ");
+            sb.Append(@"    * " + KeycapRtf("Scrollwheel") + @" will zoom in/out\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\b Keyboard functions:}\line ");
+            sb.Append(@"    * " + KeycapRtf("F11") + @" will toggle fullscreen\line ");
+            sb.Append(@"    * " + KeycapRtf("ESCAPE") + @" (in fullscreen) will exit fullscreen\line ");
+            sb.Append(@"    * " + KeycapRtf("ENTER") + @" will toggle blinking for selected components\line ");
+            sb.Append(@"    * " + KeycapRtf("ALT") + @" + " + KeycapRtf("A") + @" will select all components in ""Component list""\line ");
+            sb.Append(@"    * " + KeycapRtf("ALT") + @" + " + KeycapRtf("C") + @" will clear all selections and show all components in ""Component list""\line ");
+            sb.Append(@"    * Start typing anywhere to filter component list(view ""Filtering"")\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\b Filtering:}\line ");
+            sb.Append(@"    * Filtering supports multi-word / character searching, divided by a whitespace\line ");
+            sb.Append(@"    * When doing a multi - word searching then the order is not important\line ");
+            sb.Append(@"    * Filtering is case-insensitive\line ");
+            sb.Append(@"    * Examples of a multi - word / character search:\line ");
+            sb.Append(@"        - Typing "+ KeycapRtf("U6 | CPU | 8502") + @" will find the component "+ KeycapRtf("U6 | CPU | 8502") +@"\line ");
+            sb.Append(@"        - Typing "+ KeycapRtf("CPU 8502 U6") + @" will find the component "+ KeycapRtf("U6 | CPU | 8502") +@"\line ");
+            sb.Append(@"        - Typing "+ KeycapRtf("5 8 U P c 6") + @" will find the component "+ KeycapRtf("U6 | CPU | 8502") +@"\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\b PAL/NTSC:}\line ");
+            sb.Append(@"    * {\b PAL}\line ");
+            sb.Append(@"        - Filters all components and images where the region is either set to PAL or not relevant (generic)\line ");
+            sb.Append(@"    * {\b NTSC}\line ");
+            sb.Append(@"        - Filters all components and images where the region is either set to NTSC or not relevant (generic)\line ");
+            sb.Append(@"    * The component information popup shows a counter on the two region buttons for the number of images relevant specifically for this region or if images are generic\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\b Component selection:}\line ");
+            sb.Append(@"    * When a component is selected, then it will also visualize if component is part of thumbnail in list - view:\line ");
+            sb.Append(@"        - Appending an asterisk/* as first character in thumbnail label\line ");
+            sb.Append(@"        - Background color of thumbnail label changes to blue\line ");
+            sb.Append(@"    * You cannot highlight a component in image, if its component category is unselected\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\b Component selection:}\line ");
+            sb.Append(@"    * When a component is selected, then it will also visualize if component is part of thumbnail in list - view:\line ");
+            sb.Append(@"        - Appending an asterisk/* as first character in thumbnail label\line ");
+            sb.Append(@"        - Background color of thumbnail label changes to blue\line ");
+            sb.Append(@"    * You cannot highlight a component in image, if its component category is unselected\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\b Circuit tracing:}\line ");
+            sb.Append(@"    * When mouse cursor shows a ""cross"", then you can start drawing a new trace\line ");
+            sb.Append(@"    * Holding down " + KeycapRtf("SHIFT") + @" while drawing a trace, will vertically and horizontally align the trace to its neighbour markers\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\b ""Labels visible"" panel:}\line ");
+            sb.Append(@"    * If no components are selected for the specific schematic, then the panel with checkboxes will not be shown\line ");
+            sb.Append(@"    * The panel can be toggled minimized/maximized with the ""M"" button\line ");
+            sb.Append(@"    * When only one checkbox is selected, then it will replace whitespaces in label with new-lines to condense the text\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\b ""Traces visible"" panel:}\line ");
+            sb.Append(@"    * If no traces are drawn for the specific schematic, then the panel with checkboxes will not be shown\line ");
+            sb.Append(@"    * The panel can be toggled minimized/maximized with the ""M"" button\line ");
+            sb.Append(@"    * Traces can be toggled hidden/shown based on their color - this applies to all traces within the selected hardware/board\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"------------------------------------------------------------------------------------------------------------------------------------ \line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\fs28{\b Component information popup}}\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"If multiple images are available for the selected component, then it will show ""Image 1 of x"" in the top right corner.\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\b Mouse functions:}\line ");
+            sb.Append(@"    * " + KeycapRtf("Left-click") + @" in the image area will change back to first image (typically the pinout)\line ");
+            sb.Append(@"    * " + KeycapRtf("Scrollwheel") + @" will change image, if multiple images\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\b Keyboard  functions:}\line ");
+            sb.Append(@"    * Arrow keys " + KeycapRtf("LEFT") + @" "+ KeycapRtf("RIGHT") +@" "+ KeycapRtf("UP") + @" "+ KeycapRtf("DOWN") + @" will change image, if multiple images\line ");
+            sb.Append(@"    * " + KeycapRtf("SPACE") + @" will change back to first image (typical the pinout)\line ");
+            sb.Append(@"    * " + KeycapRtf("CTRL") + @" + " + KeycapRtf("TAB") + @" will toggle between PAL and NTSC\line ");
+            sb.Append(@"    * " + KeycapRtf("ESCAPE") + @" will close popup\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"------------------------------------------------------------------------------------------------------------------------------------ \line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\fs28{\b Data update from online source}}\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"It is possible to fetch the newest data from the online source.\line ");
+            sb.Append(@"You can do this via the ""Configuration"" tab.\line ");
+            sb.Append(@"\line ");
+            sb.Append(@"If you have not modified any data on your own, then there is no risks in doing this - go for it.\line ");
+            sb.Append(@"If you do have modified some data, then be aware that all Excel data files and all images will be overwritten, so do make a backup before you update.\line ");
+            sb.Append(@"The update will not delete any files it does not know - e.g. if you have added some of your own files.\line ");
+            sb.Append(@"The update will not delete any of your own component modifications done through the component information popup.\line ");
+            sb.Append(@"\line ");
+            sb.Append(@"The update will happen at the {\b next} application launch, so you will not see the changes immediately.\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"------------------------------------------------------------------------------------------------------------------------------------ \line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\fs28{\b Show or hide hardware and boards}}\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"In ""Configuration"" you can select which hardware and boards you want to show or hide in the application.\line ");
+            sb.Append(@"Per default it will show everything, but you can uncheck the ones you do not want to have in the application.\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"Changing any checkbox will be effectuated at the {\b next} application launch, so you will not see the changes immediately.\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"------------------------------------------------------------------------------------------------------------------------------------ \line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"{\fs28{\b Misc} }\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"When there is a newer version available online, it will be marked with an asterisk (*) in the ""About"" tab.\line ");
+            sb.Append(@"Then navigate to the tab and download the new version from https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"How-to add or update your own data:\line ");
+            sb.Append(@"    * View https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/wiki/Documentation\line ");
+            sb.Append(@"\line ");
+
+            sb.Append(@"Report a problem or comment something from either of these places:\line ");
+            sb.Append(@"    * Through the ""Feedback"" tab\line ");
+            sb.Append(@"    * Through https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues\line ");
+            sb.Append(@"\line");
+
+            sb.Append("}");
+
+            return sb.ToString();
+        }
+
+        private static string KeycapRtf(string text)
+        {
+            // base font for keys a tad smaller than body
+            var inner = $"\\f1\\fs20\\cf1\\highlight2\\~{EscapeRtf(text)}\\~\\highlight0";
+            return "{" + inner + "}";
+        }
+
+
+        private static string EscapeRtf(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            return s.Replace("\\", "\\\\").Replace("{", "\\{").Replace("}", "\\}");
+        }
+
+        private void RichTextBoxHelp_Resize_SetPadding(object sender, EventArgs e)
+        {
+            SetRichTextBoxPadding(richTextBoxHelp, new Padding(12, 10, 12, 10));
+        }
+
+        private void RichTextBoxHelp_LinkClicked(object sender, LinkClickedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(e.LinkText))
+                return;
+
+            try
+            {
+                Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                DebugOutput("ERROR: Failed opening URL [" + e.LinkText + "]: " + ex);
+            }
+        }
+
+
+
+
+
+
+
+
+
+        /*
         private async void InitializeTabHelp()
         {
             await EnsureWebView2LightAsync(webView2Help);
@@ -1593,12 +2706,175 @@ namespace Commodore_Repair_Toolbox
 
             webView2Help.NavigateToString(htmlContent);
         }
+        */
 
 
         // ###########################################################################################
         // Initialize the tab for "About".
         // ###########################################################################################
 
+        private void InitializeTabAboutNew()
+        {
+            try
+            {
+                richTextBoxAbout.DetectUrls = true;
+
+                richTextBoxAbout.LinkClicked -= RichTextBoxHelp_LinkClicked;
+                richTextBoxAbout.LinkClicked += RichTextBoxHelp_LinkClicked;
+
+                SetRichTextBoxPadding(richTextBoxAbout, new Padding(10, 10, 10, 10));
+                richTextBoxAbout.Resize -= RichTextBoxAbout_Resize_SetPadding;
+                richTextBoxAbout.Resize += RichTextBoxAbout_Resize_SetPadding;
+            }
+            catch { /* best-effort */ }
+        }
+
+        private void RichTextBoxAbout_Resize_SetPadding(object sender, EventArgs e)
+        {
+            SetRichTextBoxPadding(richTextBoxAbout, new Padding(10, 10, 10, 10));
+        }
+
+        private void UpdateTabAboutNew()
+        {
+            InitializeTabAboutNew();
+
+            // Credits for selected board
+            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
+            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
+
+            richTextBoxAbout.Rtf = BuildAboutRtf(foundBoard);
+        }
+
+        private static string BuildAboutRtf(Board board)
+        {
+            var sb = new StringBuilder();
+
+            // RTF header with font + color tables
+            sb.Append(@"{\rtf1\ansi\deff0");
+            sb.Append(@"{\fonttbl{\f0 Calibri;}{\f1 Consolas;}}");
+
+            // "colortbl" index:
+            // 0 = auto
+            // 1 = black
+            // 2 = IndianRed
+            // 3 = keycap bg (light gray) (if you want to keep it around)
+            sb.Append(@"{\colortbl ;\red0\green0\blue0;\red205\green92\blue92;\red230\green234\blue238;}");
+            sb.Append(@"\f0\fs22 "); // Calibri 11pt
+
+            sb.Append(@"{\fs28\b Commodore Repair Toolbox\b0}\line\line ");
+
+            sb.Append(@"You are running version \b ");
+            sb.Append(EscapeRtf(versionThis));
+            sb.Append(@"\b0  (64-bit)\line\line ");
+
+            if (!string.IsNullOrWhiteSpace(versionOnline))
+            {
+                sb.Append(@"\cf2 There is a newer version available online: ");
+                sb.Append(@"{\b ");
+                sb.Append(EscapeRtf(versionOnline));
+                sb.Append(@"}\b0\line ");
+                sb.Append(@"View the Changelog and download the new version from here: https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases\line\line ");
+                sb.Append(@"\cf0");
+            }
+
+            sb.Append(@"All programming done by Dennis Helligsø (dennis@commodore-repair-toolbox.dk).\line\line ");
+
+            sb.Append(@"Visit official project home page at https://github.com/HovKlan-DH/Commodore-Repair-Toolbox\line\line ");
+
+            sb.Append(@"------------------------------------------------------------------------------------------------------------------------------------\line\line ");
+
+            sb.Append(@"Credits and recognition for this board data go to:\line\line ");
+            AppendBoardCreditsRtf(sb, board);
+
+            sb.Append(@"\line ");
+            sb.Append(@"------------------------------------------------------------------------------------------------------------------------------------\line\line ");
+
+            sb.Append(@"\b A comment from the developer, Dennis:\b0\line\line ");
+
+            sb.Append(@"\i ");
+            sb.Append(EscapeRtf(
+                "I have been repairing Commodore 64/128 computers for some years, but I still consider myself as a novice in this world of hardware - I am more a software person, which you may have guessed having this tool here. I often forget where and what to check, and I struggle to find again all the relevant resources and schematics, not to mention the struggle to find the components in the schematics - a pure mess and quite inefficient. I did often refer to the \"Mainboards\" section of https://myoldcomputer.nl/technical-info/mainboards, and I noticed that Jeroen did have a prototype of an application named \"Repair Help\", and it did have the easy layout I was looking for (I did get a copy of it). However, it was never finalized from him, so I took upon myself to create something similar, and a couple of years later (including a long hiatus) I did come up with this quite similar looking application, though expanded with additional functionalities and data points."
+            ));
+            sb.Append(@"\line\line ");
+
+            sb.Append(EscapeRtf(
+                "The longer-term goal is that the tool will cover all C64 and C128 computers, and ideally also its most used peripherals, and I will continue to add new and refine data for myself (when doing my own diagnostics and repairing), but I will most likely not be able to do this myself alone. I would really appreciate some help with this, so if you have the willingness, then please reach out to me, and I will happily explain the nitty-gritty details. It is actually quite easy when having tried it once."
+            ));
+            sb.Append(@"\line\line ");
+
+            sb.Append(EscapeRtf(
+                "If you see anything that can be better, e.g. bad data quality or improvements for the tool, then do reach out to me. Of course I would also be happy, if you would send a comment from the \"Feedback\" tab - even if you do not like the tool, as constructive criticism is always welcome :-)"
+            ));
+            sb.Append(@"\line\line ");
+
+            sb.Append(EscapeRtf("// Dennis"));
+            sb.Append(@"\i0\line ");
+
+            sb.Append("}");
+            return sb.ToString();
+        }
+
+        private static void AppendBoardCreditsRtf(StringBuilder sb, Board board)
+        {
+            if (board?.BoardCredits == null || board.BoardCredits.Count == 0)
+            {
+                sb.Append(@"(No credits found for this board)\line\line ");
+                return;
+            }
+
+            var grouped = board.BoardCredits
+                .GroupBy(c => c.Category)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.GroupBy(c2 => string.IsNullOrWhiteSpace(c2.SubCategory) ? "Unnamed" : c2.SubCategory)
+                          .ToDictionary(sg => sg.Key, sg => sg.ToList())
+                );
+
+            foreach (var category in grouped)
+            {
+                sb.Append(@"\b ");
+                sb.Append(EscapeRtf(category.Key));
+                sb.Append(@"\b0:\line ");
+
+                foreach (var subcat in category.Value)
+                {
+                    if (!string.Equals(subcat.Key, "Unnamed", StringComparison.OrdinalIgnoreCase))
+                    {
+                        sb.Append(@"        \b ");
+                        sb.Append(EscapeRtf(subcat.Key));
+                        sb.Append(@"\b0\line ");
+                    }
+
+                    foreach (var credit in subcat.Value)
+                    {
+                        sb.Append(@"                ");
+                        sb.Append(FormatBulletRtf(credit.Contact == "" ? credit.Name : (credit.Name + ", " + credit.Contact)));
+                        sb.Append(@"\line ");
+                    }
+                }
+
+                sb.Append(@"\line ");
+            }
+
+            sb.Append(@"When people contribute a substantial amount of data, they can choose to be listed here.\line ");
+            sb.Append(@"Either the real name or a handle can be chosen and contact address is optional (email, GitHub or personal web page).\line ");
+        }
+
+        private static string FormatBulletRtf(string text)
+        {
+            // Simple bullet with hanging indent, no nested list semantics
+            return @"{\pard\li360\fi-180\pntext\u8226?  " + EscapeRtf(text) + @"}";
+        }
+
+
+
+
+
+
+
+
+
+        /*
         private async void UpdateTabAbout()
         {
             await EnsureWebView2LightAsync(webView2About);
@@ -1728,6 +3004,7 @@ namespace Commodore_Repair_Toolbox
 
             webView2About.NavigateToString(htmlContent);
         }
+        */
 
 
         // ###########################################################################################
@@ -1921,7 +3198,8 @@ namespace Commodore_Repair_Toolbox
 
             UpdateShowOfSelectedComponents();
             ShowOverlaysAccordingToComponentList();
-            UpdateTabOverview(GetSelectedBoardClass());
+//            UpdateTabOverview(GetSelectedBoardClass());
+            UpdateTabNewOverview(GetSelectedBoardClass());
 
             listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
         }
@@ -2489,8 +3767,10 @@ namespace Commodore_Repair_Toolbox
             SuspendLayout();
             InitializeThumbnails();
             InitializeTabMain();
-            UpdateTabResources(selectedBoardClass);
-            UpdateTabAbout();
+//            UpdateTabResources(selectedBoardClass);
+            UpdateTabResourcesNew(selectedBoardClass);
+//            UpdateTabAbout();
+            UpdateTabAboutNew();
 
             // Load polylines after initializing thumbnails and tabs
             PolylinesManagement.LoadPolylines();
@@ -2731,6 +4011,9 @@ namespace Commodore_Repair_Toolbox
             Debug.WriteLine("[InitializeTabMain] called from [" + callerName + "]");
 #endif
 
+            // Reset zoom-level
+            zoomLevel = 1;
+
             // Dispose the image, if one already exists
             if (image != null)
             {
@@ -2745,6 +4028,7 @@ namespace Commodore_Repair_Toolbox
             );
 
             // Clear old controls
+            RemoveClosePopupOnClickHandlers(); // HEST, temporary - will this work??????????
             panelMain.Controls.Clear();
             overlayComponentsTab.Clear();
             overlayComponentsTabOriginalSizes.Clear();
@@ -2855,6 +4139,20 @@ namespace Commodore_Repair_Toolbox
             labelComponent.DoubleBuffered(true);
             panelMain.Controls.Add(labelComponent);
             labelComponent.BringToFront();
+
+            labelZoom = new Label
+            {
+                AutoSize = true,
+                BackColor = Color.Moccasin,
+                ForeColor = Color.Black,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Calibri", 11, FontStyle.Regular)
+            };
+            labelZoom.DoubleBuffered(true);
+            labelZoom.Text = $"Z:{zoomLevel}";
+            panelMain.Controls.Add(labelZoom);
+            labelZoom.BringToFront();
+            labelZoom.Location = new Point(panelMain.ClientSize.Width - labelZoom.PreferredWidth - 20, 5);
 
             // Finish up
             ResizeTabImage();
@@ -3431,7 +4729,7 @@ namespace Commodore_Repair_Toolbox
                 // Zoom IN
                 if (delta > 0) 
                 {
-                    if (zoomFactor <= 4.0f)
+                    if (zoomFactor * 1.5f <= 4.9f)
                     {
                         zoomFactor *= 1.5f;
                         hasZoomChanged = true;
@@ -3490,7 +4788,7 @@ namespace Commodore_Repair_Toolbox
                     // 6) Re-highlight overlays (so they scale properly)
                     HighlightOverlays("tab");
 
-                    label11.Text = $"{zoomLevel}";
+                    labelZoom.Text = $"Z:{zoomLevel}";
                 }
             }
             finally
@@ -3810,6 +5108,42 @@ namespace Commodore_Repair_Toolbox
         // Close any open component informtion popup.
         // ###########################################################################################
 
+        // Add near your other fields
+        private readonly Dictionary<Control, MouseEventHandler> _closePopupMouseDownHandlers =
+            new Dictionary<Control, MouseEventHandler>();
+
+        private void AttachClosePopupOnClick(Control parent)
+        {
+            if (parent == null) return;
+
+            if (!_closePopupMouseDownHandlers.ContainsKey(parent))
+            {
+                MouseEventHandler handler = (s, e) =>
+                {
+                    CloseComponentPopup();
+                };
+
+                parent.MouseDown += handler;
+                _closePopupMouseDownHandlers[parent] = handler;
+            }
+
+            foreach (Control child in parent.Controls)
+            {
+                AttachClosePopupOnClick(child);
+            }
+        }
+
+        private void RemoveClosePopupOnClickHandlers()
+        {
+            foreach (var kvp in _closePopupMouseDownHandlers)
+            {
+                kvp.Key.MouseDown -= kvp.Value;
+            }
+
+            _closePopupMouseDownHandlers.Clear();
+        }
+
+        /*
         private void AttachClosePopupOnClick(Control parent)
         {
             // Attach a single MouseDown event to close any open popup
@@ -3825,6 +5159,7 @@ namespace Commodore_Repair_Toolbox
                 AttachClosePopupOnClick(child);
             }
         }
+        */
 
 
         // ###########################################################################################
@@ -5038,6 +6373,38 @@ namespace Commodore_Repair_Toolbox
 
             Configuration.SaveSetting("KeyboardZoomEnabled", isKeyboardZoomEnabled);
         }
+
+
+        // ###########################################################################################
+
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, ref Rectangle lParam);
+
+        private static void SetRichTextBoxPadding(RichTextBox rtb, Padding padding)
+        {
+            if (rtb == null) return;
+            if (!rtb.IsHandleCreated) rtb.CreateControl();
+
+            // Rectangle is in client coordinates.
+            Rectangle rect = rtb.ClientRectangle;
+            rect.X += padding.Left;
+            rect.Y += padding.Top;
+            rect.Width -= padding.Left + padding.Right;
+            rect.Height -= padding.Top + padding.Bottom;
+
+            if (rect.Width < 1) rect.Width = 1;
+            if (rect.Height < 1) rect.Height = 1;
+
+            SendMessage(rtb.Handle, EM_SETRECT, IntPtr.Zero, ref rect);
+
+            // Redraw
+            rtb.Invalidate();
+        }
+
+
+        // ###########################################################################################
+
     }
 
 

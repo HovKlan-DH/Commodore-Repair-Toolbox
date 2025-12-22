@@ -120,18 +120,12 @@
   <metadata name="tabAbout.Locked" type="System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
     <value>True</value>
   </metadata>
-  <metadata name="webView2About.Locked" type="System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
-    <value>True</value>
-  </metadata>
   <data name="textBox3.Text" xml:space="preserve">
     <value>Below will list all available hardware and models available in all Excel data files. You can then hide the ones you are not interested in.
 If a checkbox is selected, it means it will show.
 
 The changes will not take effect until the NEXT application launch!</value>
   </data>
-  <metadata name="webView2About.Locked" type="System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
-    <value>True</value>
-  </metadata>
   <metadata name="colorDialog1.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
     <value>17, 17</value>
   </metadata>

@@ -9,7 +9,7 @@
     <OutputType>WinExe</OutputType>
     <RootNamespace>Commodore_Repair_Toolbox</RootNamespace>
     <AssemblyName>Commodore-Repair-Toolbox</AssemblyName>
-    <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Deterministic>true</Deterministic>
@@ -93,15 +93,6 @@
     </Reference>
     <Reference Include="Microsoft.IO.RecyclableMemoryStream, Version=3.0.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.IO.RecyclableMemoryStream.3.0.1\lib\netstandard2.0\Microsoft.IO.RecyclableMemoryStream.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Web.WebView2.Core, Version=1.0.3650.58, Culture=neutral, PublicKeyToken=2a8ab48044d2601e, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Web.WebView2.1.0.3650.58\lib\net462\Microsoft.Web.WebView2.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Web.WebView2.WinForms, Version=1.0.3650.58, Culture=neutral, PublicKeyToken=2a8ab48044d2601e, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Web.WebView2.1.0.3650.58\lib\net462\Microsoft.Web.WebView2.WinForms.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Web.WebView2.Wpf, Version=1.0.3650.58, Culture=neutral, PublicKeyToken=2a8ab48044d2601e, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.Web.WebView2.1.0.3650.58\lib\net462\Microsoft.Web.WebView2.Wpf.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>packages\Newtonsoft.Json.13.0.4\lib\net45\Newtonsoft.Json.dll</HintPath>
@@ -233,10 +224,10 @@
 REM --------------------------
 REM Pack EXE with ILRepack
 REM --------------------------
-"D:\Data\Development\Visual Studio\Commodore-Repair-Toolbox\packages\ILRepack.2.0.44\tools\ILRepack.exe" /out:"$(TargetPath)" "$(TargetPath)" "$(TargetDir)EPPlus.dll" "$(TargetDir)EPPlus.Interfaces.dll" "$(TargetDir)EPPlus.System.Drawing.dll" "$(TargetDir)Microsoft.Bcl.Cryptography.dll" "$(TargetDir)Microsoft.IO.RecyclableMemoryStream.dll" "$(TargetDir)Microsoft.Web.WebView2.Core.dll" "$(TargetDir)Microsoft.Web.WebView2.WinForms.dll" "$(TargetDir)Microsoft.Web.WebView2.Wpf.dll" "$(TargetDir)Newtonsoft.Json.dll" "$(TargetDir)System.Buffers.dll" "$(TargetDir)System.Drawing.Common.dll" "$(TargetDir)System.Formats.Asn1.dll" "$(TargetDir)System.Memory.dll" "$(TargetDir)System.Numerics.Vectors.dll" "$(TargetDir)System.Runtime.CompilerServices.Unsafe.dll" "$(TargetDir)System.Security.Cryptography.Xml.dll"
-rem "$(TargetDir)System.ComponentModel.Annotations.dll"
-rem "$(TargetDir)System.ValueTuple.dll"
-
+"D:\Data\Development\Visual Studio\Commodore-Repair-Toolbox\packages\ILRepack.2.0.44\tools\ILRepack.exe" /out:"$(TargetPath)" "$(TargetPath)" "$(TargetDir)EPPlus.dll" "$(TargetDir)EPPlus.Interfaces.dll" "$(TargetDir)EPPlus.System.Drawing.dll" "$(TargetDir)Microsoft.Bcl.Cryptography.dll" "$(TargetDir)Microsoft.IO.RecyclableMemoryStream.dll" "$(TargetDir)Newtonsoft.Json.dll" "$(TargetDir)System.Buffers.dll" "$(TargetDir)System.Drawing.Common.dll" "$(TargetDir)System.Formats.Asn1.dll" "$(TargetDir)System.Memory.dll" "$(TargetDir)System.Numerics.Vectors.dll" "$(TargetDir)System.Runtime.CompilerServices.Unsafe.dll" "$(TargetDir)System.Security.Cryptography.Xml.dll"
+rem "$(TargetDir)Microsoft.Web.WebView2.Core.dll"
+rem "$(TargetDir)Microsoft.Web.WebView2.WinForms.dll"
+rem "$(TargetDir)Microsoft.Web.WebView2.Wpf.dll"
 
 REM ------------------------
 REM Delete LOCAL folders
@@ -276,11 +267,9 @@ del /Q *.cfg
     </PropertyGroup>
     <Error Condition="!Exists('packages\System.ValueTuple.4.6.1\build\net471\System.ValueTuple.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\System.ValueTuple.4.6.1\build\net471\System.ValueTuple.targets'))" />
     <Error Condition="!Exists('packages\ILRepack.2.0.44\build\ILRepack.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\ILRepack.2.0.44\build\ILRepack.props'))" />
-    <Error Condition="!Exists('packages\Microsoft.Web.WebView2.1.0.3650.58\build\Microsoft.Web.WebView2.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Web.WebView2.1.0.3650.58\build\Microsoft.Web.WebView2.targets'))" />
   </Target>
   <PropertyGroup>
     <WebView2LoaderPreference>Static</WebView2LoaderPreference>
   </PropertyGroup>
   <Import Project="packages\System.ValueTuple.4.6.1\build\net471\System.ValueTuple.targets" Condition="Exists('packages\System.ValueTuple.4.6.1\build\net471\System.ValueTuple.targets')" />
-  <Import Project="packages\Microsoft.Web.WebView2.1.0.3650.58\build\Microsoft.Web.WebView2.targets" Condition="Exists('packages\Microsoft.Web.WebView2.1.0.3650.58\build\Microsoft.Web.WebView2.targets')" />
 </Project>
