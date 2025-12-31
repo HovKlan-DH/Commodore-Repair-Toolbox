@@ -10,6 +10,7 @@ using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Security.Policy;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -1007,7 +1008,8 @@ namespace Commodore_Repair_Toolbox
                 string filePath = model.LocalFilePaths[0]; // simple: open first; can be enhanced to choose
                 if (File.Exists(filePath))
                 {
-                    Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
+//                    Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
+                    OpenExternalTarget(filePath, isUrl: false);
                 }
                 else
                 {
@@ -1018,7 +1020,8 @@ namespace Commodore_Repair_Toolbox
 
             if (col == "WebLinks" && model.WebUrls != null && model.WebUrls.Count > 0)
             {
-                Process.Start(new ProcessStartInfo(model.WebUrls[0]) { UseShellExecute = true });
+//                Process.Start(new ProcessStartInfo(model.WebUrls[0]) { UseShellExecute = true });
+                OpenExternalTarget(model.WebUrls[0], isUrl: true);
                 return;
             }
         }
@@ -1710,6 +1713,7 @@ namespace Commodore_Repair_Toolbox
             ResourcesOpenTarget(target, lv == _resourcesLocalFiles);
         }
 
+/*
         private void ResourcesOpenTarget(string target, bool isLocalFile)
         {
             if (string.IsNullOrWhiteSpace(target))
@@ -1725,7 +1729,8 @@ namespace Commodore_Repair_Toolbox
             {
                 if (File.Exists(target))
                 {
-                    Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+//                    Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+                    OpenExternalTarget(target, isUrl: false);
                 }
                 else
                 {
@@ -1752,7 +1757,8 @@ namespace Commodore_Repair_Toolbox
 
             try
             {
-                Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+//                Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+                OpenExternalTarget(uri.AbsoluteUri, isUrl: true);
             }
             catch (Exception ex)
             {
@@ -1761,7 +1767,22 @@ namespace Commodore_Repair_Toolbox
 
             textBoxFilterComponents.Focus();
         }
+*/
+        private void ResourcesOpenTarget(string target, bool isLocalFile)
+        {
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                DebugOutput("[Resources] Target is empty/null");
+                return;
+            }
 
+            target = target.Trim();
+            DebugOutput("[Resources] Open: isLocalFile=" + isLocalFile + " target=[" + target + "]");
+
+            OpenExternalTarget(target, isUrl: !isLocalFile);
+
+            textBoxFilterComponents.Focus();
+        }
 
         private void ApplyResourcesListViewHeaderStyle(ListView lv, Color headerBackColor)
         {
@@ -2468,7 +2489,8 @@ namespace Commodore_Repair_Toolbox
 
             try
             {
-                Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
+//                Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
+                OpenExternalTarget(e.LinkText, isUrl: true);
             }
             catch (Exception ex)
             {
@@ -4150,6 +4172,7 @@ namespace Commodore_Repair_Toolbox
             };
             labelZoom.DoubleBuffered(true);
             labelZoom.Text = $"Z:{zoomLevel}";
+            labelZoom.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             panelMain.Controls.Add(labelZoom);
             labelZoom.BringToFront();
             labelZoom.Location = new Point(panelMain.ClientSize.Width - labelZoom.PreferredWidth - 20, 5);
@@ -6400,6 +6423,301 @@ namespace Commodore_Repair_Toolbox
 
             // Redraw
             rtb.Invalidate();
+        }
+
+
+        // ###########################################################################################
+        // Open external targets (URL or local file) with best-effort approach.
+        // Platform dependent.
+        // ###########################################################################################
+
+        public static void OpenExternalTarget(string target, bool isUrl)
+        {
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                DebugOutput("[OpenExternalTarget] Target is empty/null");
+                return;
+            }
+
+            target = target.Trim();
+
+            if (isUrl && !target.Contains("://"))
+            {
+                target = "https://" + target;
+            }
+
+            bool isWine = Environment.OSVersion.Platform == PlatformID.Win32NT && IsRunningUnderWine();
+
+            if (isUrl)
+            {
+                if (!Uri.TryCreate(target, UriKind.Absolute, out var uri))
+                {
+                    DebugOutput("[OpenExternalTarget] Invalid URL: [" + target + "]");
+                    return;
+                }
+
+                target = uri.AbsoluteUri;
+            }
+            else
+            {
+                target = NormalizePossiblyWinePath(target);
+
+                if (!File.Exists(target))
+                {
+                    DebugOutput("[OpenExternalTarget] File does not exist: [" + target + "]");
+                    return;
+                }
+            }
+
+            DebugOutput("[OpenExternalTarget] Open isUrl=" + isUrl + " isWine=" + isWine + " target=[" + target + "]");
+
+            // Under Wine+Mono, ShellExecute frequently throws "Path not found" for Unix paths.
+            if (!isWine)
+            {
+                if (TryOpenWithShellExecute(target))
+                {
+                    DebugOutput("[OpenExternalTarget] ShellExecute OK");
+                    return;
+                }
+            }
+            else
+            {
+                DebugOutput("[OpenExternalTarget] Skipping ShellExecute under Wine");
+            }
+
+            if (TryOpenWithPlatformTools(target, isUrl))
+            {
+                DebugOutput("[OpenExternalTarget] Platform tools OK");
+                return;
+            }
+
+            DebugOutput("[OpenExternalTarget] FAILED to open target=[" + target + "]");
+        }
+
+        private static bool TryOpenWithShellExecute(string target)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = target,
+                    UseShellExecute = true
+                });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DebugOutput("[OpenExternalTarget] ShellExecute failed: " + ex);
+                return false;
+            }
+        }
+
+        private static bool IsRunningUnderWine()
+        {
+            // Method 1: Check for Wine-specific environment variables
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WINELOADERNOEXEC"))) return true;
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WINEPREFIX"))) return true;
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WINESERVER"))) return true;
+
+            // Method 2: Check if paths look like Wine Z: drive mapping
+            try
+            {
+                string appPath = System.Windows.Forms.Application.StartupPath;
+                if (!string.IsNullOrEmpty(appPath) &&
+                    appPath.Length >= 2 &&
+                    (appPath[0] == 'Z' || appPath[0] == 'z') &&
+                    appPath[1] == ':')
+                {
+                    return true;
+                }
+            }
+            catch { }
+
+            // Method 3: Check for wine_get_version export in ntdll (most reliable)
+            try
+            {
+                IntPtr ntdll = GetModuleHandle("ntdll.dll");
+                if (ntdll != IntPtr.Zero)
+                {
+                    IntPtr wineGetVersion = GetProcAddress(ntdll, "wine_get_version");
+                    if (wineGetVersion != IntPtr.Zero)
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)]
+        private static extern IntPtr GetProcAddress(IntPtr hModule, string lpProcName);
+
+
+        private static bool TryOpenWithPlatformTools(string target, bool isUrl)
+        {
+            bool isWindows = Environment.OSVersion.Platform == PlatformID.Win32NT;
+            bool isUnix = Environment.OSVersion.Platform == PlatformID.Unix;
+            bool isMac = Environment.OSVersion.Platform == PlatformID.MacOSX;
+
+            try
+            {
+                if (isWindows && IsRunningUnderWine())
+                {
+                    // target is already a Unix path (converted in OpenExternalTarget)
+                    DebugOutput("[OpenExternalTarget] Wine mode: target=[" + target + "]");
+
+                    // Must go through bash so the shell handles quoting properly
+                    // Mono's Process.Start doesn't handle quoted arguments correctly
+                    string escaped = target.Replace("'", "'\\''");
+                    string bashCmd = "xdg-open '" + escaped + "'";
+
+                    return RunToolAndLog("/bin/bash", "-c \"" + bashCmd.Replace("\"", "\\\"") + "\"");
+                }
+
+                if (isWindows)
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "cmd",
+                        Arguments = "/c start \"\" \"" + target + "\"",
+                        CreateNoWindow = true,
+                        UseShellExecute = false
+                    });
+                    return true;
+                }
+
+                if (isMac)
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "open",
+                        Arguments = "\"" + target + "\"",
+                        UseShellExecute = false
+                    });
+                    return true;
+                }
+
+                if (isUnix)
+                {
+                    string escaped = target.Replace("'", "'\\''");
+                    string bashCmd = "xdg-open '" + escaped + "'";
+                    return RunToolAndLog("/bin/bash", "-c \"" + bashCmd.Replace("\"", "\\\"") + "\"");
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                DebugOutput("[OpenExternalTarget] Platform open failed: " + ex);
+                return false;
+            }
+        }
+
+        private static bool RunToolAndLog(string fileName, string arguments)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true
+                };
+
+                DebugOutput("[OpenExternalTarget] Exec: " + fileName + " " + arguments);
+
+                using (var p = Process.Start(psi))
+                {
+                    if (p == null)
+                    {
+                        DebugOutput("[OpenExternalTarget] Exec failed: Process.Start returned null");
+                        return false;
+                    }
+
+                    // xdg-open / wine start may either exit quickly or stay around.
+                    // If it doesn't exit quickly, assume it successfully launched the handler.
+                    bool exited = p.WaitForExit(2000);
+
+                    if (exited)
+                    {
+                        string stdout = SafeReadToEnd(p.StandardOutput);
+                        string stderr = SafeReadToEnd(p.StandardError);
+
+                        DebugOutput("[OpenExternalTarget] Exited=True ExitCode=" + p.ExitCode);
+                        if (!string.IsNullOrWhiteSpace(stdout)) DebugOutput("[OpenExternalTarget] stdout: " + stdout.Trim());
+                        if (!string.IsNullOrWhiteSpace(stderr)) DebugOutput("[OpenExternalTarget] stderr: " + stderr.Trim());
+
+                        return p.ExitCode == 0;
+                    }
+
+                    DebugOutput("[OpenExternalTarget] Exited=False (assuming launched OK): " + fileName);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugOutput("[OpenExternalTarget] Exec exception: " + ex);
+                return false;
+            }
+        }
+
+        private static string SafeReadToEnd(StreamReader sr)
+        {
+            try { return sr.ReadToEnd(); }
+            catch { return ""; }
+        }
+
+        private static string EscapeForBashSingleArg(string s)
+        {
+            // Wrap with single quotes and escape existing single quotes:  abc'd -> 'abc'"'"'d'
+            if (s == null) return "''";
+            return "'" + s.Replace("'", "'\"'\"'") + "'";
+        }
+
+        private static string NormalizePossiblyWinePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return path;
+
+            // Convert Wine Z:\path\to\file => /path/to/file
+            // Wine typically maps Z: to the Unix root.
+            if (path.Length >= 3 &&
+                (path[0] == 'Z' || path[0] == 'z') &&
+                path[1] == ':' &&
+                (path[2] == '\\' || path[2] == '/'))
+            {
+                string unix = path.Substring(2).Replace('\\', '/'); // keep leading slash
+                DebugOutput("[OpenExternalTarget] Wine path detected. Converted [" + path + "] -> [" + unix + "]");
+                return unix;
+            }
+
+            // Also handle "z:\"
+            if (path.Length >= 3 &&
+                (path[0] == 'z') &&
+                path[1] == ':' &&
+                (path[2] == '\\' || path[2] == '/'))
+            {
+                string unix = path.Substring(2).Replace('\\', '/');
+                DebugOutput("[OpenExternalTarget] Wine path detected. Converted [" + path + "] -> [" + unix + "]");
+                return unix;
+            }
+
+            // Otherwise: normalize slashes and full path
+            try
+            {
+                return Path.GetFullPath(path);
+            }
+            catch
+            {
+                return path;
+            }
         }
 
 

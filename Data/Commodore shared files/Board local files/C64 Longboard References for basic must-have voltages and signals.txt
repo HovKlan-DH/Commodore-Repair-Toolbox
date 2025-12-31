@@ -1,7 +1,7 @@
 ----------------------------
 Hardware      : Commodore 64
 Board(s)      : 250407 + 250425 + 250466 (all "longboards")
-Revision date : 2025-December-20
+Revision date : 2025-December-30
 --------------------------------
 
 Below is my default troubleshooting guide for myself, so I do not forget. In most cases it covers the basics only, and it is for sure not a methodotical checklist that will check everything. I will add or change, once I repair more.
@@ -13,6 +13,14 @@ Tooling requirements
 --------------------
 - Oscilloscope
 - Multimeter
+
+
+---------------------
+Very first inspection
+---------------------
+Do a thorough visual inspection of the board. Check for obvious faults like loose wires or components, components with bent or broken pins, short circuits, oxidation, user modifications or anything else that looks weird.
+Many times the board has previously been repaired by someone else, so do check the backside for rework, and if it looks horrible, then it could be a good place to start troubleshooting.
+Also do check that IC's are oriented correctly, and that e.g. SID and PLA has not been swapped.
 
 
 -----------------
@@ -50,7 +58,6 @@ Also check the two power supplies:
         +5VDC pin 2 (right-most pin): this is "CAN" source
     7812:
         +12VDC pin 2 (right-most pin)
-
 
 
 -----------

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Security.Policy;
 using System.Windows.Forms;
 
 namespace Commodore_Repair_Toolbox
@@ -1063,7 +1064,8 @@ namespace Commodore_Repair_Toolbox
 
             if (File.Exists(filePath))
             {
-                System.Diagnostics.Process.Start(filePath);
+//                System.Diagnostics.Process.Start(filePath);
+                Main.OpenExternalTarget(filePath, isUrl: false);
             }
         }
 
@@ -1075,7 +1077,8 @@ namespace Commodore_Repair_Toolbox
             if (!links.ContainsKey(selectedName)) return;
 
             string url = links[selectedName];
-            System.Diagnostics.Process.Start(url);
+//            System.Diagnostics.Process.Start(url);
+            Main.OpenExternalTarget(url, isUrl: true);
         }
 
     }

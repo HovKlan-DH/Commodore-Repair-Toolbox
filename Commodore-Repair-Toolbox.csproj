@@ -233,13 +233,16 @@ REM ------------------------
 REM Delete LOCAL folders
 REM ------------------------
 IF EXIST "Data" RMDIR /S /Q "Data"
-IF EXIST "Commodore-Repair-Toolbox.exe.WebView2" RMDIR /S /Q "Commodore-Repair-Toolbox.exe.WebView2"
+rem IF EXIST "Commodore-Repair-Toolbox.exe.WebView2" RMDIR /S /Q "Commodore-Repair-Toolbox.exe.WebView2"
 
 
 REM ----------------------------------------------------
 REM Copy the GitHub "Data" folder to LOCAL folder
 REM ----------------------------------------------------
-XCOPY "..\..\..\Data" "Data" /E /I /H /C /Q /Y
+REM CPU = x64
+rem XCOPY "..\..\..\Data" "Data" /E /I /H /C /Q /Y
+REM CPU = Any
+XCOPY "..\..\Data" "Data" /E /I /H /C /Q /Y
 
 
 REM --------------------------------
