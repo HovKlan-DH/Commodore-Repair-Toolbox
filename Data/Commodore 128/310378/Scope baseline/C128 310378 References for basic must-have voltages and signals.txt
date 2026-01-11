@@ -1,8 +1,8 @@
 --------------------------------------
 Hardware      : Commodore 128 and 128D
 Board         : 310378
-Revision date : 2025-April-24
------------------------------
+Revision date : 2026-January-7
+------------------------------
 
 Note that the below measurements are not bulletproof facts - they are concrete measurements done on my system
 at a specific point in time, but there may be many reasons why your readings differ the exact same readings.
@@ -31,14 +31,14 @@ can be found in the "Resources" tab.
 Power rails
 -----------
 +5VDC:
-    - U6, CPU, pin 6       = 4.8V
-    - U11, PLA, pin 48     = 4.8V
-    - U21, VIC-IIe, pin 48 = 4.7V
+    - U6, CPU, pin 6
+    - U11, PLA, pin 48
+    - U21, VIC-IIe, pin 48
 +12VDC:
-    - U59, 7812, pin 3 = 12.2V (the pin at the left-most position)
-    - U5, SID, pin 28  = 12.2V
+    - U59, 7812, pin 3 (the pin at the left-most position)
+    - U5, SID, pin 28
 9VAC: 
-    - CN9, User port, pin 10+11 = 9.7V (measure using an AC multimeter with one probe on each pin)
+    - CN9, User port, pin 10+11 (measure using an AC multimeter with one probe on each pin)
 
 
 ------------
