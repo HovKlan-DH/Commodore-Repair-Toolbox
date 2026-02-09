@@ -43,13 +43,7 @@ namespace Commodore_Repair_Toolbox
         private bool _suppressResourcesSelection;
 
         // For "Help" tab
-        private Panel _helpNewPanel;
-        private RichTextBox _helpNewRtb;
-        private const int HelpIndentLevel1 = 18;  // bullet text start
-        private const int HelpIndentLevel2 = 40;  // sub-bullet text start
-        private const int HelpIndentLevel3 = 62;  // sub-sub-bullet (if you need it)
         private const int EM_SETRECT = 0x00B3;
-
 
         public static void InitializeLogging()
         {
@@ -61,42 +55,6 @@ namespace Commodore_Repair_Toolbox
                 _logInitialized = true;
             }
         }
-
-        // HTML code for all tabs using "WebView2" component for content
-        private string htmlForTabs = @"
-            <style>
-            body { padding: 10px; font-family: Calibri, sans-serif; font-size: 11pt; }
-            h1 { font-size: 14pt; }
-            h2 { font-size: 11pt; padding: 0px; margin: 0px; }
-            ul { margin: 0px; }
-            a { color: #5181d0; }
-            .typewriter {
-                background-color: black;
-                color: white;
-                font-family: Consolas, ""Lucida Console"", Monaco, monospace;
-                padding-left: 0.2rem;
-                padding-right: 0.2rem;
-                padding-top: 0.1rem;
-                padding-bottom: 0.1rem;
-                white-space: pre;
-                font-size: 75%;
-                display: inline-block;
-                border-radius: 0.25rem;
-            }
-            </style>
-            <script>
-            document.addEventListener('click', function(e) {
-                // Return if we should not react on this class
-                if (e.target.tagName.toLowerCase() === 'td' && 
-                    e.target.classList.contains('doNotFocusFilter') && 
-                    e.target.hasAttribute('data-compLabel')) {
-                    return; // Do nothing if this specific element is clicked
-                }
-                // Send an event for clicking anywhere in the HTML code
-                window.chrome.webview.postMessage('htmlClick');
-            });
-            </script>
-        ";
 
         // Reference to the popup/info form
         private FormComponent componentInfoPopup = null;
@@ -231,16 +189,8 @@ namespace Commodore_Repair_Toolbox
 
             // Initialize relevant "WebView2" components (used in tab pages)
             InitializeTabConfiguration();
-//            InitializeTabHelp();
-
-            // TEMPORARY, HEST
-            InitializeTabOverviewNewOverviewGrid();
-            InitializeTabHelpNew();
-            // TEMPORARY remove the "Overview" tab, until we decide this is the way to go or not
-            tabControl.TabPages.Remove(tabOverview);
-            tabControl.TabPages.Remove(tabResources);
-            tabControl.TabPages.Remove(tabHelp);
-            tabControl.TabPages.Remove(tabAbout);
+            InitializeTabOverviewNewOverviewGrid(); // hest
+            InitializeTabHelp();
 
             // Attach "form load" event, which is triggered just before form is shown
             Load += Form_Load;
@@ -317,13 +267,10 @@ namespace Commodore_Repair_Toolbox
                 );
             }
 
-
             // Wait 10 seconds before starting the background check
             label13.TextAlign = ContentAlignment.MiddleCenter;
             await Task.Delay(10000);
             await Task.Run(() => checkFilesFromSource());
-
-
         }
 
         private void Form_Closing(object sender, FormClosingEventArgs e)
@@ -416,7 +363,6 @@ namespace Commodore_Repair_Toolbox
                         if (onlineAvailableVersion != versionThis)
                         {
                             tabAbout.Text = "About*";
-                            tabAboutNew.Text = "About*";
                             versionOnline = onlineAvailableVersion;
                             versionOnlineTxt = "<font color='IndianRed'>";
                             versionOnlineTxt += $"There is a newer version available online: <b>" + versionOnline + @"</b ><br />";
@@ -439,7 +385,6 @@ namespace Commodore_Repair_Toolbox
                     else
                     {
                         tabAbout.Text = "About*";
-                        tabAboutNew.Text = "About*";
                         versionOnlineTxt = "<font color='IndianRed'>";
                         versionOnlineTxt += "<hr>";
                         versionOnlineTxt += "ERROR:<br />";
@@ -455,7 +400,6 @@ namespace Commodore_Repair_Toolbox
                 DebugOutput("EXCEPTION in \"GetOnlineVersion()\":");
                 DebugOutput(ex.ToString());
                 tabAbout.Text = "About*";
-                tabAboutNew.Text = "About*";
                 versionOnlineTxt = "<font color='IndianRed'>";
                 versionOnlineTxt += "<hr>";
                 versionOnlineTxt += "ERROR:<br />";
@@ -573,8 +517,6 @@ namespace Commodore_Repair_Toolbox
             isPanelTracesVisible = bool.TryParse(showTraces, out bool result) && result;
 
             checkBoxKeyboardZoom.Checked = keyboardZoomEnabled;
-
-//            SetRegionButtonColors();
         }
 
 
@@ -672,7 +614,6 @@ namespace Commodore_Repair_Toolbox
         private void AttachClickEventsToFocusFilterComponents(Control parent)
         {
             if (!(parent is ComboBox))
-//            if (!(parent is ComboBox) && !(parent is ListView)) // HEST
             {
                 EventHandler handler = (s, e) => textBoxFilterComponents.Focus();
                 parent.Click += handler;
@@ -1006,7 +947,6 @@ namespace Commodore_Repair_Toolbox
                 string filePath = model.LocalFilePaths[0]; // simple: open first; can be enhanced to choose
                 if (File.Exists(filePath))
                 {
-//                    Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
                     OpenExternalTarget(filePath, isUrl: false);
                 }
                 else
@@ -1018,75 +958,11 @@ namespace Commodore_Repair_Toolbox
 
             if (col == "WebLinks" && model.WebUrls != null && model.WebUrls.Count > 0)
             {
-//                Process.Start(new ProcessStartInfo(model.WebUrls[0]) { UseShellExecute = true });
                 OpenExternalTarget(model.WebUrls[0], isUrl: true);
                 return;
             }
         }
 
-
-        // ###########################################################################################
-        // Enforce WebView2 to use "Light" mode only.
-        // ###########################################################################################
-
-        /*
-        private async Task EnsureWebView2LightAsync(Microsoft.Web.WebView2.WinForms.WebView2 wv)
-        {
-            // Initialize normally
-            if (wv.CoreWebView2 == null)
-                await wv.EnsureCoreWebView2Async();
-
-            // Use light color scheme
-            try
-            {
-                wv.CoreWebView2.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Light;
-            }
-            catch { }
-
-            // Set the WinForms control background explicitly (the previous code wrongly used Controller).
-            // The property is on the WebView2 control, not on CoreWebView2.
-            wv.DefaultBackgroundColor = Color.White;
-
-            // Inject defensive CSS and meta to neutralize dark-mode media queries
-            const string forceLightScript = @"
-                (function() {
-                    try {
-                        let meta = document.querySelector('meta[name=""color-scheme""]');
-                        if (!meta) {
-                            meta = document.createElement('meta');
-                            meta.name = 'color-scheme';
-                            meta.content = 'light';
-                            document.head.appendChild(meta);
-                        } else {
-                            meta.content = 'light';
-                        }
-
-                        if (!document.getElementById('crt-force-light')) {
-                            const style = document.createElement('style');
-                            style.id = 'crt-force-light';
-                            style.textContent = `
-                                :root, html, body {
-                                    background:#ffffff !important;
-                                    color:#000 !important;
-                                }
-                                @media (prefers-color-scheme: dark) {
-                                    :root, html, body {
-                                        background:#ffffff !important;
-                                        color:#000 !important;
-                                    }
-                                }
-                            `;
-                            document.head.appendChild(style);
-                        }
-                    } catch(e) {}
-                })();";
-            try
-            {
-                await wv.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(forceLightScript);
-            }
-            catch { }
-        }
-        */
 
         // ###########################################################################################
         // Initialize and update the tab for "Overview".
@@ -1097,297 +973,6 @@ namespace Commodore_Repair_Toolbox
         {
             UpdateTabOverviewNew(selectedBoard);
         }
-
-/*
-        public async void UpdateTabOverview(Board selectedBoard)
-        {
-            await EnsureWebView2LightAsync(webView2Overview);
-
-            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-
-            string revisionDate = "";
-            if (foundBoard != null)
-            {
-                revisionDate = foundBoard.RevisionDate;
-            }
-
-            string htmlContent = @"
-                <html>
-                <head>
-                <meta charset='UTF-8'>
-                <script>
-                    document.addEventListener('click', function(e) {
-                    var target = e.target;
-                    <!-- Event for 'Open URL' -->
-                    if (target.tagName.toLowerCase() === 'a' && !target.href.startsWith('file://')) {
-                        e.preventDefault();
-                        window.chrome.webview.postMessage('openUrl:' + target.href);
-                    }
-                    <!-- Event for 'Open file' -->
-                    if (target.tagName.toLowerCase() === 'a' && target.href.startsWith('file://')) {
-                        e.preventDefault();
-                        window.chrome.webview.postMessage('openFile:' + target.href);
-                    }
-                    <!-- Event for 'Open component' -->
-                    if (target.matches('[data-compLabel]')) {
-                        var compLabel = target.getAttribute('data-compLabel');
-                        window.chrome.webview.postMessage('openComp:' + compLabel);
-                    }
-                    <!-- Event for 'Close popup' -->
-                    if (!(e.target.tagName.toLowerCase() === 'a' && e.target.href.startsWith('file://')) &&
-                        !e.target.matches('[data-compLabel]')) {
-                        window.chrome.webview.postMessage('htmlClick');
-                    }
-                    });
-                </script>
-                <style>
-                body { overflow-x: hidden; }
-                table { border-collapse: collapse; }
-                thead {
-                    position: sticky;
-                    top: 0;
-                    background-color: #DDD;
-                    z-index: 20;
-                }
-                tbody tr:hover { background-color: #f2f2f2; }
-                th { 
-                    text-align: left; 
-                    color: black;
-                }
-                th, td { 
-                    padding: 4px 10px; 
-                    font-size: 11pt;
-                }
-                td[data-compLabel] {
-                    color: #0645AD;
-                    cursor: pointer;
-                }
-                td[data-compLabel]:hover { color: #0B0080; }
-                .tooltip-link {
-                    position: relative;
-                    cursor: pointer;
-                    text-decoration: none;
-                }
-                .tooltip-link::after {
-                    content: attr(data-title);
-                    position: absolute;
-                    bottom: 100%;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background: black;
-                    color: white;
-                    padding: 4px 8px;
-                    border-radius: 4px;
-                    white-space: nowrap;
-                    opacity: 0;
-                    pointer-events: none;
-                    transition: opacity 0.1s ease-in-out;
-                    font-size: 15px;
-                    z-index: 10;
-                }
-                .tooltip-link:hover::after { opacity: 1; }
-                </style>
-                </head>
-                <body>
-                " + htmlForTabs + @"
-                <h1>Overview of components</h1>
-                This is a overview of all components for the selected board. Components listed, follows what is visible in the ""Component list"".<br /><br />
-                The data for this board has the revision date: <b>" + revisionDate + @"</b><br /><br />
-            ";
-
-            string js = @"
-                window.updateComponentNotes = function(componentId, componentValue) {
-                    var el = document.getElementById(componentId);
-                    if (el) {
-                        el.innerText = componentValue;
-                    }
-                };
-                window.chrome.webview.addEventListener('message', function(e) {
-                    if (e.data && e.data.type === 'updateNotes') {
-                        window.updateComponentNotes(e.data.id, e.data.value);
-                    }
-                });
-            ";
-
-            htmlContent += $"<script>{js}</script>";
-
-            if (foundBoard != null)
-            {
-                if (foundBoard?.Components != null)
-                {
-                    // Filter components based on what is visible in "listBoxComponents"
-                    var visibleComponents = listBoxComponents.Items.Cast<string>().ToHashSet();
-
-                    htmlContent += "<table width='100%' border='1'>";
-                    htmlContent += "<thead>";
-                    htmlContent += "<tr>";
-                    htmlContent += "<th valign='bottom'>Type</th>";
-                    htmlContent += "<th valign='bottom'>Component</th>";
-                    htmlContent += "<th valign='bottom'>Technical name</th>";
-                    htmlContent += "<th valign='bottom'>Friendly name</th>";
-                    htmlContent += "<th valign='bottom'>Part-number</th>";
-                    htmlContent += "<th valign='bottom'>Short description</th>";
-                    htmlContent += "<th valign='bottom'>Notes</th>";
-                    htmlContent += "<th valign='bottom'>Local files</th>";
-                    htmlContent += "<th valign='bottom'>Web links</th>";
-                    htmlContent += "</tr>";
-                    htmlContent += "</thead>";
-                    htmlContent += "<tbody>";
-
-                    foreach (BoardComponents comp in foundBoard.Components)
-                    {
-                        if (!visibleComponents.Contains(comp.NameDisplay)) continue; // skip component if it is not visible in "listBoxComponents"
-
-                        string compType = comp.Type;
-                        string compLabel = comp.Label;
-                        string compNameTechnical = comp.NameTechnical;
-                        string compNameFriendly = comp.NameFriendly;
-                        string compPartnumber = comp.Partnumber;
-
-                        compNameFriendly = compNameFriendly.Replace("?", "");
-
-                        // Read the potential user-modified values from configuration file
-                        string baseKey = $"UserData|{hardwareSelectedName}|{boardSelectedName}|{compLabel}";
-                        string oneLinerKey = $"{baseKey}|Oneliner";
-                        string notesKey = $"{baseKey}|Notes";
-                        string compDescrShort = Configuration.GetSetting(oneLinerKey, "");
-                        if (string.IsNullOrEmpty(compDescrShort))
-                        {
-                            compDescrShort = comp.OneLiner;
-                        }
-                        string compDescrLong = Configuration.GetSetting(notesKey, "");
-                        if (string.IsNullOrEmpty(compDescrLong))
-                        {
-                            // Get the first non-empty Note from ComponentImages, if available
-                            if (comp.ComponentImages != null && comp.ComponentImages.Count > 0)
-                            {
-                                var firstNote = comp.ComponentImages
-                                    .Select(img => img.Note)
-                                    .FirstOrDefault(note => !string.IsNullOrEmpty(note));
-                                compDescrLong = firstNote ?? "";
-                            }
-                            else
-                            {
-                                compDescrLong = "";
-                            }
-                        }
-                        compDescrLong = compDescrLong.Replace("\\n", "<br />");
-                        compDescrLong = compDescrLong.Replace("\n", "<br />");
-                        compDescrLong = compDescrLong.Replace(Environment.NewLine, "<br />");
-
-                        htmlContent += "<tr>";
-
-                        htmlContent += $"<td valign='top'>{compType}</td>";
-                        htmlContent += $"<td valign='top' data-compLabel='{compLabel}' class='doNotFocusFilter'>{compLabel}</td>";
-                        htmlContent += $"<td valign='top'>{compNameTechnical}</td>";
-                        htmlContent += $"<td valign='top'>{compNameFriendly}</td>";
-                        htmlContent += $"<td valign='top'>{compPartnumber}</td>";
-                        htmlContent += $"<td valign='top'>{compDescrShort}</td>";
-                        htmlContent += $"<td valign='top'>{compDescrLong}</td>";
-
-                        // Include component local files
-                        htmlContent += "<td valign='top'>";
-                        if (comp.LocalFiles != null && comp.LocalFiles.Count > 0)
-                        {
-                            int counter = 1;
-                            foreach (ComponentLocalFiles file in comp.LocalFiles)
-                            {
-                                // Translate the relative path into an absolute path
-                                string filePath = Path.GetFullPath(DataPaths.Resolve(file.FileName));
-                                string fileUri = new Uri(filePath).AbsoluteUri;
-
-                                htmlContent += "<a href='" + fileUri + "' class='tooltip-link' data-title='" + file.Name + "' target='_blank'>#" + counter + "</a> ";
-                                counter++;
-                            }
-                        }
-                        htmlContent += "</td>";
-
-                        // Include component links
-                        htmlContent += "<td valign='top'>";
-                        if (comp.ComponentLinks != null && comp.ComponentLinks.Count > 0)
-                        {
-                            int counter = 1;
-                            foreach (ComponentLinks link in comp.ComponentLinks)
-                            {
-                                htmlContent += "<a href='" + link.Url + "' target='_blank' class='tooltip-link' data-title='" + link.Name + "'>#" + counter + "</a> ";
-                                counter++;
-                            }
-                        }
-                        htmlContent += "</td>";
-
-                        htmlContent += "</tr>";
-                    }
-
-                    htmlContent += "</tbody>";
-                    htmlContent += "</table>";
-                }
-            }
-
-            htmlContent += "<br />";
-            htmlContent += "</body>";
-            htmlContent += "</html >";
-
-            // Make sure we detach any current event handles, before we add a new one
-            webView2Overview.CoreWebView2.WebMessageReceived -= WebView2_WebMessageReceived;
-            webView2Overview.CoreWebView2.WebMessageReceived += WebView2_WebMessageReceived;
-
-            webView2Overview.NavigateToString(htmlContent);
-        }
-*/
-
-        /*
-        private void WebView2_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs e)
-        {
-            var message = e.TryGetWebMessageAsString();
-
-            CloseComponentPopup();
-
-            // Open URL
-            if (message.StartsWith("openUrl:"))
-            {
-                string url = message.Substring("openUrl:".Length);
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            }
-
-            // Open file
-            else if (message.StartsWith("openFile:"))
-            {
-                string fileUrl = message.Substring("openFile:".Length);
-                if (File.Exists(new Uri(fileUrl).LocalPath))
-                {
-                    Process.Start(new ProcessStartInfo(new Uri(fileUrl).LocalPath) { UseShellExecute = true });
-                }
-                else
-                {
-                    DebugOutput("File [" + new Uri(fileUrl).LocalPath + "] does not exists!");
-                }
-            }
-
-            // Open component
-            else if (message.StartsWith("openComp:"))
-            {
-                string compName = message.Substring("openComp:".Length);
-                var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-                var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-                List<BoardComponents> comps = foundBoard?.Components.Where(c => c.Label == compName).ToList();
-
-                if (comps != null && comps.Count > 0)
-                {
-                    componentInfoPopup = new FormComponent(comps, this);
-                    componentInfoPopup.Show(this);
-                    componentInfoPopup.BringToFront();
-                }
-            }
-
-            // Click anywhere in HTML
-            else if (message == "htmlClick")
-            {
-                textBoxFilterComponents.Focus();
-                // NOP (it has this event to close the component popup)
-            }
-        }
-        */
 
         private void CloseComponentPopup()
         {
@@ -1403,7 +988,6 @@ namespace Commodore_Repair_Toolbox
         // Initialize and update the tab for "Resources".
         // Will load new content from board data file.
         // ###########################################################################################
-
 
         private void InitializeTabResourcesNew()
         {
@@ -1444,7 +1028,7 @@ namespace Commodore_Repair_Toolbox
                 FullRowSelect = false,
                 HideSelection = true,
                 Location = new Point(12, localHeader.Bottom + 6),
-                Width = tabResourcesNew.ClientSize.Width - 24,
+                Width = tabResources.ClientSize.Width - 24,
                 Height = 220,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                 HeaderStyle = ColumnHeaderStyle.Nonclickable,
@@ -1471,7 +1055,7 @@ namespace Commodore_Repair_Toolbox
                 FullRowSelect = false,
                 HideSelection = true,
                 Location = new Point(12, linksHeader.Bottom + 6),
-                Width = tabResourcesNew.ClientSize.Width - 24,
+                Width = tabResources.ClientSize.Width - 24,
                 Height = 220,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                 HeaderStyle = ColumnHeaderStyle.Nonclickable,
@@ -1487,7 +1071,7 @@ namespace Commodore_Repair_Toolbox
             ApplyResourcesListViewLinkBehavior(_resourcesLocalFiles);
             ApplyResourcesListViewLinkBehavior(_resourcesWebLinks);
 
-            tabResourcesNew.Resize += (s, e) =>
+            tabResources.Resize += (s, e) =>
             {
                 LayoutResourcesControls();
             };
@@ -1498,7 +1082,7 @@ namespace Commodore_Repair_Toolbox
             _resourcesPanel.Controls.Add(linksHeader);
             _resourcesPanel.Controls.Add(_resourcesWebLinks);
 
-            tabResourcesNew.Controls.Add(_resourcesPanel);
+            tabResources.Controls.Add(_resourcesPanel);
 
             ApplyResourcesListViewHeaderStyle(_resourcesLocalFiles, _resourcesLocalHeaderBackColor);
             ApplyResourcesListViewHeaderStyle(_resourcesWebLinks, _resourcesLinksHeaderBackColor);
@@ -1711,61 +1295,6 @@ namespace Commodore_Repair_Toolbox
             ResourcesOpenTarget(target, lv == _resourcesLocalFiles);
         }
 
-/*
-        private void ResourcesOpenTarget(string target, bool isLocalFile)
-        {
-            if (string.IsNullOrWhiteSpace(target))
-            {
-                DebugOutput("[Resources] Target is empty/null");
-                return;
-            }
-
-            target = target.Trim();
-            DebugOutput("[Resources] Open: isLocalFile=" + isLocalFile + " target=[" + target + "]");
-
-            if (isLocalFile)
-            {
-                if (File.Exists(target))
-                {
-//                    Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
-                    OpenExternalTarget(target, isUrl: false);
-                }
-                else
-                {
-                    DebugOutput("File [" + target + "] does not exists!");
-                }
-
-                textBoxFilterComponents.Focus();
-                return;
-            }
-
-            if (!target.Contains("://"))
-            {
-                target = "https://" + target;
-            }
-
-            if (!Uri.TryCreate(target, UriKind.Absolute, out Uri uri))
-            {
-                DebugOutput("[Resources] Invalid URL (TryCreate failed): [" + target + "]");
-                textBoxFilterComponents.Focus();
-                return;
-            }
-
-            DebugOutput("[Resources] Launching URL: [" + uri.AbsoluteUri + "]");
-
-            try
-            {
-//                Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
-                OpenExternalTarget(uri.AbsoluteUri, isUrl: true);
-            }
-            catch (Exception ex)
-            {
-                DebugOutput("ERROR: Failed opening URL [" + uri.AbsoluteUri + "]: " + ex);
-            }
-
-            textBoxFilterComponents.Focus();
-        }
-*/
         private void ResourcesOpenTarget(string target, bool isLocalFile)
         {
             if (string.IsNullOrWhiteSpace(target))
@@ -1788,9 +1317,6 @@ namespace Commodore_Repair_Toolbox
 
             lv.DrawColumnHeader -= ResourcesListView_DrawColumnHeader;
             lv.DrawColumnHeader += ResourcesListView_DrawColumnHeader;
-
-            lv.DrawItem -= ResourcesListView_DrawItem;
-            lv.DrawItem += ResourcesListView_DrawItem;
 
             lv.DrawSubItem -= ResourcesListView_DrawSubItem;
             lv.DrawSubItem += ResourcesListView_DrawSubItem;
@@ -1818,12 +1344,6 @@ namespace Commodore_Repair_Toolbox
                     Color.Black,
                     TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             }
-        }
-
-        private void ResourcesListView_DrawItem(object sender, DrawListViewItemEventArgs e)
-        {
-            // Intentionally empty.
-            // We draw full background + text in DrawSubItem to avoid OS hot/hover painting conflicts.
         }
 
         private void ResourcesListView_DrawSubItem(object sender, DrawListViewSubItemEventArgs e)
@@ -1912,9 +1432,6 @@ namespace Commodore_Repair_Toolbox
                     }
                 }
 
-//                _resourcesLocalFiles.AutoResizeColumns(ColumnHeaderAutoResizeStyle.ColumnContent);
-//                _resourcesWebLinks.AutoResizeColumns(ColumnHeaderAutoResizeStyle.ColumnContent);
-
                 LayoutResourcesControls();
             }
             finally
@@ -1945,7 +1462,7 @@ namespace Commodore_Repair_Toolbox
                 return;
             }
 
-            int width = tabResourcesNew.ClientSize.Width - 24;
+            int width = tabResources.ClientSize.Width - 24;
             _resourcesLocalFiles.Width = width;
             _resourcesWebLinks.Width = width;
 
@@ -1974,119 +1491,6 @@ namespace Commodore_Repair_Toolbox
             if (desired > maxHeight) return maxHeight;
             return desired;
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        /*
-        private async void UpdateTabResources(Board selectedBoard)
-        {
-            await EnsureWebView2LightAsync(webView2Resources);
-
-            string htmlContent = @"
-                <html>
-                <head>
-                <meta charset='UTF-8'>
-                <script>
-                document.addEventListener('click', function(e) {
-                    var target = e.target;
-                    if (target.tagName.toLowerCase() === 'a' && target.href.startsWith('file://')) {
-                        e.preventDefault();
-                        window.chrome.webview.postMessage('openFile:' + target.href);
-                    }
-                });
-                </script>
-                </head>
-                <body>
-                " + htmlForTabs + @"
-                <h1>Resources for troubleshooting and information</h1><br />
-            ";
-
-            // Get the two datasets, or "null"
-            var groupedLocalFiles = selectedBoard.BoardLocalFiles?.GroupBy(file => file.Category);
-            var groupedLinks = selectedBoard.BoardLinks?.GroupBy(link => link.Category);
-
-            // Local files
-            if (groupedLocalFiles != null && groupedLocalFiles.Any())
-            {
-                htmlContent += "<h1>Local files</h1>";
-                foreach (var group in groupedLocalFiles)
-                {
-                    htmlContent += "<h2>" + group.Key + "</h2>";
-                    htmlContent += "<ul>";
-
-                    foreach (var file in group)
-                    {
-                        // Translate the relative path into an absolute path
-                        string filePath = Path.GetFullPath(Path.Combine(DataPaths.DataRoot, file.Datafile));
-                        string fileUri = new Uri(filePath).AbsoluteUri;
-
-                        htmlContent += "<li><a href='" + fileUri + "' target='_blank'>" + file.Name + "</a></li>";
-                    }
-                    htmlContent += "</ul>";
-                    htmlContent += "<br />";
-                }
-            }
-            else
-            {
-                htmlContent += "<font color='IndianRed'>Could not read [Board local files] data from data file!</a></font><br />";
-            }
-
-            // Web links
-            if (groupedLinks != null && groupedLinks.Any())
-            {
-                htmlContent += "<h1>Links</h1>";
-                foreach (var group in groupedLinks)
-                {
-                    htmlContent += "<h2>" + group.Key + "</h2>";
-                    htmlContent += "<ul>";
-
-                    foreach (var link in group)
-                    {
-                        htmlContent += "<li><a href='" + link.Url + "' target='_blank'>" + link.Name + "</a></li>";
-                    }
-                    htmlContent += "</ul>";
-                    htmlContent += "<br />";
-                }
-            }
-            else
-            {
-                htmlContent += "<font color='IndianRed'>Could not read [Board links] data from data file!</a></font><br />";
-            }
-
-            htmlContent += "</body>";
-            htmlContent += "</html >";
-
-            // Make sure we detach any current event handles, before we add a new one
-            webView2Resources.CoreWebView2.WebMessageReceived -= WebView2_WebMessageReceived; // detach first
-            webView2Resources.CoreWebView2.WebMessageReceived += WebView2_WebMessageReceived; // attach again
-            webView2Resources.CoreWebView2.NewWindowRequested -= WebView2OpenUrl_NewWindowRequested; // detach first
-            webView2Resources.CoreWebView2.NewWindowRequested += WebView2OpenUrl_NewWindowRequested; // attach again
-
-            webView2Resources.NavigateToString(htmlContent);
-        }
-
-        private void WebView2OpenUrl_NewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs args)
-        {
-            // Open URL in default web browser
-            args.Handled = true;
-            Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true });
-
-            // Set focus back to the "textBoxFilterComponents"
-            textBoxFilterComponents.Focus();
-        }
-        */
 
 
         // ###########################################################################################
@@ -2282,7 +1686,7 @@ namespace Commodore_Repair_Toolbox
         // Initialize the tab for "Help".
         // ###########################################################################################
 
-        private void InitializeTabHelpNew()
+        private void InitializeTabHelp()
         {
             try
             {
@@ -2468,7 +1872,6 @@ namespace Commodore_Repair_Toolbox
             return "{" + inner + "}";
         }
 
-
         private static string EscapeRtf(string s)
         {
             if (string.IsNullOrEmpty(s)) return "";
@@ -2487,7 +1890,6 @@ namespace Commodore_Repair_Toolbox
 
             try
             {
-//                Process.Start(new ProcessStartInfo(e.LinkText) { UseShellExecute = true });
                 OpenExternalTarget(e.LinkText, isUrl: true);
             }
             catch (Exception ex)
@@ -2495,238 +1897,6 @@ namespace Commodore_Repair_Toolbox
                 DebugOutput("ERROR: Failed opening URL [" + e.LinkText + "]: " + ex);
             }
         }
-
-
-
-
-
-
-
-
-
-        /*
-        private async void InitializeTabHelp()
-        {
-            await EnsureWebView2LightAsync(webView2Help);
-
-            string htmlContent = @"
-                <html>
-                <head>
-                <meta charset='UTF-8'>
-                </head>
-                <body>
-                " + htmlForTabs + @"
-                <h1>Help for application usage</h1><br />
-
-                <b>""Schematics"" tab</b>:<br />
-                <br />
-
-                <ul>
-                    <li>Mouse functions:</li>
-                    <ul>
-                        <li><span class='typewriter'>Left-click</span> on a component will show a information popup</li>
-                        <li><span class='typewriter'>Left-click</span> + <span class='typewriter'>Hold</span> will do one of three things:</li>
-                        <ul>
-                            <li>Start a new trace, when in ""empty"" space (not on top of component)</li>
-                            <li>Move trace marker, if mouse is on top of an existing trace marker</li>
-                            <li>Insert new trace marker, if mouse is on top of an existing trace, but not on top of a trace marker</li>
-                        </ul>
-                        <li><span class='typewriter'>Right-click</span> will do one of three things:</li>
-                        <ul>
-                            <li>Toggle component highlight, if mouse is on top of a component</li>
-                            <li>Remove entire trace, if mouse is on top of an existing trace, but not on top of a trace marker</li>
-                            <li>Remove trace marker, if mouse is on top of an existing trace marker</li>
-                        </ul>
-                        <li><span class='typewriter'>Right-click</span> + <span class='typewriter'>Hold</span> will pan the image</li>
-                        <li><span class='typewriter'>Scrollwheel</span> will zoom in/out</li>
-                    </ul>
-                </ul>
-                <br />
-
-                <ul>
-                    <li>Keyboard functions:</li>
-                    <ul>
-                        <li><span class='typewriter'>F11</span> will toggle fullscreen</li>
-                        <li><span class='typewriter'>ESCAPE</span> will exit fullscreen</li>
-                        <li><span class='typewriter'>ENTER</span> will toggle blinking for selected components</li>
-                        <li><span class='typewriter'>ALT</span> + <span class='typewriter'>A</span> will select all components in ""Component list""</li>
-                        <li><span class='typewriter'>ALT</span> + <span class='typewriter'>C</span> will clear all selections and show all components in ""Component list""</li>
-                        <li>Start typing anywhere to filter component list (view ""Filtering"")</li>
-                    </ul>
-                </ul>
-                <br />
-
-                <ul>
-                    <li>Filtering:</li>
-                    <ul>
-                        <li>Filtering supports multi-word/character searching, divided by a whitespace</li>
-                        <li>When doing a multi-word searching then the order is not important</li>
-                        <li>Filtering is case-insensitive</li>
-                        <li>Examples of a multi-word/character search:</li>
-                        <ul>
-                            <li>Typing <span class='typewriter'>U6 | CPU | 8502</span> will find the component <span style='background:lightgrey;'>&nbsp;U6 | CPU | 8502&nbsp;</span></li>
-                            <li>Typing <span class='typewriter'>CPU 8502 U6</span> will find the component <span style='background:lightgrey;'>&nbsp;U6 | CPU | 8502&nbsp;</span></li>
-                            <li>Typing <span class='typewriter'>5 8 U P c 6</span> will find the component <span style='background:lightgrey;'>&nbsp;U6 | CPU | 8502&nbsp;</span></li>
-                        </ul>
-                    </ul>
-                </ul>
-                <br />
-
-                <ul>
-                    <li>PAL/NTSC:</li>
-                    <ul>
-                        <li>PAL</li>
-                        <ul>
-                            <li>Filters all components and images where the region is either set to PAL or not relevant (generic)</li>
-                        </ul>
-                        <li>NTSC</li>
-                        <ul>
-                            <li>Filters all components and images where the region is either set to NTSC or not relevant (generic)</li>
-                        </ul>
-                        <li>The component information popup shows a counter on the two region buttons for the number of images relevant specifically for this region or if images are generic</li>
-                    </ul>
-                </ul>
-                <br />
-
-                <ul>
-                    <li>Component selection:</li>
-                    <ul>
-                        <li>When a component is selected, then it will also visualize if component is part of thumbnail in list-view:</li>
-                    <ul>
-                    <li>Appending an asterisk/* as first character in thumbnail label</li>
-                    <li>Background color of thumbnail label changes to blue</li>
-                    </ul>
-                        <li>You cannot highlight a component in image, if its component category is unselected</li>
-                    </ul>
-                </ul>
-                <br />
-                
-                <ul>
-                    <li>Circuit tracing:</li>
-                    <ul>
-                        <li>When mouse cursor shows a ""cross"", then you can start drawing a new trace</li>
-                        <li>Holding down <span class='typewriter'>SHIFT</span> while drawing a trace, will vertically and horizontally align the trace to its neighbour markers</li>
-                    </ul>
-                </ul>
-                <br />
-
-                <ul>
-                    <li>""Labels visible"" panel:</li>
-                    <ul>
-                        <li>If no components are selected for the specific schematic, then the panel with checkboxes will not be shown</li>
-                        <li>The panel can be toggled minimized/maximized with the ""M"" button</li>
-                        <li>When only one checkbox is selected, then it will replace whitespaces in label with new-lines to condense the text</li>
-                    </ul>
-                </ul>
-                <br />
-
-                <ul>
-                    <li>""Traces visible"" panel:</li>
-                    <ul>
-                        <li>If no traces are drawn for the specific schematic, then the panel with checkboxes will not be shown</li>
-                        <li>The panel can be toggled minimized/maximized with the ""M"" button</li>
-                        <li>Traces can be toggled hidden/shown based on their color - this applies to all traces within the selected hardware/board</li>
-                    </ul>
-                </ul>
-                <br />
-
-                <hr><br />
-
-                <b>Component information popup</b>:<br />
-                <br />
-
-                If multiple images are available for the selected component, then it will show ""Image 1 of x"" in the top right corner.<br />
-                <br />
-
-                <ul>
-                    <li>Mouse functions:</li>
-                    <ul>
-                        <li><span class='typewriter'>Left-click</span> in the image area will change back to first image (typically the pinout)</li>
-                        <li><span class='typewriter'>Scrollwheel</span> will change image, if multiple images</li>
-                    </ul>
-                </ul>
-                <br />
-
-                <ul>
-                    <li>Keyboard functions:</li>
-                    <ul>
-                        <li>Arrows keys <span class='typewriter'>←</span> <span class='typewriter'>→</span> <span class='typewriter'>↑</span> <span class='typewriter'>↓</span> will change image, if multiple images</li>
-                        <li><span class='typewriter'>SPACE</span> will change back to first image (typical the pinout)</li>
-                        <li><span class='typewriter'>CTRL</span> + <span class='typewriter'>TAB</span> will toggle between PAL and NTSC</li>
-                        <li><span class='typewriter'>ESCAPE</span> will close popup</li>
-                    </ul>
-                </ul>
-                <br />
-
-                <hr><br />
-
-                <b>Data update from online source</b>:<br />
-                <br />
-
-                It is possible to fetch the newest data from the online source.<br />
-                You can do this via the ""Configuration"" tab.<br />
-                <br />
-
-                If you have <i>not</i> modified any data on your own, then there is no risks in doing this - go for it.<br />
-                If you <i>do have</i> modified some data, then be aware that all Excel data files and all images will be overwritten, so do make a backup before you update.<br />
-                The update will not delete any files it does not know - e.g. if you have added some of your own files.<br />
-                The update will not delete any of your own component modifications done through the component information popup.<br />
-                <br />
-                
-                The update will happen at the <i>next</i> application launch, so you will not see the changes immediately.<br />
-                <br />
-
-                <hr><br />
-
-                <b>Show or hide hardware and boards</b>:<br />
-                <br />
-
-                In ""Configuration"" you can select which hardware and boards you want to show or hide in the application.<br />
-                Per default it will show everything, but you can uncheck the ones you do not want to have in the application.<br />
-                <br />
-
-                Changing any checkbox will be effectuated at the <i>next</i> application launch, so you will not see the changes immediately.<br />
-                <br />
-
-                <hr><br />
-
-                <b>Misc</b>:<br />
-                <br />
-
-                When there is a newer version available online, it will be marked with an asterisk (*) in the ""About"" tab.<br />
-                Then navigate to the tab and download the new version from <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases' target='_blank'>GitHub</a>.<br />
-                <br />
-
-                <ul>
-                    <li>How-to add or update your own data:</li>
-                    <ul>
-                        <li>View <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/wiki/Documentation' target='_blank'>GitHub Documentation</a></li>
-                    </ul>
-                </ul>
-                <br />
-
-                <ul>
-                    <li>Report a problem or comment something from either of these places:</li>
-                    <ul>
-                        <li>Through the ""Feedback"" tab</li>
-                        <li>Through the <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues' target='_blank'>GitHub Issues</a></li>
-                    </ul>
-                </ul>
-                <br />
-                
-                </body>
-                </html>
-            ";
-
-            // Make sure we detach any current event handles, before we add a new one
-            webView2Help.CoreWebView2.WebMessageReceived -= WebView2_WebMessageReceived; // detach first
-            webView2Help.CoreWebView2.WebMessageReceived += WebView2_WebMessageReceived; // attach again
-            webView2Help.CoreWebView2.NewWindowRequested -= WebView2OpenUrl_NewWindowRequested; // detach first
-            webView2Help.CoreWebView2.NewWindowRequested += WebView2OpenUrl_NewWindowRequested; // attach again
-
-            webView2Help.NavigateToString(htmlContent);
-        }
-        */
 
 
         // ###########################################################################################
@@ -2887,146 +2057,6 @@ namespace Commodore_Repair_Toolbox
         }
 
 
-
-
-
-
-
-
-
-        /*
-        private async void UpdateTabAbout()
-        {
-            await EnsureWebView2LightAsync(webView2About);
-
-            // Create HTML for the "boardCredits" class
-            var foundHardware = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
-            var foundBoard = foundHardware?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
-
-            string htmlCredits = "";
-            if (foundBoard?.BoardCredits != null && foundBoard.BoardCredits.Count > 0)
-            {
-                var grouped = foundBoard.BoardCredits
-                    .GroupBy(c => c.Category)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => g.GroupBy(c2 => string.IsNullOrWhiteSpace(c2.SubCategory) ? "Unnamed" : c2.SubCategory)
-                              .ToDictionary(
-                                  sg => sg.Key,
-                                  sg => sg.ToList()
-                              )
-                    );
-
-                var sb = new StringBuilder();
-                sb.AppendLine("<ul>");
-                foreach (var category in grouped)
-                {
-                    sb.AppendLine($"<li><b>{category.Key}</b>");
-                    sb.AppendLine("<ul>");
-                    foreach (var subcat in category.Value)
-                    {
-                        if (subcat.Key != "Unnamed")
-                        {
-                            sb.AppendLine($"<li><b>{subcat.Key}</b>");
-                            sb.AppendLine("<ul>");
-                            foreach (var credit in subcat.Value)
-                            {
-                                if (credit.Contact == "")
-                                {
-                                    sb.AppendLine($"<li>{credit.Name}</li>");
-                                }
-                                else
-                                {
-                                    sb.AppendLine($"<li>{credit.Name}, {credit.Contact}</li>");
-                                }
-                            }
-                            sb.AppendLine("</ul>");
-                            sb.AppendLine("</li>");
-                        }
-                        else
-                        {
-                            foreach (var credit in subcat.Value)
-                            {
-                                if (credit.Contact == "")
-                                {
-                                    sb.AppendLine($"<li>{credit.Name}</li>");
-                                }
-                                else
-                                {
-                                    sb.AppendLine($"<li>{credit.Name}, {credit.Contact}</li>");
-                                }
-                            }
-                        }
-                    }
-                    sb.AppendLine("</ul>");
-                    sb.AppendLine("</li>");
-                }
-                sb.AppendLine("</ul>");
-                sb.AppendLine("<br />");
-                sb.AppendLine("When people contribute a substantial amount of data, they can choose to be listed here.<br />");
-                sb.AppendLine("Either the real name or a handle can be chosen and contact address is optional (email, GitHub or personal web page).<br />");
-                sb.AppendLine("<br />");
-
-                htmlCredits = sb.ToString();
-            }
-
-            string htmlContent = @"
-                <html>
-                <head>
-                <meta charset='UTF-8'>
-                </head>
-                <body>
-                " + htmlForTabs + @"
-                <h1>Commodore Repair Toolbox</h1><br />
-
-                You are running version <b>" + versionThis + @"</b> (64-bit)<br />
-                <br />
-
-                " + versionOnlineTxt + @"
-
-                All programming done by Dennis Helligsø (dennis@commodore-repair-toolbox.dk).<br />
-                <br />
-
-                Visit official project home page at <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox' target='_blank'>https://github.com/HovKlan-DH/Commodore-Repair-Toolbox</a><br />
-                <br />
-
-                <hr><br />
-                Credits and recognition for this board data go to:<br /><br />
-
-                " + htmlCredits + @"
-
-                <hr><br />
-
-                A comment from the developer:<br /><br />
-
-                <i>
-                I have been repairing Commodore 64/128 computers for some years, but I still consider myself as a novice in this world of hardware - I am more a software person, which you may have guessed having this tool here. I often forget where and what to check, and I struggle to find again all the relevant resources and schematics, not to mention the struggle to find the components in the schematics - a pure mess and quite inefficient. I did often refer to the ""Mainboards"" section of <a href=""https://myoldcomputer.nl/technical-info/mainboards/"" target=""_blank"">My Old Computer</a>, and I noticed that Jeroen did have a prototype of an application named ""Repair Help"", and it did have the easy layout I was looking for (I did get a copy of it). However, it was never finalized from him, so I took upon myself to create something similar, and a couple of years later (including a long hiatus) I did come up with this quite similar looking application, though expanded with additional functionalities and data points.<br />
-                <br />
-
-                The longer-term goal is that the tool will cover all C64 and C128 computers, and ideally also its most used peripherals, and I will continue to add new and refine data for myself (when doing my own diagnostics and repairing), but I will most likely not be able to do this myself alone. I would really appreciate some help with this, so if you have the willingness, then please reach out to me, and I will happily explain the nitty-gritty details. It is actually quite easy when having tried it once.<br />
-                <br />
-
-                If you see anything that can be better, e.g. bad data quality or improvements for the tool, then do reach out to me. Of course I would also be happy, if you would send a comment from the ""Feedback"" tab - even if you do not like the tool, as constructive criticism is always welcome :-)<br />
-                <br />
-
-                // Dennis
-                </i>
-                
-                </body>
-                </html>
-            ";
-
-            // Make sure we detach any current event handles, before we add a new one
-            webView2About.CoreWebView2.WebMessageReceived -= WebView2_WebMessageReceived; // detach first
-            webView2About.CoreWebView2.WebMessageReceived += WebView2_WebMessageReceived; // attach again
-            webView2About.CoreWebView2.NewWindowRequested -= WebView2OpenUrl_NewWindowRequested; // detach first
-            webView2About.CoreWebView2.NewWindowRequested += WebView2OpenUrl_NewWindowRequested; // attach again
-
-            webView2About.NavigateToString(htmlContent);
-        }
-        */
-
-
         // ###########################################################################################
         // Initialize the tab for "About".
         // ###########################################################################################
@@ -3067,22 +2097,6 @@ namespace Commodore_Repair_Toolbox
             Debug.WriteLine("[UpdateComponentSelection] called from [" + callerName + "]");
 #endif
 
-            /*
-            var listBoxComponentsSelectedClone = listBoxComponents.SelectedItems.Cast<object>().ToList(); // create a list of selected components
-
-            foreach (var item in listBoxComponents.Items)
-            {
-                if (listBoxComponentsSelectedClone.Contains(item))
-                {
-                    AddSelectedComponentIfNotInList(item.ToString());
-                }
-                else
-                {
-                    RemoveSelectedComponentIfInList(item.ToString());
-                }
-            }
-            */
-
             // Build a Display -> Label map once (outside the loop)
             var hw = classHardware.FirstOrDefault(h => h.Name == hardwareSelectedName);
             var bd = hw?.Boards.FirstOrDefault(b => b.Name == boardSelectedName);
@@ -3116,7 +2130,6 @@ namespace Commodore_Repair_Toolbox
             // Update overlays
             ShowOverlaysAccordingToComponentList();
         }
-
 
         private void UpdateComponentList(string from)
         {
@@ -3178,12 +2191,6 @@ namespace Commodore_Repair_Toolbox
 
                             if (listBoxComponentsSelectedClone.Contains(componentDisplay) || (from == "TextBoxFilterComponents_TextChanged" && searchTerms.Length > 0))
                             {
-                                /*
-                                if (!selectedComponents.Contains(componentDisplay))
-                                {
-                                    AddSelectedComponentIfNotInList(componentDisplay);
-                                }
-                                */
                                 if (!selectedComponents.Contains(componentLabel))
                                 {
                                     AddSelectedComponentIfNotInList(componentLabel);
@@ -3196,19 +2203,16 @@ namespace Commodore_Repair_Toolbox
                             }
                             else
                             {
-                                //RemoveSelectedComponentIfInList(componentDisplay);
                                 RemoveSelectedComponentIfInList(componentLabel);
                             }
                         }
                         else
                         {
-                            //RemoveSelectedComponentIfInList(componentDisplay);
                             RemoveSelectedComponentIfInList(componentLabel);
                         }
                     }
                     else
                     {
-                        //RemoveSelectedComponentIfInList(componentDisplay);
                         RemoveSelectedComponentIfInList(componentLabel);
                     }
                 }
@@ -3218,21 +2222,13 @@ namespace Commodore_Repair_Toolbox
 
             UpdateShowOfSelectedComponents();
             ShowOverlaysAccordingToComponentList();
-//            UpdateTabOverview(GetSelectedBoardClass());
             UpdateTabNewOverview(GetSelectedBoardClass());
 
             listBoxComponents.SelectedIndexChanged += listBoxComponents_SelectedIndexChanged;
         }
 
-        //private void AddSelectedComponentIfNotInList(string componentDisplay)
         private void AddSelectedComponentIfNotInList(string componentLabel)
         {
-            /*
-            if (!listBoxComponentsSelectedText.Contains(componentDisplay))
-            {
-                listBoxComponentsSelectedText.Add(componentDisplay);
-            }
-            */
             if (!listBoxComponentsSelectedText.Contains(componentLabel))
             {
                 listBoxComponentsSelectedText.Add(componentLabel);
@@ -3240,15 +2236,8 @@ namespace Commodore_Repair_Toolbox
 
         }
 
-        //private void RemoveSelectedComponentIfInList(string componentDisplay)
         private void RemoveSelectedComponentIfInList(string componentLabel)
         {
-            /*
-            if (listBoxComponentsSelectedText.Contains(componentDisplay))
-            {
-                listBoxComponentsSelectedText.Remove(componentDisplay);
-            }
-            */
             if (listBoxComponentsSelectedText.Contains(componentLabel))
             {
                 listBoxComponentsSelectedText.Remove(componentLabel);
@@ -3428,8 +2417,6 @@ namespace Commodore_Repair_Toolbox
                 {
                     panelLabelsVisible.Visible = false;
                 }
-
-                //                UpdateShowOfSelectedComponents();
             }
 
             // Thumbnail list
@@ -3460,7 +2447,6 @@ namespace Commodore_Repair_Toolbox
                                     .FirstOrDefault(cb => cb.Label == comp.Label)?.NameDisplay ?? "";
 
                                 // Check if the component is selected in component list
-                                //                                bool highlighted = selectedComponents.Contains(componentDisplay);
                                 bool highlighted = selectedComponents.Contains(comp.Label);
 
                                 foreach (var ov in comp.Overlays)
@@ -3787,9 +2773,7 @@ namespace Commodore_Repair_Toolbox
             SuspendLayout();
             InitializeThumbnails();
             InitializeTabMain();
-//            UpdateTabResources(selectedBoardClass);
             UpdateTabResourcesNew(selectedBoardClass);
-//            UpdateTabAbout();
             UpdateTabAboutNew();
 
             // Load polylines after initializing thumbnails and tabs
@@ -4129,8 +3113,6 @@ namespace Commodore_Repair_Toolbox
                 Name = "labelRegion",
                 Text = selectedRegion,
                 AutoSize = true,
-                //Width = TextRenderer.MeasureText("NTSC", new Font("Calibri", 11)).Width + 5,
-                //Height = labelFile.PreferredHeight,
                 BackColor = regionColorBack,
                 ForeColor = regionColorText,
                 BorderStyle = BorderStyle.FixedSingle,
@@ -4200,17 +3182,14 @@ namespace Commodore_Repair_Toolbox
                 if (bo?.Components != null)
                 {
                     foreach (var comp in bo.Components)
-                    //                    foreach (var comp in bo.Components.GroupBy(c => c.Label).Select(g => g.First()))
                     {
                         string componentDisplay = bd.Components.FirstOrDefault(cb => cb.Label == comp.Label)?.NameDisplay ?? "";
                         if (comp.Overlays == null) continue;
 
                         foreach (var ov in comp.Overlays)
                         {
-                            // hest 2
                             PictureBox overlayPictureBox = new PictureBox
                             {
-                                //                                Name = componentDisplay,
                                 Name = comp.Label,
                                 Location = new Point(ov.Bounds.X, ov.Bounds.Y),
                                 Size = new Size(ov.Bounds.Width, ov.Bounds.Height),
@@ -4467,8 +3446,6 @@ namespace Commodore_Repair_Toolbox
                 bool hasSelectedComponent = selectedComponents.Any(selectedComponentText =>
                 {
                     // Find component "label"
-                    //                    string componentLabel = bd.Components
-                    //                        .FirstOrDefault(cb => cb.NameDisplay == selectedComponentText)?.Label ?? "";
                     string componentLabel = bd.Components
                         .FirstOrDefault(cb => cb.Label == selectedComponentText)?.Label ?? "";
 
@@ -4665,76 +3642,6 @@ namespace Commodore_Repair_Toolbox
         private void panelZoom_MouseWheel(object sender, MouseEventArgs e)
         {
             PerformZoom(e.Delta, e.Location);
-
-            /*
-            ControlUpdateHelper.BeginControlUpdate(panelZoom);
-
-            try
-            {
-                float oldZoomFactor = zoomFactor;
-                bool hasZoomChanged = false;
-
-                if (e.Delta > 0) // scrolling up => zoom in
-                {
-                    if (zoomFactor <= 4.0f)
-                    {
-                        zoomFactor *= 1.5f;
-                        hasZoomChanged = true;
-                        zoomLevel++;
-                    }
-                }
-                else // scrolling down => zoom out
-                {
-                    // Only zoom out if the image is bigger than the container
-                    if (panelImageMain.Width > panelZoom.Width || panelImageMain.Height > panelZoom.Height)
-                    {
-                        zoomFactor /= 1.5f;
-                        hasZoomChanged = true;
-                        zoomLevel--;
-                    }
-                }
-
-                if (hasZoomChanged)
-                {
-                    isResizedByMouseWheel = true;
-
-                    // 2) Calculate new size
-                    Size newSize = new Size(
-                        (int)(image.Width * zoomFactor),
-                        (int)(image.Height * zoomFactor)
-                    );
-
-                    // 3) Figure out how to keep the same "point under mouse"
-                    Point mousePosition = new Point(
-                        e.X - panelZoom.AutoScrollPosition.X,
-                        e.Y - panelZoom.AutoScrollPosition.Y
-                    );
-
-                    Point newScrollPosition = new Point(
-                        (int)(mousePosition.X * (zoomFactor / oldZoomFactor)),
-                        (int)(mousePosition.Y * (zoomFactor / oldZoomFactor))
-                    );
-
-                    // 4) Apply the new size
-                    panelImageMain.Size = newSize;
-
-                    // 5) Update the scroll position
-                    panelZoom.AutoScrollPosition = new Point(
-                        newScrollPosition.X - e.X,
-                        newScrollPosition.Y - e.Y
-                    );
-
-                    // 6) Re‐highlight overlays (so they scale properly)
-                    HighlightOverlays("tab");
-
-                    label11.Text = $"{zoomLevel}";
-                }
-            }
-            finally
-            {
-                ControlUpdateHelper.EndControlUpdate(panelZoom);
-            }
-            */
         }
 
         private void PerformZoom(int delta, Point clientPos)
@@ -4980,10 +3887,6 @@ namespace Commodore_Repair_Toolbox
             if (e.MouseArgs.Button == MouseButtons.Left)
             {
                 // 1) HIGHLIGHT the overlay
-                //if (!listBoxComponentsSelectedText.Contains(componentDisplay))
-                //{
-                //    listBoxComponentsSelectedText.Add(componentDisplay);
-                //}
                 if (!listBoxComponentsSelectedText.Contains(componentLabel))
                 {
                     listBoxComponentsSelectedText.Add(componentLabel);
@@ -5007,10 +3910,8 @@ namespace Commodore_Repair_Toolbox
             // Right-mouse click (toggle component selection)
             else if (e.MouseArgs.Button == MouseButtons.Right)
             {
-                //if (!listBoxComponentsSelectedText.Contains(componentDisplay))
                 if (!listBoxComponentsSelectedText.Contains(componentLabel))
                 {
-                    //listBoxComponentsSelectedText.Add(componentDisplay);
                     listBoxComponentsSelectedText.Add(componentLabel);
                     int index = listBoxComponents.Items.IndexOf(componentDisplay);
                     if (index >= 0)
@@ -5020,7 +3921,6 @@ namespace Commodore_Repair_Toolbox
                 }
                 else
                 {
-                    //listBoxComponentsSelectedText.Remove(componentDisplay);
                     listBoxComponentsSelectedText.Remove(componentLabel);
                     int index = listBoxComponents.Items.IndexOf(componentDisplay);
                     if (index >= 0)
@@ -5163,24 +4063,6 @@ namespace Commodore_Repair_Toolbox
 
             _closePopupMouseDownHandlers.Clear();
         }
-
-        /*
-        private void AttachClosePopupOnClick(Control parent)
-        {
-            // Attach a single MouseDown event to close any open popup
-            parent.MouseDown += (s, e) =>
-            {
-                // Only if we click in the main form and a popup is open
-                CloseComponentPopup();
-            };
-
-            // Recurse to child controls
-            foreach (Control child in parent.Controls)
-            {
-                AttachClosePopupOnClick(child);
-            }
-        }
-        */
 
 
         // ###########################################################################################
@@ -5865,7 +4747,6 @@ namespace Commodore_Repair_Toolbox
                 panel1.Controls.Add(checkBox);
                 panel1.Controls.Add(counterLabel);
 
-
                 yOffset += Math.Max(colorPanel.Height, checkBox.Height) + 5; // Adjust spacing
             }
 
@@ -6133,7 +5014,6 @@ namespace Commodore_Repair_Toolbox
             {
                 DebugOutput("EXCEPTION raised for fetching JSON file catalogue from online source:");
                 DebugOutput(ex.ToString());
-//                MessageBox.Show(ex.ToString(), "Error fetching JSON file catalogue", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -6295,8 +5175,8 @@ namespace Commodore_Repair_Toolbox
                 {
                     localFiles.Add(new LocalFiles
                     {
-                        File = relative,          // Store relative path only
-                        Checksum = GetFileChecksum(full) // Use full path for hashing
+                        File = relative, // store relative path only
+                        Checksum = GetFileChecksum(full) // use full path for hashing
                     });
                 }
             }

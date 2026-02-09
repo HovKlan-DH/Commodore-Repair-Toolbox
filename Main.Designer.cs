@@ -41,11 +41,9 @@
             this.checkBox3 = new System.Windows.Forms.CheckBox();
             this.checkBox2 = new System.Windows.Forms.CheckBox();
             this.panelThumbnails = new System.Windows.Forms.Panel();
-            this.tabOverview = new System.Windows.Forms.TabPage();
             this.tabOverviewNew = new System.Windows.Forms.TabPage();
             this.dataGridViewOverview = new System.Windows.Forms.DataGridView();
             this.tabResources = new System.Windows.Forms.TabPage();
-            this.tabResourcesNew = new System.Windows.Forms.TabPage();
             this.tabConfiguration = new System.Windows.Forms.TabPage();
             this.panel2 = new System.Windows.Forms.Panel();
             this.checkBoxKeyboardZoom = new System.Windows.Forms.CheckBox();
@@ -69,10 +67,8 @@
             this.label2 = new System.Windows.Forms.Label();
             this.label1 = new System.Windows.Forms.Label();
             this.tabHelp = new System.Windows.Forms.TabPage();
-            this.tabHelpNew = new System.Windows.Forms.TabPage();
             this.richTextBoxHelp = new System.Windows.Forms.RichTextBox();
             this.tabAbout = new System.Windows.Forms.TabPage();
-            this.tabAboutNew = new System.Windows.Forms.TabPage();
             this.richTextBoxAbout = new System.Windows.Forms.RichTextBox();
             this.comboBoxHardware = new System.Windows.Forms.ComboBox();
             this.labelHardware = new System.Windows.Forms.Label();
@@ -109,24 +105,20 @@
             this.tabConfiguration.SuspendLayout();
             this.panel2.SuspendLayout();
             this.tabFeedback.SuspendLayout();
-            this.tabHelpNew.SuspendLayout();
-            this.tabAboutNew.SuspendLayout();
+            this.tabHelp.SuspendLayout();
+            this.tabAbout.SuspendLayout();
             this.panelBehindTab.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl
             // 
             this.tabControl.Controls.Add(this.tabSchematics);
-            this.tabControl.Controls.Add(this.tabOverview);
             this.tabControl.Controls.Add(this.tabOverviewNew);
             this.tabControl.Controls.Add(this.tabResources);
-            this.tabControl.Controls.Add(this.tabResourcesNew);
             this.tabControl.Controls.Add(this.tabConfiguration);
             this.tabControl.Controls.Add(this.tabFeedback);
             this.tabControl.Controls.Add(this.tabHelp);
-            this.tabControl.Controls.Add(this.tabHelpNew);
             this.tabControl.Controls.Add(this.tabAbout);
-            this.tabControl.Controls.Add(this.tabAboutNew);
             this.tabControl.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.tabControl.Location = new System.Drawing.Point(30, 26);
             this.tabControl.Margin = new System.Windows.Forms.Padding(0);
@@ -271,15 +263,6 @@
             this.panelThumbnails.Size = new System.Drawing.Size(104, 536);
             this.panelThumbnails.TabIndex = 0;
             // 
-            // tabOverview
-            // 
-            this.tabOverview.Location = new System.Drawing.Point(4, 30);
-            this.tabOverview.Name = "tabOverview";
-            this.tabOverview.Size = new System.Drawing.Size(720, 536);
-            this.tabOverview.TabIndex = 8;
-            this.tabOverview.Text = "Overview-OLD";
-            this.tabOverview.UseVisualStyleBackColor = true;
-            // 
             // tabOverviewNew
             // 
             this.tabOverviewNew.Controls.Add(this.dataGridViewOverview);
@@ -311,22 +294,12 @@
             // 
             // tabResources
             // 
-            this.tabResources.BackColor = System.Drawing.Color.White;
             this.tabResources.Location = new System.Drawing.Point(4, 30);
-            this.tabResources.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabResources.Name = "tabResources";
             this.tabResources.Size = new System.Drawing.Size(720, 536);
-            this.tabResources.TabIndex = 3;
-            this.tabResources.Text = "Resources-OLD";
-            // 
-            // tabResourcesNew
-            // 
-            this.tabResourcesNew.Location = new System.Drawing.Point(4, 30);
-            this.tabResourcesNew.Name = "tabResourcesNew";
-            this.tabResourcesNew.Size = new System.Drawing.Size(720, 536);
-            this.tabResourcesNew.TabIndex = 11;
-            this.tabResourcesNew.Text = "Resources";
-            this.tabResourcesNew.UseVisualStyleBackColor = true;
+            this.tabResources.TabIndex = 11;
+            this.tabResources.Text = "Resources";
+            this.tabResources.UseVisualStyleBackColor = true;
             // 
             // tabConfiguration
             // 
@@ -556,23 +529,13 @@
             // 
             // tabHelp
             // 
-            this.tabHelp.BackColor = System.Drawing.Color.White;
+            this.tabHelp.Controls.Add(this.richTextBoxHelp);
             this.tabHelp.Location = new System.Drawing.Point(4, 30);
-            this.tabHelp.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabHelp.Name = "tabHelp";
             this.tabHelp.Size = new System.Drawing.Size(720, 536);
-            this.tabHelp.TabIndex = 6;
-            this.tabHelp.Text = "Help-OLD";
-            // 
-            // tabHelpNew
-            // 
-            this.tabHelpNew.Controls.Add(this.richTextBoxHelp);
-            this.tabHelpNew.Location = new System.Drawing.Point(4, 30);
-            this.tabHelpNew.Name = "tabHelpNew";
-            this.tabHelpNew.Size = new System.Drawing.Size(720, 536);
-            this.tabHelpNew.TabIndex = 12;
-            this.tabHelpNew.Text = "Help";
-            this.tabHelpNew.UseVisualStyleBackColor = true;
+            this.tabHelp.TabIndex = 12;
+            this.tabHelp.Text = "Help";
+            this.tabHelp.UseVisualStyleBackColor = true;
             // 
             // richTextBoxHelp
             // 
@@ -589,24 +552,13 @@
             // 
             // tabAbout
             // 
-            this.tabAbout.BackColor = System.Drawing.Color.White;
-            this.tabAbout.Font = new System.Drawing.Font("Calibri", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.tabAbout.Controls.Add(this.richTextBoxAbout);
             this.tabAbout.Location = new System.Drawing.Point(4, 30);
-            this.tabAbout.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.tabAbout.Name = "tabAbout";
             this.tabAbout.Size = new System.Drawing.Size(720, 536);
-            this.tabAbout.TabIndex = 5;
-            this.tabAbout.Text = "About-OLD";
-            // 
-            // tabAboutNew
-            // 
-            this.tabAboutNew.Controls.Add(this.richTextBoxAbout);
-            this.tabAboutNew.Location = new System.Drawing.Point(4, 30);
-            this.tabAboutNew.Name = "tabAboutNew";
-            this.tabAboutNew.Size = new System.Drawing.Size(720, 536);
-            this.tabAboutNew.TabIndex = 13;
-            this.tabAboutNew.Text = "About";
-            this.tabAboutNew.UseVisualStyleBackColor = true;
+            this.tabAbout.TabIndex = 13;
+            this.tabAbout.Text = "About";
+            this.tabAbout.UseVisualStyleBackColor = true;
             // 
             // richTextBoxAbout
             // 
@@ -911,8 +863,8 @@
             this.panel2.PerformLayout();
             this.tabFeedback.ResumeLayout(false);
             this.tabFeedback.PerformLayout();
-            this.tabHelpNew.ResumeLayout(false);
-            this.tabAboutNew.ResumeLayout(false);
+            this.tabHelp.ResumeLayout(false);
+            this.tabAbout.ResumeLayout(false);
             this.panelBehindTab.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
@@ -923,8 +875,6 @@
 
         private System.Windows.Forms.TabControl tabControl;
         private System.Windows.Forms.TabPage tabSchematics;
-        private System.Windows.Forms.TabPage tabResources;
-        private System.Windows.Forms.TabPage tabAbout;
         private System.Windows.Forms.ComboBox comboBoxHardware;
         private System.Windows.Forms.Label labelHardware;
         private System.Windows.Forms.Label labelBoard;
@@ -943,7 +893,6 @@
         private System.Windows.Forms.SplitContainer splitContainerSchematics;
         private System.Windows.Forms.Panel panelBehindTab;
         private System.Windows.Forms.CheckBox checkBoxBlink;
-        private System.Windows.Forms.TabPage tabHelp;
         private System.Windows.Forms.TextBox textBoxFilterComponents;
 //        public Microsoft.Web.WebView2.WinForms.WebView2 webView2Resources; // Dennis, made "public" from "private"
 //        private Microsoft.Web.WebView2.WinForms.WebView2 webView2Help;
@@ -964,7 +913,6 @@
         private System.Windows.Forms.TextBox textBox6;
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.Label label9;
-        private System.Windows.Forms.TabPage tabOverview;
 //        private Microsoft.Web.WebView2.WinForms.WebView2 webView2Overview;
         private System.Windows.Forms.CheckBox checkBox2;
         private System.Windows.Forms.CheckBox checkBox3;
@@ -987,10 +935,10 @@
         private System.Windows.Forms.CheckBox checkBoxKeyboardZoom;
         private System.Windows.Forms.TabPage tabOverviewNew;
         private System.Windows.Forms.DataGridView dataGridViewOverview;
-        private System.Windows.Forms.TabPage tabResourcesNew;
-        private System.Windows.Forms.TabPage tabHelpNew;
+        private System.Windows.Forms.TabPage tabResources;
+        private System.Windows.Forms.TabPage tabHelp;
         private System.Windows.Forms.RichTextBox richTextBoxHelp;
-        private System.Windows.Forms.TabPage tabAboutNew;
+        private System.Windows.Forms.TabPage tabAbout;
         private System.Windows.Forms.RichTextBox richTextBoxAbout;
     }
 }
