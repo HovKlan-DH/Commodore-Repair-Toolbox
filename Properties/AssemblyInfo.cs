@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("Commodore Repair Toolbox")]
-[assembly: AssemblyCopyright("Dennis Helligsø ©  2025")]
+[assembly: AssemblyCopyright("Dennis Helligsø ©  2025-2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -32,5 +32,5 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("2025.12.20.1")]
-[assembly: AssemblyFileVersion("2025.12.20.1")]
+[assembly: AssemblyVersion("2026.02.08.1")]
+[assembly: AssemblyFileVersion("2026.02.08.1")]

@@ -1,10 +1,8 @@
-﻿using OfficeOpenXml.Export.ToDataTable;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Security.Policy;
 using System.Windows.Forms;
 
 namespace Commodore_Repair_Toolbox
@@ -424,7 +422,8 @@ namespace Commodore_Repair_Toolbox
 
                 // Remove any "filteredComponentImages" whose file does not exist, but keep if "FileName" is empty
                 filteredComponentImages = filteredComponentImages
-                    .Where((img, idx) => string.IsNullOrWhiteSpace(img.FileName) || File.Exists(Path.Combine(DataPaths.DataRoot, img.FileName)))
+                    .Where(img => string.IsNullOrWhiteSpace(img.FileName) ||
+                    File.Exists(Path.Combine(DataPaths.DataRoot, img.FileName)))
                     .ToList();
             }
             else
@@ -739,6 +738,24 @@ namespace Commodore_Repair_Toolbox
             labelName.Visible = false;
             labelReading.Visible = false;
             labelImageX.Visible = false;
+
+            // If no images after filtering, render "empty" state and stop
+            if (imagePaths.Count == 0 || filteredComponentImages.Count == 0)
+            {
+                pictureBoxImage.Image = null;
+                RemoveThumbnails();
+
+                DisplayRegionalComponentData();
+                PopulateComponentOneliner();
+
+                // Avoid indexing "filteredComponentImages" in "PopulateImageNote()"
+                textBoxNote.TextChanged -= textBoxNote_TextChanged;
+                textBoxNote.Text = "";
+                textBoxNote.TextChanged += textBoxNote_TextChanged;
+                panelNote.Invalidate();
+
+                return;
+            }
 
             // Show more, if there are thumbnails
             if (imagePaths.Count > 0)

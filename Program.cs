@@ -21,11 +21,26 @@ namespace Commodore_Repair_Toolbox
                 return;
             }
 
+            // Load configuration before DataPaths.Initialize() can persist DataRoot
+            Splashscreen.Current?.UpdateStatus("Loading configuration file");
+            Configuration.LoadConfig();
+
             DataPaths.Initialize(args);
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+
+            // Show splash screen while the main form is loading
+            using (var splash = new Splashscreen())
+            {
+                splash.Show();
+                splash.Refresh();
+
+                var mainForm = new MainForm();
+                mainForm.Shown += (s, e) => splash.Close();
+
+                Application.Run(mainForm);
+            }
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿//using Microsoft.Web.WebView2.Core;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
@@ -10,7 +9,6 @@ using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Security.Policy;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -21,7 +19,7 @@ namespace Commodore_Repair_Toolbox
     public partial class Main : Form
     {
         // Default values
-        private string buildType = ""; // Debug|Release
+        private static string buildType = ""; // Debug|Release
         private string onlineAvailableVersion = ""; // will be empty, if no newer version available
         private string crtPage = "https://commodore-repair-toolbox.dk";
         private string crtPageAutoUpdate = "/auto-update/";
@@ -195,9 +193,6 @@ namespace Commodore_Repair_Toolbox
         {
             InitializeComponent();
 
-            // Load configuration file
-            LoadConfigFile();
-
             // Load configuration parameter "UpdateDataAtNextLaunch"
             string syncDataAtNextLaunchStr = Configuration.GetSetting("UpdateDataAtNextLaunch", "False");
             bool shouldSyncData = bool.TryParse(syncDataAtNextLaunchStr, out bool result) && result;
@@ -226,11 +221,13 @@ namespace Commodore_Repair_Toolbox
             EnableDoubleBuffering();
 
             // Get application versions - both this one and the one online
-            GetAssemblyVersion();
+            versionThis = GetAssemblyVersion();
             GetOnlineVersion();
 
             // Load all files (Excel and configuration)
             LoadExcelData();
+
+            Splashscreen.Current?.UpdateStatus("Finishing setting up the rest");
 
             // Initialize relevant "WebView2" components (used in tab pages)
             InitializeTabConfiguration();
@@ -340,7 +337,7 @@ namespace Commodore_Repair_Toolbox
         // Will transform assembly information into a text string.
         // ###########################################################################################
 
-        private void GetAssemblyVersion()
+        public static string GetAssemblyVersion()
         {
             try
             {
@@ -376,12 +373,13 @@ namespace Commodore_Repair_Toolbox
                 string buildTypeTmp = buildType == "Debug" ? "# DEVELOPMENT " : "";
 
                 // Set the application version
-                versionThis = (date + " " + buildTypeTmp + rev).Trim();
+                return (date + " " + buildTypeTmp + rev).Trim();
             }
             catch (Exception ex)
             {
                 DebugOutput("EXCEPTION in \"GetAssemblyVersion()\":");
                 DebugOutput(ex.ToString());
+                return null;
             }
         }
 

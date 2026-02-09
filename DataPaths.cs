@@ -109,8 +109,8 @@ namespace Commodore_Repair_Toolbox
             devRoot = null;
             if (!Debugger.IsAttached) return false;
 
-            // bin/x64/Debug -> ../../../Data
-            string candidate = Path.GetFullPath(Path.Combine(exeDir, @"..\..\..\Data"));
+            // bin/x64/Debug -> ../../Data
+            string candidate = Path.GetFullPath(Path.Combine(exeDir, @"..\..\Data"));
             if (!Directory.Exists(candidate)) return false;
 
             string excel = Path.Combine(candidate, MainExcelFileName);
