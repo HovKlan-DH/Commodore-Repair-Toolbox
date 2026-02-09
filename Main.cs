@@ -308,10 +308,10 @@ namespace Commodore_Repair_Toolbox
                 {
                     message += "* " + file + "\r\n";
                 }
-                message += "\r\nThis may lead to unexpected behavior in the application.";
+                message += "\r\nThis may lead to unexpected behavior or errors in the application.";
                 MessageBox.Show(
                     message,
-                    "WARNING: Application/data version mismatch",
+                    "WARNING: Application and data version mismatch",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning
                 );

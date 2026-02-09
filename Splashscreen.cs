@@ -1,11 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Commodore_Repair_Toolbox
@@ -45,6 +38,8 @@ namespace Commodore_Repair_Toolbox
                 (panelMain.Width - label3.Width) / 2,
                 label3.Location.Y
             );
+
+            label2.Text = Main.GetAssemblyVersion();
         }
 
         public void UpdateStatus(string status)

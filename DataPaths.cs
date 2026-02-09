@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Windows.Forms;
 
 namespace Commodore_Repair_Toolbox
@@ -75,13 +74,8 @@ namespace Commodore_Repair_Toolbox
             }
 
             CriticalExit(
-                "Could not resolve a valid data-root.\r\n\r\n" +
-                "Checked in order:\r\n" +
-                "  1) Commandline --data-root\r\n" +
-                "  2) Config key DataRoot\r\n" +
-                "  3) <exe>\\Data (should exist)\r\n" +
-                "  4) ../../../Data (only when debugging in Visual Studio)\r\n\r\n" +
-                "Please specify --data-root or create an appropriate \"Data\" folder.");
+                "Could not resolve a valid \"data root\".\r\n\r\n" +
+                "Please consult with the commandline argument \"Commodore-Repair-Toolbox.exe /?\" and provide a valid data root path.");
         }
 
         private static void FinalValidate()
