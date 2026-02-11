@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("Commodore Repair Toolbox")]
-[assembly: AssemblyCopyright("Dennis Helligsø ©  2025-2026")]
+[assembly: AssemblyCopyright("Dennis Helligsø © 2025-2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

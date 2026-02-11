@@ -45,6 +45,9 @@ namespace Commodore_Repair_Toolbox
         // For "Help" tab
         private const int EM_SETRECT = 0x00B3;
 
+        private Panel _waitOverlay;
+        private Label _waitOverlayLabel;
+
         public static void InitializeLogging()
         {
             if (_logInitialized) return;
@@ -3669,11 +3672,17 @@ namespace Commodore_Repair_Toolbox
                 else
                 {
                     // Only zoom out if the image is bigger than the container
-                    if (panelImageMain.Width > panelZoom.Width || panelImageMain.Height > panelZoom.Height)
+                    if (zoomLevel > 1)
                     {
-                        zoomFactor /= 1.5f;
-                        hasZoomChanged = true;
-                        zoomLevel--;
+                        if (panelImageMain.Width > panelZoom.Width || panelImageMain.Height > panelZoom.Height)
+                        {
+                            zoomFactor /= 1.5f;
+                            hasZoomChanged = true;
+                            zoomLevel--;
+                        }
+                    } else
+                    {
+                        zoomLevel = 1;
                     }
                 }
 
@@ -4134,9 +4143,9 @@ namespace Commodore_Repair_Toolbox
 
         // ###########################################################################################
         // "Hardware" combobox change.
-        // ###########################################################################################
+        // ###########################################################################################       
 
-        private void comboBoxHardware_SelectedIndexChanged(object sender, EventArgs e)
+        private async void comboBoxHardware_SelectedIndexChanged(object sender, EventArgs e)
         {
             ClearEverything();
 
