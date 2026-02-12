@@ -229,36 +229,25 @@
   <PropertyGroup>
     <PostBuildEvent>if "$(ConfigurationName)" == "Release" (
 
-
 REM --------------------------
 REM Pack EXE with ILRepack
 REM --------------------------
 "D:\Data\Development\Visual Studio\Commodore-Repair-Toolbox\packages\ILRepack.2.0.44\tools\ILRepack.exe" /out:"$(TargetPath)" "$(TargetPath)" "$(TargetDir)EPPlus.dll" "$(TargetDir)EPPlus.Interfaces.dll" "$(TargetDir)EPPlus.System.Drawing.dll" "$(TargetDir)Microsoft.Bcl.Cryptography.dll" "$(TargetDir)Microsoft.IO.RecyclableMemoryStream.dll" "$(TargetDir)Newtonsoft.Json.dll" "$(TargetDir)System.Buffers.dll" "$(TargetDir)System.Drawing.Common.dll" "$(TargetDir)System.Formats.Asn1.dll" "$(TargetDir)System.Memory.dll" "$(TargetDir)System.Numerics.Vectors.dll" "$(TargetDir)System.Runtime.CompilerServices.Unsafe.dll" "$(TargetDir)System.Security.Cryptography.Xml.dll"
-rem "$(TargetDir)Microsoft.Web.WebView2.Core.dll"
-rem "$(TargetDir)Microsoft.Web.WebView2.WinForms.dll"
-rem "$(TargetDir)Microsoft.Web.WebView2.Wpf.dll"
 
 REM ------------------------
 REM Delete LOCAL folders
 REM ------------------------
 IF EXIST "Data" RMDIR /S /Q "Data"
-rem IF EXIST "Commodore-Repair-Toolbox.exe.WebView2" RMDIR /S /Q "Commodore-Repair-Toolbox.exe.WebView2"
-
 
 REM ----------------------------------------------------
 REM Copy the GitHub "Data" folder to LOCAL folder
 REM ----------------------------------------------------
-REM CPU = x64
-rem XCOPY "..\..\..\Data" "Data" /E /I /H /C /Q /Y
-REM CPU = Any
 XCOPY "..\..\Data" "Data" /E /I /H /C /Q /Y
-
 
 REM --------------------------------
 REM Digitally sign the application
 REM --------------------------------
 "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe" sign /fd sha256 /tr http://ts.ssl.com /td sha256 /sha1 7e2215692c12ad960e40a844b1e1bc15ca006df9 "$(TargetPath)"
-
 
 REM ----------------------------------------------------------
 REM Delete unnecessary files (to check it works without it)
