@@ -2,7 +2,7 @@
 
 This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ hence forward) - a Windows* utility tool for repairing vintage computers or peripherals.
 
-*Note: As of version 2026-February-12 it should be able to run in Linux with Wine and Mono, but this is very much in experimental mode.
+*Note: As of version 2026-February-12 it _should_ be able to run in Linux with Wine and Mono, but this is very much in experimental mode.
 
 
 # What is it?
