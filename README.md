@@ -29,7 +29,7 @@ Almost all Commodore boards have a full oscilloscope baseline for the PAL and NT
 # Requirements
 
 * Windows 7 or newer (works with both 32/64-bit)
-* .NET Framework 4.8 or 4.8.1
+* .NET Framework 4.8 or newer
 
 As per version **2026-February-12** there is **experimental** support for Linux with Wine and Mono installed... but it is not yet officially supported, though I would like to know if it works or not.
 
