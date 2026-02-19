@@ -40,6 +40,8 @@ _CRT_ does not require any installation - just download the newest ZIP file from
 
 When launched _CRT_ you can download newer data (if present) from its online source.
 
+It does not create or use any registry settings, and everything is handled via the local files located within the ZIP file.
+
 
 # Built-in hardware and boards
 
