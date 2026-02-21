@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace Commodore_Repair_Toolbox
@@ -16,6 +17,7 @@ namespace Commodore_Repair_Toolbox
             StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 
             label4.Text = string.Empty;
+            label4.TextAlign = ContentAlignment.TopCenter;
 
             // Center the picture box within the panel
             pictureBox1.Location = new System.Drawing.Point(

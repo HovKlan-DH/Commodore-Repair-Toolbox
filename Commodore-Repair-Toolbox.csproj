@@ -147,6 +147,7 @@
     <Reference Include="WindowsFormsIntegration" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AutoUpdater.cs" />
     <Compile Include="CommandlineHelp.cs" />
     <Compile Include="Configuration.cs" />
     <Compile Include="ControlExtensions.cs" />

@@ -21,9 +21,10 @@ namespace Commodore_Repair_Toolbox
         // Default values
         private static string buildType = ""; // Debug|Release
         private string onlineAvailableVersion = ""; // will be empty, if no newer version available
-        private string crtPage = "https://commodore-repair-toolbox.dk";
-        private string crtPageAutoUpdate = "/auto-update/";
-        private string crtPageFeedback = "/feedback-app/";
+        private static string crtPage = "https://commodore-repair-toolbox.dk";
+        private static string crtNewExecutable = crtPage + "/auto-update/Commodore-Repair-Toolbox.exe";
+        private static string crtPageAutoUpdate = "/auto-update/";
+        private static string crtPageFeedback = "/feedback-app/";
 
         private static bool _logInitialized = false;
         private static readonly object _logSync = new object();
@@ -45,8 +46,8 @@ namespace Commodore_Repair_Toolbox
         // For "Help" tab
         private const int EM_SETRECT = 0x00B3;
 
-        private Panel _waitOverlay;
-        private Label _waitOverlayLabel;
+//        private Panel _waitOverlay;
+//        private Label _waitOverlayLabel;
 
         public static void InitializeLogging()
         {
@@ -159,14 +160,7 @@ namespace Commodore_Repair_Toolbox
             bool shouldSyncData = bool.TryParse(syncDataAtNextLaunchStr, out bool result) && result;
             if (shouldSyncData)
             {
-                MessageBox.Show(
-                    "\"CRT\" will now update all its Excel data files and images from the online source, and it means it will overwrite all local \"CRT\" files.\r\n\r\nDepending on the amount of updates needed, this can either be very fast (less than 10 seconds) or take a little longer time (a few minutes).\r\n\r\nCheck the logfile for details.",
-                    "Data update information",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
-
-                syncFilesFromSource();
+                SyncFilesFromSource();
             }
 
             polylinesManagement = new PolylinesManagement(this);
@@ -190,9 +184,8 @@ namespace Commodore_Repair_Toolbox
 
             Splashscreen.Current?.UpdateStatus("Finishing setting up the rest");
 
-            // Initialize relevant "WebView2" components (used in tab pages)
             InitializeTabConfiguration();
-            InitializeTabOverviewNewOverviewGrid(); // hest
+            InitializeTabOverviewOverviewGrid();
             InitializeTabHelp();
 
             // Attach "form load" event, which is triggered just before form is shown
@@ -367,18 +360,66 @@ namespace Commodore_Repair_Toolbox
                         {
                             tabAbout.Text = "About*";
                             versionOnline = onlineAvailableVersion;
-                            versionOnlineTxt = "<font color='IndianRed'>";
-                            versionOnlineTxt += $"There is a newer version available online: <b>" + versionOnline + @"</b ><br />";
-                            versionOnlineTxt += "View the <i>Changelog</i> and download the new version from here, <a href='https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases' target='_blank'> https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases</a><br />";
-                            versionOnlineTxt += "<br />";
-                            versionOnlineTxt += "</font>";
 
+                            // Add a simple auto-update button docked to the top of the About tab
+                            Panel aboutNotifyPanel = new Panel
+                            {
+                                Dock = DockStyle.Top,
+                                Height = 66,
+                                BackColor = Color.WhiteSmoke,
+                                Name = "panelAutoUpdate",
+                            };
+
+                            Button autoUpdateButton = new Button
+                            {
+                                Text = "Auto-install Update" + Environment.NewLine + versionOnline,
+                                AutoSize = false,
+                                Size = new Size(220, 44),
+                                Location = new Point(11, 11),
+                                Anchor = AnchorStyles.Top | AnchorStyles.Left,
+                                //UseVisualStyleBackColor = true
+                                BackColor = Color.IndianRed,
+                                ForeColor = Color.White,
+                                FlatStyle = FlatStyle.Flat
+                            };
+                            autoUpdateButton.FlatAppearance.BorderColor = Color.DarkRed;
+                            autoUpdateButton.FlatAppearance.BorderSize = 2;
+                            autoUpdateButton.Click += (sender, e) =>
+                            {
+                                AutoUpdater.PerformUpdate(crtNewExecutable, "--fetch-data");
+                            };
+
+                            aboutNotifyPanel.Controls.Add(autoUpdateButton);
+
+                            // Draw a solid IndianRed border around the notification panel
+                            aboutNotifyPanel.Paint += (s, pe) =>
+                            {
+                                float penWidth = thumbnailSelectedBorderWidth;
+                                using (Pen pen = new Pen(Color.IndianRed, penWidth))
+                                {
+                                    float offset = penWidth / 2;
+                                    pe.Graphics.DrawRectangle(
+                                        pen,
+                                        offset,
+                                        offset,
+                                        aboutNotifyPanel.ClientSize.Width - penWidth,
+                                        aboutNotifyPanel.ClientSize.Height - penWidth
+                                    );
+                                }
+                            };
+
+                            // Add to About tab (stays at back of Z-order so it docks above richTextBoxAbout)
+                            tabAbout.Controls.Add(aboutNotifyPanel);
+
+                            // Top-bar notification label (text only; the button lives in the About tab)
                             string newText = "Newer version is available; view \"About\" tab";
                             Size textSize = TextRenderer.MeasureText(newText, label13.Font);
                             label13.Text = newText;
                             label13.Width = textSize.Width + 2;
+                            label13.Anchor = AnchorStyles.Top | AnchorStyles.Right;
                             label13.Visible = true;
                             label13.Location = new Point(panelBehindTab.Width - label13.Width - 2, 3);
+                            label13.BringToFront();
                         }
                         else
                         {
@@ -696,7 +737,7 @@ namespace Commodore_Repair_Toolbox
         // Overview tab
         // ###########################################################################################
 
-        private void InitializeTabOverviewNewOverviewGrid()
+        private void InitializeTabOverviewOverviewGrid()
         {
             // Hide the left row-header column entirely
             dataGridViewOverview.RowHeadersVisible = false;
@@ -1962,11 +2003,8 @@ namespace Commodore_Repair_Toolbox
 
             if (!string.IsNullOrWhiteSpace(versionOnline))
             {
-                sb.Append(@"\cf2 There is a newer version available online: ");
-                sb.Append(@"{\b ");
-                sb.Append(EscapeRtf(versionOnline));
-                sb.Append(@"}\b0\line ");
-                sb.Append(@"View the Changelog and download the new version from here: https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases\line\line ");
+                sb.Append(@"\cf2 There is a newer version available. Click the above ""{\b Auto-install Update\b0}"" button to install it, or download it manually from below link.\line ");
+                sb.Append(@"View the {\i Changelog\i0} here, https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases\line\line ");
                 sb.Append(@"\cf0");
             }
 
@@ -3035,7 +3073,7 @@ namespace Commodore_Repair_Toolbox
             );
 
             // Clear old controls
-            RemoveClosePopupOnClickHandlers(); // HEST, temporary - will this work??????????
+            RemoveClosePopupOnClickHandlers();
             panelMain.Controls.Clear();
             overlayComponentsTab.Clear();
             overlayComponentsTabOriginalSizes.Clear();
@@ -3660,7 +3698,7 @@ namespace Commodore_Repair_Toolbox
                 // Zoom IN
                 if (delta > 0) 
                 {
-                    if (zoomFactor * 1.5f <= 4.9f)
+                    if (zoomFactor * 1.5f <= 4.5f)
                     {
                         zoomFactor *= 1.5f;
                         hasZoomChanged = true;
@@ -4484,7 +4522,7 @@ namespace Commodore_Repair_Toolbox
         // Check if the file is exclusively locked by another application.
         // ###########################################################################################
 
-        private bool IsFileLocked(string filePath)
+        private static bool IsFileLocked(string filePath)
         {
             if (File.Exists(filePath))
             {
@@ -5027,14 +5065,27 @@ namespace Commodore_Repair_Toolbox
         }
 
 
-        private void syncFilesFromSource()
+        // ###########################################################################################
+        // Synchronize all local data files with the online source.
+        // When showCompletionDialog is true, a MessageBox is shown after completion.
+        // When false (e.g. after auto-update), progress is shown on the splash screen only.
+        // ###########################################################################################
+
+        public static void SyncFilesFromSource(bool showCompletionDialog = true)
         {
+            // Ensure version string is available (may not be set yet if called before the constructor)
+            if (string.IsNullOrEmpty(versionThis))
+            {
+                versionThis = GetAssemblyVersion();
+            }
 
             // Fetch the list of files and checksums from the online source
             List<DataUpdate> checksumFromOnline;
 
             try
             {
+                Splashscreen.Current?.UpdateStatus("Fetching file catalog from server...");
+
                 using (var webClient = new WebClient())
                 {
                     ServicePointManager.Expect100Continue = true;
@@ -5046,8 +5097,10 @@ namespace Commodore_Repair_Toolbox
                 }
                 DebugOutput("INFO: Fetched checksum list of [" + checksumFromOnline.Count + "] files from online source");
 
+                Splashscreen.Current?.UpdateStatus("Calculating local file checksums...");
+
                 List<LocalFiles> checksumFromLocal = GetAllReferencedLocalFiles();
-                DebugOutput("INFO: Calculated checksum list of [" + checksumFromOnline.Count + "] files from local storage");
+                DebugOutput("INFO: Calculated checksum list of [" + checksumFromLocal.Count + "] files from local storage");
 
                 // Find files present online but missing locally
                 var missingLocal = checksumFromOnline
@@ -5078,13 +5131,25 @@ namespace Commodore_Repair_Toolbox
 
                 // ---
 
+                int fileIndex = 0;
+                int fileCount = filesToTransfer.Count;
+
                 foreach (var file in filesToTransfer)
                 {
+                    fileIndex++;
+
                     // Find the online file entry (assuming DataUpdate has File and Url or similar)
                     var onlineFile = checksumFromOnline.FirstOrDefault(f =>
                         string.Equals(f.File, file, StringComparison.OrdinalIgnoreCase));
                     if (onlineFile == null)
                         continue; // Skip if not found online
+
+                    // Update splash screen with progress
+                    string shortName = Path.GetFileName(file);
+                    Splashscreen.Current?.UpdateStatus(
+                        "Downloading file " + fileIndex + " of " + fileCount + ":" +
+                        Environment.NewLine + shortName
+                    );
 
                     // Ensure the directory exists
                     string localPath = Path.Combine(DataPaths.DataRoot, file.Replace("/", "\\"));
@@ -5127,15 +5192,16 @@ namespace Commodore_Repair_Toolbox
                     }
                 }
 
+                // Silent mode: just log and update splash
                 if (filesToTransfer.Count > 0)
                 {
-                    // Show a message box with the number of files transferred
-                    string message = $"Updated [{filesToTransfer.Count}] file(s) from online source to local storage.\r\n\r\nWill launch main application after this popup.";
-                    MessageBox.Show(message, "Data update done", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    DebugOutput("INFO: Data sync completed - updated [" + filesToTransfer.Count + "] file(s)");
+                    Splashscreen.Current?.UpdateStatus("Data update completed (" + filesToTransfer.Count + " files)");
                 }
                 else
                 {
-                    MessageBox.Show("No files were updated from online source.\r\n\r\nWill launch main application after this popup.", "Data update done", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    DebugOutput("INFO: Data sync completed - all files are up to date");
+                    Splashscreen.Current?.UpdateStatus("All data files are up to date");
                 }
 
                 // Save to the configuration file, that we now have updated

@@ -41,6 +41,10 @@ namespace Commodore_Repair_Toolbox
             sb.AppendLine("        - Commodore-Repair-Toolbox.xlsx");
             sb.AppendLine("        - All referenced board data files and images etc.");
             sb.AppendLine();
+            sb.AppendLine("  --fetch-data");
+            sb.AppendLine("      Fetch data from the online source and launch application.");
+            sb.AppendLine("      Does require the \"Data\" folder and the main Excel data file.");
+            sb.AppendLine();
             sb.AppendLine("  --help | /?");
             sb.AppendLine("      Show this help and exit.");
             sb.AppendLine();

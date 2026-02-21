@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -24,9 +25,10 @@ namespace Commodore_Repair_Toolbox
                 settings = File.ReadAllLines(filePath, Encoding.UTF8)
                     .Select(line => line.Split(new[] { '=' }, 2))
                     .Where(parts => parts.Length == 2)
+                    .GroupBy(parts => parts[0].Trim(), StringComparer.Ordinal)
                     .ToDictionary(
-                        parts => parts[0].Trim(),
-                        parts => parts[1].Trim()
+                        g => g.Key,
+                        g => g.Last()[1].Trim()   // last value wins
                 );
             }
 

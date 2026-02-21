@@ -407,7 +407,8 @@ namespace Commodore_Repair_Toolbox
         {
             if (component.ComponentImages != null && component.ComponentImages.Count > 0)
             {
-                filteredComponentImages = component.ComponentImages
+                // First, filter by region
+                var regionFiltered = component.ComponentImages
                     .Where(img =>
                         string.IsNullOrEmpty(Main.selectedRegion) ||
                         string.IsNullOrEmpty(img.Region) ||
@@ -415,24 +416,40 @@ namespace Commodore_Repair_Toolbox
                     )
                     .ToList();
 
-                imagePaths = filteredComponentImages
-                    .Select(img => Path.Combine(DataPaths.DataRoot, img.FileName))
-                    .Where(File.Exists)
-                    .ToList();
+                // Build both lists in 1:1 correspondence.
+                // Entries with empty FileName keep an empty path (note/pin data is preserved).
+                // Entries whose FileName references a non-existent file are removed from both.
+                var syncedPaths = new List<string>();
+                var syncedFiltered = new List<ComponentImages>();
 
-                // Remove any "filteredComponentImages" whose file does not exist, but keep if "FileName" is empty
-                filteredComponentImages = filteredComponentImages
-                    .Where(img => string.IsNullOrWhiteSpace(img.FileName) ||
-                    File.Exists(Path.Combine(DataPaths.DataRoot, img.FileName)))
-                    .ToList();
+                foreach (var img in regionFiltered)
+                {
+                    if (string.IsNullOrWhiteSpace(img.FileName))
+                    {
+                        syncedPaths.Add("");
+                        syncedFiltered.Add(img);
+                    }
+                    else
+                    {
+                        string path = Path.Combine(DataPaths.DataRoot, img.FileName);
+                        if (File.Exists(path))
+                        {
+                            syncedPaths.Add(path);
+                            syncedFiltered.Add(img);
+                        }
+                    }
+                }
+
+                imagePaths = syncedPaths;
+                filteredComponentImages = syncedFiltered;
             }
             else
             {
                 imagePaths = new List<string>();
-                filteredComponentImages = new List<ComponentImages> { new ComponentImages() };
+                filteredComponentImages = new List<ComponentImages>();
             }
 
-            if (currentImageIndex >= imagePaths.Count)
+            if (currentImageIndex >= filteredComponentImages.Count)
             {
                 currentImageIndex = 0;
             }
@@ -467,7 +484,7 @@ namespace Commodore_Repair_Toolbox
             int panelThumbnailWidth = 120;
             int panelWidth = panelImageAndThumbnails.Width;
 
-            if (imagePaths.Count > 1)
+            if (filteredComponentImages.Count > 1)
             {
                 RemoveThumbnails();
 
@@ -511,7 +528,7 @@ namespace Commodore_Repair_Toolbox
                     };
                     pictureBox.Controls.Add(labelPin);
 
-                    if (i < imagePaths.Count)
+                    if (i < imagePaths.Count && !string.IsNullOrEmpty(imagePaths[i]))
                     {
                         pictureBox.Image = Image.FromFile(imagePaths[i]);
                     }
@@ -548,7 +565,7 @@ namespace Commodore_Repair_Toolbox
             }
 
             // Resize the main picture box to fill the remaining space
-            if (imagePaths.Count > 1)
+            if (filteredComponentImages.Count > 1)
             {
                 pictureBoxImage.Size = new Size(panelImageAndThumbnails.Width, panelImageAndThumbnails.Height - panelThumbnailHeight - 5);
             }
@@ -561,7 +578,7 @@ namespace Commodore_Repair_Toolbox
         private void UpdateThumbnails()
         {
             int panels = thumbnailPictureBoxes.Count;
-            int imagesCount = imagePaths.Count;
+            int imagesCount = filteredComponentImages.Count;
 
             // Adjust window so "currentImageIndex" is always visible
             if (currentImageIndex < thumbnailWindowStart)
@@ -591,14 +608,21 @@ namespace Commodore_Repair_Toolbox
                 pb.Tag = imgIdx;
                 if (imgIdx < imagesCount)
                 {
-                    pb.Image = Image.FromFile(imagePaths[imgIdx]);
+                    if (!string.IsNullOrEmpty(imagePaths[imgIdx]))
+                    {
+                        pb.Image = Image.FromFile(imagePaths[imgIdx]);
+                    }
+                    else
+                    {
+                        pb.Image = null;
+                    }
                     pb.Visible = true;
 
                     // Update labels inside the "PictureBox"
                     var labels = pb.Controls.OfType<Label>().ToList();
                     if (
                         labels.Count >= 1 && component.ComponentImages != null &&
-                        imgIdx < component.ComponentImages.Count
+                        imgIdx < filteredComponentImages.Count
                         )
                     {
                         var pinValue = filteredComponentImages[imgIdx].Pin;
@@ -669,10 +693,16 @@ namespace Commodore_Repair_Toolbox
                 lastArrowKeyTime = now;
             }
 
+            // Guard against empty list
+            if (filteredComponentImages.Count == 0)
+            {
+                return base.ProcessCmdKey(ref msg, keyData);
+            }
+
             // Simulate scrolling up; get PREVIOUS image
             if (keyData == Keys.Down || keyData == Keys.Left)
             {
-                currentImageIndex = (currentImageIndex - 1 + imagePaths.Count) % imagePaths.Count;
+                currentImageIndex = (currentImageIndex - 1 + filteredComponentImages.Count) % filteredComponentImages.Count;
                 UpdateImage();
                 return true;
             }
@@ -680,7 +710,7 @@ namespace Commodore_Repair_Toolbox
             // Simulate scrolling down; get NEXT image
             else if (keyData == Keys.Up || keyData == Keys.Right)
             {
-                currentImageIndex = (currentImageIndex + 1) % imagePaths.Count;
+                currentImageIndex = (currentImageIndex + 1) % filteredComponentImages.Count;
                 UpdateImage();
                 return true;
             }
@@ -739,8 +769,8 @@ namespace Commodore_Repair_Toolbox
             labelReading.Visible = false;
             labelImageX.Visible = false;
 
-            // If no images after filtering, render "empty" state and stop
-            if (imagePaths.Count == 0 || filteredComponentImages.Count == 0)
+            // If no entries after filtering, render "empty" state and stop
+            if (filteredComponentImages.Count == 0)
             {
                 pictureBoxImage.Image = null;
                 RemoveThumbnails();
@@ -758,10 +788,18 @@ namespace Commodore_Repair_Toolbox
             }
 
             // Show more, if there are thumbnails
-            if (imagePaths.Count > 0)
+            if (filteredComponentImages.Count > 0)
             {
-                // Update the image
-                pictureBoxImage.Image = Image.FromFile(imagePaths[currentImageIndex]);
+                // Update the image (guard against entries without a file)
+                string currentPath = imagePaths[currentImageIndex];
+                if (!string.IsNullOrEmpty(currentPath))
+                {
+                    pictureBoxImage.Image = Image.FromFile(currentPath);
+                }
+                else
+                {
+                    pictureBoxImage.Image = null;
+                }
 
                 // Update labels
                 string region = filteredComponentImages[currentImageIndex].Region;
@@ -772,9 +810,9 @@ namespace Commodore_Repair_Toolbox
                 labelPin.Text = "Pin " + pin;
                 labelName.Text = name;
                 labelRegion.Text = region;
-                labelPin.Visible = pin != "" ? true : false;
-                labelName.Visible = name != "" ? true : false;
-                labelRegion.Visible = region != "" ? true : false;
+                labelPin.Visible = !string.IsNullOrEmpty(pin);
+                labelName.Visible = !string.IsNullOrEmpty(name);
+                labelRegion.Visible = !string.IsNullOrEmpty(region);
 
                 if (labelPin.Visible)
                 {
@@ -809,12 +847,12 @@ namespace Commodore_Repair_Toolbox
 
                 // Find the "Description" from the "component.Oscilloscope" list, based on the component name and pin
                 labelReading.Text = reading;
-                labelReading.Visible = reading != "" ? true : false;
+                labelReading.Visible = !string.IsNullOrEmpty(reading);
 
                 // Count the number of images, and show a counter in "label13"
-                if (imagePaths.Count > 1)
+                if (filteredComponentImages.Count > 1)
                 {
-                    labelImageX.Text = $"Image {currentImageIndex + 1} of {imagePaths.Count}";
+                    labelImageX.Text = $"Image {currentImageIndex + 1} of {filteredComponentImages.Count}";
 
                     // Place "labelImageX" at bottom left corner
                     labelImageX.Location = new Point(10, pictureBoxImage.Height - labelImageX.Height - 5);
@@ -852,7 +890,9 @@ namespace Commodore_Repair_Toolbox
             Rectangle rect = panelNote.ClientRectangle;
             rect.Inflate(0, 0); // shrink to avoid clipping
             string textBox1_org = textBoxNote.Text.Replace(Environment.NewLine, "\n");
-            string excelData = filteredComponentImages[currentImageIndex].Note ?? "";
+            string excelData = (currentImageIndex >= 0 && currentImageIndex < filteredComponentImages.Count)
+                ? (filteredComponentImages[currentImageIndex].Note ?? "")
+                : "";
             Color borderColor = textBox1_org != excelData ? Color.IndianRed : ColorTranslator.FromHtml("#96919D");
             ControlPaint.DrawBorder(e.Graphics, rect, borderColor, ButtonBorderStyle.Solid);
         }

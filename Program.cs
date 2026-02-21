@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Windows.Forms;
 
 using MainForm = Commodore_Repair_Toolbox.Main;  // Alias to avoid clash with Program.Main()
@@ -21,6 +22,9 @@ namespace Commodore_Repair_Toolbox
                 return;
             }
 
+            // Check if launched with --fetch-data (e.g. after auto-update)
+            bool fetchData = args.Any(a => a.Equals("--fetch-data", StringComparison.OrdinalIgnoreCase));
+
             // Load configuration before DataPaths.Initialize() can persist DataRoot
             Splashscreen.Current?.UpdateStatus("Loading configuration file");
             Configuration.LoadConfig();
@@ -35,6 +39,12 @@ namespace Commodore_Repair_Toolbox
             {
                 splash.Show();
                 splash.Refresh();
+
+                // If launched with "--fetch-data", sync data files with splash progress before loading the main form
+                if (fetchData)
+                {
+                    MainForm.SyncFilesFromSource(showCompletionDialog: false);
+                }
 
                 var mainForm = new MainForm();
                 mainForm.Shown += (s, e) => splash.Close();
