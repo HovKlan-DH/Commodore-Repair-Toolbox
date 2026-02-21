@@ -46,9 +46,6 @@ namespace Commodore_Repair_Toolbox
         // For "Help" tab
         private const int EM_SETRECT = 0x00B3;
 
-//        private Panel _waitOverlay;
-//        private Label _waitOverlayLabel;
-
         public static void InitializeLogging()
         {
             if (_logInitialized) return;
@@ -149,7 +146,6 @@ namespace Commodore_Repair_Toolbox
         // ###########################################################################################
         // Main form constructor.
         // ###########################################################################################
-
 
         public Main()
         {
@@ -365,19 +361,18 @@ namespace Commodore_Repair_Toolbox
                             Panel aboutNotifyPanel = new Panel
                             {
                                 Dock = DockStyle.Top,
-                                Height = 66,
+                                Height = 72,
                                 BackColor = Color.WhiteSmoke,
                                 Name = "panelAutoUpdate",
                             };
 
                             Button autoUpdateButton = new Button
                             {
-                                Text = "Auto-install Update" + Environment.NewLine + versionOnline,
+                                Text = "Auto-install New Version" + Environment.NewLine + versionOnline,
                                 AutoSize = false,
-                                Size = new Size(220, 44),
+                                Size = new Size(220, 50),
                                 Location = new Point(11, 11),
                                 Anchor = AnchorStyles.Top | AnchorStyles.Left,
-                                //UseVisualStyleBackColor = true
                                 BackColor = Color.IndianRed,
                                 ForeColor = Color.White,
                                 FlatStyle = FlatStyle.Flat
@@ -462,24 +457,6 @@ namespace Commodore_Repair_Toolbox
         private void LoadExcelData()
         {
             DataStructure.GetAllData(classHardware);
-        }
-
-
-        // ###########################################################################################
-        // Load the saved settings from the configuration file (if any).
-        // ###########################################################################################
-
-        private void LoadConfigFile()
-        {
-            try
-            {
-                Configuration.LoadConfig();
-            }
-            catch (Exception ex)
-            {
-                DebugOutput("EXCEPTION in \"LoadConfigFile()\":");
-                DebugOutput(ex.ToString());
-            }
         }
 
 
@@ -1522,12 +1499,12 @@ namespace Commodore_Repair_Toolbox
 
         private static int CalculateListViewHeight(ListView lv)
         {
-            const int minHeight = 60;     // don’t collapse too far when empty
-            const int maxHeight = 600;    // cap; beyond this user scrolls the panel, not the list
+            const int minHeight = 60;
+            const int maxHeight = 600;
 
             // Height = header + rows + a little padding for borders
-            int headerHeight = lv.Font.Height + 10; // simple approximation for ColumnHeader height
-            int rowHeight = lv.Font.Height + 6;     // simple approximation for Item height
+            int headerHeight = lv.Font.Height + 10;
+            int rowHeight = lv.Font.Height + 6;
             int rows = Math.Max(1, lv.Items.Count);
 
             int desired = headerHeight + (rowHeight * rows) + 6;
@@ -1625,7 +1602,6 @@ namespace Commodore_Repair_Toolbox
 
                     // Add extra spacing after all schematics for a board
                     boardY += 10;
-
                 }
 
                 // Adjust panel height to fit all checkboxes
@@ -1717,6 +1693,7 @@ namespace Commodore_Repair_Toolbox
                         }
                     }
                 }
+
                 // If no schematic is checked, uncheck the board
                 if (boardCheckBox != null && !anySchematicChecked)
                 {
@@ -1864,10 +1841,10 @@ namespace Commodore_Repair_Toolbox
             sb.Append(@"It is possible to fetch the newest data from the online source.\line ");
             sb.Append(@"You can do this via the ""Configuration"" tab.\line ");
             sb.Append(@"\line ");
-            sb.Append(@"If you have not modified any data on your own, then there is no risks in doing this - go for it.\line ");
-            sb.Append(@"If you do have modified some data, then be aware that all Excel data files and all images will be overwritten, so do make a backup before you update.\line ");
-            sb.Append(@"The update will not delete any files it does not know - e.g. if you have added some of your own files.\line ");
-            sb.Append(@"The update will not delete any of your own component modifications done through the component information popup.\line ");
+            sb.Append(@"If you have not modified any data in the Excel data files on your own, then there is no risks in doing this - go for it.\line ");
+            sb.Append(@"If you do have modified some data in the Excel data files, then be aware that all Excel data files and all images will be overwritten, so do make a backup before you update.\line ");
+            sb.Append(@"The update will not delete any files it does not officially know - e.g. if you have added some of your own files, they will not be deleted.\line ");
+            sb.Append(@"The update will not delete any of your own component text modifications done through the component information popup.\line ");
             sb.Append(@"\line ");
             sb.Append(@"The update will happen at the {\b next} application launch, so you will not see the changes immediately.\line ");
             sb.Append(@"\line ");
@@ -1880,6 +1857,7 @@ namespace Commodore_Repair_Toolbox
 
             sb.Append(@"In ""Configuration"" you can select which hardware and boards you want to show or hide in the application.\line ");
             sb.Append(@"Per default it will show everything, but you can uncheck the ones you do not want to have in the application.\line ");
+            sb.Append(@"In some cases there are redundant schematics, where it both have the original (scanned) Commodore schematics but also a new set of replica schematics, and in these cases you can decide if you want to hide one of these sets (or keeping both visible).\line ");
             sb.Append(@"\line ");
 
             sb.Append(@"Changing any checkbox will be effectuated at the {\b next} application launch, so you will not see the changes immediately.\line ");
@@ -1891,8 +1869,8 @@ namespace Commodore_Repair_Toolbox
             sb.Append(@"{\fs28{\b Misc} }\line ");
             sb.Append(@"\line ");
 
-            sb.Append(@"When there is a newer version available online, it will be marked with an asterisk (*) in the ""About"" tab.\line ");
-            sb.Append(@"Then navigate to the tab and download the new version from https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases\line ");
+            sb.Append(@"When there is a newer version available online, it will be marked with an asterisk (*) in the ""About"" tab, and it will show with a red label in top-right corner.\line ");
+            sb.Append(@"Then navigate to the ""About"" tab and update to the new version, either via ""Auto-install"" or manually download from https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases\line ");
             sb.Append(@"\line ");
 
             sb.Append(@"How-to add or update your own data:\line ");
@@ -2003,7 +1981,7 @@ namespace Commodore_Repair_Toolbox
 
             if (!string.IsNullOrWhiteSpace(versionOnline))
             {
-                sb.Append(@"\cf2 There is a newer version available. Click the above ""{\b Auto-install Update\b0}"" button to install it, or download it manually from below link.\line ");
+                sb.Append(@"\cf2 There is a newer version available. Click the above ""{\b Auto-install New Version\b0}"" button to install it, or download it manually from below link.\line ");
                 sb.Append(@"View the {\i Changelog\i0} here, https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases\line\line ");
                 sb.Append(@"\cf0");
             }
@@ -2029,7 +2007,7 @@ namespace Commodore_Repair_Toolbox
             sb.Append(@"\line\line ");
 
             sb.Append(EscapeRtf(
-                "The longer-term goal is that the tool will cover all C64 and C128 computers, and ideally also its most used peripherals, and I will continue to add new and refine data for myself (when doing my own diagnostics and repairing), but I will most likely not be able to do this myself alone. I would really appreciate some help with this, so if you have the willingness, then please reach out to me, and I will happily explain the nitty-gritty details. It is actually quite easy when having tried it once."
+                "The longer-term goal is that the tool will cover all the earlier Commodore computers, and ideally also its most used peripherals, and I will continue to add new and refine data for myself (when doing my own diagnostics and repairing), but I will most likely not be able to do this myself alone. I would really appreciate some help with this, so if you have the willingness to contribute, then please reach out to me, and I will happily explain the nitty-gritty details. It is actually quite easy when having tried it once."
             ));
             sb.Append(@"\line\line ");
 
