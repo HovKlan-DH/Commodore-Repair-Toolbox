@@ -3,7 +3,13 @@ name: Build and Release - PoC (All Platforms)
 on:
   push:
     tags:
-      - 'poc-*'   # Only triggers on tags like poc-1.0, poc-1.1 etc.
+      - 'poc-*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release (e.g. poc-2)'
+        required: true
+        default: 'poc-manual'
 
 jobs:
 
@@ -34,13 +40,13 @@ jobs:
       - name: Zip Windows build
         run: |
           Compress-Archive -Path publish/windows/* `
-            -DestinationPath CommodoreRepairToolbox-${{ github.ref_name }}-windows-x64.zip
+            -DestinationPath CommodoreRepairToolbox-windows-x64.zip
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: CommodoreRepairToolbox-*-windows-x64.zip
+          path: CommodoreRepairToolbox-windows-x64.zip
 
   ###############################################################
   # LINUX BUILD
@@ -69,13 +75,13 @@ jobs:
       - name: Zip Linux build
         run: |
           cd publish/linux
-          zip -r ../../CommodoreRepairToolbox-${{ github.ref_name }}-linux-x64.zip .
+          zip -r ../../CommodoreRepairToolbox-linux-x64.zip .
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-build
-          path: CommodoreRepairToolbox-*-linux-x64.zip
+          path: CommodoreRepairToolbox-linux-x64.zip
 
   ###############################################################
   # MACOS BUILD
@@ -113,15 +119,15 @@ jobs:
       - name: Zip macOS builds
         run: |
           cd publish/macos-x64
-          zip -r ../../CommodoreRepairToolbox-${{ github.ref_name }}-macos-x64.zip .
+          zip -r ../../CommodoreRepairToolbox-macos-x64.zip .
           cd ../macos-arm64
-          zip -r ../../CommodoreRepairToolbox-${{ github.ref_name }}-macos-arm64.zip .
+          zip -r ../../CommodoreRepairToolbox-macos-arm64.zip .
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-build
-          path: CommodoreRepairToolbox-*-macos-*.zip
+          path: CommodoreRepairToolbox-macos-*.zip
 
   ###############################################################
   # CREATE GITHUB RELEASE
@@ -139,10 +145,20 @@ jobs:
           path: release-assets
           merge-multiple: true
 
+      - name: Set release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Pre-Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "PoC - Commodore Repair Toolbox ${{ github.ref_name }}"
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "PoC - Commodore Repair Toolbox ${{ steps.tag.outputs.tag }}"
           body: |
             ## ⚠️ This is a PoC (Proof of Concept) build — NOT a production release!
 
@@ -151,16 +167,15 @@ jobs:
             ### Downloads
             | Platform | File |
             |----------|------|
-            | 🪟 Windows | `*-windows-x64.zip` |
-            | 🐧 Linux | `*-linux-x64.zip` |
-            | 🍎 macOS (Intel) | `*-macos-x64.zip` |
-            | 🍎 macOS (Apple Silicon) | `*-macos-arm64.zip` |
+            | 🪟 Windows x64 | `CommodoreRepairToolbox-windows-x64.zip` |
+            | 🐧 Linux x64 | `CommodoreRepairToolbox-linux-x64.zip` |
+            | 🍎 macOS Intel | `CommodoreRepairToolbox-macos-x64.zip` |
+            | 🍎 macOS Apple Silicon | `CommodoreRepairToolbox-macos-arm64.zip` |
 
-            ### Notes
-            - Windows: Extract the zip and run `PoC_1.exe`
-            - Linux: Extract, `chmod +x PoC_1` and run `./PoC_1`
-            - macOS: Extract and run `./PoC_1` (right-click → Open on first launch)
+            ### How to run
+            - **Windows**: Extract the zip and run `PoC_1.exe`
+            - **Linux**: Extract, run `chmod +x PoC_1` then `./PoC_1`
+            - **macOS**: Extract and run `./PoC_1` (right-click → Open on first launch)
           draft: false
           prerelease: true
           files: release-assets/*
-          
