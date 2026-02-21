@@ -83,7 +83,11 @@ You can also contribute by adding new data and send the Excel file and "label fi
 
 # Contact
 
-Errors or issues can be reported via [Issues](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) and questions or comments can be created in the [Discussions](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/discussions). To get in direct contact, then you can connect via the built-in "Feedback" tab in the _CRT_ application.
+Errors or issues can be reported via [Issues](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/issues) and questions or comments can be created in the [Discussions](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/discussions).
+
+To get in direct contact (via email), then you can connect via the built-in "Feedback" tab in the _CRT_ application.
+
+If you are using Discord then the most direct connect would be to join the [CRT channel in Retro Hardware](https://discord.gg/HDWct2vxem), which is a great community for many retro topics.
 
 
 # Documentation of data
