@@ -2,7 +2,7 @@
 
 This is the official home page for _Commodore Repair Toolbox_ (named as _CRT_ hence forward) - a Windows* utility tool for repairing vintage computers or peripherals.
 
-*Note: As of version 2026-February-12 it should be able to run in Linux with Wine and Mono, but this is very much in experimental mode.
+*Note: As of version 2026-February-12 it _should_ be able to run in Linux with Wine and Mono, but this is very much in experimental mode.
 
 
 # What is it?
@@ -29,7 +29,7 @@ Almost all Commodore boards have a full oscilloscope baseline for the PAL and NT
 # Requirements
 
 * Windows 7 or newer (works with both 32/64-bit)
-* .NET Framework 4.8 or 4.8.1
+* .NET Framework 4.8 or newer
 
 As per version **2026-February-12** there is **experimental** support for Linux with Wine and Mono installed... but it is not yet officially supported, though I would like to know if it works or not.
 
@@ -39,6 +39,8 @@ As per version **2026-February-12** there is **experimental** support for Linux 
 _CRT_ does not require any installation - just download the newest ZIP file from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), extract it and run the executable file, `Commodore-Repair-Toolbox.exe`, The ZIP file contains a full set of data.
 
 When launched _CRT_ you can download newer data (if present) from its online source.
+
+It does not create or use any registry settings, and everything is handled via the local files located within the ZIP file.
 
 
 # Built-in hardware and boards
