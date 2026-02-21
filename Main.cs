@@ -28,6 +28,7 @@ namespace Commodore_Repair_Toolbox
 
         private static bool _logInitialized = false;
         private static readonly object _logSync = new object();
+        private static bool _syncPerformedAtLaunch = false;
 
         // For "Resources" tab
         private Panel _resourcesPanel;
@@ -159,6 +160,10 @@ namespace Commodore_Repair_Toolbox
                 SyncFilesFromSource();
             }
 
+            // Initialize "Always update data" checkbox from configuration (wire event after to avoid an extra save)
+            this.checkBoxAlwaysUpdateData.Checked = Configuration.GetSetting("AlwaysUpdateData", "False") == "True";
+            this.checkBoxAlwaysUpdateData.CheckedChanged += this.checkBoxAlwaysUpdateData_CheckedChanged;
+
             polylinesManagement = new PolylinesManagement(this);
 
             // Get build type
@@ -259,10 +264,14 @@ namespace Commodore_Repair_Toolbox
                 );
             }
 
-            // Wait 10 seconds before starting the background check
+            // Wait 10 seconds before starting the background check.
+            // Skip the background check if a full sync was already performed at launch.
             label13.TextAlign = ContentAlignment.MiddleCenter;
             await Task.Delay(10000);
-            await Task.Run(() => checkFilesFromSource());
+            if (!_syncPerformedAtLaunch)
+            {
+                await Task.Run(() => checkFilesFromSource());
+            }
         }
 
         private void Form_Closing(object sender, FormClosingEventArgs e)
@@ -4556,6 +4565,17 @@ namespace Commodore_Repair_Toolbox
 
 
         // ###########################################################################################
+        // Save the "Always update data" preference to the configuration file.
+        // When checked, every application launch will synchronize data files from the online source.
+        // ###########################################################################################
+
+        private void checkBoxAlwaysUpdateData_CheckedChanged(object sender, EventArgs e)
+        {
+            Configuration.SaveSetting("AlwaysUpdateData", this.checkBoxAlwaysUpdateData.Checked.ToString());
+        }
+
+
+        // ###########################################################################################
         // Define a custom method to suspend and resume drawing on a control.
         // Should be better than "SuspendLayout" and "ResumeLayout".
         // ###########################################################################################
@@ -5051,6 +5071,8 @@ namespace Commodore_Repair_Toolbox
 
         public static void SyncFilesFromSource(bool showCompletionDialog = true)
         {
+            _syncPerformedAtLaunch = true;
+
             // Ensure version string is available (may not be set yet if called before the constructor)
             if (string.IsNullOrEmpty(versionThis))
             {

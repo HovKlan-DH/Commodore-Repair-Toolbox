@@ -29,6 +29,12 @@ namespace Commodore_Repair_Toolbox
             Splashscreen.Current?.UpdateStatus("Loading configuration file");
             Configuration.LoadConfig();
 
+            // Also trigger data fetch if the "Always update data" option is enabled in configuration
+            if (!fetchData)
+            {
+                fetchData = Configuration.GetSetting("AlwaysUpdateData", "False") == "True";
+            }
+
             DataPaths.Initialize(args);
 
             Application.EnableVisualStyles();

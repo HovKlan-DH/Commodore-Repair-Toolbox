@@ -92,6 +92,7 @@
             this.colorDialog1 = new System.Windows.Forms.ColorDialog();
             this.buttonRegionPal = new System.Windows.Forms.Button();
             this.buttonRegionNtsc = new System.Windows.Forms.Button();
+            this.checkBoxAlwaysUpdateData = new System.Windows.Forms.CheckBox();
             this.tabControl.SuspendLayout();
             this.tabSchematics.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerSchematics)).BeginInit();
@@ -314,6 +315,7 @@
             // panel2
             // 
             this.panel2.AutoScroll = true;
+            this.panel2.Controls.Add(this.checkBoxAlwaysUpdateData);
             this.panel2.Controls.Add(this.checkBoxKeyboardZoom);
             this.panel2.Controls.Add(this.textBox3);
             this.panel2.Controls.Add(this.label12);
@@ -327,7 +329,7 @@
             // checkBoxKeyboardZoom
             // 
             this.checkBoxKeyboardZoom.AutoSize = true;
-            this.checkBoxKeyboardZoom.Location = new System.Drawing.Point(19, 108);
+            this.checkBoxKeyboardZoom.Location = new System.Drawing.Point(19, 121);
             this.checkBoxKeyboardZoom.Name = "checkBoxKeyboardZoom";
             this.checkBoxKeyboardZoom.Size = new System.Drawing.Size(347, 25);
             this.checkBoxKeyboardZoom.TabIndex = 20;
@@ -339,7 +341,7 @@
             // 
             this.textBox3.BackColor = System.Drawing.Color.White;
             this.textBox3.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.textBox3.Location = new System.Drawing.Point(20, 151);
+            this.textBox3.Location = new System.Drawing.Point(20, 168);
             this.textBox3.Multiline = true;
             this.textBox3.Name = "textBox3";
             this.textBox3.ReadOnly = true;
@@ -818,6 +820,16 @@
             this.buttonRegionNtsc.Text = "NTSC";
             this.buttonRegionNtsc.UseVisualStyleBackColor = true;
             // 
+            // checkBoxAlwaysUpdateData
+            // 
+            this.checkBoxAlwaysUpdateData.AutoSize = true;
+            this.checkBoxAlwaysUpdateData.Location = new System.Drawing.Point(20, 97);
+            this.checkBoxAlwaysUpdateData.Name = "checkBoxAlwaysUpdateData";
+            this.checkBoxAlwaysUpdateData.Size = new System.Drawing.Size(452, 25);
+            this.checkBoxAlwaysUpdateData.TabIndex = 21;
+            this.checkBoxAlwaysUpdateData.Text = "Always update data from online source at application launch";
+            this.checkBoxAlwaysUpdateData.UseVisualStyleBackColor = true;
+            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 21F);
@@ -940,5 +952,6 @@
         private System.Windows.Forms.RichTextBox richTextBoxHelp;
         private System.Windows.Forms.TabPage tabAbout;
         private System.Windows.Forms.RichTextBox richTextBoxAbout;
+        private System.Windows.Forms.CheckBox checkBoxAlwaysUpdateData;
     }
 }
