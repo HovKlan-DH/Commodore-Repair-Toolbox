@@ -1,0 +1,181 @@
+name: Build and Release - PoC (All Platforms)
+
+on:
+  push:
+    tags:
+      - 'poc-*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release (e.g. poc-2)'
+        required: true
+        default: 'poc-manual'
+
+jobs:
+
+  ###############################################################
+  # WINDOWS BUILD
+  ###############################################################
+  build-windows:
+    name: Build - Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish Windows
+        run: |
+          dotnet publish PoC/PoC_1/PoC_1.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained `
+            -p:PublishSingleFile=true `
+            -o publish/windows
+
+      - name: Zip Windows build
+        run: |
+          Compress-Archive -Path publish/windows/* `
+            -DestinationPath CommodoreRepairToolbox-windows-x64.zip
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: CommodoreRepairToolbox-windows-x64.zip
+
+  ###############################################################
+  # LINUX BUILD
+  ###############################################################
+  build-linux:
+    name: Build - Linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish Linux
+        run: |
+          dotnet publish PoC/PoC_1/PoC_1.csproj \
+            -c Release \
+            -r linux-x64 \
+            --self-contained \
+            -p:PublishSingleFile=true \
+            -o publish/linux
+
+      - name: Zip Linux build
+        run: |
+          cd publish/linux
+          zip -r ../../CommodoreRepairToolbox-linux-x64.zip .
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: CommodoreRepairToolbox-linux-x64.zip
+
+  ###############################################################
+  # MACOS BUILD
+  ###############################################################
+  build-macos:
+    name: Build - macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish macOS (Intel)
+        run: |
+          dotnet publish PoC/PoC_1/PoC_1.csproj \
+            -c Release \
+            -r osx-x64 \
+            --self-contained \
+            -p:PublishSingleFile=true \
+            -o publish/macos-x64
+
+      - name: Publish macOS (Apple Silicon)
+        run: |
+          dotnet publish PoC/PoC_1/PoC_1.csproj \
+            -c Release \
+            -r osx-arm64 \
+            --self-contained \
+            -p:PublishSingleFile=true \
+            -o publish/macos-arm64
+
+      - name: Zip macOS builds
+        run: |
+          cd publish/macos-x64
+          zip -r ../../CommodoreRepairToolbox-macos-x64.zip .
+          cd ../macos-arm64
+          zip -r ../../CommodoreRepairToolbox-macos-arm64.zip .
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: CommodoreRepairToolbox-macos-*.zip
+
+  ###############################################################
+  # CREATE GITHUB RELEASE
+  ###############################################################
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-linux, build-macos]
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Set release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pre-Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "PoC - Commodore Repair Toolbox ${{ steps.tag.outputs.tag }}"
+          body: |
+            ## ⚠️ This is a PoC (Proof of Concept) build — NOT a production release!
+
+            This is an experimental Avalonia UI cross-platform build for testing purposes only.
+
+            ### Downloads
+            | Platform | File |
+            |----------|------|
+            | 🪟 Windows x64 | `CommodoreRepairToolbox-windows-x64.zip` |
+            | 🐧 Linux x64 | `CommodoreRepairToolbox-linux-x64.zip` |
+            | 🍎 macOS Intel | `CommodoreRepairToolbox-macos-x64.zip` |
+            | 🍎 macOS Apple Silicon | `CommodoreRepairToolbox-macos-arm64.zip` |
+
+            ### How to run
+            - **Windows**: Extract the zip and run `PoC_1.exe`
+            - **Linux**: Extract, run `chmod +x PoC_1` then `./PoC_1`
+            - **macOS**: Extract and run `./PoC_1` (right-click → Open on first launch)
+          draft: false
+          prerelease: true
+          files: release-assets/*
