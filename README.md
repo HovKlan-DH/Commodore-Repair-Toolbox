@@ -87,7 +87,7 @@ Errors or issues can be reported via [Issues](https://github.com/HovKlan-DH/Comm
 
 To get in direct contact (via email), then you can connect via the built-in "Feedback" tab in the _CRT_ application.
 
-If you are using Discord then the most direct connect would be to join the CRT group in [Retro Hardware](https://discord.gg/HDWct2vxem), which is a great community for many retro topics.
+If you are using Discord then the most direct connect would be to join the [CRT channel in Retro Hardware](https://discord.gg/HDWct2vxem), which is a great community for many retro topics.
 
 
 # Documentation of data
