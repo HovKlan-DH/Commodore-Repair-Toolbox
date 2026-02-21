@@ -1,0 +1,19 @@
+# Build output
+bin/
+obj/
+
+# Publish output
+publish/
+installer_output/
+
+# VS Code settings (optional - you may want to keep these)
+.vscode/
+
+# User-specific files
+*.user
+*.suo
+.vs/
+
+# OS files
+.DS_Store
+Thumbs.db
