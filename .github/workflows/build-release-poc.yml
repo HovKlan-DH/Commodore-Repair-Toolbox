@@ -34,10 +34,10 @@ jobs:
 
       - name: Set version
         id: ver
-        shell: bash
+        shell: pwsh
         run: |
-          TAG=$([[ "${{ github.event_name }}" == "workflow_dispatch" ]] && echo "${{ inputs.tag_name }}" || echo "${{ github.ref_name }}")
-          echo "version=$TAG" >> $GITHUB_OUTPUT
+          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.tag_name }}" } else { "${{ github.ref_name }}" }
+          "version=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Publish Windows (x64)
         run: |
@@ -104,9 +104,10 @@ jobs:
 
       - name: Set version
         id: ver
+        shell: pwsh
         run: |
-          TAG=$([[ "${{ github.event_name }}" == "workflow_dispatch" ]] && echo "${{ inputs.tag_name }}" || echo "${{ github.ref_name }}")
-          echo "version=$TAG" >> $GITHUB_OUTPUT
+          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.tag_name }}" } else { "${{ github.ref_name }}" }
+          "version=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Publish Linux (x64)
         run: |
@@ -160,9 +161,10 @@ jobs:
 
       - name: Set version
         id: ver
+        shell: pwsh
         run: |
-          TAG=$([[ "${{ github.event_name }}" == "workflow_dispatch" ]] && echo "${{ inputs.tag_name }}" || echo "${{ github.ref_name }}")
-          echo "version=$TAG" >> $GITHUB_OUTPUT
+          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.tag_name }}" } else { "${{ github.ref_name }}" }
+          "version=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Publish macOS (arm64)
         run: |
