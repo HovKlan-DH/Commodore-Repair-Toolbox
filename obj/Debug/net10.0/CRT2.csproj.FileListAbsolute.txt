@@ -89,3 +89,4 @@ D:\Data\Development\Visual Studio\CRT2\obj\Debug\net10.0\refint\Commodore-Repair
 D:\Data\Development\Visual Studio\CRT2\obj\Debug\net10.0\Commodore-Repair-Toolbox.pdb
 D:\Data\Development\Visual Studio\CRT2\obj\Debug\net10.0\CRT2.genruntimeconfig.cache
 D:\Data\Development\Visual Studio\CRT2\obj\Debug\net10.0\ref\Commodore-Repair-Toolbox.dll
+D:\Data\Development\Visual Studio\CRT2\obj\Debug\net10.0\CRT2.sourcelink.json

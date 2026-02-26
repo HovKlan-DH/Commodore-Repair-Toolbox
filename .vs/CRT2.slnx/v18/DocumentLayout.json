@@ -102,8 +102,7 @@
               "RelativeToolTip": "UpdateService.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-24T19:35:09.071Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-02-24T19:35:09.071Z"
             },
             {
               "$type": "Document",
@@ -175,8 +174,7 @@
               "RelativeToolTip": "OnlineServices.cs",
               "ViewState": "AgIAACgAAAAAAAAAAAAhwD4AAAA1AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-22T16:35:25.368Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-02-22T16:35:25.368Z"
             },
             {
               "$type": "Document",
@@ -254,9 +252,9 @@
               "Title": "App.axaml.cs",
               "DocumentMoniker": "D:\\Data\\Development\\Visual Studio\\CRT2\\App.axaml.cs",
               "RelativeDocumentMoniker": "App.axaml.cs",
-              "ToolTip": "D:\\Data\\Development\\Visual Studio\\CRT2\\App.axaml.cs",
-              "RelativeToolTip": "App.axaml.cs",
-              "ViewState": "AgIAABYAAAAAAAAAAAAAABcAAAArAAAAAAAAAA==",
+              "ToolTip": "D:\\Data\\Development\\Visual Studio\\CRT2\\App.axaml.cs \u2B24",
+              "RelativeToolTip": "App.axaml.cs \u2B24",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-02-22T13:20:43.117Z",
               "EditorCaption": ""

@@ -16,7 +16,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCopyrightAttribute("©2025-2026")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("A utility tool for Commodore hardware repairing, troubleshooting and diagnosing.")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("2.0.0.1")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("2.0.0.1")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("2.0.0.1+e067f1ed3ec863945bba4df22bee141d9777589c")]
 [assembly: System.Reflection.AssemblyProductAttribute("Commodore Repair Toolbox")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Commodore Repair Toolbox")]
 [assembly: System.Reflection.AssemblyVersionAttribute("2.0.0.1")]
