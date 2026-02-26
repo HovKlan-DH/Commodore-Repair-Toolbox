@@ -133,11 +133,9 @@ jobs:
           unzip data-pack.zip -d publish/linux-x64/Data/
 
       - name: Install vpk
-        shell: powershell
         run: dotnet tool install -g vpk
 
       - name: Pack with Velopack
-        shell: powershell
         run: |
           vpk pack \
             --packId ${{ env.PACK_ID }} \
@@ -171,13 +169,13 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Set version
-      id: ver
-      run: |
-        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-          echo "version=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
-        else
-          echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-        fi
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
     
       - name: Publish macOS (arm64)
         run: |
@@ -204,11 +202,9 @@ jobs:
           unzip data-pack.zip -d publish/macos-x64/Data/
 
       - name: Install vpk
-        shell: powershell
         run: dotnet tool install -g vpk
 
       - name: Pack with Velopack (macOS arm64)
-        shell: powershell
         run: |
           vpk pack \
             --packId ${{ env.PACK_ID }} \
