@@ -53,15 +53,37 @@ jobs:
         run: Get-ChildItem Cert:\CurrentUser\My | Select-Object Subject, Thumbprint
   
       - name: Sign executable
+        shell: powershell
         env:
           YUBIKEY_PIN: ${{ secrets.YUBIKEY_PIN }}
+          CERT_THUMBPRINT: ${{ secrets.CERT_THUMBPRINT }}
         run: |
-          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe" sign `
-            /sha1 7e2215692c12ad960e40a844b1e1bc15ca006df9 `
-            /fd SHA256 `
-            /tr http://timestamp.digicert.com `
-            /td SHA256 `
-            publish/windows-x64/${{ env.EXE_WINDOWS }}
+          $cert = Get-ChildItem Cert:\CurrentUser\My |
+            Where-Object { $_.Thumbprint -eq $env:CERT_THUMBPRINT } |
+            Select-Object -First 1
+
+          if ($null -eq $cert) { throw "Certificate not found in store" }
+
+          $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
+          if ($rsa -is [System.Security.Cryptography.RSACng]) {
+              $pinBytes = [System.Text.Encoding]::Unicode.GetBytes($env:YUBIKEY_PIN + [char]0)
+              $prop = New-Object System.Security.Cryptography.CngProperty(
+                  "SmartCardPin", $pinBytes,
+                  [System.Security.Cryptography.CngPropertyOptions]::None)
+              $rsa.Key.SetProperty($prop)
+          }
+
+          $result = Set-AuthenticodeSignature `
+              -FilePath "publish/windows-x64/$env:EXE_WINDOWS" `
+              -Certificate $cert `
+              -TimestampServer "http://timestamp.digicert.com" `
+              -HashAlgorithm SHA256
+
+          if ($result.Status -ne "Valid") {
+              throw "Signing failed: $($result.StatusMessage)"
+          }
+
+          Write-Host "Signed successfully"
 
       - name: Download and extract data pack
         shell: pwsh
