@@ -11,8 +11,8 @@ namespace CRT
     // ###########################################################################################
     public static class UpdateService
     {
-//        private const string GitHubOwner = "HovKlan-DH";
-//        private const string GitHubRepo = "CRT-PoC";
+        private const string GitHubOwner = "HovKlan-DH";
+        private const string GitHubRepo = "Commodore-Repair-Toolbox";
 
         private static UpdateManager? _manager;
         private static UpdateInfo? _pendingUpdate;
