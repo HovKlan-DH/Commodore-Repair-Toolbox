@@ -76,6 +76,7 @@ jobs:
             --packDir publish/windows-x64 `
             --mainExe ${{ env.EXE_WINDOWS }} `
             --noPortable `
+            --icon "Assets/Commodore icon.ico" `
             --outputDir velopack-output
 
       - name: Upload Velopack artifacts
@@ -131,6 +132,7 @@ jobs:
             --packVersion ${{ steps.ver.outputs.version }} \
             --packDir publish/linux-x64 \
             --mainExe ${{ env.EXE_UNIX }} \
+            --icon "Assets/Commodore icon.ico" \
             --outputDir velopack-output
 
       - name: Upload Velopack artifacts
@@ -198,6 +200,7 @@ jobs:
             --mainExe ${{ env.EXE_UNIX }} \
             --channel osx-arm64 \
             --noPortable \
+            --icon "Assets/Commodore icon.ico" \
             --outputDir velopack-output
 
       - name: Pack with Velopack (macOS x64)
@@ -209,6 +212,7 @@ jobs:
             --mainExe ${{ env.EXE_UNIX }} \
             --channel osx-x64 \
             --noPortable \
+            --icon "Assets/Commodore icon.ico" \
             --outputDir velopack-output
 
       - name: Upload Velopack artifacts
