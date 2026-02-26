@@ -15,7 +15,7 @@ env:
   PACK_ID: Commodore-Repair-Toolbox
   EXE_WINDOWS: Commodore-Repair-Toolbox.exe
   EXE_UNIX: Commodore-Repair-Toolbox
-  PROJECT: Commodore-Repair-Toolbox.csproj
+  PROJECT: CRT2.csproj
 
 jobs:
 
