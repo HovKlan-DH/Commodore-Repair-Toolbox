@@ -25,17 +25,12 @@ jobs:
   ###############################################################
   build-windows:
     name: Build Windows (x64)
-    runs-on: windows-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: crt-v2
-          
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
 
       - name: Set version
         id: ver
@@ -52,6 +47,17 @@ jobs:
             --self-contained `
             -p:Version=${{ steps.ver.outputs.version }} `
             -o publish/windows-x64
+
+      - name: Sign executable
+        env:
+          YUBIKEY_PIN: ${{ secrets.YUBIKEY_PIN }}
+        run: |
+          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe" sign `
+            /sha1 7e2215692c12ad960e40a844b1e1bc15ca006df9 `
+            /fd SHA256 `
+            /tr http://timestamp.digicert.com `
+            /td SHA256 `
+            publish/windows-x64/${{ env.EXE_WINDOWS }}
 
       - name: Download and extract data pack
         shell: pwsh
