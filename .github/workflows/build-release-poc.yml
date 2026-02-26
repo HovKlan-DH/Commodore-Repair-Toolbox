@@ -65,15 +65,17 @@ jobs:
             publish/windows-x64/${{ env.EXE_WINDOWS }}
 
       - name: Download and extract data pack
-        shell: pwsh
+        shell: powershell
         run: |
           Invoke-WebRequest "${{ env.DATA_PACK_URL }}" -OutFile data-pack.zip
           Expand-Archive data-pack.zip -DestinationPath publish/windows-x64/Data/
 
       - name: Install vpk
+        shell: powershell
         run: dotnet tool install -g vpk
 
       - name: Pack with Velopack
+        shell: powershell
         run: |
           vpk pack `
             --packId ${{ env.PACK_ID }} `
@@ -122,9 +124,11 @@ jobs:
           unzip data-pack.zip -d publish/linux-x64/Data/
 
       - name: Install vpk
+        shell: powershell
         run: dotnet tool install -g vpk
 
       - name: Pack with Velopack
+        shell: powershell
         run: |
           vpk pack \
             --packId ${{ env.PACK_ID }} \
@@ -182,9 +186,11 @@ jobs:
           unzip data-pack.zip -d publish/macos-x64/Data/
 
       - name: Install vpk
+        shell: powershell
         run: dotnet tool install -g vpk
 
       - name: Pack with Velopack (macOS arm64)
+        shell: powershell
         run: |
           vpk pack \
             --packId ${{ env.PACK_ID }} \
