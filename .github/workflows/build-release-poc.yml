@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Version for this release (ex. 2.0.0.1)'
+        description: 'Version for this release (ex. 2.0.0)'
         required: true
-        default: '2.0.0'
+        default: '1.9.0'
 
 env:
   PACK_ID: Commodore-Repair-Toolbox
