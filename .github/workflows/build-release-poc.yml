@@ -48,6 +48,10 @@ jobs:
             -p:Version=${{ steps.ver.outputs.version }} `
             -o publish/windows-x64
 
+      - name: List available certificates
+        shell: powershell
+        run: Get-ChildItem Cert:\CurrentUser\My | Select-Object Subject, Thumbprint
+  
       - name: Sign executable
         env:
           YUBIKEY_PIN: ${{ secrets.YUBIKEY_PIN }}
