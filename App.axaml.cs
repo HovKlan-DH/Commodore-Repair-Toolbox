@@ -4,7 +4,6 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 
-
 namespace CRT
 {
     public partial class App : Application
@@ -20,7 +19,7 @@ namespace CRT
         public override async void OnFrameworkInitializationCompleted()
         {
             Logger.Initialize();
-            Logger.Info("Commodore Repair Toolbox launched");
+            Logger.Info("Commodore Repair Toolbox 2 launched");
 
             _ = OnlineServices.CheckVersionAsync();
 

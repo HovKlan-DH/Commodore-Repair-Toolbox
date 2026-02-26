@@ -8,11 +8,8 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/Dotnet.gitignore
 
 .vs/
-.vs-old/
 bin/
-bin-old/
 obj/
-obj-old/
 
 # Build results
 [Dd]ebug/
