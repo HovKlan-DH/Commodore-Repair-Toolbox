@@ -29,6 +29,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Verify tag is on "crt-v2" branch
+        if: github.event_name == 'push'
+        run: |
+          git fetch --all
+          BRANCH=$(git branch -r --contains ${{ github.sha }} | grep 'origin/crt-v2' || true)
+          if [ -z "$BRANCH" ]; then
+            echo "::error::This tag was not created from the \"crt-v2\" branch - aborting..."
+            exit 1
+          fi
+          
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -79,6 +89,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Verify tag is on "crt-v2" branch
+        if: github.event_name == 'push'
+        run: |
+          git fetch --all
+          BRANCH=$(git branch -r --contains ${{ github.sha }} | grep 'origin/crt-v2' || true)
+          if [ -z "$BRANCH" ]; then
+            echo "::error::This tag was not created from the \"crt-v2\" branch - aborting..."
+            exit 1
+          fi
+          
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -127,6 +147,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Verify tag is on "crt-v2" branch
+        if: github.event_name == 'push'
+        run: |
+          git fetch --all
+          BRANCH=$(git branch -r --contains ${{ github.sha }} | grep 'origin/crt-v2' || true)
+          if [ -z "$BRANCH" ]; then
+            echo "::error::This tag was not created from the \"crt-v2\" branch - aborting..."
+            exit 1
+          fi
+          
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
