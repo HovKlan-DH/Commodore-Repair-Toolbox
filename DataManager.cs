@@ -37,6 +37,9 @@ namespace CRT
         // ###########################################################################################
         public static async Task InitializeAsync(string[] args)
         {
+            Logger.Info(args.Length > 0
+                ? $"Commandline parameters: [{string.Join(" ", args)}]"
+                : "No commandline parameters given");
             _dataRoot = ResolveDataRoot(args);
             Logger.Info($"Data root is [{_dataRoot}]");
 
@@ -44,7 +47,20 @@ namespace CRT
             Directory.CreateDirectory(_dataRoot);
 
             if (isNewRoot)
-                Logger.Info("Data root folder created — all files will be downloaded from online source");
+            {
+                var bundledData = Path.Combine(AppContext.BaseDirectory, "Data");
+                if (Directory.Exists(bundledData))
+                {
+                    Logger.Info("Data root folder created — seeding from install package");
+                    RaiseStatus("Seeding data from install package...");
+                    await Task.Run(() => CopyDirectory(bundledData, _dataRoot));
+                    Logger.Info("Data seeded from install package");
+                }
+                else
+                {
+                    Logger.Info("Data root folder created — all files will be downloaded from online source");
+                }
+            }
             else
                 Logger.Info("Checking online source for new or updated files");
 
@@ -56,6 +72,20 @@ namespace CRT
 #endif
             RaiseStatus("Loading hardware definitions...");
             await Task.Run(LoadMainExcel);
+        }
+
+        // ###########################################################################################
+        // Recursively copies all files and subdirectories from source into destination.
+        // ###########################################################################################
+        private static void CopyDirectory(string source, string destination)
+        {
+            foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+            {
+                var relative = Path.GetRelativePath(source, file);
+                var dest = Path.Combine(destination, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                File.Copy(file, dest, overwrite: true);
+            }
         }
 
         // ###########################################################################################

@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -19,13 +20,16 @@ namespace CRT
         public override async void OnFrameworkInitializationCompleted()
         {
             Logger.Initialize();
-            Logger.Info("Commodore Repair Toolbox 2 launched");
+            var version = Assembly.GetExecutingAssembly().GetName().Version;
+            Logger.Info(version != null
+                ? $"Commodore Repair Toolbox version [{version.Major}.{version.Minor}.{version.Build}] launched"
+                : "Commodore Repair Toolbox launched");
 
             _ = OnlineServices.CheckVersionAsync();
 
             var os = RuntimeInformation.OSDescription;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && Environment.OSVersion.Version.Build >= 22000)
-                os = os.Replace("Windows 10", "Windows 11");
+//            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && Environment.OSVersion.Version.Build >= 22000)
+//                os = os.Replace("Windows 10", "Windows 11");
             Logger.Info($"Operating system is [{os}]");
 
             var archDescription = RuntimeInformation.ProcessArchitecture switch

@@ -1,0 +1,7 @@
+
+# 1.9.1
+-------
+* Update moved from "About" tab to dismisable panel.
+* Added version number to logfile.
+* Dumping commandline parameter(s) to logfile.
+* Added initial data package (~500MB).

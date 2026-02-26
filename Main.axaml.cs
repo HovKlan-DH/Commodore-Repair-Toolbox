@@ -69,11 +69,14 @@ namespace CRT
                 ? $"Version {version.Major}.{version.Minor}.{version.Build}"
                 : "Version unknown";
 
+#if DEBUG
+            UpdateService.DebugSimulateUpdate = true;
+#endif
             this.CheckForAppUpdate();
         }
 
         // ###########################################################################################
-        // Checks for an available update on startup and shows the install button if one is found.
+        // Checks for an available update on startup and shows the banner if one is found.
         // ###########################################################################################
         private async void CheckForAppUpdate()
         {
@@ -81,31 +84,31 @@ namespace CRT
 
             if (available == true)
             {
-                this.UpdateStatusText.Text = $"Version {UpdateService.PendingVersion} is available";
-                this.InstallUpdateButton.IsVisible = true;
-            }
-            else if (available == false)
-            {
-                this.UpdateStatusText.Text = "Application is up to date";
-            }
-            else
-            {
-                this.UpdateStatusText.Text = $"Could not check for updates - [{UpdateService.LastCheckError}]";
+                this.UpdateBannerText.Text = $"Version {UpdateService.PendingVersion} is available";
+                this.UpdateBanner.IsVisible = true;
             }
         }
 
         // ###########################################################################################
-        // Downloads and installs the pending update, showing progress, then restarts the app.
+        // Dismisses the update banner without cancelling the update.
+        // ###########################################################################################
+        private void OnUpdateBannerDismiss(object? sender, RoutedEventArgs e)
+        {
+            this.UpdateBanner.IsVisible = false;
+        }
+
+        // ###########################################################################################
+        // Downloads and installs the pending update, showing progress in the banner text.
         // ###########################################################################################
         private async void OnInstallUpdateClick(object? sender, RoutedEventArgs e)
         {
-            this.InstallUpdateButton.IsEnabled = false;
-            this.UpdateProgressBar.IsVisible = true;
-            this.UpdateStatusText.Text = "Downloading update...";
+            this.UpdateBannerInstallButton.IsEnabled = false;
+            this.UpdateBannerDismissButton.IsEnabled = false;
+            this.UpdateBannerText.Text = "Downloading update...";
 
             await UpdateService.DownloadAndInstallAsync(progress =>
             {
-                Dispatcher.UIThread.Post(() => this.UpdateProgressBar.Value = progress);
+                Dispatcher.UIThread.Post(() => this.UpdateBannerText.Text = $"Downloading update... {progress}%");
             });
             // DownloadAndInstallAsync calls ApplyUpdatesAndRestart internally - app relaunches automatically
         }

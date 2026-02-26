@@ -33,6 +33,28 @@
             <Setter Property="Background" Value="IndianRed" />
         </Style>
 
+        <!-- Banner install button: explicit hover/pressed backgrounds -->
+        <Style Selector="Button.BannerInstallButton /template/ ContentPresenter">
+            <Setter Property="Background" Value="IndianRed" />
+        </Style>
+        <Style Selector="Button.BannerInstallButton:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#C05050" />
+        </Style>
+        <Style Selector="Button.BannerInstallButton:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="#8B2020" />
+        </Style>
+
+        <!-- Banner dismiss button: subtle hover on dark background -->
+        <Style Selector="Button.BannerDismissButton /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.BannerDismissButton:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#6B2020" />
+        </Style>
+        <Style Selector="Button.BannerDismissButton:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="#4C1515" />
+        </Style>
+
     </Window.Styles>
 
     <Grid>
@@ -96,7 +118,56 @@
                 BorderThickness="1"
                 Padding="16,0,16,16">
             <Grid>
-                <TabControl>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Update notification banner -->
+                <Border x:Name="UpdateBanner"
+                        Grid.Row="0"
+                        IsVisible="False"
+                        Background="#4C1515"
+                        CornerRadius="4"
+                        Margin="0,8,0,4"
+                        Padding="12,6">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock x:Name="UpdateBannerText"
+                                   Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Foreground="White"
+                                   FontSize="12" />
+
+                        <Button x:Name="UpdateBannerInstallButton"
+                                Grid.Column="1"
+                                Classes="BannerInstallButton"
+                                Content="Install"
+                                Margin="12,0,4,0"
+                                Background="IndianRed"
+                                Foreground="White"
+                                FontSize="11"
+                                Padding="10,3"
+                                Click="OnInstallUpdateClick" />
+
+                        <Button x:Name="UpdateBannerDismissButton"
+                                Grid.Column="2"
+                                Classes="BannerDismissButton"
+                                Content="✕"
+                                Background="Transparent"
+                                Foreground="White"
+                                FontSize="11"
+                                Padding="6,3"
+                                Click="OnUpdateBannerDismiss" />
+                    </Grid>
+                </Border>
+
+                <TabControl Grid.Row="1">
 
                     <TabItem Header="Schematics">
                         <Grid>
@@ -259,28 +330,6 @@
                                        FontSize="11"
                                        Foreground="Gray"
                                        HorizontalAlignment="Center" />
-
-                            <Separator Margin="0,4" />
-
-                            <TextBlock x:Name="UpdateStatusText"
-                                       Text="Checking for updates..."
-                                       FontSize="11"
-                                       Foreground="Gray"
-                                       HorizontalAlignment="Center" />
-
-                            <Button x:Name="InstallUpdateButton"
-                                    Content="Install Update"
-                                    IsVisible="False"
-                                    HorizontalAlignment="Center"
-                                    Background="IndianRed"
-                                    Foreground="White"
-                                    Click="OnInstallUpdateClick" />
-
-                            <ProgressBar x:Name="UpdateProgressBar"
-                                         IsVisible="False"
-                                         Minimum="0"
-                                         Maximum="100"
-                                         Width="280" />
 
                         </StackPanel>
                     </TabItem>
