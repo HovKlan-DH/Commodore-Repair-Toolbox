@@ -56,34 +56,13 @@ jobs:
         shell: powershell
         env:
           YUBIKEY_PIN: ${{ secrets.YUBIKEY_PIN }}
-          CERT_THUMBPRINT: ${{ secrets.CERT_THUMBPRINT }}
         run: |
-          $cert = Get-ChildItem Cert:\CurrentUser\My |
-            Where-Object { $_.Thumbprint -eq $env:CERT_THUMBPRINT } |
-            Select-Object -First 1
-
-          if ($null -eq $cert) { throw "Certificate not found in store" }
-
-          $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
-          if ($rsa -is [System.Security.Cryptography.RSACng]) {
-              $pinBytes = [System.Text.Encoding]::Unicode.GetBytes($env:YUBIKEY_PIN + [char]0)
-              $prop = New-Object System.Security.Cryptography.CngProperty(
-                  "SmartCardPin", $pinBytes,
-                  [System.Security.Cryptography.CngPropertyOptions]::None)
-              $rsa.Key.SetProperty($prop)
-          }
-
-          $result = Set-AuthenticodeSignature `
-              -FilePath "publish/windows-x64/$env:EXE_WINDOWS" `
-              -Certificate $cert `
-              -TimestampServer "http://timestamp.digicert.com" `
-              -HashAlgorithm SHA256
-
-          if ($result.Status -ne "Valid") {
-              throw "Signing failed: $($result.StatusMessage)"
-          }
-
-          Write-Host "Signed successfully"
+          java -jar C:\tools\jsign.jar `
+            --storetype YUBIKEY `
+            --storepass "$env:YUBIKEY_PIN" `
+            --tsaurl http://timestamp.digicert.com `
+            --alg SHA-256 `
+            publish/windows-x64/${{ env.EXE_WINDOWS }}
 
       - name: Download and extract data pack
         shell: pwsh
