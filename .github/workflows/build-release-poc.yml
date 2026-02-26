@@ -16,6 +16,7 @@ env:
   EXE_WINDOWS: Commodore-Repair-Toolbox.exe
   EXE_UNIX: Commodore-Repair-Toolbox
   PROJECT: CRT2.csproj
+  DATA_PACK_URL: https://commodore-repair-toolbox.dk/auto-data/Data.zip
 
 jobs:
 
@@ -51,6 +52,12 @@ jobs:
             --self-contained `
             -p:Version=${{ steps.ver.outputs.version }} `
             -o publish/windows-x64
+
+      - name: Download and extract data pack
+        shell: pwsh
+        run: |
+          Invoke-WebRequest "${{ env.DATA_PACK_URL }}" -OutFile data-pack.zip
+          Expand-Archive data-pack.zip -DestinationPath publish/windows-x64/Data/
 
       - name: Install vpk
         run: dotnet tool install -g vpk
@@ -102,6 +109,11 @@ jobs:
             --self-contained \
             -p:Version=${{ steps.ver.outputs.version }} \
             -o publish/linux-x64
+
+      - name: Download and extract data pack
+        run: |
+          curl -fsSL "${{ env.DATA_PACK_URL }}" -o data-pack.zip
+          unzip data-pack.zip -d publish/linux-x64/Data/
 
       - name: Install vpk
         run: dotnet tool install -g vpk
@@ -161,6 +173,12 @@ jobs:
             --self-contained \
             -p:Version=${{ steps.ver.outputs.version }} \
             -o publish/macos-x64
+
+      - name: Download and extract data pack
+        run: |
+          curl -fsSL "${{ env.DATA_PACK_URL }}" -o data-pack.zip
+          unzip data-pack.zip -d publish/macos-arm64/Data/
+          unzip data-pack.zip -d publish/macos-x64/Data/
 
       - name: Install vpk
         run: dotnet tool install -g vpk
