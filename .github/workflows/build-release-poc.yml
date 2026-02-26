@@ -57,7 +57,7 @@ jobs:
         env:
           YUBIKEY_PIN: ${{ secrets.YUBIKEY_PIN }}
         run: |
-          java -jar C:\tools\jsign.jar `
+          java -jar C:\tools\jsign-6.0.jar `
             --storetype YUBIKEY `
             --storepass "$env:YUBIKEY_PIN" `
             --tsaurl http://timestamp.digicert.com `
