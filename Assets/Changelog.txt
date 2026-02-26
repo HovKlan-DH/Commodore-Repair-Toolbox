@@ -4,6 +4,7 @@
 * Added version to window title
 * Digitally signing Windows binary
 * Added application icon for installer packages
+* Added code signing for Windows executable
 
 # 1.9.1
 -------
