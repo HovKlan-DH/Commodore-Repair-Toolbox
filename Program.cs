@@ -1,62 +1,27 @@
-﻿using System;
-using System.Linq;
-using System.Windows.Forms;
-
-using MainForm = Commodore_Repair_Toolbox.Main;  // Alias to avoid clash with Program.Main()
+﻿using Velopack;
+using Avalonia;
+using System;
 
 namespace Commodore_Repair_Toolbox
 {
-    internal static class Program
+    internal class Program
     {
+        // Initialization code. Don't use any Avalonia, third-party APIs or any
+        // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
+        // yet and stuff might break.
         [STAThread]
-        static void Main()
+        public static void Main(string[] args)
         {
-            var args = Environment.GetCommandLineArgs();
-
-            // Ensure log exists BEFORE any other initialization (DataPaths, help, etc.)
-            MainForm.InitializeLogging();
-
-            if (CommandlineHelp.ShouldShowHelp(args))
-            {
-                CommandlineHelp.ShowAndExit();
-                return;
-            }
-
-            // Check if launched with --fetch-data (e.g. after auto-update)
-            bool fetchData = args.Any(a => a.Equals("--fetch-data", StringComparison.OrdinalIgnoreCase));
-
-            // Load configuration before DataPaths.Initialize() can persist DataRoot
-            Splashscreen.Current?.UpdateStatus("Loading configuration file");
-            Configuration.LoadConfig();
-
-            // Also trigger data fetch if the "Always update data" option is enabled in configuration
-            if (!fetchData)
-            {
-                fetchData = Configuration.GetSetting("AlwaysUpdateData", "False") == "True";
-            }
-
-            DataPaths.Initialize(args);
-
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-
-            // Show splash screen while the main form is loading
-            using (var splash = new Splashscreen())
-            {
-                splash.Show();
-                splash.Refresh();
-
-                // If launched with "--fetch-data", sync data files with splash progress before loading the main form
-                if (fetchData)
-                {
-                    MainForm.SyncFilesFromSource(showCompletionDialog: false);
-                }
-
-                var mainForm = new MainForm();
-                mainForm.Shown += (s, e) => splash.Close();
-
-                Application.Run(mainForm);
-            }
+            VelopackApp.Build().Run();
+            BuildAvaloniaApp()
+                .StartWithClassicDesktopLifetime(args);
         }
+
+        // Avalonia configuration, don't remove; also used by visual designer.
+        public static AppBuilder BuildAvaloniaApp()
+            => AppBuilder.Configure<CRT.App>()
+                .UsePlatformDetect()
+                .WithInterFont()
+                .LogToTrace();
     }
 }

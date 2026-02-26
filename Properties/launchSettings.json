@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "CRT2": {
+      "commandName": "Project",
+      "commandLineArgs": "--data-root=\"D:\\Data\\Development\\Visual Studio\\Vintage-Repair-Toolbox\\bin\\Debug\\net10.0\\hest1\"",
+      "hotReloadEnabled": false
+    }
+  }
+}

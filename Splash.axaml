@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="CRT.Splash"
+        Width="600" Height="350"
+        WindowStartupLocation="CenterScreen"
+        SystemDecorations="None"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True">
+
+    <Grid Background="White">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+            <TextBlock Text="My Application"
+                       FontSize="36"
+                       Foreground="White"
+                       HorizontalAlignment="Center" />
+            <TextBlock x:Name="StatusLabel"
+                       Text="Loading, please wait..."
+                       FontSize="14"
+                       Foreground="Black"
+                       HorizontalAlignment="Center"
+                       Margin="0,12,0,0" />
+            <TextBlock x:Name="FileLabel"
+                       Text=""
+                       FontSize="12"
+                       Foreground="Black"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center"
+                       MaxWidth="520"
+                       TextTrimming="CharacterEllipsis"
+                       IsVisible="False" />
+        </StackPanel>
+    </Grid>
+
+</Window>

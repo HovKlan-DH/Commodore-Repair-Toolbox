@@ -1,0 +1,295 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:CRT"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="CRT.Main"
+        Title="Commodore Repair Toolbox"
+        MinWidth="400"
+        MinHeight="300">
+
+    <Window.Styles>
+
+        <!-- Base tab font size and reduced vertical padding -->
+        <Style Selector="TabItem">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="12,4" />
+        </Style>
+
+        <!-- Hover: tint the header text -->
+        <Style Selector="TabItem:pointerover">
+            <Setter Property="Foreground" Value="IndianRed" />
+        </Style>
+
+        <!-- Hover: show a faint underline indicator -->
+        <Style Selector="TabItem:pointerover /template/ Border#PART_SelectedPipe">
+            <Setter Property="IsVisible" Value="True" />
+            <Setter Property="Background" Value="LightCoral" />
+        </Style>
+
+        <!-- Selected: solid underline indicator -->
+        <Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
+            <Setter Property="Background" Value="IndianRed" />
+        </Style>
+
+    </Window.Styles>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200" MinWidth="80" />
+            <ColumnDefinition Width="4" />
+            <ColumnDefinition Width="*" MinWidth="100" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left Panel -->
+        <Border x:Name="LeftPanel"
+                Grid.Column="0"
+                BorderBrush="IndianRed"
+                BorderThickness="1"
+                Padding="16">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Size label -->
+                <TextBlock x:Name="LeftSizeLabel"
+                           Grid.Row="0"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Top"
+                           FontSize="11"
+                           Foreground="Gray" />
+
+                <!-- Hardware and Board selectors -->
+                <StackPanel Grid.Row="1"
+                            Spacing="4"
+                            VerticalAlignment="Top"
+                            Margin="0,8,0,0">
+                    <TextBlock Text="Hardware"
+                               FontSize="11"
+                               Foreground="Gray" />
+                    <ComboBox x:Name="HardwareComboBox"
+                              HorizontalAlignment="Stretch" />
+                    <TextBlock Text="Board"
+                               FontSize="11"
+                               Foreground="Gray"
+                               Margin="0,8,0,0" />
+                    <ComboBox x:Name="BoardComboBox"
+                              HorizontalAlignment="Stretch" />
+                </StackPanel>
+
+            </Grid>
+        </Border>
+
+        <!-- Left Splitter -->
+        <GridSplitter Grid.Column="1"
+                      ResizeDirection="Columns"
+                      HorizontalAlignment="Stretch"
+                      Background="Gray" />
+
+        <!-- Right Panel -->
+        <Border x:Name="RightPanel"
+                Grid.Column="2"
+                BorderBrush="IndianRed"
+                BorderThickness="1"
+                Padding="16,0,16,16">
+            <Grid>
+                <TabControl>
+
+                    <TabItem Header="Schematics">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" MinWidth="80" />
+                                <ColumnDefinition Width="4" />
+                                <ColumnDefinition Width="*" MinWidth="100" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Schematics Image Panel (zoomable) -->
+                            <Border Grid.Column="0"
+                                    x:Name="SchematicsContainer"
+                                    ClipToBounds="True"
+                                    PointerWheelChanged="OnSchematicsZoom"
+                                    PointerPressed="OnSchematicsPointerPressed"
+                                    PointerMoved="OnSchematicsPointerMoved"
+                                    PointerReleased="OnSchematicsPointerReleased"
+                                    Padding="0,0,0,0"
+                                    >
+                                <Grid>
+                                    <Image x:Name="SchematicsImage"
+                                           Stretch="Uniform"
+                                           HorizontalAlignment="Left"
+                                           VerticalAlignment="Top"
+                                           RenderTransformOrigin="0%,0%"
+                                           RenderOptions.BitmapInterpolationMode="HighQuality">
+                                        <Image.RenderTransform>
+                                            <MatrixTransform />
+                                        </Image.RenderTransform>
+                                    </Image>
+
+                                    <local:SchematicHighlightsOverlay x:Name="SchematicsHighlightsOverlay"
+                                                                     IsHitTestVisible="False"
+                                                                     RenderTransformOrigin="0%,0%">
+                                        <local:SchematicHighlightsOverlay.RenderTransform>
+                                            <MatrixTransform />
+                                        </local:SchematicHighlightsOverlay.RenderTransform>
+                                    </local:SchematicHighlightsOverlay>
+                                </Grid>
+                            </Border>
+
+                            <!-- Schematics Splitter -->
+                            <GridSplitter Grid.Column="1"
+                                          ResizeDirection="Columns"
+                                          HorizontalAlignment="Stretch"
+                                          Background="Gray" />
+
+                            <!-- Schematics Right Content - Thumbnail Gallery -->
+                            <ListBox x:Name="SchematicsThumbnailList"
+                                     Grid.Column="2"
+                                     Background="Transparent"
+                                     SelectionMode="Single"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+
+                                <ListBox.Styles>
+
+                                    <!-- Remove default pointer-over and selection backgrounds -->
+                                    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="Transparent" />
+                                    </Style>
+                                    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="Transparent" />
+                                    </Style>
+
+                                    <!-- Ensure each item stretches to fill the full panel width -->
+                                    <Style Selector="ListBoxItem">
+                                        <Setter Property="Padding"                     Value="0" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+
+                                    <!-- Default thumbnail border: 1px black -->
+                                    <Style Selector="ListBoxItem Border.ThumbnailBorder">
+                                        <Setter Property="BorderBrush"     Value="Black" />
+                                        <Setter Property="BorderThickness" Value="1" />
+                                    </Style>
+
+                                    <!-- Selected thumbnail border: thicker IndianRed -->
+                                    <Style Selector="ListBoxItem:selected Border.ThumbnailBorder">
+                                        <Setter Property="BorderBrush"     Value="IndianRed" />
+                                        <Setter Property="BorderThickness" Value="3" />
+                                    </Style>
+
+                                </ListBox.Styles>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="local:SchematicThumbnail">
+                                        <Border Classes="ThumbnailBorder"
+                                                Margin="4"
+                                                HorizontalAlignment="Stretch">
+                                            <Image Source="{Binding ImageSource}"
+                                                   Stretch="Uniform"
+                                                   HorizontalAlignment="Stretch"
+                                                   RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                        </Grid>
+                    </TabItem>
+
+                    <TabItem Header="Overview">
+                        <StackPanel Spacing="16"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+
+                            <TextBlock x:Name="RightSizeLabel"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Top"
+                               FontSize="11"
+                               Foreground="Gray" />
+
+                            <Button x:Name="MyButton"
+                                    Content="Click me!"
+                                    Click="OnMyButtonClick"
+                                    Background="LightBlue" />
+                            <TextBlock x:Name="StatusText"
+                                       Text="Waiting for click..."
+                                       Background="LightYellow"
+                                       Foreground="DarkBlue"
+                                       HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </TabItem>
+
+                    <TabItem Header="Resources">
+                        <TextBlock Text="Details content goes here"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </TabItem>
+
+                    <TabItem Header="Configuration">
+                        <TextBlock Text="Details content goes here"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </TabItem>
+
+                    <TabItem Header="Feedback">
+                        <TextBlock Text="Details content goes here"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </TabItem>
+
+                    <TabItem Header="Help">
+                        <TextBlock Text="Details content goes here"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </TabItem>
+
+                    <TabItem Header="About">
+                        <StackPanel Spacing="12"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    MaxWidth="360">
+
+                            <TextBlock Text="Commodore Repair Toolbox"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" />
+
+                            <TextBlock x:Name="AppVersionText"
+                                       FontSize="11"
+                                       Foreground="Gray"
+                                       HorizontalAlignment="Center" />
+
+                            <Separator Margin="0,4" />
+
+                            <TextBlock x:Name="UpdateStatusText"
+                                       Text="Checking for updates..."
+                                       FontSize="11"
+                                       Foreground="Gray"
+                                       HorizontalAlignment="Center" />
+
+                            <Button x:Name="InstallUpdateButton"
+                                    Content="Install Update"
+                                    IsVisible="False"
+                                    HorizontalAlignment="Center"
+                                    Background="IndianRed"
+                                    Foreground="White"
+                                    Click="OnInstallUpdateClick" />
+
+                            <ProgressBar x:Name="UpdateProgressBar"
+                                         IsVisible="False"
+                                         Minimum="0"
+                                         Maximum="100"
+                                         Width="280" />
+
+                        </StackPanel>
+                    </TabItem>
+
+                </TabControl>
+
+            </Grid>
+        </Border>
+
+    </Grid>
+
+</Window>
