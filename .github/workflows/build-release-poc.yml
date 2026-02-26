@@ -222,10 +222,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
-          name: "PoC - Vintage Repair Toolbox ${{ steps.tag.outputs.tag }}"
+          name: "ALPHA - Commodore Repair Toolbox ${{ steps.tag.outputs.tag }}"
           body: |
             ## ⚠️ This is an ALPHA release - NOT a stable release!!!
 
+            **CRT 2** is a new application built from scratch to natively support **Windows**, **Linux** and **macOS**. There will be many alpha-releases until the final version will be named **2.0.0**. Please support by giving your comments, if this works or not, and what needs improvement.
+
+            You only need to install the application once, and thereafter you can update directly from inside the application.
+            
             ### Downloads
             | Platform | File |
             |----------|------|
