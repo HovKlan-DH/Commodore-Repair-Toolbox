@@ -65,9 +65,17 @@ namespace CRT
             this.PopulateHardwareDropDown();
 
             var version = Assembly.GetExecutingAssembly().GetName().Version;
-            this.AppVersionText.Text = version != null
-                ? $"Version {version.Major}.{version.Minor}.{version.Build}"
+            var versionString = version != null
+                ? $"{version.Major}.{version.Minor}.{version.Build}"
+                : null;
+
+            this.AppVersionText.Text = versionString != null
+                ? $"Version {versionString}"
                 : "Version unknown";
+
+            this.Title = versionString != null
+                ? $"Commodore Repair Toolbox {versionString}"
+                : "Commodore Repair Toolbox";
 
 #if DEBUG
             UpdateService.DebugSimulateUpdate = true;
