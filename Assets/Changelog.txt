@@ -1,4 +1,8 @@
 
+# 1.9.3
+-------
+* Added code signing for Windows installer
+
 # 1.9.2
 -------
 * Added version to window title
