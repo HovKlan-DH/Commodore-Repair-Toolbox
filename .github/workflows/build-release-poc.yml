@@ -279,10 +279,8 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: "DEVELOPMENT - CRT2 ${{ steps.tag.outputs.tag }}"
           body: |
-            ## ⚠️ This is a DEVELOPMENT release and should NOT be downloaded unless you know what it is!!!
-
             If you are looking for the normal/stable version, then look below and find the next release, **2026-February-21**.
-            
+
             **CRT2** is a new application built from scratch to natively support **Windows**, **Linux** and **macOS**. There will be many alpha-releases until the final version will be named **2.0.0**. Please support by giving your comments, if this works or not, and what needs improvement.
             
             You only need to install the ALPHA application once, and thereafter you can update directly from inside the application.
@@ -293,7 +291,8 @@ jobs:
             > [!CAUTION]
             > **DO NOT REPORT BUGS IN "ISSUES"**, as this is way too early for that. Instead you can participate in the online Discord discussion here, https://discord.gg/HDWct2vxem
             
-            ### Direct downloads for supported platforms
+            
+            ### Direct downloads for different platforms
             | Platform | File |
             |----------|------|
             | Windows x64 | [Commodore-Repair-Toolbox-win-Setup.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Commodore-Repair-Toolbox-win-Setup.exe) |
@@ -309,3 +308,26 @@ jobs:
             release-assets/*.nupkg
             release-assets/releases.*.json
             release-assets/assets.*.json
+
+      - name: Delete old pre-releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          echo "Fetching all pre-releases..."
+          gh release list \
+            --repo ${{ github.repository }} \
+            --limit 100 \
+            --json tagName,isPrerelease \
+            | jq -r '.[] | select(.isPrerelease == true) | .tagName' \
+            | while read tag; do
+                if [ "$tag" != "$CURRENT_TAG" ]; then
+                  echo "Deleting pre-release: $tag"
+                  gh release delete "$tag" \
+                    --repo ${{ github.repository }} \
+                    --yes \
+                    --cleanup-tag
+                else
+                  echo "Keeping current pre-release: $tag"
+                fi
+              done
