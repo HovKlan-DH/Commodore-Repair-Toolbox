@@ -265,8 +265,6 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: "ALPHA - Commodore Repair Toolbox ${{ steps.tag.outputs.tag }}"
           body: |
-            ## ⚠️ This is an ALPHA release - NOT a stable release!!!
-
             If you are looking for the normal/stable version, then look below and find the next release, **2026-February-21**.
 
             **CRT2** is a new application built from scratch to natively support **Windows**, **Linux** and **macOS**. There will be many alpha-releases until the final version will be named **2.0.0**. Please support by giving your comments, if this works or not, and what needs improvement.
@@ -274,7 +272,11 @@ jobs:
             You only need to install the ALPHA application once, and thereafter you can update directly from inside the application.
             
             > [!CAUTION]
+            > **DO NOT DOWNLOAD IF YOU DO NOT KNOW WHAT THIS VERSION IS** - use stable version available in below release
+            
+            > [!CAUTION]
             > **DO NOT REPORT BUGS IN "ISSUES"**, as this is way too early for that. Instead you can participate in the online Discord discussion here, https://discord.gg/HDWct2vxem
+            
             
             ### Direct downloads for different platforms
             | Platform | File |
