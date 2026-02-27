@@ -263,7 +263,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
-          name: "ALPHA - Commodore Repair Toolbox ${{ steps.tag.outputs.tag }}"
+          name: "DEVELOPMENT - CRT2 ${{ steps.tag.outputs.tag }}"
           body: |
             If you are looking for the normal/stable version, then look below and find the next release, **2026-February-21**.
 
