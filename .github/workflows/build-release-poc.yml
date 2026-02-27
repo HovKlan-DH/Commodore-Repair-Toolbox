@@ -293,7 +293,7 @@ jobs:
             > [!CAUTION]
             > **DO NOT REPORT BUGS IN "ISSUES"**, as this is way too early for that. Instead you can participate in the online Discord discussion here, https://discord.gg/HDWct2vxem
             
-            ### Direct downloads for different platforms
+            ### Direct downloads for supported platforms
             | Platform | File |
             |----------|------|
             | Windows x64 | [Commodore-Repair-Toolbox-win-Setup.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Commodore-Repair-Toolbox-win-Setup.exe) |
