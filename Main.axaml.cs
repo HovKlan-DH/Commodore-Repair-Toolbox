@@ -71,7 +71,7 @@ namespace CRT
 
             this.AppVersionText.Text = versionString != null
                 ? $"Version {versionString}"
-                : "Version unknown";
+                : "Version (unknown)";
 
             this.Title = versionString != null
                 ? $"Commodore Repair Toolbox {versionString}"
