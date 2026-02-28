@@ -11,9 +11,6 @@ namespace CRT
     // ###########################################################################################
     public static class UpdateService
     {
-        private const string GitHubOwner = "HovKlan-DH";
-        private const string GitHubRepo = "Commodore-Repair-Toolbox";
-
         private static UpdateManager? _manager;
         private static UpdateInfo? _pendingUpdate;
         private static string? _lastCheckError;
@@ -22,15 +19,6 @@ namespace CRT
         // Returns the error message from the last failed update check, or null if no error occurred.
         // ###########################################################################################
         public static string? LastCheckError => _lastCheckError;
-
-#if DEBUG
-        // ###########################################################################################
-        // Set to true in debug builds to simulate an available update for UI testing.
-        // Fakes the version number, progress bar, and skips the actual restart.
-        // ###########################################################################################
-        public static bool DebugSimulateUpdate { get; set; } = false;
-        private const string DebugSimulatedVersion = "99.0.0";
-#endif
 
         // ###########################################################################################
         // Checks GitHub Releases for a newer version.
@@ -41,7 +29,7 @@ namespace CRT
             _lastCheckError = null;
 
 #if DEBUG
-            if (DebugSimulateUpdate)
+            if (AppConfig.DebugSimulateUpdate)
             {
                 Logger.Info("Update check - simulating update available [debug]");
                 return true;
@@ -53,11 +41,10 @@ namespace CRT
 #else
             try
             {
-                // 3rd parameter represents if pre-releases should be included in check:
-                // true = include pre-releases
-                // false = only stable releases
-                //                _manager = new UpdateManager(new GithubSource($"https://github.com/{GitHubOwner}/{GitHubRepo}", null, false));
-                _manager = new UpdateManager(new GithubSource($"https://github.com/{GitHubOwner}/{GitHubRepo}", null, true));
+                _manager = new UpdateManager(new GithubSource(
+                    $"https://github.com/{AppConfig.GitHubOwner}/{AppConfig.GitHubRepo}",
+                    null,
+                    AppConfig.IncludePreReleases));
 
                 _pendingUpdate = await _manager.CheckForUpdatesAsync();
                 return _pendingUpdate != null;
@@ -84,7 +71,7 @@ namespace CRT
         public static async Task DownloadAndInstallAsync(Action<int>? onProgress = null)
         {
 #if DEBUG
-            if (DebugSimulateUpdate)
+            if (AppConfig.DebugSimulateUpdate)
             {
                 Logger.Info("Debug simulation - faking update download");
                 for (int i = 0; i <= 100; i += 5)
@@ -118,7 +105,7 @@ namespace CRT
         // ###########################################################################################
         public static string? PendingVersion =>
 #if DEBUG
-            DebugSimulateUpdate ? DebugSimulatedVersion :
+            AppConfig.DebugSimulateUpdate ? AppConfig.DebugSimulatedVersion :
 #endif
             _pendingUpdate?.TargetFullRelease.Version.ToString();
     }

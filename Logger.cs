@@ -24,9 +24,9 @@ namespace CRT
             try
             {
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                var directory = Path.Combine(appData, "Commodore-Repair-Toolbox");
+                var directory = Path.Combine(appData, AppConfig.AppFolderName);
                 Directory.CreateDirectory(directory);
-                _logFilePath = Path.Combine(directory, "Commodore-Repair-Toolbox.log");
+                _logFilePath = Path.Combine(directory, AppConfig.LogFileName);
                 File.WriteAllText(_logFilePath, string.Empty);
             }
             catch

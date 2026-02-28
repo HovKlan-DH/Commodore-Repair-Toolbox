@@ -10,8 +10,6 @@ namespace CRT
     public static class DataManager
     {
         private const string DataRootArg = "--data-root=";
-        private const string AppFolderName = "Commodore-Repair-Toolbox";
-        private const string MainExcelFileName = "Commodore-Repair-Toolbox.xlsx";
         private const string SheetHardwareBoard = "Hardware & Board";
 
         // Column header names used for robust, order-independent column mapping
@@ -21,6 +19,7 @@ namespace CRT
         private const string ColHardwareNotes = "Hardware notes in \"Overview\" tab";
 
         private static string _dataRoot = string.Empty;
+        private static List<DataFileEntry>? _syncManifest;
 
         public static string DataRoot => _dataRoot;
         public static List<HardwareBoardEntry> HardwareBoards { get; private set; } = [];
@@ -32,8 +31,8 @@ namespace CRT
         public static event Action<string>? FileDownloadChanged;
 
         // ###########################################################################################
-        // Resolves the data root, ensures the folder exists, then synchronizes all files against
-        // the online checksum manifest. Always runs at startup — never skips the online check.
+        // Resolves the data root, ensures the folder exists, syncs all Excel files against the
+        // online manifest, then loads hardware definitions. Images are left for SyncRemainingAsync.
         // ###########################################################################################
         public static async Task InitializeAsync(string[] args)
         {
@@ -43,11 +42,12 @@ namespace CRT
             _dataRoot = ResolveDataRoot(args);
             Logger.Info($"Data root is [{_dataRoot}]");
 
+            // Create the data root folder, if this is either first-run or using a custom --data-root
             bool isNewRoot = !Directory.Exists(_dataRoot);
             Directory.CreateDirectory(_dataRoot);
-
             if (isNewRoot)
             {
+                // Check if this is a first-run with the default "AppData" path
                 var bundledData = Path.Combine(AppContext.BaseDirectory, "Data");
                 if (Directory.Exists(bundledData))
                 {
@@ -62,16 +62,90 @@ namespace CRT
                 }
             }
             else
-                Logger.Info("Checking online source for new or updated files");
+                Logger.Info(UserSettings.CheckDataOnLaunch
+                    ? "Checking online source for new or updated files"
+                    : "Online data sync is disabled in settings");
 
 #if DEBUG
-            Logger.Info("DEBUG build - skipping online sync");
-#else
-            RaiseStatus("Checking files against online source...");
-            await OnlineServices.SyncDataAsync(_dataRoot, RaiseStatus, RaiseFileDownload);
+            if (!AppConfig.DebugSimulateSync)
+            {
+                Logger.Info("DEBUG build - skipping online sync");
+            }
+            else
+            {
 #endif
+                if (UserSettings.CheckDataOnLaunch)
+                {
+                    RaiseStatus("Fetching online file manifest...");
+                    _syncManifest = await OnlineServices.FetchManifestAsync(RaiseStatus);
+
+                    if (_syncManifest != null)
+                    {
+                        // Sync only the main Excel file first — one exact match, no manifest scan
+                        RaiseStatus("Checking main data file...");
+                        await OnlineServices.SyncFilesAsync(
+                            _syncManifest, _dataRoot,
+                            f => string.Equals(f, AppConfig.MainExcelFileName, StringComparison.OrdinalIgnoreCase),
+                            RaiseStatus, RaiseFileDownload);
+                    }
+                }
+                else
+                {
+                    Logger.Info("Online data sync skipped - disabled in settings");
+                }
+#if DEBUG
+            }
+#endif
+
+            // Load main Excel now — HardwareBoards is populated from this point on
             RaiseStatus("Loading hardware definitions...");
             await Task.Run(LoadMainExcel);
+
+#if DEBUG
+            if (AppConfig.DebugSimulateSync)
+            {
+#endif
+                if (_syncManifest != null && HardwareBoards.Count > 0)
+                {
+                    // Build an exact set of board Excel paths from the loaded hardware list —
+                    // this is a handful of files, not a broad extension scan of the full manifest
+                    var boardExcelFiles = HardwareBoards
+                        .Select(e => e.ExcelDataFile)
+                        .Where(f => !string.IsNullOrWhiteSpace(f))
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                    RaiseStatus("Checking board data files...");
+                    await OnlineServices.SyncFilesAsync(
+                        _syncManifest, _dataRoot,
+                        f => boardExcelFiles.Contains(f),
+                        RaiseStatus, RaiseFileDownload);
+                }
+#if DEBUG
+            }
+#endif
+        }
+
+        // Returns true when a background sync manifest is queued and ready to process.
+        public static bool HasPendingSync => _syncManifest != null;
+
+        // ###########################################################################################
+        // Syncs all non-Excel files (images etc.) using the manifest already fetched at startup.
+        // Intended to run silently in the background after the UI has opened.
+        // onStatus: optional callback for general progress messages, fired on the caller's thread.
+        // Returns the number of files that were successfully new or updated.
+        // ###########################################################################################
+        public static async Task<int> SyncRemainingAsync(Action<string>? onStatus = null)
+        {
+            if (_syncManifest == null)
+                return 0;
+
+            var manifest = _syncManifest;
+            _syncManifest = null;
+
+            return await OnlineServices.SyncFilesAsync(
+                manifest, _dataRoot,
+                f => !f.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase),
+                onStatus);
         }
 
         // ###########################################################################################
@@ -101,7 +175,7 @@ namespace CRT
             }
 
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            return Path.Combine(appData, AppFolderName, "Data");
+            return Path.Combine(appData, AppConfig.AppFolderName, "Data");
         }
 
         // ###########################################################################################
@@ -111,7 +185,7 @@ namespace CRT
         // ###########################################################################################
         private static void LoadMainExcel()
         {
-            var excelPath = Path.Combine(_dataRoot, MainExcelFileName);
+            var excelPath = Path.Combine(_dataRoot, AppConfig.MainExcelFileName);
 
             if (!File.Exists(excelPath))
             {

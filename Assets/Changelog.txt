@@ -1,4 +1,17 @@
 
+# 1.9.4
+-------
+* Changed data sync at launch to fetch only Excel data files before UI (in splash) and all data updates after UI has loaded
+* Added checkbox "Check for new version at application launch" in "Configuration tab"
+* Added checkbox "Check for new or update data at application launch" in "Configuration tab"
+* Added save of:
+  - splitter positions
+  - window position
+  - monitor
+* Added categories multi-select
+* Added components multi-select
+* Added thumbnail header
+
 # 1.9.3
 -------
 * Added code signing for Windows installer
@@ -12,7 +25,7 @@
 
 # 1.9.1
 -------
-* Update moved from "About" tab to dismisable panel.
-* Added version number to logfile.
-* Dumping commandline parameter(s) to logfile.
-* Added initial data package (~500MB).
+* Update moved from "About" tab to dismisable panel
+* Added version number to logfile
+* Dumping commandline parameter(s) to logfile
+* Added initial data package (~500MB)

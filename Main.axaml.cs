@@ -21,13 +21,9 @@ namespace CRT
     {
         // Zoom
         private Matrix _schematicsMatrix = Matrix.Identity;
-        private const double SchematicsZoomFactor = 1.5;
-        private const double SchematicsMinZoom = 0.9;
-        private const double SchematicsMaxZoom = 20.0;
 
         // Thumbnails
         private List<SchematicThumbnail> _currentThumbnails = [];
-        private const int ThumbnailMaxWidth = 800;
 
         // Full-res viewer
         private Bitmap? _currentFullResBitmap;
@@ -39,13 +35,74 @@ namespace CRT
         private Matrix _panStartMatrix;
 
         // Highlights
-        private const string DefaultRegion = "PAL";
         private Dictionary<string, HighlightSpatialIndex> _highlightIndexBySchematic = new(StringComparer.OrdinalIgnoreCase);
         private Dictionary<string, BoardSchematicEntry> _schematicByName = new(StringComparer.OrdinalIgnoreCase);
+
+        // Highlight rects per schematic per board label — built at board load, used for on-demand highlighting
+        private Dictionary<string, Dictionary<string, List<Rect>>> _highlightRectsBySchematicAndLabel = new(StringComparer.OrdinalIgnoreCase);
+
+        // Window placement: tracks the last known normal-state size and position
+        private double _restoreWidth;
+        private double _restoreHeight;
+        private PixelPoint _restorePosition;
+        private DispatcherTimer? _windowPlacementSaveTimer;
+
+        // Category filter: suppresses saves during programmatic selection changes
+        private bool _suppressCategoryFilterSave;
+
+        private BoardData? _currentBoardData;
+        private bool _suppressComponentHighlightUpdate;
 
         public Main()
         {
             InitializeComponent();
+
+            // Restore left panel width from settings
+            this.RootGrid.ColumnDefinitions[0].Width = new GridLength(UserSettings.LeftPanelWidth);
+            this.RootGrid.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
+
+            // Subscribe to splitter pointer-release to persist positions when a drag ends.
+            // handledEventsToo: true is required because GridSplitter marks the event as handled.
+            this.MainSplitter.AddHandler(
+                InputElement.PointerReleasedEvent,
+                this.OnMainSplitterPointerReleased,
+                RoutingStrategies.Bubble,
+                handledEventsToo: true);
+
+            this.SchematicsSplitter.AddHandler(
+                InputElement.PointerReleasedEvent,
+                this.OnSchematicsSplitterPointerReleased,
+                RoutingStrategies.Bubble,
+                handledEventsToo: true);
+
+            // Initialize restore values from settings, then apply window placement before Show()
+            // so Normal windows appear at the right place/size with zero flicker.
+            // Maximized windows are positioned on the saved screen before being maximized so the
+            // OS maximizes them on the correct monitor.
+            _restoreWidth = Math.Max(this.MinWidth, UserSettings.WindowWidth);
+            _restoreHeight = Math.Max(this.MinHeight, UserSettings.WindowHeight);
+            _restorePosition = new PixelPoint(UserSettings.WindowX, UserSettings.WindowY);
+
+            if (UserSettings.HasWindowPlacement)
+            {
+                this.WindowStartupLocation = WindowStartupLocation.Manual;
+                this.Width = _restoreWidth;
+                this.Height = _restoreHeight;
+
+                if (UserSettings.WindowState == nameof(Avalonia.Controls.WindowState.Maximized))
+                {
+                    // Place anywhere on the saved screen so the OS maximizes it there
+                    this.Position = new PixelPoint(UserSettings.WindowScreenX + 100, UserSettings.WindowScreenY + 100);
+                    this.WindowState = Avalonia.Controls.WindowState.Maximized;
+                }
+                else
+                {
+                    this.Position = _restorePosition;
+                }
+            }
+
+            this.Opened += this.OnWindowFirstOpened;
+            this.Closing += this.OnWindowClosing;
 
             // Align the visual transform origin with the top-left coordinate system used in ClampSchematicsMatrix
             this.SchematicsImage.RenderTransformOrigin = RelativePoint.TopLeft;
@@ -58,10 +115,19 @@ namespace CRT
                     this.ClampSchematicsMatrix();
             };
 
+            // Also clamp when the individual image object updates its logical dimensions
+            this.SchematicsImage.PropertyChanged += (s, e) =>
+            {
+                if (e.Property == Visual.BoundsProperty)
+                    this.ClampSchematicsMatrix();
+            };
+
             this.SubscribePanelSizeChanges();
             this.HardwareComboBox.SelectionChanged += this.OnHardwareSelectionChanged;
             this.BoardComboBox.SelectionChanged += this.OnBoardSelectionChanged;
             this.SchematicsThumbnailList.SelectionChanged += this.OnSchematicsThumbnailSelectionChanged;
+            this.CategoryFilterListBox.SelectionChanged += this.OnCategoryFilterSelectionChanged;
+            this.ComponentFilterListBox.SelectionChanged += this.OnComponentFilterSelectionChanged;
             this.PopulateHardwareDropDown();
 
             var version = Assembly.GetExecutingAssembly().GetName().Version;
@@ -77,10 +143,19 @@ namespace CRT
                 ? $"Commodore Repair Toolbox {versionString}"
                 : "Commodore Repair Toolbox";
 
-#if DEBUG
-            UpdateService.DebugSimulateUpdate = true;
-#endif
-            this.CheckForAppUpdate();
+            // Initialize configuration checkboxes — subscribe after setting initial values
+            // to avoid triggering redundant saves during startup
+            this.CheckVersionOnLaunchCheckBox.IsChecked = UserSettings.CheckVersionOnLaunch;
+            this.CheckDataOnLaunchCheckBox.IsChecked = UserSettings.CheckDataOnLaunch;
+            this.CheckVersionOnLaunchCheckBox.IsCheckedChanged += this.OnCheckVersionOnLaunchChanged;
+            this.CheckDataOnLaunchCheckBox.IsCheckedChanged += this.OnCheckDataOnLaunchChanged;
+
+            if (UserSettings.CheckVersionOnLaunch)
+            {
+                this.CheckForAppUpdate();
+            }
+
+            this.StartBackgroundSyncAsync();
         }
 
         // ###########################################################################################
@@ -95,6 +170,49 @@ namespace CRT
                 this.UpdateBannerText.Text = $"Version {UpdateService.PendingVersion} is available";
                 this.UpdateBanner.IsVisible = true;
             }
+        }
+
+        // ###########################################################################################
+        // Shows the sync banner during background sync, then hides it automatically if nothing
+        // changed, or keeps it visible with a summary if files were updated.
+        // ###########################################################################################
+        private async void StartBackgroundSyncAsync()
+        {
+            if (!DataManager.HasPendingSync)
+                return;
+
+            this.SyncBannerText.Text = "Synching data with online source...";
+            this.SyncBanner.IsVisible = true;
+
+            int changed = await DataManager.SyncRemainingAsync(status =>
+                Dispatcher.UIThread.Post(() => this.SyncBannerText.Text = status));
+
+            if (changed > 0)
+            {
+                this.SyncBannerText.Text = changed == 1
+                    ? "1 file updated in the background"
+                    : $"{changed} files updated in the background";
+            }
+            else
+            {
+                this.SyncBanner.IsVisible = false;
+            }
+        }
+
+        // ###########################################################################################
+        // Dismisses the sync banner.
+        // ###########################################################################################
+        private void OnSyncBannerDismiss(object? sender, RoutedEventArgs e)
+        {
+            this.SyncBanner.IsVisible = false;
+        }
+
+        // ###########################################################################################
+        // Dismisses the sync banner when clicking anywhere on it.
+        // ###########################################################################################
+        private void OnSyncBannerPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            this.SyncBanner.IsVisible = false;
         }
 
         // ###########################################################################################
@@ -175,17 +293,30 @@ namespace CRT
 
         // ###########################################################################################
         // Handles board selection changes - loads board data and builds the thumbnail gallery.
-        // Also builds per-schematic highlight indices for fast viewport rendering.
+        // Also builds per-schematic, per-label highlight rect lookup for selection-driven rendering.
         // ###########################################################################################
         private async void OnBoardSelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
+            // Suppress category saves immediately — setting ItemsSource = null below fires
+            // SelectionChanged with an empty selection, which would overwrite the new board's
+            // saved categories before the restore logic has a chance to run.
+            this._suppressCategoryFilterSave = true;
+
             foreach (var thumb in this._currentThumbnails)
-                (thumb.ImageSource as IDisposable)?.Dispose();
+            {
+                if (!ReferenceEquals(thumb.ImageSource, thumb.BaseThumbnail))
+                    (thumb.ImageSource as IDisposable)?.Dispose();
+                (thumb.BaseThumbnail as IDisposable)?.Dispose();
+            }
             this._currentThumbnails = [];
             this.SchematicsThumbnailList.ItemsSource = null;
+            this.CategoryFilterListBox.ItemsSource = null;
+            this.ComponentFilterListBox.ItemsSource = null;
 
             this._highlightIndexBySchematic = new(StringComparer.OrdinalIgnoreCase);
             this._schematicByName = new(StringComparer.OrdinalIgnoreCase);
+            this._highlightRectsBySchematicAndLabel = new(StringComparer.OrdinalIgnoreCase);
+            this._currentBoardData = null;
 
             this.ResetSchematicsViewer();
 
@@ -206,10 +337,44 @@ namespace CRT
             if (boardData == null)
                 return;
 
-            // Build highlight indices (can be large)
-            var indices = await Task.Run(() => CreateHighlightIndices(boardData, DefaultRegion));
-            this._highlightIndexBySchematic = indices.HighlightIndexBySchematic;
-            this._schematicByName = indices.SchematicByName;
+            this._currentBoardData = boardData;
+
+            // Populate category filter in insertion order
+            var categories = BuildDistinctCategories(boardData);
+            var boardKey = this.GetCurrentBoardKey();
+
+            this.CategoryFilterListBox.ItemsSource = categories;
+
+            var savedCategories = UserSettings.GetSelectedCategories(boardKey);
+            if (savedCategories == null)
+            {
+                // No saved selection yet — default: select all
+                this.CategoryFilterListBox.SelectAll();
+            }
+            else
+            {
+                // Restore the previously saved per-board selection
+                for (int i = 0; i < categories.Count; i++)
+                {
+                    if (savedCategories.Contains(categories[i], StringComparer.OrdinalIgnoreCase))
+                        this.CategoryFilterListBox.Selection.Select(i);
+                }
+            }
+            this._suppressCategoryFilterSave = false;
+
+            // Populate component filter for this board, filtered by the active region and categories
+            var activeCategories = new HashSet<string>(
+                this.CategoryFilterListBox.SelectedItems?.Cast<string>() ?? [],
+                StringComparer.OrdinalIgnoreCase);
+            var componentItems = BuildComponentItems(boardData, AppConfig.DefaultRegion, activeCategories);
+            this.ComponentFilterListBox.ItemsSource = componentItems;
+
+            // Build per-schematic, per-label highlight rects for selection-driven highlighting
+            this._highlightRectsBySchematicAndLabel = await Task.Run(() => BuildHighlightRects(boardData, AppConfig.DefaultRegion));
+            this._schematicByName = boardData.Schematics
+                .Where(s => !string.IsNullOrWhiteSpace(s.SchematicName))
+                .ToDictionary(s => s.SchematicName, s => s, StringComparer.OrdinalIgnoreCase);
+            this._highlightIndexBySchematic = new(StringComparer.OrdinalIgnoreCase);
 
             // Load full-resolution bitmaps on a background thread
             var loaded = await Task.Run(() =>
@@ -237,25 +402,18 @@ namespace CRT
                 return result;
             });
 
-            // Pre-scale to thumbnail size on UI thread, then release full-resolution originals
+            // Pre-scale to base thumbnails (no highlights) on the UI thread, then release full-resolution originals
             var thumbnails = new List<SchematicThumbnail>();
 
             foreach (var (name, fullPath, fullBitmap) in loaded)
             {
-                IImage? thumbnailImage = null;
+                RenderTargetBitmap? baseThumbnail = null;
+                PixelSize originalPixelSize = default;
 
                 if (fullBitmap != null)
                 {
-                    if (this._highlightIndexBySchematic.TryGetValue(name, out var index) &&
-                        this._schematicByName.TryGetValue(name, out var schematic))
-                    {
-                        thumbnailImage = CreateScaledThumbnailWithHighlights(fullBitmap, ThumbnailMaxWidth, index, schematic);
-                    }
-                    else
-                    {
-                        thumbnailImage = CreateScaledThumbnail(fullBitmap, ThumbnailMaxWidth);
-                    }
-
+                    baseThumbnail = CreateScaledThumbnail(fullBitmap, AppConfig.ThumbnailMaxWidth);
+                    originalPixelSize = fullBitmap.PixelSize;
                     fullBitmap.Dispose();
                 }
 
@@ -263,7 +421,9 @@ namespace CRT
                 {
                     Name = name,
                     ImageFilePath = fullPath,
-                    ImageSource = thumbnailImage
+                    BaseThumbnail = baseThumbnail,
+                    OriginalPixelSize = originalPixelSize,
+                    ImageSource = baseThumbnail
                 });
             }
 
@@ -272,6 +432,11 @@ namespace CRT
 
             if (thumbnails.Count > 0)
                 this.SchematicsThumbnailList.SelectedIndex = 0;
+
+            // Restore schematics splitter ratio saved for this specific board
+            var ratio = UserSettings.GetSchematicsSplitterRatio(boardKey);
+            this.SchematicsInnerGrid.ColumnDefinitions[0].Width = new GridLength(ratio * 100.0, GridUnitType.Star);
+            this.SchematicsInnerGrid.ColumnDefinitions[2].Width = new GridLength((1.0 - ratio) * 100.0, GridUnitType.Star);
         }
 
         // ###########################################################################################
@@ -320,18 +485,27 @@ namespace CRT
             this._currentFullResBitmap = bitmap;
             this.SchematicsImage.Source = bitmap;
 
-            if (bitmap != null &&
-                this._highlightIndexBySchematic.TryGetValue(selected.Name, out var index) &&
-                this._schematicByName.TryGetValue(selected.Name, out var schematic))
+            if (bitmap != null)
             {
-                this.SchematicsHighlightsOverlay.HighlightIndex = index;
+                // Always set BitmapPixelSize so the overlay can render as soon as a component is selected,
+                // even if no highlight index exists yet at the time this schematic loads.
                 this.SchematicsHighlightsOverlay.BitmapPixelSize = bitmap.PixelSize;
-                this.SchematicsHighlightsOverlay.HighlightColor = ParseColorOrDefault(schematic.MainImageHighlightColor, Colors.IndianRed);
-                this.SchematicsHighlightsOverlay.HighlightOpacity = ParseOpacityOrDefault(schematic.MainHighlightOpacity, 0.20);
+
+                if (this._highlightIndexBySchematic.TryGetValue(selected.Name, out var index) &&
+                    this._schematicByName.TryGetValue(selected.Name, out var schematic))
+                {
+                    this.SchematicsHighlightsOverlay.HighlightIndex = index;
+                    this.SchematicsHighlightsOverlay.HighlightColor = ParseColorOrDefault(schematic.MainImageHighlightColor, Colors.IndianRed);
+                    this.SchematicsHighlightsOverlay.HighlightOpacity = ParseOpacityOrDefault(schematic.MainHighlightOpacity, 0.20);
+                }
             }
 
             this.SchematicsHighlightsOverlay.ViewMatrix = this._schematicsMatrix;
             this.SchematicsHighlightsOverlay.InvalidateVisual();
+
+            // Defer a clamp call so the engine can measure and center the new image layout 
+            // immediately instead of waiting for a window resize or banner collapse.
+            Dispatcher.UIThread.Post(() => this.ClampSchematicsMatrix());
         }
 
         // ###########################################################################################
@@ -477,19 +651,29 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Creates a pre-scaled thumbnail and bakes component highlight overlays into it.
+        // Composites highlight rectangles onto a base thumbnail and returns the new rendered bitmap.
         // ###########################################################################################
-        private static RenderTargetBitmap CreateScaledThumbnailWithHighlights(Bitmap source, int maxWidth, HighlightSpatialIndex index, BoardSchematicEntry schematic)
+        private static RenderTargetBitmap CreateHighlightedThumbnail(
+            IImage baseThumbnail, PixelSize originalPixelSize,
+            HighlightSpatialIndex index, BoardSchematicEntry schematic)
         {
-            double scale = Math.Min(1.0, (double)maxWidth / source.PixelSize.Width);
-            int tw = Math.Max(1, (int)(source.PixelSize.Width * scale));
-            int th = Math.Max(1, (int)(source.PixelSize.Height * scale));
+            int tw = 1, th = 1;
+            if (baseThumbnail is RenderTargetBitmap rtb)
+            {
+                tw = rtb.PixelSize.Width;
+                th = rtb.PixelSize.Height;
+            }
+            else if (baseThumbnail is Bitmap bmp)
+            {
+                tw = bmp.PixelSize.Width;
+                th = bmp.PixelSize.Height;
+            }
 
             var root = new Grid();
 
             var image = new Image
             {
-                Source = source,
+                Source = baseThumbnail,
                 Stretch = Stretch.Uniform,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
                 VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
@@ -498,7 +682,7 @@ namespace CRT
             var overlay = new SchematicHighlightsOverlay
             {
                 HighlightIndex = index,
-                BitmapPixelSize = source.PixelSize,
+                BitmapPixelSize = originalPixelSize,
                 ViewMatrix = Matrix.Identity,
                 HighlightColor = ParseColorOrDefault(schematic.ThumbnailImageHighlightColor, Colors.IndianRed),
                 HighlightOpacity = ParseOpacityOrDefault(schematic.ThumbnailHighlightOpacity, 0.20),
@@ -511,9 +695,9 @@ namespace CRT
             root.Measure(new Size(tw, th));
             root.Arrange(new Rect(0, 0, tw, th));
 
-            var rtb = new RenderTargetBitmap(new PixelSize(tw, th), new Vector(96, 96));
-            rtb.Render(root);
-            return rtb;
+            var result = new RenderTargetBitmap(new PixelSize(tw, th), new Vector(96, 96));
+            result.Render(root);
+            return result;
         }
 
         // ###########################################################################################
@@ -530,14 +714,14 @@ namespace CRT
         private void OnSchematicsZoom(object? sender, PointerWheelEventArgs e)
         {
             var pos = e.GetPosition(this.SchematicsImage);
-            double delta = e.Delta.Y > 0 ? SchematicsZoomFactor : 1.0 / SchematicsZoomFactor;
+            double delta = e.Delta.Y > 0 ? AppConfig.SchematicsZoomFactor : 1.0 / AppConfig.SchematicsZoomFactor;
 
             double newScale = this._schematicsMatrix.M11 * delta;
 
-            if (newScale > SchematicsMaxZoom)
+            if (newScale > AppConfig.SchematicsMaxZoom)
                 return;
 
-            if (newScale < SchematicsMinZoom)
+            if (newScale < AppConfig.SchematicsMinZoom)
             {
                 this._schematicsMatrix = Matrix.Identity;
                 ((MatrixTransform)this.SchematicsImage.RenderTransform!).Matrix = this._schematicsMatrix;
@@ -606,15 +790,11 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Creates per-schematic highlight indices, filtered by region (PAL or empty region).
+        // Builds per-schematic, per-board-label highlight rect lookup from the loaded board data,
+        // filtered by the active region. Used for on-demand highlighting when a component is selected.
         // ###########################################################################################
-        private static (Dictionary<string, HighlightSpatialIndex> HighlightIndexBySchematic, Dictionary<string, BoardSchematicEntry> SchematicByName)
-            CreateHighlightIndices(BoardData boardData, string region)
+        private static Dictionary<string, Dictionary<string, List<Rect>>> BuildHighlightRects(BoardData boardData, string region)
         {
-            var schematicByName = boardData.Schematics
-                .Where(s => !string.IsNullOrWhiteSpace(s.SchematicName))
-                .ToDictionary(s => s.SchematicName, s => s, StringComparer.OrdinalIgnoreCase);
-
             var componentRegionByLabel = boardData.Components
                 .Where(c => !string.IsNullOrWhiteSpace(c.BoardLabel))
                 .GroupBy(c => c.BoardLabel, StringComparer.OrdinalIgnoreCase)
@@ -631,7 +811,7 @@ namespace CRT
                 return string.Equals(r.Trim(), region, StringComparison.OrdinalIgnoreCase);
             }
 
-            var rectsBySchematic = new Dictionary<string, List<Rect>>(StringComparer.OrdinalIgnoreCase);
+            var result = new Dictionary<string, Dictionary<string, List<Rect>>>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var h in boardData.ComponentHighlights)
             {
@@ -650,25 +830,109 @@ namespace CRT
                 if (w <= 0 || hh <= 0)
                     continue;
 
-                if (!rectsBySchematic.TryGetValue(h.SchematicName, out var list))
+                if (!result.TryGetValue(h.SchematicName, out var byLabel))
                 {
-                    list = [];
-                    rectsBySchematic[h.SchematicName] = list;
+                    byLabel = new Dictionary<string, List<Rect>>(StringComparer.OrdinalIgnoreCase);
+                    result[h.SchematicName] = byLabel;
                 }
 
-                list.Add(new Rect(x, y, w, hh));
+                if (!byLabel.TryGetValue(h.BoardLabel, out var rects))
+                {
+                    rects = [];
+                    byLabel[h.BoardLabel] = rects;
+                }
+
+                rects.Add(new Rect(x, y, w, hh));
             }
 
-            var indexBySchematic = new Dictionary<string, HighlightSpatialIndex>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (schematicName, rects) in rectsBySchematic)
+            return result;
+        }
+
+        // ###########################################################################################
+        // Handles component selection changes and drives highlight updates in both the main viewer
+        // and all thumbnails.
+        // ###########################################################################################
+        private void OnComponentFilterSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (this._suppressComponentHighlightUpdate)
+                return;
+
+            var boardLabels = this.ComponentFilterListBox.SelectedItems?
+                .Cast<ComponentListItem>()
+                .Select(item => item.BoardLabel)
+                .Where(l => !string.IsNullOrEmpty(l))
+                .ToList() ?? [];
+
+            this.UpdateHighlightsForComponents(boardLabels);
+        }
+
+        /// ###########################################################################################
+        // Rebuilds highlight indices from the selected board labels, updates the main schematic
+        // viewer overlay, and regenerates or restores all thumbnails accordingly.
+        // ###########################################################################################
+        private void UpdateHighlightsForComponents(List<string> boardLabels)
+        {
+            // Rebuild per-schematic highlight indices containing only the selected board labels
+            this._highlightIndexBySchematic = new(StringComparer.OrdinalIgnoreCase);
+
+            if (boardLabels.Count > 0)
             {
-                if (rects.Count == 0)
+                foreach (var (schematicName, byLabel) in this._highlightRectsBySchematicAndLabel)
+                {
+                    var rects = new List<Rect>();
+                    foreach (var label in boardLabels)
+                    {
+                        if (byLabel.TryGetValue(label, out var labelRects))
+                            rects.AddRange(labelRects);
+                    }
+
+                    if (rects.Count > 0)
+                        this._highlightIndexBySchematic[schematicName] = new HighlightSpatialIndex(rects);
+                }
+            }
+
+            // Update main viewer overlay for the currently displayed schematic
+            var selectedThumb = this.SchematicsThumbnailList.SelectedItem as SchematicThumbnail;
+            if (selectedThumb != null &&
+                this._highlightIndexBySchematic.TryGetValue(selectedThumb.Name, out var mainIndex) &&
+                this._schematicByName.TryGetValue(selectedThumb.Name, out var mainSchematic))
+            {
+                this.SchematicsHighlightsOverlay.HighlightIndex = mainIndex;
+                this.SchematicsHighlightsOverlay.BitmapPixelSize = this._currentFullResBitmap?.PixelSize ?? new PixelSize(0, 0);
+                this.SchematicsHighlightsOverlay.HighlightColor = ParseColorOrDefault(mainSchematic.MainImageHighlightColor, Colors.IndianRed);
+                this.SchematicsHighlightsOverlay.HighlightOpacity = ParseOpacityOrDefault(mainSchematic.MainHighlightOpacity, 0.20);
+            }
+            else
+            {
+                this.SchematicsHighlightsOverlay.HighlightIndex = null;
+            }
+            this.SchematicsHighlightsOverlay.InvalidateVisual();
+
+            // Regenerate thumbnails that have matching highlights; restore others to base
+            foreach (var thumb in this._currentThumbnails)
+            {
+                if (thumb.BaseThumbnail == null)
                     continue;
 
-                indexBySchematic[schematicName] = new HighlightSpatialIndex(rects);
+                if (this._highlightIndexBySchematic.TryGetValue(thumb.Name, out var thumbIndex) &&
+                    this._schematicByName.TryGetValue(thumb.Name, out var thumbSchematic))
+                {
+                    var highlighted = CreateHighlightedThumbnail(thumb.BaseThumbnail, thumb.OriginalPixelSize, thumbIndex, thumbSchematic);
+                    var old = thumb.ImageSource;
+                    thumb.ImageSource = highlighted;
+                    if (!ReferenceEquals(old, thumb.BaseThumbnail))
+                        (old as IDisposable)?.Dispose();
+                }
+                else
+                {
+                    if (!ReferenceEquals(thumb.ImageSource, thumb.BaseThumbnail))
+                    {
+                        var old = thumb.ImageSource;
+                        thumb.ImageSource = thumb.BaseThumbnail;
+                        (old as IDisposable)?.Dispose();
+                    }
+                }
             }
-
-            return (indexBySchematic, schematicByName);
         }
 
         // ###########################################################################################
@@ -702,5 +966,358 @@ namespace CRT
 
             return Math.Clamp(v, 0.0, 1.0);
         }
+
+        // ###########################################################################################
+        // Persists the "Check for new version at launch" preference when the checkbox is toggled.
+        // ###########################################################################################
+        private void OnCheckVersionOnLaunchChanged(object? sender, RoutedEventArgs e)
+        {
+            UserSettings.CheckVersionOnLaunch = this.CheckVersionOnLaunchCheckBox.IsChecked == true;
+        }
+
+        // ###########################################################################################
+        // Persists the "Check for new or updated data at launch" preference when the checkbox is toggled.
+        // ###########################################################################################
+        private void OnCheckDataOnLaunchChanged(object? sender, RoutedEventArgs e)
+        {
+            UserSettings.CheckDataOnLaunch = this.CheckDataOnLaunchCheckBox.IsChecked == true;
+        }
+
+        // ###########################################################################################
+        // Saves the selected category list for the current board whenever the user changes it.
+        // Skipped during programmatic population to avoid overwriting a valid saved state.
+        // ###########################################################################################
+        private void OnCategoryFilterSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (this._suppressCategoryFilterSave)
+                return;
+
+            var boardKey = this.GetCurrentBoardKey();
+            if (string.IsNullOrEmpty(boardKey))
+                return;
+
+            var selected = this.CategoryFilterListBox.SelectedItems?
+                .Cast<string>()
+                .ToList() ?? [];
+
+            UserSettings.SetSelectedCategories(boardKey, selected);
+
+            if (this._currentBoardData != null)
+            {
+                // Capture selected board labels before the list is rebuilt
+                var previouslySelectedLabels = new HashSet<string>(
+                    this.ComponentFilterListBox.SelectedItems?.Cast<ComponentListItem>()
+                        .Select(i => i.BoardLabel) ?? [],
+                    StringComparer.OrdinalIgnoreCase);
+
+                var categoryFilter = new HashSet<string>(selected, StringComparer.OrdinalIgnoreCase);
+                var componentItems = BuildComponentItems(this._currentBoardData, AppConfig.DefaultRegion, categoryFilter);
+
+                // Suppress highlight updates during ItemsSource replacement and re-selection
+                this._suppressComponentHighlightUpdate = true;
+                this.ComponentFilterListBox.ItemsSource = componentItems;
+
+                // Re-select items that were selected before and are still present in the new list
+                for (int i = 0; i < componentItems.Count; i++)
+                {
+                    if (previouslySelectedLabels.Contains(componentItems[i].BoardLabel))
+                        this.ComponentFilterListBox.Selection.Select(i);
+                }
+                this._suppressComponentHighlightUpdate = false;
+
+                // Drive a single highlight update with only the surviving selected labels
+                var survivingLabels = componentItems
+                    .Where(item => previouslySelectedLabels.Contains(item.BoardLabel))
+                    .Select(item => item.BoardLabel)
+                    .Where(l => !string.IsNullOrEmpty(l))
+                    .ToList();
+
+                this.UpdateHighlightsForComponents(survivingLabels);
+            }
+        }
+
+        // ###########################################################################################
+        // Returns a composite key uniquely identifying the current hardware and board selection.
+        // Used to store and retrieve per-board settings such as the schematics splitter position.
+        // ###########################################################################################
+        private string GetCurrentBoardKey()
+        {
+            var hw = this.HardwareComboBox.SelectedItem as string;
+            var board = this.BoardComboBox.SelectedItem as string;
+            if (string.IsNullOrEmpty(hw) || string.IsNullOrEmpty(board))
+            {
+                return string.Empty;
+            }
+            return $"{hw}|{board}";
+        }
+
+        // ###########################################################################################
+        // Saves the left panel width after the main splitter drag ends.
+        // Deferred via Post to ensure Bounds reflects the completed layout pass.
+        // ###########################################################################################
+        private void OnMainSplitterPointerReleased(object? sender, PointerReleasedEventArgs e)
+        {
+            Dispatcher.UIThread.Post(() => UserSettings.LeftPanelWidth = this.LeftPanel.Bounds.Width);
+        }
+
+        // ###########################################################################################
+        // Saves the schematics/thumbnail split ratio for the current board after the drag ends.
+        // Deferred via Post to ensure Bounds reflects the completed layout pass.
+        // ###########################################################################################
+        private void OnSchematicsSplitterPointerReleased(object? sender, PointerReleasedEventArgs e)
+        {
+            var boardKey = this.GetCurrentBoardKey();
+            if (string.IsNullOrEmpty(boardKey))
+            {
+                return;
+            }
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                var leftWidth = this.SchematicsContainer.Bounds.Width;
+                var rightWidth = this.SchematicsThumbnailList.Bounds.Width;
+                var total = leftWidth + rightWidth;
+                if (total <= 0)
+                {
+                    return;
+                }
+                UserSettings.SetSchematicsSplitterRatio(boardKey, leftWidth / total);
+            });
+        }
+
+        // ###########################################################################################
+        // On first open: validates the saved position is on a live screen (corrects to primary
+        // if the monitor was disconnected), then subscribes to size, position, and state tracking.
+        // ###########################################################################################
+        private void OnWindowFirstOpened(object? sender, EventArgs e)
+        {
+            this.Opened -= this.OnWindowFirstOpened;
+
+            if (UserSettings.HasWindowPlacement && this.WindowState == Avalonia.Controls.WindowState.Normal)
+            {
+                bool isOnScreen = this.Screens.All.Any(s =>
+                    _restorePosition.X >= s.Bounds.X &&
+                    _restorePosition.Y >= s.Bounds.Y &&
+                    _restorePosition.X < s.Bounds.X + s.Bounds.Width &&
+                    _restorePosition.Y < s.Bounds.Y + s.Bounds.Height);
+
+                if (!isOnScreen)
+                {
+                    var primary = this.Screens.Primary;
+                    if (primary != null)
+                    {
+                        this.Position = new PixelPoint(
+                            primary.Bounds.X + Math.Max(0, (primary.Bounds.Width - (int)this.Width) / 2),
+                            primary.Bounds.Y + Math.Max(0, (primary.Bounds.Height - (int)this.Height) / 2));
+                    }
+                }
+            }
+
+            // Save when the window is maximized, restored, or moved to another screen
+            this.PropertyChanged += (s, args) =>
+            {
+                if (args.Property == Window.WindowStateProperty)
+                {
+                    this.ScheduleWindowPlacementSave();
+                }
+            };
+
+            this.PositionChanged += this.OnWindowPositionChanged;
+            this.SizeChanged += this.OnWindowSizeChanged;
+        }
+
+        // ###########################################################################################
+        // Tracks the window's position in Normal state and schedules a debounced save.
+        // ###########################################################################################
+        private void OnWindowPositionChanged(object? sender, PixelPointEventArgs e)
+        {
+            if (this.WindowState == Avalonia.Controls.WindowState.Normal)
+            {
+                _restorePosition = e.Point;
+                this.ScheduleWindowPlacementSave();
+            }
+        }
+
+        // ###########################################################################################
+        // Tracks the window's size in Normal state and schedules a debounced save.
+        // ###########################################################################################
+        private void OnWindowSizeChanged(object? sender, SizeChangedEventArgs e)
+        {
+            if (this.WindowState == Avalonia.Controls.WindowState.Normal)
+            {
+                _restoreWidth = e.NewSize.Width;
+                _restoreHeight = e.NewSize.Height;
+                this.ScheduleWindowPlacementSave();
+            }
+        }
+
+        // ###########################################################################################
+        // Resets and starts a 500 ms debounce timer; saves only after the window has been
+        // idle for that period, avoiding a write on every pixel during resize or move.
+        // ###########################################################################################
+        private void ScheduleWindowPlacementSave()
+        {
+            if (_windowPlacementSaveTimer == null)
+            {
+                _windowPlacementSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+                _windowPlacementSaveTimer.Tick += (s, e) =>
+                {
+                    _windowPlacementSaveTimer.Stop();
+                    this.CommitWindowPlacement();
+                };
+            }
+
+            _windowPlacementSaveTimer.Stop();
+            _windowPlacementSaveTimer.Start();
+        }
+
+        // ###########################################################################################
+        // Captures the current window state and screen, then persists to settings.
+        // Called by the debounce timer and directly on close.
+        // ###########################################################################################
+        private void CommitWindowPlacement()
+        {
+            var state = this.WindowState == Avalonia.Controls.WindowState.Minimized
+                ? Avalonia.Controls.WindowState.Normal
+                : this.WindowState;
+
+            var screen = this.Screens.All.FirstOrDefault(s =>
+                this.Position.X >= s.Bounds.X &&
+                this.Position.Y >= s.Bounds.Y &&
+                this.Position.X < s.Bounds.X + s.Bounds.Width &&
+                this.Position.Y < s.Bounds.Y + s.Bounds.Height)
+                ?? this.Screens.Primary;
+
+            UserSettings.SaveWindowPlacement(
+                state.ToString(),
+                _restoreWidth,
+                _restoreHeight,
+                _restorePosition.X,
+                _restorePosition.Y,
+                screen?.Bounds.X ?? 0,
+                screen?.Bounds.Y ?? 0,
+                screen?.Bounds.Width ?? 1920,
+                screen?.Bounds.Height ?? 1080,
+                screen?.Scaling ?? 1.0);
+        }
+
+        // ###########################################################################################
+        // Stops any pending debounce timer and does a final synchronous save on close.
+        // ###########################################################################################
+        private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
+        {
+            _windowPlacementSaveTimer?.Stop();
+            this.CommitWindowPlacement();
+        }
+
+        // ###########################################################################################
+        // Builds a distinct list of component categories in the order they first appear.
+        // ###########################################################################################
+        private static List<string> BuildDistinctCategories(BoardData boardData)
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var categories = new List<string>();
+
+            foreach (var component in boardData.Components)
+            {
+                if (!string.IsNullOrWhiteSpace(component.Category) && seen.Add(component.Category))
+                    categories.Add(component.Category);
+            }
+
+            return categories;
+        }
+
+        // ###########################################################################################
+        // Builds component list items filtered by the given region.
+        // Each item carries the board label for highlight lookups and a display text assembled
+        // from the non-empty parts: BoardLabel | FriendlyName | TechnicalNameOrValue.
+        // Components with an empty Region column are always included regardless of the active region.
+        // ###########################################################################################
+        private static List<ComponentListItem> BuildComponentItems(BoardData boardData, string region)
+        {
+            var items = new List<ComponentListItem>();
+
+            foreach (var component in boardData.Components)
+            {
+                var componentRegion = component.Region?.Trim() ?? string.Empty;
+
+                if (!string.IsNullOrEmpty(componentRegion) &&
+                    !string.Equals(componentRegion, region, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var parts = new List<string>(3);
+                if (!string.IsNullOrWhiteSpace(component.BoardLabel))
+                    parts.Add(component.BoardLabel.Trim());
+                if (!string.IsNullOrWhiteSpace(component.FriendlyName))
+                    parts.Add(component.FriendlyName.Trim());
+                if (!string.IsNullOrWhiteSpace(component.TechnicalNameOrValue))
+                    parts.Add(component.TechnicalNameOrValue.Trim());
+
+                if (parts.Count == 0)
+                    continue;
+
+                items.Add(new ComponentListItem
+                {
+                    BoardLabel = component.BoardLabel?.Trim() ?? string.Empty,
+                    DisplayText = string.Join(" | ", parts)
+                });
+            }
+
+            return items;
+        }
+
+        // ###########################################################################################
+        // Lightweight view model for a component list item — carries the board label for
+        // highlight lookups alongside the display text shown in the UI.
+        // ###########################################################################################
+        private sealed class ComponentListItem
+        {
+            public string DisplayText { get; init; } = string.Empty;
+            public string BoardLabel { get; init; } = string.Empty;
+            public override string ToString() => this.DisplayText;
+        }
+
+        // ###########################################################################################
+        // Builds component list items filtered by the given region.
+        // Each item carries the board label for highlight lookups and a display text assembled
+        // from the non-empty parts: BoardLabel | FriendlyName | TechnicalNameOrValue.
+        // Components with an empty Region column are always included regardless of the active region.
+        // ###########################################################################################
+        private static List<ComponentListItem> BuildComponentItems(BoardData boardData, string region, HashSet<string>? categoryFilter = null)
+        {
+            var items = new List<ComponentListItem>();
+
+            foreach (var component in boardData.Components)
+            {
+                var componentRegion = component.Region?.Trim() ?? string.Empty;
+
+                if (!string.IsNullOrEmpty(componentRegion) &&
+                    !string.Equals(componentRegion, region, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (categoryFilter != null && !categoryFilter.Contains(component.Category ?? string.Empty))
+                    continue;
+
+                var parts = new List<string>(3);
+                if (!string.IsNullOrWhiteSpace(component.BoardLabel))
+                    parts.Add(component.BoardLabel.Trim());
+                if (!string.IsNullOrWhiteSpace(component.FriendlyName))
+                    parts.Add(component.FriendlyName.Trim());
+                if (!string.IsNullOrWhiteSpace(component.TechnicalNameOrValue))
+                    parts.Add(component.TechnicalNameOrValue.Trim());
+
+                if (parts.Count == 0)
+                    continue;
+
+                items.Add(new ComponentListItem
+                {
+                    BoardLabel = component.BoardLabel?.Trim() ?? string.Empty,
+                    DisplayText = string.Join(" | ", parts)
+                });
+            }
+
+            return items;
+        }
+
     }
 }

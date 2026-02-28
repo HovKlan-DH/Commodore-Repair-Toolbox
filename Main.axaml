@@ -6,8 +6,8 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="CRT.Main"
         Title="Commodore Repair Toolbox"
-        MinWidth="400"
-        MinHeight="300">
+        MinWidth="800"
+        MinHeight="500">
 
     <Window.Styles>
 
@@ -57,7 +57,7 @@
 
     </Window.Styles>
 
-    <Grid>
+    <Grid x:Name="RootGrid">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="200" MinWidth="80" />
             <ColumnDefinition Width="4" />
@@ -84,29 +84,140 @@
                            FontSize="11"
                            Foreground="Gray" />
 
-                <!-- Hardware and Board selectors -->
-                <StackPanel Grid.Row="1"
-                            Spacing="4"
-                            VerticalAlignment="Top"
-                            Margin="0,8,0,0">
-                    <TextBlock Text="Hardware"
+                <!-- Hardware, Board and Category selectors -->
+                <Grid Grid.Row="1"
+                      Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="Hardware"
                                FontSize="11"
                                Foreground="Gray" />
-                    <ComboBox x:Name="HardwareComboBox"
-                              HorizontalAlignment="Stretch" />
-                    <TextBlock Text="Board"
+                    <ComboBox Grid.Row="1"
+                              x:Name="HardwareComboBox"
+                              HorizontalAlignment="Stretch"
+                              Margin="0,4,0,0" />
+                    <TextBlock Grid.Row="2"
+                               Text="Board"
                                FontSize="11"
                                Foreground="Gray"
                                Margin="0,8,0,0" />
-                    <ComboBox x:Name="BoardComboBox"
-                              HorizontalAlignment="Stretch" />
-                </StackPanel>
+                    <ComboBox Grid.Row="3"
+                              x:Name="BoardComboBox"
+                              HorizontalAlignment="Stretch"
+                              Margin="0,4,0,0" />
+                    <TextBlock Grid.Row="4"
+                               Text="Category"
+                               FontSize="11"
+                               Foreground="Gray"
+                               Margin="0,8,0,0" />
+                    <ListBox Grid.Row="5"
+                             x:Name="CategoryFilterListBox"
+                             SelectionMode="Multiple,Toggle"
+                             Margin="0,4,0,0"
+                             Background="White"
+                             BorderBrush="Gray"
+                             BorderThickness="1"
+                             CornerRadius="4"
+                             ClipToBounds="True"
+                             Padding="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.Styles>
+                            <Style Selector="ListBox /template/ Border">
+                                <Setter Property="CornerRadius" Value="3" />
+                                <Setter Property="ClipToBounds" Value="True" />
+                            </Style>
+                            <Style Selector="ListBox /template/ ScrollViewer">
+                                <Setter Property="CornerRadius" Value="3" />
+                                <Setter Property="ClipToBounds" Value="True" />
+                            </Style>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="8,3" />
+                                <Setter Property="MinHeight" Value="0" />
+                                <Setter Property="FontSize" Value="11" />
+                            </Style>
+                            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                                <Setter Property="Background" Value="SkyBlue" />
+                            </Style>
+                            <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                                <Setter Property="Background" Value="LightBlue" />
+                            </Style>
+                            <Style Selector="ListBoxItem:selected">
+                                <Setter Property="Foreground" Value="White" />
+                            </Style>
+                            <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter">
+                                <Setter Property="Background" Value="SkyBlue" />
+                            </Style>
+                            <Style Selector="ListBoxItem:selected:pointerover">
+                                <Setter Property="Foreground" Value="White" />
+                            </Style>
+                        </ListBox.Styles>
+                    </ListBox>
+
+                    <TextBlock Grid.Row="6"
+                               Text="Component"
+                               FontSize="11"
+                               Foreground="Gray"
+                               Margin="0,8,0,0" />
+                    <ListBox Grid.Row="7"
+                             x:Name="ComponentFilterListBox"
+                             SelectionMode="Multiple,Toggle"
+                             Margin="0,4,0,0"
+                             Background="White"
+                             BorderBrush="Gray"
+                             BorderThickness="1"
+                             CornerRadius="4"
+                             ClipToBounds="True"
+                             Padding="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.Styles>
+                            <Style Selector="ListBox /template/ Border">
+                                <Setter Property="CornerRadius" Value="3" />
+                                <Setter Property="ClipToBounds" Value="True" />
+                            </Style>
+                            <Style Selector="ListBox /template/ ScrollViewer">
+                                <Setter Property="CornerRadius" Value="3" />
+                                <Setter Property="ClipToBounds" Value="True" />
+                            </Style>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="8,3" />
+                                <Setter Property="MinHeight" Value="0" />
+                                <Setter Property="FontSize" Value="11" />
+                            </Style>
+                            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                                <Setter Property="Background" Value="SkyBlue" />
+                            </Style>
+                            <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                                <Setter Property="Background" Value="LightBlue" />
+                            </Style>
+                            <Style Selector="ListBoxItem:selected">
+                                <Setter Property="Foreground" Value="White" />
+                            </Style>
+                            <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter">
+                                <Setter Property="Background" Value="SkyBlue" />
+                            </Style>
+                            <Style Selector="ListBoxItem:selected:pointerover">
+                                <Setter Property="Foreground" Value="White" />
+                            </Style>
+                        </ListBox.Styles>
+                    </ListBox>
+                </Grid>
 
             </Grid>
         </Border>
 
         <!-- Left Splitter -->
-        <GridSplitter Grid.Column="1"
+        <GridSplitter x:Name="MainSplitter"
+                      Grid.Column="1"
                       ResizeDirection="Columns"
                       HorizontalAlignment="Stretch"
                       Background="Gray" />
@@ -114,11 +225,12 @@
         <!-- Right Panel -->
         <Border x:Name="RightPanel"
                 Grid.Column="2"
-                BorderBrush="IndianRed"
+                BorderBrush="White"
                 BorderThickness="1"
-                Padding="16,0,16,16">
+                Padding="0,0,0,0">
             <Grid>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
@@ -167,10 +279,44 @@
                     </Grid>
                 </Border>
 
-                <TabControl Grid.Row="1">
+                <!-- Data sync notification banner -->
+                <Border x:Name="SyncBanner"
+                        Grid.Row="1"
+                        IsVisible="False"
+                        Background="#4C1515"
+                        CornerRadius="4"
+                        Margin="0,0,0,4"
+                        Padding="12,6"
+                        Cursor="Hand"
+                        PointerPressed="OnSyncBannerPointerPressed">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock x:Name="SyncBannerText"
+                                   Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Foreground="White"
+                                   FontSize="12" />
+
+                        <Button x:Name="SyncBannerDismissButton"
+                                Grid.Column="1"
+                                Classes="BannerDismissButton"
+                                Content="✕"
+                                Background="Transparent"
+                                Foreground="White"
+                                FontSize="11"
+                                Padding="6,3"
+                                Click="OnSyncBannerDismiss" />
+                    </Grid>
+                </Border>
+
+                <TabControl Grid.Row="2">
 
                     <TabItem Header="Schematics">
-                        <Grid>
+                        <Grid x:Name="SchematicsInnerGrid">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" MinWidth="80" />
                                 <ColumnDefinition Width="4" />
@@ -210,7 +356,8 @@
                             </Border>
 
                             <!-- Schematics Splitter -->
-                            <GridSplitter Grid.Column="1"
+                            <GridSplitter x:Name="SchematicsSplitter"
+                                          Grid.Column="1"
                                           ResizeDirection="Columns"
                                           HorizontalAlignment="Stretch"
                                           Background="Gray" />
@@ -254,12 +401,33 @@
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="local:SchematicThumbnail">
                                         <Border Classes="ThumbnailBorder"
-                                                Margin="4"
-                                                HorizontalAlignment="Stretch">
-                                            <Image Source="{Binding ImageSource}"
-                                                   Stretch="Uniform"
-                                                   HorizontalAlignment="Stretch"
-                                                   RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                Margin="4,4,8,4"
+                                                CornerRadius="0"
+                                                HorizontalAlignment="Stretch"
+                                                ClipToBounds="True">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="*" />
+                                                </Grid.RowDefinitions>
+                                                
+                                                <Border Grid.Row="0"
+                                                        Background="Khaki"
+                                                        BorderBrush="Black"
+                                                        BorderThickness="0,0,0,1">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               HorizontalAlignment="Stretch"
+                                                               TextAlignment="Left"
+                                                               FontSize="11"
+                                                               Padding="4,3" />
+                                                </Border>
+                                                
+                                                <Image Grid.Row="1"
+                                                       Source="{Binding ImageSource}"
+                                                       Stretch="Uniform"
+                                                       HorizontalAlignment="Stretch"
+                                                       RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                            </Grid>
                                         </Border>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
@@ -298,9 +466,23 @@
                     </TabItem>
 
                     <TabItem Header="Configuration">
-                        <TextBlock Text="Details content goes here"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
+                        <StackPanel Spacing="8"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Top"
+                                    Margin="16">
+
+                            <TextBlock Text="Application Launch"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,4" />
+
+                            <CheckBox x:Name="CheckVersionOnLaunchCheckBox"
+                                      Content="Check for new version at application launch" />
+
+                            <CheckBox x:Name="CheckDataOnLaunchCheckBox"
+                                      Content="Check for new or updated data at application launch" />
+
+                        </StackPanel>
                     </TabItem>
 
                     <TabItem Header="Feedback">
