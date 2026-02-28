@@ -283,7 +283,7 @@ jobs:
 
             **CRT2** is a new application built from scratch to natively support **Windows**, **Linux** and **macOS**. There will be many alpha-releases until the final version will be named **2.0.0**. Please support by giving your comments, if this works or not, and what needs improvement.
             
-            You only need to install the ALPHA application once, and thereafter you can update directly from inside the application.
+            You only need to install the CRT2 application once, and thereafter you can update directly from inside the application.
             
             > [!CAUTION]
             > **DO NOT DOWNLOAD IF YOU DO NOT KNOW WHAT THIS VERSION IS** - use stable version available in below release
