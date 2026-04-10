@@ -261,20 +261,23 @@ After a year with _CRT_ and due to several questions about "_is it Windows only_
 
 ## Screenshots
 
-Main schematics:
-<img width="902" height="555" alt="image" src="https://github.com/user-attachments/assets/ec67b241-2e08-46c8-ac27-21c17c795d1a" />
+Main schematics (with a component showing its direct connected traces):
+<img width="900" height="539" alt="image" src="https://github.com/user-attachments/assets/51bcb53c-976f-47c2-a07d-472c40804890" />
 
 Overview where a lot of component information is garthered:
-<img width="902" height="555" alt="image" src="https://github.com/user-attachments/assets/8db1fab6-55cc-45de-bfa0-3892f3145490" />
+<img width="900" height="539" alt="image" src="https://github.com/user-attachments/assets/4328b95c-b4ec-44e7-ae8c-4824b4023ae0" />
 
 Resources relevant to the hardware and board:
-<img width="902" height="555" alt="image" src="https://github.com/user-attachments/assets/bcb695c7-a7e3-414e-8ed0-cd7f43337ac4" />
+<img width="900" height="539" alt="image" src="https://github.com/user-attachments/assets/784a279b-9522-4602-b6c5-cd3fc253a564" />
+
+Oscilloscope configuration and test (it can auto-configure various settings per baseline image):
+<img width="900" height="539" alt="image" src="https://github.com/user-attachments/assets/469866cd-94e0-4140-9eef-129eb4ab3aad" />
 
 Configuration options:
-<img width="902" height="555" alt="image" src="https://github.com/user-attachments/assets/06f6a331-5d8a-4766-be01-ad9ee5be2d1a" />
+<img width="900" height="539" alt="image" src="https://github.com/user-attachments/assets/168830f8-1f35-450a-bd0f-153d33493f41" />
 
-Doing a few manual traces:
-<img width="902" height="727" alt="image" src="https://github.com/user-attachments/assets/8291d990-5a20-4c8b-a537-fc5075a3235c" />
+One specific image from the oscilloscope baseline:
+<img width="900" height="539" alt="image" src="https://github.com/user-attachments/assets/14632c12-2b88-4690-8cb8-fd20abb241ca" />
 
-Component information popup:
-<img width="902" height="580" alt="image" src="https://github.com/user-attachments/assets/ec811492-7c13-4542-bc80-a9479ba0d315" />
+Some images can also have detailed explanation:
+<img width="900" height="539" alt="image" src="https://github.com/user-attachments/assets/f0505e76-a7ce-4bb2-a854-1cccf06be372" />
