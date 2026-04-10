@@ -55,6 +55,7 @@ When a new version is released it will be shown to you in the application, and y
   - **250407** (long board)
     - Covers _all_ components
     - Oscilloscope baseline measurements for PAL and NTSC
+    - Interactive (KiCad) traces and netlists
   - **250425** (long board)
     - Covers _all_ components
     - Oscilloscope baseline measurements for PAL and NTSC
@@ -64,6 +65,7 @@ When a new version is released it will be shown to you in the application, and y
   - **250469** (short board)
     - Covers _all_ components
     - Oscilloscope baseline measurements for PAL and NTSC
+    - Interactive (KiCad) traces and netlists
 - **Commodore 128 and 128D** 
   - **310378** (C128 and C128D, plastic cabinet)
     - Covers _all_ components
