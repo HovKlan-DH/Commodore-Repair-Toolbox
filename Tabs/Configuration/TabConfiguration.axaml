@@ -36,7 +36,7 @@
 		<CheckBox x:Name="ShowDevelopmentVersionNotificationCheckBox"
                   Content="Allow notification for BETA versions" />
 
-		<TextBlock Text="Misc"
+		<TextBlock Text="Data contribution"
                    FontSize="12"
                    FontWeight="SemiBold"
                    Margin="0,16,0,4" />

@@ -1,10 +1,11 @@
-- Fixed it will not show "oscilloscope disconnected" at application launch, if not set to auto-connect
-- Added label editor in "Schematics" tab
-- Added YouTube video for showcasing label editor functionalities:
-  - [How to use component label editor in CRT](https://youtu.be/jmYrz2VB3ig)
-- Added more checks for the data validator
-- Changed "Contribute" tab:
-  - Added UUID per row in Excel data files
-  - Added "File location" drop-down
-  - Changed "File" does no longer include relative path
-- Refactored and mitigated some potential security risks
+- Added interactive KiCad traces and netlists for these boards:
+  - **Commodore 64**
+    - **250407 (long board)**
+    - **250469 (short board)**
+- Added YouTube video for showcasing interactive traces functionalities:
+  - [How to use interactive traces in CRT](https://youtu.be/Y55nC_gJbH4)
+- Added "Board settings" panel in "Schematics" tab
+- Added "Print component list" in "Overview" tab
+- Changed it will only show selected categories/components in "Overview" tab
+- Changed it now highlights the component when hovering mouse over it
+- Refactored parts of code for better performance

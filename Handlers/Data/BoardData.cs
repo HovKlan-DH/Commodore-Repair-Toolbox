@@ -6,11 +6,22 @@ namespace Handlers.DataHandling
     {
         public string UuidV4 { get; init; } = string.Empty;
         public string SchematicName { get; init; } = string.Empty;
+        public string CadName { get; init; } = string.Empty;
         public string SchematicImageFile { get; init; } = string.Empty;
         public string MainImageHighlightColor { get; init; } = string.Empty;
         public string MainHighlightOpacity { get; init; } = string.Empty;
         public string ThumbnailImageHighlightColor { get; init; } = string.Empty;
         public string ThumbnailHighlightOpacity { get; init; } = string.Empty;
+
+        public string KiCadP1WorldX { get; init; } = string.Empty;
+        public string KiCadP1WorldY { get; init; } = string.Empty;
+        public string KiCadP1ImageX { get; init; } = string.Empty;
+        public string KiCadP1ImageY { get; init; } = string.Empty;
+
+        public string KiCadP2WorldX { get; init; } = string.Empty;
+        public string KiCadP2WorldY { get; init; } = string.Empty;
+        public string KiCadP2ImageX { get; init; } = string.Empty;
+        public string KiCadP2ImageY { get; init; } = string.Empty;
     }
 
     public class ComponentEntry
@@ -97,19 +108,6 @@ namespace Handlers.DataHandling
     // ###########################################################################################
     public class BoardData
     {
-        /*
-        public List<BoardSchematicEntry> Schematics { get; init; } = [];
-        public List<ComponentEntry> Components { get; init; } = [];
-        public List<ComponentImageEntry> ComponentImages { get; init; } = [];
-        public List<ComponentHighlightEntry> ComponentHighlights { get; init; } = [];
-        public List<ComponentLocalFileEntry> ComponentLocalFiles { get; init; } = [];
-        public List<ComponentLinkEntry> ComponentLinks { get; init; } = [];
-        public List<BoardLocalFileEntry> BoardLocalFiles { get; init; } = [];
-        public List<BoardLinkEntry> BoardLinks { get; init; } = [];
-        public List<CreditEntry> Credits { get; init; } = [];
-        public bool IsLoaded { get; init; }
-        */
-        // Below is supporting .NET6
         public string RevisionDate { get; init; } = string.Empty;
         public List<BoardSchematicEntry> Schematics { get; init; } = new();
         public List<ComponentEntry> Components { get; init; } = new();

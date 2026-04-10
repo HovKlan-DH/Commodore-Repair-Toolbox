@@ -22,11 +22,20 @@ namespace Handlers.DataHandling
 
         // Board schematics columns
         private const string ColSchematicName = "Schematic name";
+        private const string ColCadName = "CAD name";
         private const string ColSchematicImageFile = "Schematic image file";
         private const string ColMainImageHighlightColor = "Main image highlight color";
         private const string ColMainHighlightOpacity = "Main highlight opacity";
         private const string ColThumbnailImageHighlightColor = "Thumbnail image highlight color";
         private const string ColThumbnailHighlightOpacity = "Thumbnail highlight opacity";
+        private const string ColKiCadP1WorldX = "CAD 1 Top X";
+        private const string ColKiCadP1WorldY = "CAD 1 Top Y";
+        private const string ColKiCadP1ImageX = "Image 1 Top X";
+        private const string ColKiCadP1ImageY = "Image 1 Top Y";
+        private const string ColKiCadP2WorldX = "CAD 2 Bottom X";
+        private const string ColKiCadP2WorldY = "CAD 2 Bottom Y";
+        private const string ColKiCadP2ImageX = "Image 2 Bottom X";
+        private const string ColKiCadP2ImageY = "Image 2 Bottom Y";
 
         // Shared columns (appear in multiple sheets)
         private const string ColUuidV4 = "UUID v4";
@@ -241,16 +250,30 @@ namespace Handlers.DataHandling
         private static string Val(Dictionary<string, string> row, string key)
             => row.TryGetValue(key, out var v) ? v : string.Empty;
 
+        // ###########################################################################################
+        // Maps board schematic rows including optional KiCad overlay calibration values.
+        // ###########################################################################################
         private static List<BoardSchematicEntry> MapSchematics(List<Dictionary<string, string>> rows)
             => rows.Select(r => new BoardSchematicEntry
             {
                 UuidV4 = Val(r, ColUuidV4),
                 SchematicName = Val(r, ColSchematicName),
+                CadName = Val(r, ColCadName),
                 SchematicImageFile = Val(r, ColSchematicImageFile),
                 MainImageHighlightColor = Val(r, ColMainImageHighlightColor),
                 MainHighlightOpacity = Val(r, ColMainHighlightOpacity),
                 ThumbnailImageHighlightColor = Val(r, ColThumbnailImageHighlightColor),
-                ThumbnailHighlightOpacity = Val(r, ColThumbnailHighlightOpacity)
+                ThumbnailHighlightOpacity = Val(r, ColThumbnailHighlightOpacity),
+
+                KiCadP1WorldX = Val(r, ColKiCadP1WorldX),
+                KiCadP1WorldY = Val(r, ColKiCadP1WorldY),
+                KiCadP1ImageX = Val(r, ColKiCadP1ImageX),
+                KiCadP1ImageY = Val(r, ColKiCadP1ImageY),
+
+                KiCadP2WorldX = Val(r, ColKiCadP2WorldX),
+                KiCadP2WorldY = Val(r, ColKiCadP2WorldY),
+                KiCadP2ImageX = Val(r, ColKiCadP2ImageX),
+                KiCadP2ImageY = Val(r, ColKiCadP2ImageY)
             }).ToList();
 
         private static List<ComponentEntry> MapComponents(List<Dictionary<string, string>> rows)

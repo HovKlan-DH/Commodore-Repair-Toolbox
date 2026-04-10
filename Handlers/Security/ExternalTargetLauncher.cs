@@ -9,24 +9,24 @@ namespace CRT
     public static class ExternalTargetLauncher
     {
         // ###########################################################################################
-        // Opens a validated external target. Only HTTP/HTTPS URLs are allowed, and local files must
-        // resolve inside the configured data-root boundary.
+        // Opens a validated external target. Allowed URI schemes are HTTP/HTTPS/mailto, and local
+        // files must resolve inside the configured data-root boundary.
         // ###########################################################################################
         public static bool TryOpen(string target, string? dataRootOverride = null)
         {
             if (string.IsNullOrWhiteSpace(target))
                 return false;
 
-            if (ExternalTargetLauncher.TryCreateAllowedWebUri(target, out Uri? webUri))
+            if (ExternalTargetLauncher.TryCreateAllowedUri(target, out Uri allowedUri))
             {
-                return ExternalTargetLauncher.TryStart(webUri.AbsoluteUri, $"URL [{webUri.AbsoluteUri}]");
+                return ExternalTargetLauncher.TryStart(allowedUri.AbsoluteUri, $"URI [{allowedUri.AbsoluteUri}]");
             }
 
             string dataRoot = !string.IsNullOrWhiteSpace(dataRootOverride)
                 ? dataRootOverride
                 : DataManager.DataRoot;
 
-            if (ExternalTargetLauncher.TryResolveDataRootScopedFilePath(target, dataRoot, out string? localPath))
+            if (ExternalTargetLauncher.TryResolveDataRootScopedFilePath(target, dataRoot, out string localPath))
             {
                 return ExternalTargetLauncher.TryStart(localPath, $"local file [{localPath}]");
             }
@@ -36,17 +36,18 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Validates that a target string is an allowed HTTP/HTTPS URL.
+        // Validates that a target string is an allowed absolute URI.
         // ###########################################################################################
-        private static bool TryCreateAllowedWebUri(string target, out Uri? uri)
+        private static bool TryCreateAllowedUri(string target, out Uri uri)
         {
-            uri = null;
+            uri = null!;
 
             if (!Uri.TryCreate(target.Trim(), UriKind.Absolute, out Uri? candidateUri))
                 return false;
 
             if (!string.Equals(candidateUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(candidateUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+                !string.Equals(candidateUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(candidateUri.Scheme, "mailto", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -59,9 +60,9 @@ namespace CRT
         // Resolves a local file path and rejects anything outside the configured data-root.
         // Relative paths are resolved against data-root; absolute paths must still stay inside it.
         // ###########################################################################################
-        private static bool TryResolveDataRootScopedFilePath(string target, string dataRoot, out string? localPath)
+        private static bool TryResolveDataRootScopedFilePath(string target, string dataRoot, out string localPath)
         {
-            localPath = null;
+            localPath = string.Empty;
 
             if (string.IsNullOrWhiteSpace(dataRoot) || string.IsNullOrWhiteSpace(target))
                 return false;

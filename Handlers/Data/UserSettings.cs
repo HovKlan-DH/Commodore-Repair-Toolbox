@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security;
+using System.Security.Cryptography.Xml;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -38,6 +40,10 @@ namespace Handlers.DataHandling
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? MultipleInstancesForComponentPopup { get; set; }
 
+        [JsonPropertyName("contributorMode")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? ContributorMode { get; set; }
+
         [JsonPropertyName("leftPanelWidth")] public double LeftPanelWidth { get; set; } = 200.0;
         [JsonPropertyName("schematicsSplitterRatios")] public Dictionary<string, double> SchematicsSplitterRatios { get; set; } = new();
         [JsonPropertyName("selectedCategoriesByBoard")] public Dictionary<string, List<string>> SelectedCategoriesByBoard { get; set; } = new();
@@ -69,6 +75,7 @@ namespace Handlers.DataHandling
         [JsonPropertyName("schematicsLabelFriendly")] public bool SchematicsLabelFriendly { get; set; } = false;
         [JsonPropertyName("schematicsLabelSelectedOnly")] public bool SchematicsLabelSelectedOnly { get; set; } = false;
         [JsonPropertyName("schematicsLabelsPanelExpanded")] public bool SchematicsLabelsPanelExpanded { get; set; } = true;
+        [JsonPropertyName("schematicsBoardSettingsPanelExpanded")] public bool SchematicsBoardSettingsPanelExpanded { get; set; } = true;
         [JsonPropertyName("blinkSelected")] public bool BlinkSelected { get; set; } = false;
         [JsonPropertyName("schematicsOrderByBoard")] public Dictionary<string, List<string>> SchematicsOrderByBoard { get; set; } = new();
         [JsonPropertyName("contactEmail")] public string ContactEmail { get; set; } = string.Empty;
@@ -81,6 +88,8 @@ namespace Handlers.DataHandling
         [JsonPropertyName("componentInfoKeyboardHandling")] public string ComponentInfoKeyboardHandling { get; set; } = "Control oscilloscope";
         [JsonPropertyName("oscilloscopeImageFolder")] public string OscilloscopeImageFolder { get; set; } = string.Empty;
         [JsonPropertyName("oscilloscopeSyncEnabled")] public bool? ComponentInfoOscilloscopeSyncEnabled { get; set; }
+        [JsonPropertyName("schematicsHoverHighlightsTracesByBoard")] public Dictionary<string, bool> SchematicsHoverHighlightsTracesByBoard { get; set; } = new();
+        [JsonPropertyName("contributorModeByBoard")] public Dictionary<string, bool> ContributorModeByBoard { get; set; } = new();
     }
 
     // ###########################################################################################
@@ -181,6 +190,17 @@ namespace Handlers.DataHandling
             }
         }
 
+        public static bool ContributorMode
+        {
+            get => _data.ContributorMode ?? false;
+            set
+            {
+                _data.ContributorMode = value;
+                Logger.Info($"Setting changed: [ContributorMode] [{value}]");
+                Save();
+            }
+        }
+
         public static double LeftPanelWidth
         {
             get => _data.LeftPanelWidth;
@@ -258,6 +278,12 @@ namespace Handlers.DataHandling
         {
             get => _data.SchematicsLabelsPanelExpanded;
             set { _data.SchematicsLabelsPanelExpanded = value; Save(); }
+        }
+
+        public static bool SchematicsBoardSettingsPanelExpanded
+        {
+            get => _data.SchematicsBoardSettingsPanelExpanded;
+            set { _data.SchematicsBoardSettingsPanelExpanded = value; Save(); }
         }
 
         public static bool BlinkSelected
@@ -436,9 +462,11 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [ComponentInfoKeyboardHandling] [{ComponentInfoKeyboardHandling}]");
                     Logger.Info($"        [ComponentInfoScrollAction] [{ComponentInfoScrollAction}]");
                     Logger.Info($"        [ContactEmail] [{(string.IsNullOrWhiteSpace(ContactEmail) ? "empty" : "set")}]");
+                    Logger.Info($"        [ContributorMode] [{ContributorMode}]");
                     Logger.Info($"        [LeftPanelWidth] [{_data.LeftPanelWidth:F1}]");
                     Logger.Info($"        [Region] [{Region}]");
                     Logger.Info($"        [SchematicsLabelsPanelExpanded] [{SchematicsLabelsPanelExpanded}]");
+                    Logger.Info($"        [SchematicsBoardSettingsPanelExpanded] [{SchematicsBoardSettingsPanelExpanded}]");
                     Logger.Info($"        [SchematicsLabelBoard] [{SchematicsLabelBoard}]");
                     Logger.Info($"        [SchematicsLabelTechnical] [{SchematicsLabelTechnical}]");
                     Logger.Info($"        [SchematicsLabelFriendly] [{SchematicsLabelFriendly}]");
@@ -449,6 +477,8 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [LastHardware] [{_data.LastHardware}]");
                     Logger.Info($"        [LastSchematicByBoard] [{_data.LastSchematicByBoard.Count} entries]");
                     Logger.Info($"        [SchematicsSplitterRatios] [{_data.SchematicsSplitterRatios.Count} entries]");
+                    Logger.Info($"        [SchematicsHoverHighlightsTracesByBoard] [{_data.SchematicsHoverHighlightsTracesByBoard.Count} entries]");
+                    Logger.Info($"        [ContributorModeByBoard] [{_data.ContributorModeByBoard.Count} entries]");
                     Logger.Info($"        [SelectedCategoriesByBoard] [{_data.SelectedCategoriesByBoard.Count} entries]");
                     Logger.Info($"        [OscilloscopeSeriesByVendor] [{_data.LastOscilloscopeSeriesByVendor.Count} entries]");
                     Logger.Info($"        [OscilloscopeVendor] [{_data.LastOscilloscopeVendor}]");
@@ -738,7 +768,59 @@ namespace Handlers.DataHandling
             }
         }
 
+        // ###########################################################################################
+        // Returns whether KiCad traces should auto-highlight on hover for the given board.
+        // Defaults to true so existing behavior is preserved unless explicitly changed.
+        // ###########################################################################################
+        public static bool GetSchematicsHoverHighlightsTracesForBoard(string boardKey)
+        {
+            if (string.IsNullOrWhiteSpace(boardKey))
+                return true;
 
+            return _data.SchematicsHoverHighlightsTracesByBoard.TryGetValue(boardKey, out var enabled)
+                ? enabled
+                : true;
+        }
+
+        // ###########################################################################################
+        // Persists whether KiCad traces should auto-highlight on hover for the given board.
+        // ###########################################################################################
+        public static void SetSchematicsHoverHighlightsTracesForBoard(string boardKey, bool enabled)
+        {
+            if (string.IsNullOrWhiteSpace(boardKey))
+                return;
+
+            _data.SchematicsHoverHighlightsTracesByBoard[boardKey] = enabled;
+            Logger.Info($"Setting changed: [SchematicsHoverHighlightsTraces] [{boardKey}] [{enabled}]");
+            Save();
+        }
+
+        // ###########################################################################################
+        // Returns whether contributor mode is enabled for the given board.
+        // Falls back to the legacy global setting when a board-specific value is not yet saved.
+        // ###########################################################################################
+        public static bool GetContributorModeForBoard(string boardKey)
+        {
+            if (string.IsNullOrWhiteSpace(boardKey))
+                return _data.ContributorMode ?? false;
+
+            return _data.ContributorModeByBoard.TryGetValue(boardKey, out var enabled)
+                ? enabled
+                : (_data.ContributorMode ?? false);
+        }
+
+        // ###########################################################################################
+        // Persists contributor mode for the given board.
+        // ###########################################################################################
+        public static void SetContributorModeForBoard(string boardKey, bool enabled)
+        {
+            if (string.IsNullOrWhiteSpace(boardKey))
+                return;
+
+            _data.ContributorModeByBoard[boardKey] = enabled;
+            Logger.Info($"Setting changed: [ContributorModeByBoard] [{boardKey}] [{enabled}]");
+            Save();
+        }
 
     }
 }

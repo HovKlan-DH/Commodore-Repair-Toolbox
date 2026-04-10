@@ -45,6 +45,14 @@
 				</Image>
 
 				<ts:SchematicHighlightsOverlay x:Name="SchematicsHighlightsOverlay"
+	  IsHitTestVisible="False"
+	  RenderTransformOrigin="0%,0%">
+					<ts:SchematicHighlightsOverlay.RenderTransform>
+						<MatrixTransform />
+					</ts:SchematicHighlightsOverlay.RenderTransform>
+				</ts:SchematicHighlightsOverlay>
+
+				<ts:SchematicHighlightsOverlay x:Name="SchematicsHoverHighlightsOverlay"
 					  IsHitTestVisible="False"
 					  RenderTransformOrigin="0%,0%">
 					<ts:SchematicHighlightsOverlay.RenderTransform>
@@ -74,6 +82,15 @@
 												IsHitTestVisible="False"
 												RenderTransformOrigin="0%,0%"
 												Background="Transparent">
+					<Canvas.RenderTransform>
+						<MatrixTransform />
+					</Canvas.RenderTransform>
+				</Canvas>
+
+				<Canvas x:Name="SchematicsKiCadOverlayCanvas"
+						IsHitTestVisible="False"
+						RenderTransformOrigin="0%,0%"
+						Background="Transparent">
 					<Canvas.RenderTransform>
 						<MatrixTransform />
 					</Canvas.RenderTransform>
@@ -110,77 +127,154 @@
 					</Border>
 				</StackPanel>
 
-				<Border x:Name="SchematicsHoverLabelBorder"
-					IsVisible="False"
-					IsHitTestVisible="False"
+				<StackPanel Orientation="Horizontal"
 					HorizontalAlignment="Left"
 					VerticalAlignment="Top"
 					Margin="10,44,0,0"
-					Background="{DynamicResource Schematics_ComponentHover_Bg}"
-					BorderBrush="{DynamicResource Schematics_ComponentHover_Border}"
-					BorderThickness="1"
-					CornerRadius="4"
-					Padding="8,4">
-					<TextBlock x:Name="SchematicsHoverLabelText"
-						FontSize="11"
-							   FontWeight="Bold"
-							   Foreground="{DynamicResource Schematics_ComponentHover_Fg}" />
-				</Border>
-
-				<!-- LABELS VISIBLE PANEL -->
-				<Border x:Name="LabelsPanel"
-														HorizontalAlignment="Left"
-														VerticalAlignment="Bottom"
-														Margin="10,0,0,10"
-														Background="{DynamicResource Schematics_Panels_Bg}"
-														BorderBrush="{DynamicResource Schematics_Panels_Border}"
-														BorderThickness="1"
-														CornerRadius="4"
-														Padding="8,8">
-					<StackPanel Spacing="6">
-						<StackPanel Orientation="Horizontal" Spacing="6">
-							<TextBlock Text="Labels visible"
-									   FontSize="11"
-									   VerticalAlignment="Center"
-									   FontWeight="Bold"
-									   Foreground="{DynamicResource Schematics_Panels_Fg}" />
-							<Button x:Name="ToggleLabelsPanelButton"
-									Content="Collapse"
-									FontSize="9"
-									Padding="6,2"
-									VerticalAlignment="Center" />
+					Spacing="6"
+					IsHitTestVisible="False">
+					<Border x:Name="SchematicsHoverLabelBorder"
+						IsVisible="False"
+						Background="{DynamicResource Schematics_ComponentHover_Bg}"
+						BorderBrush="{DynamicResource Schematics_ComponentHover_Border}"
+						BorderThickness="1"
+						CornerRadius="4"
+						Padding="8,4">
+						<TextBlock x:Name="SchematicsHoverLabelText"
+							FontSize="11"
+									FontWeight="Bold"
+									Foreground="{DynamicResource Schematics_ComponentHover_Fg}" />
+					</Border>
+					<Border x:Name="SchematicsHoverPadBorder"
+						IsVisible="False"
+						Background="{DynamicResource Schematics_ComponentHover_Bg}"
+						BorderBrush="{DynamicResource Schematics_ComponentHover_Border}"
+						BorderThickness="1"
+						CornerRadius="4"
+						Padding="8,4">
+						<StackPanel Orientation="Horizontal" Spacing="2">
+							<TextBlock Text="Pin"
+								FontSize="11"
+								FontWeight="Normal"
+								Foreground="{DynamicResource Schematics_ComponentHover_Fg}" />
+							<TextBlock x:Name="SchematicsHoverPadText"
+								FontSize="11"
+								FontWeight="Bold"
+								Foreground="{DynamicResource Schematics_ComponentHover_Fg}" />
 						</StackPanel>
-						<StackPanel x:Name="LabelsListPanel" Spacing="4">
-							<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnLabelBoardRowClicked">
-								<Viewbox Width="20" Height="20" IsHitTestVisible="False">
-									<CheckBox x:Name="CheckLabelBoard" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="False" IsHitTestVisible="False" />
-								</Viewbox>
-								<TextBlock Text="Board label" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
+					</Border>
+				</StackPanel>
+
+				<!-- BOTTOM LEFT SETTINGS PANELS -->
+				<Grid HorizontalAlignment="Left"
+					  VerticalAlignment="Bottom"
+					  Margin="10,0,0,10"
+					  RowDefinitions="Auto"
+					  ColumnDefinitions="Auto,Auto"
+					  ColumnSpacing="8">
+
+					<!-- LABELS VISIBLE PANEL -->
+					<Border x:Name="LabelsPanel"
+							Grid.Row="0"
+							Grid.Column="0"
+							HorizontalAlignment="Left"
+							VerticalAlignment="Bottom"
+							Background="{DynamicResource Schematics_Panels_Bg}"
+							BorderBrush="{DynamicResource Schematics_Panels_Border}"
+							BorderThickness="1"
+							CornerRadius="4"
+							Padding="8,8">
+						<StackPanel Spacing="6">
+							<StackPanel Orientation="Horizontal" Spacing="6">
+								<TextBlock Text="Labels visible"
+										   FontSize="11"
+										   VerticalAlignment="Center"
+										   FontWeight="Bold"
+										   Foreground="{DynamicResource Schematics_Panels_Fg}" />
+								<Button x:Name="ToggleLabelsPanelButton"
+										Content="Collapse"
+										FontSize="9"
+										Padding="6,2"
+										VerticalAlignment="Center" />
 							</StackPanel>
 
-							<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnLabelTechnicalRowClicked">
-								<Viewbox Width="20" Height="20" IsHitTestVisible="False">
-									<CheckBox x:Name="CheckLabelTechnical" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="False" IsHitTestVisible="False" />
-								</Viewbox>
-								<TextBlock Text="Technical name" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
-							</StackPanel>
+							<StackPanel x:Name="LabelsListPanel" Spacing="4">
+								<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnLabelBoardRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckLabelBoard" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="False" IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Board label" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
+								</StackPanel>
 
-							<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnLabelFriendlyRowClicked">
-								<Viewbox Width="20" Height="20" IsHitTestVisible="False">
-									<CheckBox x:Name="CheckLabelFriendly" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="False" IsHitTestVisible="False" />
-								</Viewbox>
-								<TextBlock Text="Friendly name" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
-							</StackPanel>
+								<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnLabelTechnicalRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckLabelTechnical" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="False" IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Technical name" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
+								</StackPanel>
 
-							<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnLabelSelectedOnlyRowClicked">
-								<Viewbox Width="20" Height="20" IsHitTestVisible="False">
-									<CheckBox x:Name="CheckLabelSelectedOnly" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="False" IsHitTestVisible="False" />
-								</Viewbox>
-								<TextBlock Text="Selected components only" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
+								<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnLabelFriendlyRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckLabelFriendly" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="False" IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Friendly name" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnLabelSelectedOnlyRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckLabelSelectedOnly" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="False" IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Selected components only" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
+								</StackPanel>
 							</StackPanel>
 						</StackPanel>
-					</StackPanel>
-				</Border>
+					</Border>
+
+					<!-- BOARD SETTINGS PANEL -->
+					<Border x:Name="BoardSettingsPanel"
+							Grid.Row="0"
+							Grid.Column="1"
+							IsEnabled="False"
+							HorizontalAlignment="Left"
+							VerticalAlignment="Bottom"
+							Background="{DynamicResource Schematics_Panels_Bg}"
+							BorderBrush="{DynamicResource Schematics_Panels_Border}"
+							BorderThickness="1"
+							CornerRadius="4"
+							Padding="8,8">
+						<StackPanel Spacing="6">
+							<StackPanel Orientation="Horizontal" Spacing="6">
+								<TextBlock Text="Board settings"
+										   FontSize="11"
+										   VerticalAlignment="Center"
+										   FontWeight="Bold"
+										   Foreground="{DynamicResource Schematics_Panels_Fg}" />
+								<Button x:Name="ToggleBoardSettingsPanelButton"
+										Content="Collapse"
+										FontSize="9"
+										Padding="6,2"
+										VerticalAlignment="Center" />
+							</StackPanel>
+
+							<StackPanel x:Name="BoardSettingsListPanel" Spacing="4">
+								<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnBoardHoverHighlightsTracesRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckBoardHoverHighlightsTraces" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="True" IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Highlight traces on hover" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnBoardContributorModeRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckBoardContributorMode" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="False" IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Enable contributor mode" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
+								</StackPanel>
+							</StackPanel>
+						</StackPanel>
+					</Border>
+
+				</Grid>
 
 				<!-- DYNAMIC POLYLINE TRACES LIST PANEL -->
 				<Border x:Name="TracesPanel"
@@ -262,6 +356,63 @@
 								   VerticalAlignment="Center"
 								   Margin="2,0"/>
 					</StackPanel>
+				</Border>
+
+				<!-- KICAD NET CONNECTIONS PANEL -->
+				<Border x:Name="KiCadNetConnectionsPanel"
+									IsVisible="False"
+									HorizontalAlignment="Right"
+									VerticalAlignment="Top"
+									Margin="10,10,10,10"
+									Background="{DynamicResource Schematics_Panels_Bg}"
+									BorderBrush="{DynamicResource Schematics_Panels_Border}"
+									BorderThickness="1"
+									CornerRadius="4"
+									Padding="8,8"
+									MinWidth="120"
+									MaxWidth="250">
+
+					<Grid RowDefinitions="Auto, *, Auto">
+						<StackPanel Grid.Row="0" Spacing="4">
+							<TextBlock Text="Netlist name:"
+								   FontSize="11"
+								   FontWeight="Bold"
+								   Foreground="{DynamicResource Schematics_Panels_Fg}" />
+							<TextBlock x:Name="KiCadNetConnectionsNetNameText"
+									FontSize="11"
+									Foreground="{DynamicResource Schematics_Panels_Fg}"
+									TextWrapping="Wrap"
+									Margin="8,0,0,4"/>
+
+							<TextBlock Text="Connected to:"
+									   FontSize="11"
+									   FontWeight="Bold"
+									   Foreground="{DynamicResource Schematics_Panels_Fg}" />
+						</StackPanel>
+
+						<ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,0">
+							<ItemsControl x:Name="KiCadNetConnectionsList">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate>
+										<TextBlock Text="{Binding}"
+												   FontSize="11"
+												   Foreground="{DynamicResource Schematics_Panels_Fg}"
+												   Margin="8,2,0,0"/>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+						</ScrollViewer>
+
+						<Button x:Name="ClearKiCadTraceSelectionButton"
+								Grid.Row="2"
+								Content="Clear All"
+								FontSize="9"
+								Padding="6,2"
+								Margin="0,8,0,0"
+								HorizontalAlignment="Stretch"
+								HorizontalContentAlignment="Center"
+								IsEnabled="False" />
+					</Grid>
 				</Border>
 
 			</Grid>
@@ -452,7 +603,7 @@
 				Padding="10,8">
 			<StackPanel x:Name="SchematicsLabelEditorMenuPanel"
 						Spacing="8"
-						Width="220">
+						Width="235">
 				<TextBlock x:Name="SchematicsLabelEditorMenuStateTextBlock"
 						   Text="Schematic actions"
 						   FontSize="11"
@@ -462,6 +613,22 @@
 				<Button x:Name="EnableLabelEditorButton"
 						Content="Enable component label editor"
 						HorizontalAlignment="Stretch" />
+
+				<Button x:Name="BeginKiCadCalibrationButton"
+									Content="Capture image calibration point"
+									HorizontalAlignment="Stretch" />
+
+				<Button x:Name="CopyKiCadWorldPointCandidatesButton"
+									Content="Copy CAD reference points"
+									HorizontalAlignment="Stretch" />
+
+				<Button x:Name="CancelKiCadCalibrationButton"
+                        Content="Cancel image calibration capture"
+                        IsVisible="False"
+                        HorizontalAlignment="Stretch"
+                        Foreground="{DynamicResource Button_Discard_Fg}"
+                        Background="{DynamicResource Button_Discard_Bg}"
+                        BorderBrush="{DynamicResource Button_Discard_Border}" />
 
 				<Button x:Name="CancelLabelEditorChangesButton"
 						Content="Discard all editor changes"

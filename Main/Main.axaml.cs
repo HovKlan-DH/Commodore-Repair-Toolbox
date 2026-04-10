@@ -1,9 +1,6 @@
 using Avalonia;
-using Avalonia.Controls.Templates;
 using Avalonia.Data;
-using Avalonia.Media;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
@@ -299,7 +296,7 @@ namespace CRT
             string url = string.IsNullOrWhiteSpace(version)
                 ? $"https://github.com/{AppConfig.GitHubOwner}/{AppConfig.GitHubRepo}/releases"
                 : $"https://github.com/{AppConfig.GitHubOwner}/{AppConfig.GitHubRepo}/releases/tag/{version}";
-            this.OpenUrl(url);
+            OpenUrl(url);
         }
 
         // ###########################################################################################
@@ -426,6 +423,7 @@ namespace CRT
                 return;
 
             this._currentBoardData = boardData;
+            await this.TabSchematicsControl.LoadKiCadProjectForCurrentBoardAsync();
             this.UpdateRegionButtonsState();
 
             this.PopulateBoardInfoSection(boardData.RevisionDate, boardData.Credits);
@@ -590,6 +588,7 @@ namespace CRT
                 .ToList() ?? new List<string>();
 
             this.TabSchematicsControl.UpdateHighlightsForComponents(boardLabels);
+            this.TabOverview.ApplyFilter(this.ComponentSearchTextBox?.Text ?? string.Empty);
         }
 
         // ###########################################################################################
@@ -654,6 +653,7 @@ namespace CRT
                 }
 
                 this.TabSchematicsControl.UpdateHighlightsForComponents(survivingLabels);
+                this.TabOverview.ApplyFilter(searchTerm);
             }
         }
 
@@ -1041,7 +1041,7 @@ namespace CRT
         // ###########################################################################################
         // Opens the configured URL in the system default browser.
         // ###########################################################################################
-        private void OpenUrl(string url)
+        private static void OpenUrl(string url)
         {
             try
             {
@@ -1284,19 +1284,24 @@ namespace CRT
 
             this._blinkSelectedEnabled = this.BlinkSelectedCheckBox.IsChecked == true;
 
-            bool hasSelection = this.TabSchematicsControl.highlightIndexBySchematic.Count > 0;
+            bool hasBlinkEligibleSelection = this.TabSchematicsControl.HasBlinkEligibleSelection();
+            bool hasComponentSelection = this.TabSchematicsControl.highlightIndexBySchematic.Count > 0;
 
-            if (this._blinkSelectedEnabled && hasSelection)
+            if (this._blinkSelectedEnabled && hasBlinkEligibleSelection)
             {
                 this._blinkSelectedPhaseVisible = false;
-                this.TabSchematicsControl.ApplyHighlightVisuals(true, this.GetCurrentBlinkFactor(true));
+                this.TabSchematicsControl.ApplyHighlightVisuals(
+                    hasComponentSelection,
+                    this.GetCurrentBlinkFactor(true));
                 this.UpdateBlinkTimer(true);
                 return;
             }
 
             this._blinkSelectedPhaseVisible = true;
-            this.UpdateBlinkTimer(hasSelection);
-            this.TabSchematicsControl.ApplyHighlightVisuals(hasSelection, this.GetCurrentBlinkFactor(hasSelection));
+            this.UpdateBlinkTimer(hasBlinkEligibleSelection);
+            this.TabSchematicsControl.ApplyHighlightVisuals(
+                hasComponentSelection,
+                this.GetCurrentBlinkFactor(hasBlinkEligibleSelection));
         }
 
         // ###########################################################################################
@@ -1331,16 +1336,20 @@ namespace CRT
         // ###########################################################################################
         private void OnBlinkSelectedTimerTick(object? sender, EventArgs e)
         {
-            bool hasSelection = this.TabSchematicsControl.highlightIndexBySchematic.Count > 0;
-            if (!hasSelection)
+            bool hasBlinkEligibleSelection = this.TabSchematicsControl.HasBlinkEligibleSelection();
+            bool hasComponentSelection = this.TabSchematicsControl.highlightIndexBySchematic.Count > 0;
+
+            if (!hasBlinkEligibleSelection)
             {
                 this.UpdateBlinkTimer(false);
-                this.TabSchematicsControl.ApplyHighlightVisuals(false, 1.0);
+                this.TabSchematicsControl.ApplyHighlightVisuals(hasComponentSelection, 1.0);
                 return;
             }
 
             this._blinkSelectedPhaseVisible = !this._blinkSelectedPhaseVisible;
-            this.TabSchematicsControl.ApplyHighlightVisuals(true, this.GetCurrentBlinkFactor(true));
+            this.TabSchematicsControl.ApplyHighlightVisuals(
+                hasComponentSelection,
+                this.GetCurrentBlinkFactor(true));
         }
 
         // ###########################################################################################
@@ -1472,6 +1481,7 @@ namespace CRT
 
             this.TabSchematicsControl.UpdateHighlightsForComponents(survivingLabels);
             this.TabContribute.LoadData(this._currentBoardData, this._localRegion);
+            this.TabOverview.ApplyFilter(searchTerm);
         }
 
         // ###########################################################################################
@@ -1539,7 +1549,7 @@ namespace CRT
         // Keeps the thumbnail list available so another schematic can be selected without closing
         // the fullscreen window first.
         // ###########################################################################################
-        private Control CreateSchematicsFullscreenPlaceholder()
+        private SchematicsFullscreenPlaceholder CreateSchematicsFullscreenPlaceholder()
         {
             double ratio = 0.70;
             var boardKey = this.GetCurrentBoardKey();

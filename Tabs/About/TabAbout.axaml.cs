@@ -1,15 +1,9 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Layout;
-using Avalonia.Media;
-using Avalonia.Platform;
 using Handlers.DataHandling;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
-using System.IO;
 using System.Reflection;
 using System.Windows.Input;
 
@@ -52,6 +46,7 @@ namespace CRT
             this.PopulateCreditsSection(credits);
         }
 
+/*
         // ###########################################################################################
         // Updates the credits section for the currently loaded board.
         // ###########################################################################################
@@ -59,6 +54,7 @@ namespace CRT
         {
             this.PopulateCreditsSection(credits);
         }
+*/
 
         // ###########################################################################################
         // Resolves assembly title from metadata, with a fallback to assembly name.
@@ -72,6 +68,7 @@ namespace CRT
             return assembly.GetName().Name ?? "Classic Repair Toolbox";
         }
 
+/*
         // ###########################################################################################
         // Loads a text asset from Avalonia resources and returns the raw file content.
         // ###########################################################################################
@@ -90,23 +87,16 @@ namespace CRT
                 return "Unable to load changelog...";
             }
         }
+*/
 
         // ###########################################################################################
-        // Opens the configured URL in the system default browser.
+        // Opens a validated external target through the shared launcher.
         // ###########################################################################################
         private void OpenUrl(string url)
         {
-            try
+            if (!ExternalTargetLauncher.TryOpen(url))
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                Logger.Warning($"Failed to open URL - [{url}] - [{ex.Message}]");
+                Logger.Warning($"Rejected external target from About tab: [{url}]");
             }
         }
 

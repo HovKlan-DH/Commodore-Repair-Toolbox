@@ -43,6 +43,18 @@
 			<Setter Property="FontSize" Value="12" />
 			<Setter Property="Foreground" Value="{DynamicResource Main_Header_Fg}" />
 		</Style>
+
+		<Style Selector="Button.OverviewFloatingPrintButton">
+			<Setter Property="Background" Value="{DynamicResource Button_Highlighted_Bg}" />
+			<Setter Property="Foreground" Value="{DynamicResource Button_Highlighted_Fg}" />
+			<Setter Property="Padding" Value="12,7" />
+			<Setter Property="MinHeight" Value="0" />
+			<Setter Property="HorizontalAlignment" Value="Right" />
+			<Setter Property="VerticalAlignment" Value="Bottom" />
+			<Setter Property="HorizontalContentAlignment" Value="Center" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="Margin" Value="0,0,12,12" />
+		</Style>
 	</UserControl.Styles>
 
 	<Grid>
@@ -183,13 +195,13 @@
 										</Grid.ColumnDefinitions>
 
 										<Button Grid.Column="0"
-											Classes="OverviewTextButton"
-											Margin="8,4,8,4"
-											VerticalAlignment="Top"
-											Cursor="Hand"
-											Click="OnComponentClick">
+										        Classes="OverviewTextButton"
+										        Margin="8,4,8,4"
+										        VerticalAlignment="Top"
+										        Cursor="Hand"
+										        Click="OnComponentClick">
 											<TextBlock Text="{Binding Component}"
-													   Foreground="{DynamicResource Main_Link_Fg}" />
+											           Foreground="{DynamicResource Main_Link_Fg}" />
 										</Button>
 
 										<SelectableTextBlock Grid.Column="1"
@@ -260,5 +272,9 @@
 				</ScrollViewer>
 			</Grid>
 		</Border>
+
+		<Button Classes="OverviewFloatingPrintButton"
+		        Content="Print component list"
+		        Click="OnPrintComponentListClick" />
 	</Grid>
 </UserControl>
