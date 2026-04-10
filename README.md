@@ -163,9 +163,12 @@ There are several ways to get in contact with the developer:
 
 You can view the below _Quick Help_ videos for introduction to specific topics in _CRT_:
 
-- [Short introduction](https://youtu.be/FamNSLKJpdI)
+- [Short introduction](https://youtu.be/fwR018x39qg)
 - [How to do manual traces](https://youtu.be/JUNXeCHsrME)
 - [How to sync oscilloscope](https://youtu.be/CbTh1FFp3tU)
+- [How to use component label editor](https://youtu.be/jmYrz2VB3ig)
+- [How to use interactive traces](https://youtu.be/Y55nC_gJbH4)
+
 
 ### Information automatically collected by CRT
 
