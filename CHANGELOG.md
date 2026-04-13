@@ -1,12 +1,18 @@
-- Fixed (again) `ESCAPE` did not close active component info popup in Linux, if set to "Open multiple windows for popup" #84
-- Added option for how KiCad traces should be highlighted on hover in "Configuration" tab
-- Added option for highlighting first pin on component, if schematic has KiCad data
-- Changes in "Enable component label editor":
-  - Added component multi-select
-  - Added component snap-align
-  - Added an "undo" and "redo" stack with `CTRL`+`Z` and `CTRL`+`Y`
-- Added user configurable theme colors (editable through configuration file)
-- Changed KiCad calibration points only includes pads and reference texts
+- **Application**
+  - Fixed (again) `ESCAPE` did not close active component info popup in Linux, if set to "Open multiple windows for popup" #84
+  - Added option for how KiCad traces should be highlighted on hover in "Configuration" tab
+  - Added option for highlighting first pin on component, if schematic has KiCad data
+  - Changes in "Enable component label editor":
+    - Added component multi-select
+    - Added component snap-align
+    - Added an "undo" and "redo" stack with `CTRL`+`Z` and `CTRL`+`Y`
+  - Added user configurable theme colors (editable through configuration file)
+  - Changed KiCad calibration points only includes pads and reference texts
+- **Data**
+  - C
+    - 250469
+      - Reexported KiCad images in a better quality
+      - Relabeled all KiCad images
 
 > [!CAUTION]
 > Due to major update of Avalonia UI then Windows 32-bit is no longer supported.

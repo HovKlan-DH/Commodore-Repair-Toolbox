@@ -94,6 +94,27 @@ public partial class TabSchematics : UserControl
     private bool thisSuppressBoardSettingsChanged;
     private PointerPressedEventArgs? thisThumbnailDragStartEventArgs;
 
+    private sealed class LabelEditorUndoHighlightState
+    {
+        public string SchematicName { get; set; } = string.Empty;
+        public string BoardLabel { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
+        public bool IsSelected { get; set; }
+    }
+
+    private sealed class LabelEditorUndoState
+    {
+        public List<LabelEditorUndoHighlightState> Highlights { get; } = new();
+        public int PrimarySelectedIndex { get; set; } = -1;
+    }
+
+    private readonly Stack<LabelEditorUndoState> thisLabelEditorUndoStack = new();
+    private readonly Stack<LabelEditorUndoState> thisLabelEditorRedoStack = new();
+
     private sealed class KiCadViewCalibration
     {
         public static KiCadViewCalibration Identity { get; } = new();
@@ -3080,6 +3101,7 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Cancels the current label-editor session and discards all in-memory editor changes.
+    // Clears undo and redo because the editor session is ending.
     // ###########################################################################################
     private void CancelLabelEditorChanges()
     {
@@ -3094,6 +3116,8 @@ public partial class TabSchematics : UserControl
         this.thisLabelEditorOriginalSelectionBounds = default;
         this.thisLabelEditorOriginalDragRectangles.Clear();
         this.thisLabelEditorWorkingHighlights.Clear();
+        this.thisLabelEditorUndoStack.Clear();
+        this.thisLabelEditorRedoStack.Clear();
 
         this.HideLabelEditorMenu();
         this.HideNewLabelEditorPrompt();
@@ -3106,6 +3130,7 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     // Validates and saves the current editor session to the board Excel file, then reloads the
     // board from disk so the runtime state reflects the persisted workbook content.
+    // Clears undo and redo because the editor session is ending.
     // ###########################################################################################
     private async void ApplyLabelEditorChanges()
     {
@@ -3174,6 +3199,8 @@ public partial class TabSchematics : UserControl
         this.thisLabelEditorOriginalSelectionBounds = default;
         this.thisLabelEditorOriginalDragRectangles.Clear();
         this.thisLabelEditorWorkingHighlights.Clear();
+        this.thisLabelEditorUndoStack.Clear();
+        this.thisLabelEditorRedoStack.Clear();
 
         this.HideLabelEditorMenu();
         this.HideNewLabelEditorPrompt();
@@ -3759,6 +3786,7 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Deletes the requested working-copy editor highlight and refreshes the overlay immediately.
+    // Records the previous state so the deletion can be undone within the current editor session.
     // ###########################################################################################
     private void DeleteLabelEditorHighlight(int workingIndex)
     {
@@ -3766,6 +3794,8 @@ public partial class TabSchematics : UserControl
         {
             return;
         }
+
+        this.PushLabelEditorUndoState(this.CreateLabelEditorUndoState());
 
         var deleted = this.thisLabelEditorWorkingHighlights[workingIndex];
         this.thisLabelEditorWorkingHighlights.RemoveAt(workingIndex);
@@ -3857,6 +3887,7 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Completes the current rectangle drawing operation and opens the board-label prompt.
+    // Records the pre-create state so the new rectangle can be undone after confirmation.
     // ###########################################################################################
     private void CompleteDrawingLabelEditorRectangle(Point releaseContainerPoint, Point releasePixelPoint)
     {
@@ -3875,6 +3906,8 @@ public partial class TabSchematics : UserControl
             this.RefreshLabelEditorOverlay();
             return;
         }
+
+        this.PushLabelEditorUndoState(this.CreateLabelEditorUndoState());
 
         var newRow = new EditableComponentHighlight
         {
@@ -4200,10 +4233,21 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Finishes the current move or resize operation for the selected rectangle.
-    // Clears any temporary snap guides drawn during resize.
+    // Clears any temporary snap guides and records the pre-drag state for undo when needed.
     // ###########################################################################################
     private void CompleteLabelEditorDrag()
     {
+        if (this.thisLabelEditorDragMode != LabelEditorDragMode.None)
+        {
+            var beforeDragState = this.CreateLabelEditorUndoStateFromOriginalDragState();
+            var afterDragState = this.CreateLabelEditorUndoState();
+
+            if (!this.AreLabelEditorUndoStatesEqual(beforeDragState, afterDragState))
+            {
+                this.PushLabelEditorUndoState(beforeDragState);
+            }
+        }
+
         this.thisLabelEditorDragMode = LabelEditorDragMode.None;
         this.thisLabelEditorOriginalDragRectangles.Clear();
         this.SchematicsLabelEditorOverlay.SnapGuides = Array.Empty<(Point Start, Point End)>();
@@ -4212,7 +4256,7 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     // Applies keyboard move, expand, or shrink operations to the selected editor rectangle.
     // Arrow keys move by 1 px, Shift expands in the pressed direction, and Alt shrinks from
-    // the opposite side of the pressed direction.
+    // the opposite side of the pressed direction. Each committed step is undoable.
     // ###########################################################################################
     private bool ApplySelectedLabelEditorKeyboardStep(Key key, KeyModifiers modifiers)
     {
@@ -4233,6 +4277,8 @@ public partial class TabSchematics : UserControl
         {
             return false;
         }
+
+        var undoState = this.CreateLabelEditorUndoState();
 
         var sourceRects = selectedRows.ToDictionary(
             row => row,
@@ -4355,12 +4401,14 @@ public partial class TabSchematics : UserControl
             return false;
         }
 
+        this.PushLabelEditorUndoState(undoState);
         this.RefreshLabelEditorOverlay();
         return true;
     }
 
     // ###########################################################################################
     // Handles keyboard interaction for label-editor and KiCad calibration capture workflows.
+    // Ctrl+Z undoes label-editor changes and Ctrl+Y redoes them within the current editor session.
     // ###########################################################################################
     private void OnSchematicsKeyDown(object? sender, KeyEventArgs e)
     {
@@ -4375,6 +4423,33 @@ public partial class TabSchematics : UserControl
 
         if (!this.thisIsLabelEditorMode)
         {
+            return;
+        }
+
+        if (this.SchematicsNewLabelPromptBorder.IsVisible)
+        {
+            return;
+        }
+
+        bool isCtrlDown = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+
+        if (isCtrlDown && e.Key == Key.Z)
+        {
+            if (this.TryUndoLabelEditorChange())
+            {
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        if (isCtrlDown && e.Key == Key.Y)
+        {
+            if (this.TryRedoLabelEditorChange())
+            {
+                e.Handled = true;
+            }
+
             return;
         }
 
@@ -7628,5 +7703,249 @@ public partial class TabSchematics : UserControl
                !string.IsNullOrWhiteSpace(this.thisHoveredComponentBoardLabel);
     }
 
+    // ###########################################################################################
+    // Captures the current label-editor working state so it can be restored by undo or redo.
+    // ###########################################################################################
+    private LabelEditorUndoState CreateLabelEditorUndoState()
+    {
+        var state = new LabelEditorUndoState
+        {
+            PrimarySelectedIndex = this.thisSelectedLabelEditorHighlight != null
+                ? this.thisLabelEditorWorkingHighlights.IndexOf(this.thisSelectedLabelEditorHighlight)
+                : -1
+        };
+
+        foreach (var row in this.thisLabelEditorWorkingHighlights)
+        {
+            state.Highlights.Add(new LabelEditorUndoHighlightState
+            {
+                SchematicName = row.SchematicName,
+                BoardLabel = row.BoardLabel,
+                Category = row.Category,
+                X = row.X,
+                Y = row.Y,
+                Width = row.Width,
+                Height = row.Height,
+                IsSelected = this.thisSelectedLabelEditorHighlights.Contains(row)
+            });
+        }
+
+        return state;
+    }
+
+    // ###########################################################################################
+    // Captures the label-editor state as it existed before the active drag started.
+    // ###########################################################################################
+    private LabelEditorUndoState CreateLabelEditorUndoStateFromOriginalDragState()
+    {
+        var state = new LabelEditorUndoState
+        {
+            PrimarySelectedIndex = this.thisSelectedLabelEditorHighlight != null
+                ? this.thisLabelEditorWorkingHighlights.IndexOf(this.thisSelectedLabelEditorHighlight)
+                : -1
+        };
+
+        foreach (var row in this.thisLabelEditorWorkingHighlights)
+        {
+            Rect rect = this.thisLabelEditorOriginalDragRectangles.TryGetValue(row, out var originalRect)
+                ? originalRect
+                : new Rect(row.X, row.Y, row.Width, row.Height);
+
+            state.Highlights.Add(new LabelEditorUndoHighlightState
+            {
+                SchematicName = row.SchematicName,
+                BoardLabel = row.BoardLabel,
+                Category = row.Category,
+                X = rect.X,
+                Y = rect.Y,
+                Width = rect.Width,
+                Height = rect.Height,
+                IsSelected = this.thisSelectedLabelEditorHighlights.Contains(row)
+            });
+        }
+
+        return state;
+    }
+
+    // ###########################################################################################
+    // Compares two label-editor snapshots so duplicate undo and redo entries can be skipped.
+    // ###########################################################################################
+    private bool AreLabelEditorUndoStatesEqual(LabelEditorUndoState leftState, LabelEditorUndoState rightState)
+    {
+        const double epsilon = 0.0001;
+
+        if (ReferenceEquals(leftState, rightState))
+        {
+            return true;
+        }
+
+        if (leftState.Highlights.Count != rightState.Highlights.Count ||
+            leftState.PrimarySelectedIndex != rightState.PrimarySelectedIndex)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < leftState.Highlights.Count; i++)
+        {
+            var left = leftState.Highlights[i];
+            var right = rightState.Highlights[i];
+
+            if (!string.Equals(left.SchematicName, right.SchematicName, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(left.BoardLabel, right.BoardLabel, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(left.Category, right.Category, StringComparison.OrdinalIgnoreCase) ||
+                Math.Abs(left.X - right.X) > epsilon ||
+                Math.Abs(left.Y - right.Y) > epsilon ||
+                Math.Abs(left.Width - right.Width) > epsilon ||
+                Math.Abs(left.Height - right.Height) > epsilon ||
+                left.IsSelected != right.IsSelected)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // ###########################################################################################
+    // Pushes one undo snapshot and clears redo because a new forward edit has been committed.
+    // ###########################################################################################
+    private void PushLabelEditorUndoState(LabelEditorUndoState state)
+    {
+        if (this.thisLabelEditorUndoStack.Count > 0 &&
+            this.AreLabelEditorUndoStatesEqual(this.thisLabelEditorUndoStack.Peek(), state))
+        {
+            return;
+        }
+
+        this.thisLabelEditorUndoStack.Push(state);
+        this.thisLabelEditorRedoStack.Clear();
+    }
+
+    // ###########################################################################################
+    // Restores one label-editor snapshot back into the working state and refreshes the overlay.
+    // ###########################################################################################
+    private void RestoreLabelEditorUndoState(LabelEditorUndoState state)
+    {
+        this.thisLabelEditorWorkingHighlights.Clear();
+        this.thisSelectedLabelEditorHighlights.Clear();
+        this.thisSelectedLabelEditorHighlight = null;
+        this.thisPendingNewLabelEditorHighlight = null;
+        this.thisIsDrawingLabelEditorRectangle = false;
+        this.thisLabelEditorDraftRectangle = null;
+        this.thisLabelEditorDragMode = LabelEditorDragMode.None;
+        this.thisLabelEditorOriginalSelectionBounds = default;
+        this.thisLabelEditorOriginalDragRectangles.Clear();
+
+        this.HideNewLabelEditorPrompt();
+
+        foreach (var snapshot in state.Highlights)
+        {
+            var row = new EditableComponentHighlight
+            {
+                SchematicName = snapshot.SchematicName,
+                BoardLabel = snapshot.BoardLabel,
+                Category = snapshot.Category,
+                X = snapshot.X,
+                Y = snapshot.Y,
+                Width = snapshot.Width,
+                Height = snapshot.Height
+            };
+
+            this.thisLabelEditorWorkingHighlights.Add(row);
+
+            if (snapshot.IsSelected)
+            {
+                this.thisSelectedLabelEditorHighlights.Add(row);
+            }
+        }
+
+        if (state.PrimarySelectedIndex >= 0 &&
+            state.PrimarySelectedIndex < this.thisLabelEditorWorkingHighlights.Count)
+        {
+            var primary = this.thisLabelEditorWorkingHighlights[state.PrimarySelectedIndex];
+            if (this.thisSelectedLabelEditorHighlights.Contains(primary))
+            {
+                this.thisSelectedLabelEditorHighlight = primary;
+            }
+        }
+
+        if (this.thisSelectedLabelEditorHighlight == null)
+        {
+            this.thisSelectedLabelEditorHighlight = this.GetFirstSelectedLabelEditorHighlightForCurrentSchematic();
+        }
+
+        this.RefreshLabelEditorOverlay();
+        this.SchematicsContainer.Focus();
+    }
+
+    // ###########################################################################################
+    // Restores the previous label-editor snapshot and moves the current state onto the redo stack.
+    // ###########################################################################################
+    private bool TryUndoLabelEditorChange()
+    {
+        if (!this.thisIsLabelEditorMode || this.SchematicsNewLabelPromptBorder.IsVisible)
+        {
+            return false;
+        }
+
+        var currentState = this.CreateLabelEditorUndoState();
+
+        while (this.thisLabelEditorUndoStack.Count > 0 &&
+               this.AreLabelEditorUndoStatesEqual(this.thisLabelEditorUndoStack.Peek(), currentState))
+        {
+            this.thisLabelEditorUndoStack.Pop();
+        }
+
+        if (this.thisLabelEditorUndoStack.Count == 0)
+        {
+            return false;
+        }
+
+        var previousState = this.thisLabelEditorUndoStack.Pop();
+
+        if (this.thisLabelEditorRedoStack.Count == 0 ||
+            !this.AreLabelEditorUndoStatesEqual(this.thisLabelEditorRedoStack.Peek(), currentState))
+        {
+            this.thisLabelEditorRedoStack.Push(currentState);
+        }
+
+        this.RestoreLabelEditorUndoState(previousState);
+        return true;
+    }
+
+    // ###########################################################################################
+    // Restores the next label-editor snapshot and moves the current state back onto the undo stack.
+    // ###########################################################################################
+    private bool TryRedoLabelEditorChange()
+    {
+        if (!this.thisIsLabelEditorMode || this.SchematicsNewLabelPromptBorder.IsVisible)
+        {
+            return false;
+        }
+
+        var currentState = this.CreateLabelEditorUndoState();
+
+        while (this.thisLabelEditorRedoStack.Count > 0 &&
+               this.AreLabelEditorUndoStatesEqual(this.thisLabelEditorRedoStack.Peek(), currentState))
+        {
+            this.thisLabelEditorRedoStack.Pop();
+        }
+
+        if (this.thisLabelEditorRedoStack.Count == 0)
+        {
+            return false;
+        }
+
+        var nextState = this.thisLabelEditorRedoStack.Pop();
+
+        if (this.thisLabelEditorUndoStack.Count == 0 ||
+            !this.AreLabelEditorUndoStatesEqual(this.thisLabelEditorUndoStack.Peek(), currentState))
+        {
+            this.thisLabelEditorUndoStack.Push(currentState);
+        }
+
+        this.RestoreLabelEditorUndoState(nextState);
+        return true;
+    }
 
 }
