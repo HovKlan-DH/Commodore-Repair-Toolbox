@@ -345,7 +345,39 @@ namespace Tabs.TabSchematics
                 contentRect.Y + (pixelPoint.Y * sy));
         }
 
+        // ###########################################################################################
+        // Applies all overlay state in one batch so the control only invalidates once per editor
+        // refresh instead of once per property assignment.
+        // ###########################################################################################
+        public void ApplyState(
+            IReadOnlyList<Rect>? rectangles,
+            int selectedIndex,
+            IReadOnlyList<int>? selectedIndices,
+            Rect? selectionBounds,
+            int hoveredIndex,
+            Rect? draftRectangle,
+            IReadOnlyList<(Point Start, Point End)>? snapGuides,
+            PixelSize bitmapPixelSize,
+            Matrix viewMatrix,
+            Color highlightColor,
+            double highlightOpacity,
+            bool isVisible)
+        {
+            this.thisRectangles = rectangles ?? Array.Empty<Rect>();
+            this.thisSelectedIndex = selectedIndex;
+            this.thisSelectedIndices = selectedIndices ?? Array.Empty<int>();
+            this.thisSelectionBounds = selectionBounds;
+            this.thisHoveredIndex = hoveredIndex;
+            this.thisDraftRectangle = draftRectangle;
+            this.thisSnapGuides = snapGuides ?? Array.Empty<(Point Start, Point End)>();
+            this.thisBitmapPixelSize = bitmapPixelSize;
+            this.thisViewMatrix = viewMatrix;
+            this.thisHighlightColor = highlightColor;
+            this.thisHighlightOpacity = highlightOpacity;
+            this.IsVisible = isVisible;
 
+            this.InvalidateVisual();
+        }
 
 
     }

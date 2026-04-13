@@ -93,6 +93,14 @@ public partial class TabSchematics : UserControl
     private string? thisHoveredComponentBoardLabel;
     private bool thisSuppressBoardSettingsChanged;
     private PointerPressedEventArgs? thisThumbnailDragStartEventArgs;
+    private readonly List<Border> thisEditorLabelContainers = new();
+    private readonly List<TextBlock> thisEditorLabelTextBlocks = new();
+    private readonly List<ScaleTransform> thisEditorLabelScaleTransforms = new();
+    private string thisLastEditorLabelVisualSignature = string.Empty;
+    private readonly List<Border> thisStandardLabelContainers = new();
+    private readonly List<TextBlock> thisStandardLabelTextBlocks = new();
+    private readonly List<ScaleTransform> thisStandardLabelScaleTransforms = new();
+    private string thisLastStandardLabelVisualSignature = string.Empty;
 
     private sealed class LabelEditorUndoHighlightState
     {
@@ -940,7 +948,8 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Translates the schematics image while the right mouse button is held down.
-    // routes movement and shift key state to Polyline Manager.
+    // Routes movement and shift key state to Polyline Manager and minimizes editor overlay churn
+    // by batching transient hover-state updates instead of mutating overlay properties directly.
     // ###########################################################################################
     private void OnSchematicsPointerMoved(object? sender, PointerEventArgs e)
     {
@@ -956,7 +965,11 @@ public partial class TabSchematics : UserControl
 
         if (this.thisIsLabelEditorMode && this.thisLabelEditorDragMode != LabelEditorDragMode.None)
         {
-            this.SchematicsLabelEditorOverlay.HoveredIndex = -1;
+            if (this.SchematicsLabelEditorOverlay.HoveredIndex != -1)
+            {
+                this.SetLabelEditorOverlayTransientState(hoveredIndex: -1);
+            }
+
             this.UpdateLabelEditorCursor(point);
 
             if (this.TryGetLabelEditorPixelPoint(point, out var pixelPoint))
@@ -970,7 +983,11 @@ public partial class TabSchematics : UserControl
 
         if (this.thisIsLabelEditorMode && this.thisIsDrawingLabelEditorRectangle)
         {
-            this.SchematicsLabelEditorOverlay.HoveredIndex = -1;
+            if (this.SchematicsLabelEditorOverlay.HoveredIndex != -1)
+            {
+                this.SetLabelEditorOverlayTransientState(hoveredIndex: -1);
+            }
+
             this.UpdateLabelEditorCursor(point);
 
             if (this.TryGetLabelEditorPixelPoint(point, out var pixelPoint))
@@ -1011,13 +1028,16 @@ public partial class TabSchematics : UserControl
 
         if (this.thisIsLabelEditorMode)
         {
+            int hoveredIndex = -1;
+
             if (this.TryGetSelectedLabelEditorHighlightAtContainerPoint(point, out var hoveredSelectedIndex))
             {
-                this.SchematicsLabelEditorOverlay.HoveredIndex = hoveredSelectedIndex;
+                hoveredIndex = hoveredSelectedIndex;
             }
-            else
+
+            if (this.SchematicsLabelEditorOverlay.HoveredIndex != hoveredIndex)
             {
-                this.SchematicsLabelEditorOverlay.HoveredIndex = -1;
+                this.SetLabelEditorOverlayTransientState(hoveredIndex: hoveredIndex);
             }
         }
 
@@ -1367,7 +1387,6 @@ public partial class TabSchematics : UserControl
         this.thisDraggedThumbnail = null;
         this.thisDraggedThumbnailOriginalIndex = -1;
         this.thisDraggedThumbnailWasSelected = false;
-        //        this.thisThumbnailCurrentInsertIndex = -1;
         this.thisThumbnailLastPointerYInList = double.NaN;
         this.thisThumbnailDragStartEventArgs = null;
         this.ClearThumbnailDropPlaceholder();
@@ -1375,6 +1394,7 @@ public partial class TabSchematics : UserControl
 
         this.polylineManager?.Reset();
         this.SchematicsLabelsCanvas.Children.Clear();
+        this.ResetComponentLabelVisualCaches();
 
         this.SetTraceColorPickerColor(Colors.White);
         this.CustomColorButton.Background = Brushes.White;
@@ -1419,14 +1439,19 @@ public partial class TabSchematics : UserControl
         this.HideLabelEditorMenu();
         this.HideNewLabelEditorPrompt();
 
-        this.SchematicsLabelEditorOverlay.Rectangles = Array.Empty<Rect>();
-        this.SchematicsLabelEditorOverlay.SelectedIndex = -1;
-        this.SchematicsLabelEditorOverlay.SelectedIndices = Array.Empty<int>();
-        this.SchematicsLabelEditorOverlay.SelectionBounds = null;
-        this.SchematicsLabelEditorOverlay.DraftRectangle = null;
-        this.SchematicsLabelEditorOverlay.BitmapPixelSize = new PixelSize(0, 0);
-        this.SchematicsLabelEditorOverlay.ViewMatrix = this.schematicsMatrix;
-        this.SchematicsLabelEditorOverlay.IsVisible = false;
+        this.SchematicsLabelEditorOverlay.ApplyState(
+            rectangles: Array.Empty<Rect>(),
+            selectedIndex: -1,
+            selectedIndices: Array.Empty<int>(),
+            selectionBounds: null,
+            hoveredIndex: -1,
+            draftRectangle: null,
+            snapGuides: Array.Empty<(Point Start, Point End)>(),
+            bitmapPixelSize: new PixelSize(0, 0),
+            viewMatrix: this.schematicsMatrix,
+            highlightColor: Colors.IndianRed,
+            highlightOpacity: 0.20,
+            isVisible: false);
 
         this.RestoreBoardSettings(string.Empty);
 
@@ -1471,13 +1496,16 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Clamps the current schematics matrix so no empty space is visible inside the container.
-    // Avoids rebuilding floating labels during pan/zoom because that causes noticeable UI churn.
+    // Updates the editor overlay through one batched state apply so pan/zoom only triggers a
+    // single redraw instead of multiple overlay invalidations.
     // ###########################################################################################
     private void ClampSchematicsMatrix()
     {
         var containerSize = this.SchematicsContainer.Bounds.Size;
         if (containerSize.Width <= 0 || containerSize.Height <= 0)
+        {
             return;
+        }
 
         var contentRect = this.GetImageContentRect();
         double scale = this.schematicsMatrix.M11;
@@ -1495,8 +1523,14 @@ public partial class TabSchematics : UserControl
 
         if (scaledWidth >= containerSize.Width)
         {
-            if (scaledLeft > 0) tx -= scaledLeft;
-            else if (scaledRight < containerSize.Width) tx += containerSize.Width - scaledRight;
+            if (scaledLeft > 0)
+            {
+                tx -= scaledLeft;
+            }
+            else if (scaledRight < containerSize.Width)
+            {
+                tx += containerSize.Width - scaledRight;
+            }
         }
         else
         {
@@ -1505,8 +1539,14 @@ public partial class TabSchematics : UserControl
 
         if (scaledHeight >= containerSize.Height)
         {
-            if (scaledTop > 0) ty -= scaledTop;
-            else if (scaledBottom < containerSize.Height) ty += containerSize.Height - scaledBottom;
+            if (scaledTop > 0)
+            {
+                ty -= scaledTop;
+            }
+            else if (scaledBottom < containerSize.Height)
+            {
+                ty += containerSize.Height - scaledBottom;
+            }
         }
         else
         {
@@ -1514,6 +1554,7 @@ public partial class TabSchematics : UserControl
         }
 
         this.schematicsMatrix = new Matrix(scale, 0, 0, scale, tx, ty);
+
         ((MatrixTransform)this.SchematicsImage.RenderTransform!).Matrix = this.schematicsMatrix;
         ((MatrixTransform)this.SchematicsHighlightsOverlay.RenderTransform!).Matrix = this.schematicsMatrix;
         ((MatrixTransform)this.SchematicsHoverHighlightsOverlay.RenderTransform!).Matrix = this.schematicsMatrix;
@@ -1528,8 +1569,19 @@ public partial class TabSchematics : UserControl
         this.SchematicsHoverHighlightsOverlay.ViewMatrix = this.schematicsMatrix;
         this.SchematicsHoverHighlightsOverlay.InvalidateVisual();
 
-        this.SchematicsLabelEditorOverlay.ViewMatrix = this.schematicsMatrix;
-        this.SchematicsLabelEditorOverlay.InvalidateVisual();
+        this.SchematicsLabelEditorOverlay.ApplyState(
+            rectangles: this.SchematicsLabelEditorOverlay.Rectangles,
+            selectedIndex: this.SchematicsLabelEditorOverlay.SelectedIndex,
+            selectedIndices: this.SchematicsLabelEditorOverlay.SelectedIndices,
+            selectionBounds: this.SchematicsLabelEditorOverlay.SelectionBounds,
+            hoveredIndex: this.SchematicsLabelEditorOverlay.HoveredIndex,
+            draftRectangle: this.SchematicsLabelEditorOverlay.DraftRectangle,
+            snapGuides: this.SchematicsLabelEditorOverlay.SnapGuides,
+            bitmapPixelSize: this.SchematicsLabelEditorOverlay.BitmapPixelSize,
+            viewMatrix: this.schematicsMatrix,
+            highlightColor: this.SchematicsLabelEditorOverlay.HighlightColor,
+            highlightOpacity: this.SchematicsLabelEditorOverlay.HighlightOpacity,
+            isVisible: this.SchematicsLabelEditorOverlay.IsVisible);
 
         this.polylineManager?.UpdateScaleFactor(scale);
         this.UpdateComponentLabelsScale(scale);
@@ -1537,19 +1589,44 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Applies inverse scale to mapped labels so they remain standard text size regardless of zoom.
+    // Uses cached editor or standard scale transforms directly when available to avoid repeated
+    // child-tree scanning and LINQ allocations during pan and zoom.
     // ###########################################################################################
     private void UpdateComponentLabelsScale(double scale)
     {
         double inverseScale = scale > 0 ? 1.0 / scale : 1.0;
+
+        if (this.thisIsLabelEditorMode && this.thisEditorLabelScaleTransforms.Count > 0)
+        {
+            for (int i = 0; i < this.thisEditorLabelScaleTransforms.Count; i++)
+            {
+                this.thisEditorLabelScaleTransforms[i].ScaleX = inverseScale;
+                this.thisEditorLabelScaleTransforms[i].ScaleY = inverseScale;
+            }
+
+            return;
+        }
+
+        if (this.thisStandardLabelScaleTransforms.Count > 0)
+        {
+            for (int i = 0; i < this.thisStandardLabelScaleTransforms.Count; i++)
+            {
+                this.thisStandardLabelScaleTransforms[i].ScaleX = inverseScale;
+                this.thisStandardLabelScaleTransforms[i].ScaleY = inverseScale;
+            }
+
+            return;
+        }
+
         foreach (var child in this.SchematicsLabelsCanvas.Children)
         {
             if (child is Border container && container.RenderTransform is TransformGroup group)
             {
-                var st = group.Children.OfType<ScaleTransform>().FirstOrDefault();
-                if (st != null)
+                var scaleTransform = group.Children.OfType<ScaleTransform>().FirstOrDefault();
+                if (scaleTransform != null)
                 {
-                    st.ScaleX = inverseScale;
-                    st.ScaleY = inverseScale;
+                    scaleTransform.ScaleX = inverseScale;
+                    scaleTransform.ScaleY = inverseScale;
                 }
             }
         }
@@ -1562,19 +1639,29 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     public void UpdateComponentLabels()
     {
-        this.SchematicsLabelsCanvas.Children.Clear();
-
         if (this.currentFullResBitmap == null)
+        {
+            this.SchematicsLabelsCanvas.Children.Clear();
+            this.ResetComponentLabelVisualCaches();
             return;
+        }
 
         double imgWidth = this.currentFullResBitmap.PixelSize.Width;
         double imgHeight = this.currentFullResBitmap.PixelSize.Height;
         if (imgWidth <= 0 || imgHeight <= 0)
+        {
+            this.SchematicsLabelsCanvas.Children.Clear();
+            this.ResetComponentLabelVisualCaches();
             return;
+        }
 
         var selectedThumb = this.SchematicsThumbnailList.SelectedItem as SchematicThumbnail;
         if (selectedThumb == null)
+        {
+            this.SchematicsLabelsCanvas.Children.Clear();
+            this.ResetComponentLabelVisualCaches();
             return;
+        }
 
         var contentRect = this.GetImageContentRect();
 
@@ -1583,73 +1670,59 @@ public partial class TabSchematics : UserControl
 
         if (this.thisIsLabelEditorMode)
         {
-            foreach (var row in this.thisLabelEditorWorkingHighlights.Where(row =>
-                         string.Equals(row.SchematicName, selectedThumb.Name, StringComparison.OrdinalIgnoreCase) &&
-                         !string.IsNullOrWhiteSpace(row.BoardLabel)))
+            if (this.thisStandardLabelContainers.Count > 0)
             {
-                double centerX = row.X + (row.Width / 2.0);
-                double centerY = row.Y + (row.Height / 2.0);
-
-                double localX = contentRect.X + (centerX / imgWidth) * contentRect.Width;
-                double localY = contentRect.Y + (centerY / imgHeight) * contentRect.Height;
-
-                var tb = new TextBlock
-                {
-                    Text = row.BoardLabel,
-                    FontSize = 11,
-                    FontWeight = FontWeight.Bold,
-                    TextAlignment = TextAlignment.Center
-                };
-                tb.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("Schematics_ComponentLabel_Fg"));
-
-                var innerBorder = new Border
-                {
-                    BorderThickness = new Avalonia.Thickness(1),
-                    CornerRadius = new Avalonia.CornerRadius(4),
-                    Padding = new Avalonia.Thickness(6, 4),
-                    Child = tb
-                };
-                innerBorder.Bind(Border.BackgroundProperty, this.GetResourceObservable("Schematics_ComponentLabel_Bg"));
-                innerBorder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("Schematics_ComponentLabel_Border"));
-
-                var transformGroup = new TransformGroup();
-                transformGroup.Children.Add(new ScaleTransform(inverseScale, inverseScale));
-
-                var container = new Border
-                {
-                    IsHitTestVisible = false,
-                    Child = innerBorder,
-                    RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
-                    RenderTransform = transformGroup
-                };
-
-                container.SizeChanged += (s, ev) =>
-                {
-                    Canvas.SetLeft(container, localX - (ev.NewSize.Width / 2.0));
-                    Canvas.SetTop(container, localY - (ev.NewSize.Height / 2.0));
-                };
-
-                Canvas.SetLeft(container, localX);
-                Canvas.SetTop(container, localY);
-
-                this.SchematicsLabelsCanvas.Children.Add(container);
+                this.SchematicsLabelsCanvas.Children.Clear();
+                this.ResetStandardComponentLabelVisualCache();
             }
 
+            var editorRows = this.thisLabelEditorWorkingHighlights
+                .Where(row =>
+                    string.Equals(row.SchematicName, selectedThumb.Name, StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(row.BoardLabel))
+                .ToList();
+
+            this.UpdateEditorComponentLabels(editorRows, contentRect, imgWidth, imgHeight, inverseScale);
             return;
+        }
+
+        if (this.thisEditorLabelContainers.Count > 0)
+        {
+            this.SchematicsLabelsCanvas.Children.Clear();
+            this.ResetEditorComponentLabelVisualCache();
         }
 
         if (this.CheckLabelBoard.IsChecked != true &&
             this.CheckLabelTechnical.IsChecked != true &&
             this.CheckLabelFriendly.IsChecked != true)
         {
+            for (int i = 0; i < this.thisStandardLabelContainers.Count; i++)
+            {
+                this.thisStandardLabelContainers[i].IsVisible = false;
+            }
+
             return;
         }
 
         if (this.MainWindow == null)
+        {
+            for (int i = 0; i < this.thisStandardLabelContainers.Count; i++)
+            {
+                this.thisStandardLabelContainers[i].IsVisible = false;
+            }
+
             return;
+        }
 
         if (!this.highlightRectsBySchematicAndLabel.TryGetValue(selectedThumb.Name, out var byLabel))
+        {
+            for (int i = 0; i < this.thisStandardLabelContainers.Count; i++)
+            {
+                this.thisStandardLabelContainers[i].IsVisible = false;
+            }
+
             return;
+        }
 
         var visibleItems = this.MainWindow.ComponentFilterListBox.ItemsSource?.Cast<Main.ComponentListItem>().ToList() ?? new List<Main.ComponentListItem>();
         var selectedItems = this.MainWindow.ComponentFilterListBox.SelectedItems?.Cast<Main.ComponentListItem>().ToList() ?? new List<Main.ComponentListItem>();
@@ -1657,6 +1730,7 @@ public partial class TabSchematics : UserControl
         bool selectedOnly = this.CheckLabelSelectedOnly.IsChecked == true;
         var itemsToLoop = selectedOnly ? selectedItems : visibleItems;
         var seenLabels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var standardLabels = new List<(string Text, double LocalX, double LocalY)>();
 
         foreach (var item in itemsToLoop)
         {
@@ -1686,49 +1760,11 @@ public partial class TabSchematics : UserControl
                 double localX = contentRect.X + (centerX / imgWidth) * contentRect.Width;
                 double localY = contentRect.Y + (centerY / imgHeight) * contentRect.Height;
 
-                var tb = new TextBlock
-                {
-                    Text = labelText,
-                    FontSize = 11,
-                    FontWeight = FontWeight.Bold,
-                    TextAlignment = TextAlignment.Center
-                };
-                tb.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("Schematics_ComponentLabel_Fg"));
-
-                var innerBorder = new Border
-                {
-                    BorderThickness = new Avalonia.Thickness(1),
-                    CornerRadius = new Avalonia.CornerRadius(4),
-                    Padding = new Avalonia.Thickness(6, 4),
-                    Child = tb
-                };
-                innerBorder.Bind(Border.BackgroundProperty, this.GetResourceObservable("Schematics_ComponentLabel_Bg"));
-                innerBorder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("Schematics_ComponentLabel_Border"));
-
-                var transformGroup = new TransformGroup();
-                transformGroup.Children.Add(new ScaleTransform(inverseScale, inverseScale));
-
-                var container = new Border
-                {
-                    IsHitTestVisible = false,
-                    Child = innerBorder,
-                    RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
-                    RenderTransform = transformGroup
-                };
-
-                // Resolves exact dynamic layout dimensions to physically center everything exactly in the component
-                container.SizeChanged += (s, ev) =>
-                {
-                    Canvas.SetLeft(container, localX - (ev.NewSize.Width / 2.0));
-                    Canvas.SetTop(container, localY - (ev.NewSize.Height / 2.0));
-                };
-
-                Canvas.SetLeft(container, localX);
-                Canvas.SetTop(container, localY);
-
-                this.SchematicsLabelsCanvas.Children.Add(container);
+                standardLabels.Add((labelText, localX, localY));
             }
         }
+
+        this.UpdateStandardComponentLabels(standardLabels, inverseScale);
     }
 
     // ###########################################################################################
@@ -2107,15 +2143,18 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Clears hover UI when pointer exits schematic area.
+    // Uses a batched overlay update so exiting the editor does not trigger extra redraw churn.
     // ###########################################################################################
     private void OnSchematicsPointerExited(object? sender, PointerEventArgs e)
     {
         if (this.isPanning)
-            return;
-
-        if (this.thisIsLabelEditorMode)
         {
-            this.SchematicsLabelEditorOverlay.HoveredIndex = -1;
+            return;
+        }
+
+        if (this.thisIsLabelEditorMode && this.SchematicsLabelEditorOverlay.HoveredIndex != -1)
+        {
+            this.SetLabelEditorOverlayTransientState(hoveredIndex: -1);
         }
 
         this.HideSchematicsHoverUi();
@@ -2922,6 +2961,7 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Re-clamps and redraws the viewer after the control is moved between windows.
+    // Uses one full label refresh and then a follow-up clamp-only pass for final layout settling.
     // ###########################################################################################
     public void RefreshAfterHostChanged()
     {
@@ -3215,21 +3255,26 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     // Refreshes the label-editor overlay from the current working-copy rectangles and selected item.
     // Uses the same main highlight color and opacity as the normal schematic highlight.
+    // Applies overlay state in one batch to avoid repeated redraws during drag operations.
     // ###########################################################################################
-    private void RefreshLabelEditorOverlay()
+    private void RefreshLabelEditorOverlay(IReadOnlyList<(Point Start, Point End)>? snapGuides = null)
     {
         if (!this.thisIsLabelEditorMode || this.currentFullResBitmap == null)
         {
-            this.SchematicsLabelEditorOverlay.IsVisible = false;
-            this.SchematicsLabelEditorOverlay.Rectangles = Array.Empty<Rect>();
-            this.SchematicsLabelEditorOverlay.SelectedIndex = -1;
-            this.SchematicsLabelEditorOverlay.SelectedIndices = Array.Empty<int>();
-            this.SchematicsLabelEditorOverlay.SelectionBounds = null;
-            this.SchematicsLabelEditorOverlay.HoveredIndex = -1;
-            this.SchematicsLabelEditorOverlay.DraftRectangle = null;
-            this.SchematicsLabelEditorOverlay.SnapGuides = Array.Empty<(Point Start, Point End)>();
-            this.SchematicsLabelEditorOverlay.BitmapPixelSize = this.currentFullResBitmap?.PixelSize ?? new PixelSize(0, 0);
-            this.SchematicsLabelEditorOverlay.ViewMatrix = this.schematicsMatrix;
+            this.SchematicsLabelEditorOverlay.ApplyState(
+                rectangles: Array.Empty<Rect>(),
+                selectedIndex: -1,
+                selectedIndices: Array.Empty<int>(),
+                selectionBounds: null,
+                hoveredIndex: -1,
+                draftRectangle: null,
+                snapGuides: Array.Empty<(Point Start, Point End)>(),
+                bitmapPixelSize: this.currentFullResBitmap?.PixelSize ?? new PixelSize(0, 0),
+                viewMatrix: this.schematicsMatrix,
+                highlightColor: Colors.IndianRed,
+                highlightOpacity: 0.20,
+                isVisible: false);
+
             this.UpdateComponentLabels();
             return;
         }
@@ -3266,18 +3311,19 @@ public partial class TabSchematics : UserControl
             highlightOpacity = ParseOpacityOrDefault(schematic.MainHighlightOpacity, 0.20);
         }
 
-        this.SchematicsLabelEditorOverlay.Rectangles = rects;
-        this.SchematicsLabelEditorOverlay.SelectedIndex = selectedIndex;
-        this.SchematicsLabelEditorOverlay.SelectedIndices = selectedIndices;
-        this.SchematicsLabelEditorOverlay.SelectionBounds = null;
-        this.SchematicsLabelEditorOverlay.HoveredIndex = -1;
-        this.SchematicsLabelEditorOverlay.DraftRectangle = this.thisLabelEditorDraftRectangle;
-        this.SchematicsLabelEditorOverlay.SnapGuides = Array.Empty<(Point Start, Point End)>();
-        this.SchematicsLabelEditorOverlay.BitmapPixelSize = this.currentFullResBitmap.PixelSize;
-        this.SchematicsLabelEditorOverlay.ViewMatrix = this.schematicsMatrix;
-        this.SchematicsLabelEditorOverlay.HighlightColor = highlightColor;
-        this.SchematicsLabelEditorOverlay.HighlightOpacity = highlightOpacity;
-        this.SchematicsLabelEditorOverlay.IsVisible = true;
+        this.SchematicsLabelEditorOverlay.ApplyState(
+            rectangles: rects,
+            selectedIndex: selectedIndex,
+            selectedIndices: selectedIndices,
+            selectionBounds: null,
+            hoveredIndex: -1,
+            draftRectangle: this.thisLabelEditorDraftRectangle,
+            snapGuides: snapGuides ?? Array.Empty<(Point Start, Point End)>(),
+            bitmapPixelSize: this.currentFullResBitmap.PixelSize,
+            viewMatrix: this.schematicsMatrix,
+            highlightColor: highlightColor,
+            highlightOpacity: highlightOpacity,
+            isVisible: true);
 
         this.UpdateComponentLabels();
     }
@@ -4227,8 +4273,7 @@ public partial class TabSchematics : UserControl
             row.Height = Math.Max(1.0, bottom - top);
         }
 
-        this.RefreshLabelEditorOverlay();
-        this.SchematicsLabelEditorOverlay.SnapGuides = snapGuides;
+        this.RefreshLabelEditorOverlay(snapGuides);
     }
 
     // ###########################################################################################
@@ -4250,7 +4295,12 @@ public partial class TabSchematics : UserControl
 
         this.thisLabelEditorDragMode = LabelEditorDragMode.None;
         this.thisLabelEditorOriginalDragRectangles.Clear();
-        this.SchematicsLabelEditorOverlay.SnapGuides = Array.Empty<(Point Start, Point End)>();
+
+        if (this.SchematicsLabelEditorOverlay.SnapGuides.Count > 0)
+        {
+            this.SetLabelEditorOverlayTransientState(
+                snapGuides: Array.Empty<(Point Start, Point End)>());
+        }
     }
 
     // ###########################################################################################
@@ -7947,5 +7997,344 @@ public partial class TabSchematics : UserControl
         this.RestoreLabelEditorUndoState(nextState);
         return true;
     }
+
+    // ###########################################################################################
+    // Clears the cached editor label visual pool so stale controls are not retained when the
+    // component label editor is inactive.
+    // ###########################################################################################
+    private void ResetEditorComponentLabelVisualCache()
+    {
+        this.thisEditorLabelContainers.Clear();
+        this.thisEditorLabelTextBlocks.Clear();
+        this.thisEditorLabelScaleTransforms.Clear();
+        this.thisLastEditorLabelVisualSignature = string.Empty;
+    }
+
+    // ###########################################################################################
+    // Ensures the reusable editor label visual pool contains at least the requested number of
+    // controls. Labels are created once and then reused during drag/resize operations.
+    // ###########################################################################################
+    private void EnsureEditorComponentLabelVisualPoolSize(int requiredCount)
+    {
+        while (this.thisEditorLabelContainers.Count < requiredCount)
+        {
+            var textBlock = new TextBlock
+            {
+                FontSize = 11,
+                FontWeight = FontWeight.Bold,
+                TextAlignment = TextAlignment.Center
+            };
+            textBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("Schematics_ComponentLabel_Fg"));
+
+            var innerBorder = new Border
+            {
+                BorderThickness = new Avalonia.Thickness(1),
+                CornerRadius = new Avalonia.CornerRadius(4),
+                Padding = new Avalonia.Thickness(6, 4),
+                Child = textBlock
+            };
+            innerBorder.Bind(Border.BackgroundProperty, this.GetResourceObservable("Schematics_ComponentLabel_Bg"));
+            innerBorder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("Schematics_ComponentLabel_Border"));
+
+            var scaleTransform = new ScaleTransform(1.0, 1.0);
+            var transformGroup = new TransformGroup();
+            transformGroup.Children.Add(scaleTransform);
+
+            var container = new Border
+            {
+                IsHitTestVisible = false,
+                IsVisible = false,
+                Child = innerBorder,
+                RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
+                RenderTransform = transformGroup
+            };
+
+            this.thisEditorLabelContainers.Add(container);
+            this.thisEditorLabelTextBlocks.Add(textBlock);
+            this.thisEditorLabelScaleTransforms.Add(scaleTransform);
+            this.SchematicsLabelsCanvas.Children.Add(container);
+        }
+    }
+
+    // ###########################################################################################
+    // Builds a lightweight signature for the currently visible editor labels so controls are only
+    // re-bound when the count or label text actually changes.
+    // ###########################################################################################
+    private string BuildEditorComponentLabelVisualSignature(IReadOnlyList<EditableComponentHighlight> rows)
+    {
+        if (rows.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var parts = new string[rows.Count];
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            parts[i] = rows[i].BoardLabel?.Trim() ?? string.Empty;
+        }
+
+        return string.Join("\u001F", parts);
+    }
+
+    // ###########################################################################################
+    // Updates the reusable editor label controls without clearing and rebuilding the entire canvas
+    // on every pointer move. This removes the large allocation churn that caused runaway memory.
+    // ###########################################################################################
+    private void UpdateEditorComponentLabels(
+        IReadOnlyList<EditableComponentHighlight> rows,
+        Rect contentRect,
+        double imgWidth,
+        double imgHeight,
+        double inverseScale)
+    {
+        if (this.thisEditorLabelContainers.Count == 0 && this.SchematicsLabelsCanvas.Children.Count > 0)
+        {
+            this.SchematicsLabelsCanvas.Children.Clear();
+        }
+
+        this.EnsureEditorComponentLabelVisualPoolSize(rows.Count);
+
+        string newSignature = this.BuildEditorComponentLabelVisualSignature(rows);
+        bool textChanged = !string.Equals(
+            this.thisLastEditorLabelVisualSignature,
+            newSignature,
+            StringComparison.Ordinal);
+
+        if (textChanged)
+        {
+            for (int i = 0; i < rows.Count; i++)
+            {
+                this.thisEditorLabelTextBlocks[i].Text = rows[i].BoardLabel;
+            }
+
+            this.thisLastEditorLabelVisualSignature = newSignature;
+        }
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            var container = this.thisEditorLabelContainers[i];
+            var scaleTransform = this.thisEditorLabelScaleTransforms[i];
+
+            double centerX = row.X + (row.Width / 2.0);
+            double centerY = row.Y + (row.Height / 2.0);
+
+            double localX = contentRect.X + (centerX / imgWidth) * contentRect.Width;
+            double localY = contentRect.Y + (centerY / imgHeight) * contentRect.Height;
+
+            scaleTransform.ScaleX = inverseScale;
+            scaleTransform.ScaleY = inverseScale;
+
+            bool needsMeasure =
+                textChanged ||
+                !container.IsVisible ||
+                container.DesiredSize.Width <= 0 ||
+                container.DesiredSize.Height <= 0;
+
+            container.IsVisible = true;
+
+            if (needsMeasure)
+            {
+                container.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            }
+
+            Size desiredSize = container.DesiredSize;
+
+            Canvas.SetLeft(container, localX - (desiredSize.Width / 2.0));
+            Canvas.SetTop(container, localY - (desiredSize.Height / 2.0));
+        }
+
+        for (int i = rows.Count; i < this.thisEditorLabelContainers.Count; i++)
+        {
+            this.thisEditorLabelContainers[i].IsVisible = false;
+        }
+    }
+
+    // ###########################################################################################
+    // Updates transient editor-overlay state such as hovered handles or snap guides without
+    // rebuilding the entire editor model or touching the reusable label pool.
+    // ###########################################################################################
+    private void SetLabelEditorOverlayTransientState(
+        int? hoveredIndex = null,
+        IReadOnlyList<(Point Start, Point End)>? snapGuides = null)
+    {
+        this.SchematicsLabelEditorOverlay.ApplyState(
+            rectangles: this.SchematicsLabelEditorOverlay.Rectangles,
+            selectedIndex: this.SchematicsLabelEditorOverlay.SelectedIndex,
+            selectedIndices: this.SchematicsLabelEditorOverlay.SelectedIndices,
+            selectionBounds: this.SchematicsLabelEditorOverlay.SelectionBounds,
+            hoveredIndex: hoveredIndex ?? this.SchematicsLabelEditorOverlay.HoveredIndex,
+            draftRectangle: this.SchematicsLabelEditorOverlay.DraftRectangle,
+            snapGuides: snapGuides ?? this.SchematicsLabelEditorOverlay.SnapGuides,
+            bitmapPixelSize: this.SchematicsLabelEditorOverlay.BitmapPixelSize,
+            viewMatrix: this.SchematicsLabelEditorOverlay.ViewMatrix,
+            highlightColor: this.SchematicsLabelEditorOverlay.HighlightColor,
+            highlightOpacity: this.SchematicsLabelEditorOverlay.HighlightOpacity,
+            isVisible: this.SchematicsLabelEditorOverlay.IsVisible);
+    }
+
+    // ###########################################################################################
+    // Clears all cached component-label visual pools so stale controls are not retained when the
+    // viewer is reset or when label rendering switches between standard and editor modes.
+    // ###########################################################################################
+    private void ResetComponentLabelVisualCaches()
+    {
+        this.thisEditorLabelContainers.Clear();
+        this.thisEditorLabelTextBlocks.Clear();
+        this.thisEditorLabelScaleTransforms.Clear();
+        this.thisLastEditorLabelVisualSignature = string.Empty;
+
+        this.thisStandardLabelContainers.Clear();
+        this.thisStandardLabelTextBlocks.Clear();
+        this.thisStandardLabelScaleTransforms.Clear();
+        this.thisLastStandardLabelVisualSignature = string.Empty;
+    }
+
+    // ###########################################################################################
+    // Clears the cached standard component-label visual pool so stale controls are not retained
+    // when normal label rendering is disabled or the editor takes ownership of the labels canvas.
+    // ###########################################################################################
+    private void ResetStandardComponentLabelVisualCache()
+    {
+        this.thisStandardLabelContainers.Clear();
+        this.thisStandardLabelTextBlocks.Clear();
+        this.thisStandardLabelScaleTransforms.Clear();
+        this.thisLastStandardLabelVisualSignature = string.Empty;
+    }
+
+    // ###########################################################################################
+    // Ensures the reusable standard component-label visual pool contains at least the requested
+    // number of controls. Labels are created once and then reused on later refreshes.
+    // ###########################################################################################
+    private void EnsureStandardComponentLabelVisualPoolSize(int requiredCount)
+    {
+        while (this.thisStandardLabelContainers.Count < requiredCount)
+        {
+            var textBlock = new TextBlock
+            {
+                FontSize = 11,
+                FontWeight = FontWeight.Bold,
+                TextAlignment = TextAlignment.Center
+            };
+            textBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("Schematics_ComponentLabel_Fg"));
+
+            var innerBorder = new Border
+            {
+                BorderThickness = new Avalonia.Thickness(1),
+                CornerRadius = new Avalonia.CornerRadius(4),
+                Padding = new Avalonia.Thickness(6, 4),
+                Child = textBlock
+            };
+            innerBorder.Bind(Border.BackgroundProperty, this.GetResourceObservable("Schematics_ComponentLabel_Bg"));
+            innerBorder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("Schematics_ComponentLabel_Border"));
+
+            var scaleTransform = new ScaleTransform(1.0, 1.0);
+            var transformGroup = new TransformGroup();
+            transformGroup.Children.Add(scaleTransform);
+
+            var container = new Border
+            {
+                IsHitTestVisible = false,
+                IsVisible = false,
+                Child = innerBorder,
+                RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
+                RenderTransform = transformGroup
+            };
+
+            this.thisStandardLabelContainers.Add(container);
+            this.thisStandardLabelTextBlocks.Add(textBlock);
+            this.thisStandardLabelScaleTransforms.Add(scaleTransform);
+            this.SchematicsLabelsCanvas.Children.Add(container);
+        }
+    }
+
+    // ###########################################################################################
+    // Builds a lightweight signature for the currently visible standard labels so text updates
+    // only occur when the visible label set actually changes.
+    // ###########################################################################################
+    private string BuildStandardComponentLabelVisualSignature(IReadOnlyList<(string Text, double LocalX, double LocalY)> labels)
+    {
+        if (labels.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var parts = new string[labels.Count];
+
+        for (int i = 0; i < labels.Count; i++)
+        {
+            parts[i] = labels[i].Text ?? string.Empty;
+        }
+
+        return string.Join("\u001F", parts);
+    }
+
+    // ###########################################################################################
+    // Updates the reusable standard component-label controls without clearing and rebuilding the
+    // entire canvas on every refresh. This removes the same allocation churn pattern that the
+    // editor labels originally suffered from.
+    // ###########################################################################################
+    private void UpdateStandardComponentLabels(
+        IReadOnlyList<(string Text, double LocalX, double LocalY)> labels,
+        double inverseScale)
+    {
+        if (this.thisStandardLabelContainers.Count == 0 && this.SchematicsLabelsCanvas.Children.Count > 0)
+        {
+            this.SchematicsLabelsCanvas.Children.Clear();
+        }
+
+        this.EnsureStandardComponentLabelVisualPoolSize(labels.Count);
+
+        string newSignature = this.BuildStandardComponentLabelVisualSignature(labels);
+        bool textChanged = !string.Equals(
+            this.thisLastStandardLabelVisualSignature,
+            newSignature,
+            StringComparison.Ordinal);
+
+        if (textChanged)
+        {
+            for (int i = 0; i < labels.Count; i++)
+            {
+                this.thisStandardLabelTextBlocks[i].Text = labels[i].Text;
+            }
+
+            this.thisLastStandardLabelVisualSignature = newSignature;
+        }
+
+        for (int i = 0; i < labels.Count; i++)
+        {
+            var label = labels[i];
+            var container = this.thisStandardLabelContainers[i];
+            var scaleTransform = this.thisStandardLabelScaleTransforms[i];
+
+            scaleTransform.ScaleX = inverseScale;
+            scaleTransform.ScaleY = inverseScale;
+
+            bool needsMeasure =
+                textChanged ||
+                !container.IsVisible ||
+                container.DesiredSize.Width <= 0 ||
+                container.DesiredSize.Height <= 0;
+
+            container.IsVisible = true;
+
+            if (needsMeasure)
+            {
+                container.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            }
+
+            Size desiredSize = container.DesiredSize;
+
+            Canvas.SetLeft(container, label.LocalX - (desiredSize.Width / 2.0));
+            Canvas.SetTop(container, label.LocalY - (desiredSize.Height / 2.0));
+        }
+
+        for (int i = labels.Count; i < this.thisStandardLabelContainers.Count; i++)
+        {
+            this.thisStandardLabelContainers[i].IsVisible = false;
+        }
+    }
+
 
 }
