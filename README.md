@@ -79,6 +79,7 @@ When a new version is released it will be shown to you in the application, and y
 ### Data contributions being worked on currently
 
 - **@Rabs** is doing an oscilloscope baseline for **Amstrad CPC 664**
+- I will create new board data for **C64 KU-14194HB** (excluding oscilloscope baseline, as I do not own any boards)
 - I will do the **PAL** oscilloscope baseline for **C128 DCR** - just need some time
 - Please let me know if you want to contribute with something, so it can be visualized here to avoid duplicate work.
 
