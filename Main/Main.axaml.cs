@@ -411,6 +411,15 @@ namespace CRT
             UserSettings.SetLastHardware(selectedHardware);
             UserSettings.SetLastBoardForHardware(selectedHardware, selectedBoard);
 
+            var boardKey = this.GetCurrentBoardKey();
+            var ratio = UserSettings.GetSchematicsSplitterRatio(boardKey);
+            var innerGrid = this.TabSchematicsControl.FindControl<Grid>("SchematicsInnerGrid");
+            if (innerGrid != null)
+            {
+                innerGrid.ColumnDefinitions[0].Width = new GridLength(ratio * 100.0, GridUnitType.Star);
+                innerGrid.ColumnDefinitions[2].Width = new GridLength((1.0 - ratio) * 100.0, GridUnitType.Star);
+            }
+
             var entry = DataManager.HardwareBoards.FirstOrDefault(ent =>
                 string.Equals(ent.HardwareName, selectedHardware, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(ent.BoardName, selectedBoard, StringComparison.OrdinalIgnoreCase));
@@ -430,7 +439,6 @@ namespace CRT
 
             // Populate category filter in insertion order
             var categories = BuildDistinctCategories(boardData);
-            var boardKey = this.GetCurrentBoardKey();
 
             this.CategoryFilterListBox.ItemsSource = categories;
 
@@ -540,14 +548,6 @@ namespace CRT
                     string.Equals(t.Name, savedSchematic, StringComparison.OrdinalIgnoreCase));
 
                 this.TabSchematicsControl.FindControl<ListBox>("SchematicsThumbnailList")!.SelectedIndex = savedIndex >= 0 ? savedIndex : 0;
-            }
-
-            var ratio = UserSettings.GetSchematicsSplitterRatio(boardKey);
-            var innerGrid = this.TabSchematicsControl.FindControl<Grid>("SchematicsInnerGrid");
-            if (innerGrid != null)
-            {
-                innerGrid.ColumnDefinitions[0].Width = new GridLength(ratio * 100.0, GridUnitType.Star);
-                innerGrid.ColumnDefinitions[2].Width = new GridLength((1.0 - ratio) * 100.0, GridUnitType.Star);
             }
 
             // Populate the Resources tab

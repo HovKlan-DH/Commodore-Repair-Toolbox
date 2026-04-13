@@ -4119,11 +4119,57 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Compatibility overload used by cursor and hover logic.
+    // Tries to hit one of the resize handles of any selected rectangle under the pointer.
+    // Corner handles are evaluated first, and side handles only exist in the center gap between
+    // corners so tiny components still allow true corner resizing in both X and Y.
     // ###########################################################################################
-    private bool TryGetSelectedLabelEditorHandleAtContainerPoint(Point pointerInContainer, out LabelEditorDragMode dragMode)
+    private bool TryGetSelectedLabelEditorHandleAtContainerPoint(
+        Point pointerInContainer,
+        out int workingIndex,
+        out LabelEditorDragMode dragMode)
     {
-        return this.TryGetSelectedLabelEditorHandleAtContainerPoint(pointerInContainer, out _, out dragMode);
+        workingIndex = -1;
+        dragMode = LabelEditorDragMode.None;
+
+        if (this.currentFullResBitmap == null)
+        {
+            return false;
+        }
+
+        if (!this.TryGetLabelEditorLocalPoint(pointerInContainer, out var localPoint))
+        {
+            return false;
+        }
+
+        double scale = Math.Max(0.0001, this.schematicsMatrix.M11);
+        string schematicName = this.GetCurrentSchematicName();
+
+        for (int i = this.thisLabelEditorWorkingHighlights.Count - 1; i >= 0; i--)
+        {
+            var row = this.thisLabelEditorWorkingHighlights[i];
+
+            if (!string.Equals(row.SchematicName, schematicName, StringComparison.OrdinalIgnoreCase) ||
+                !this.IsSelectedLabelEditorHighlight(row))
+            {
+                continue;
+            }
+
+            var localRect = this.ConvertLabelEditorPixelRectToLocalRect(new Rect(row.X, row.Y, row.Width, row.Height));
+
+            foreach (var hitTarget in BuildLabelEditorHandleHitRects(localRect, scale))
+            {
+                if (!hitTarget.HitRect.Contains(localPoint))
+                {
+                    continue;
+                }
+
+                workingIndex = i;
+                dragMode = hitTarget.DragMode;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // ###########################################################################################
@@ -7586,68 +7632,6 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Tries to hit one of the resize handles of any selected rectangle under the pointer.
-    // Returns the matching working-list index so drag behavior follows the hovered rectangle.
-    // ###########################################################################################
-    private bool TryGetSelectedLabelEditorHandleAtContainerPoint(
-        Point pointerInContainer,
-        out int workingIndex,
-        out LabelEditorDragMode dragMode)
-    {
-        workingIndex = -1;
-        dragMode = LabelEditorDragMode.None;
-
-        if (this.currentFullResBitmap == null)
-        {
-            return false;
-        }
-
-        if (!this.TryGetLabelEditorLocalPoint(pointerInContainer, out var localPoint))
-        {
-            return false;
-        }
-
-        double scale = Math.Max(0.0001, this.schematicsMatrix.M11);
-        double handleSize = Math.Clamp(10.0 / scale, 5.0, 18.0);
-        double half = handleSize / 2.0;
-
-        string schematicName = this.GetCurrentSchematicName();
-
-        for (int i = this.thisLabelEditorWorkingHighlights.Count - 1; i >= 0; i--)
-        {
-            var row = this.thisLabelEditorWorkingHighlights[i];
-
-            if (!string.Equals(row.SchematicName, schematicName, StringComparison.OrdinalIgnoreCase) ||
-                !this.IsSelectedLabelEditorHighlight(row))
-            {
-                continue;
-            }
-
-            var localRect = this.ConvertLabelEditorPixelRectToLocalRect(new Rect(row.X, row.Y, row.Width, row.Height));
-
-            var topLeft = new Rect(localRect.Left - half, localRect.Top - half, handleSize, handleSize);
-            var top = new Rect(localRect.Center.X - half, localRect.Top - half, handleSize, handleSize);
-            var topRight = new Rect(localRect.Right - half, localRect.Top - half, handleSize, handleSize);
-            var right = new Rect(localRect.Right - half, localRect.Center.Y - half, handleSize, handleSize);
-            var bottomRight = new Rect(localRect.Right - half, localRect.Bottom - half, handleSize, handleSize);
-            var bottom = new Rect(localRect.Center.X - half, localRect.Bottom - half, handleSize, handleSize);
-            var bottomLeft = new Rect(localRect.Left - half, localRect.Bottom - half, handleSize, handleSize);
-            var left = new Rect(localRect.Left - half, localRect.Center.Y - half, handleSize, handleSize);
-
-            if (topLeft.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeTopLeft; return true; }
-            if (top.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeTop; return true; }
-            if (topRight.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeTopRight; return true; }
-            if (right.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeRight; return true; }
-            if (bottomRight.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeBottomRight; return true; }
-            if (bottom.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeBottom; return true; }
-            if (bottomLeft.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeBottomLeft; return true; }
-            if (left.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeLeft; return true; }
-        }
-
-        return false;
-    }
-
-    // ###########################################################################################
     // Handle manual row clicks for board-specific pin-1 marking.
     // ###########################################################################################
     private void OnBoardMarkPin1OnSelectedComponentRowClicked(object? sender, PointerPressedEventArgs e)
@@ -8335,6 +8319,71 @@ public partial class TabSchematics : UserControl
             this.thisStandardLabelContainers[i].IsVisible = false;
         }
     }
+
+    // ###########################################################################################
+    // Builds non-overlapping resize-handle hit rectangles so corner drags keep two-axis behavior
+    // even when the selected component is too small for all handle zones to coexist.
+    // ###########################################################################################
+    private static List<(Rect HitRect, LabelEditorDragMode DragMode)> BuildLabelEditorHandleHitRects(Rect localRect, double scale)
+    {
+        double handleSize = Math.Clamp(10.0 / scale, 5.0, 18.0);
+        double half = handleSize / 2.0;
+        double minimumGap = Math.Clamp(2.0 / scale, 1.0, 4.0);
+
+        var hitRects = new List<(Rect HitRect, LabelEditorDragMode DragMode)>(8)
+        {
+            (new Rect(localRect.Left - half, localRect.Top - half, handleSize, handleSize), LabelEditorDragMode.ResizeTopLeft),
+            (new Rect(localRect.Right - half, localRect.Top - half, handleSize, handleSize), LabelEditorDragMode.ResizeTopRight),
+            (new Rect(localRect.Right - half, localRect.Bottom - half, handleSize, handleSize), LabelEditorDragMode.ResizeBottomRight),
+            (new Rect(localRect.Left - half, localRect.Bottom - half, handleSize, handleSize), LabelEditorDragMode.ResizeBottomLeft)
+        };
+
+        double horizontalSideHitLength = Math.Max(0.0, localRect.Width - handleSize - minimumGap);
+        if (horizontalSideHitLength > 0.0)
+        {
+            double horizontalSideLeft = localRect.Center.X - (horizontalSideHitLength / 2.0);
+
+            hitRects.Add((new Rect(horizontalSideLeft, localRect.Top - half, horizontalSideHitLength, handleSize), LabelEditorDragMode.ResizeTop));
+            hitRects.Add((new Rect(horizontalSideLeft, localRect.Bottom - half, horizontalSideHitLength, handleSize), LabelEditorDragMode.ResizeBottom));
+        }
+
+        double verticalSideHitLength = Math.Max(0.0, localRect.Height - handleSize - minimumGap);
+        if (verticalSideHitLength > 0.0)
+        {
+            double verticalSideTop = localRect.Center.Y - (verticalSideHitLength / 2.0);
+
+            hitRects.Add((new Rect(localRect.Right - half, verticalSideTop, handleSize, verticalSideHitLength), LabelEditorDragMode.ResizeRight));
+            hitRects.Add((new Rect(localRect.Left - half, verticalSideTop, handleSize, verticalSideHitLength), LabelEditorDragMode.ResizeLeft));
+        }
+
+        return hitRects;
+    }
+
+    // ###########################################################################################
+    // Compatibility overload used by cursor and hover logic.
+    // ###########################################################################################
+    private bool TryGetSelectedLabelEditorHandleAtContainerPoint(Point pointerInContainer, out LabelEditorDragMode dragMode)
+    {
+        return this.TryGetSelectedLabelEditorHandleAtContainerPoint(pointerInContainer, out _, out dragMode);
+    }
+
+    // ###########################################################################################
+    // Applies the persisted schematics/thumbnail split ratio for the supplied board key.
+    // Called early so the splitter does not flash at the default centered position.
+    // ###########################################################################################
+    public void ApplySchematicsSplitterRatio(string boardKey)
+    {
+        double ratio = Math.Clamp(
+            string.IsNullOrWhiteSpace(boardKey)
+                ? 0.5
+                : UserSettings.GetSchematicsSplitterRatio(boardKey),
+            0.05,
+            0.95);
+
+        this.SchematicsInnerGrid.ColumnDefinitions[0].Width = new GridLength(ratio * 100.0, GridUnitType.Star);
+        this.SchematicsInnerGrid.ColumnDefinitions[2].Width = new GridLength((1.0 - ratio) * 100.0, GridUnitType.Star);
+    }
+
 
 
 }

@@ -1,5 +1,6 @@
 - **Application**
   - Fixed (again) `ESCAPE` did not close active component info popup in Linux, if set to "Open multiple windows for popup" #84
+  - Fixed horizontal splitter in "Schematics" tab is shown in correct position at application launch
   - Added option for how KiCad traces should be highlighted on hover in "Configuration" tab
   - Added option for highlighting first pin on component, if schematic has KiCad data
   - Changes in "Enable component label editor":
@@ -10,6 +11,9 @@
   - Changed KiCad calibration points only includes pads and reference texts
 - **Data**
   - C
+    - 250407
+      - Reexported KiCad images in a better quality
+      - Relabeled all KiCad images
     - 250469
       - Reexported KiCad images in a better quality
       - Relabeled all KiCad images

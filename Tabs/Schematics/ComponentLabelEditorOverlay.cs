@@ -254,15 +254,39 @@ namespace Tabs.TabSchematics
 
         // ###########################################################################################
         // Draws compact square marker segments at the 4 corners and 4 side centers of the selected
-        // rectangle. Rectangles are used instead of lines so the marker ends stay crisp and square.
+        // rectangle. On very small rectangles, side markers are reduced or suppressed so they do
+        // not overlap the corner markers and imply the wrong resize behavior.
         // ###########################################################################################
         private void DrawSelectionMarkers(DrawingContext context, Rect rect, double scale)
         {
             double markerThickness = Math.Clamp(2.5 / scale, 1.0, 2.5);
-            double cornerLength = Math.Clamp(6.5 / scale, 3.0, 6.5);
-            double sideLength = Math.Clamp(5.0 / scale, 2.5, 5.5);
+            double baseCornerLength = Math.Clamp(6.5 / scale, 3.0, 6.5);
+            double baseSideLength = Math.Clamp(5.0 / scale, 2.5, 5.5);
             double halfThickness = markerThickness / 2.0;
-            double sideHalf = sideLength / 2.0;
+
+            double maxCornerLengthX = Math.Max(markerThickness, (rect.Width / 2.0) + halfThickness);
+            double maxCornerLengthY = Math.Max(markerThickness, (rect.Height / 2.0) + halfThickness);
+
+            double cornerLengthX = Math.Min(baseCornerLength, maxCornerLengthX);
+            double cornerLengthY = Math.Min(baseCornerLength, maxCornerLengthY);
+
+            double minimumGap = Math.Clamp(2.0 / scale, markerThickness, 3.0);
+
+            double horizontalSideLength = Math.Max(0.0, rect.Width - (cornerLengthX * 2.0) - minimumGap);
+            double verticalSideLength = Math.Max(0.0, rect.Height - (cornerLengthY * 2.0) - minimumGap);
+
+            if (horizontalSideLength > 0.0)
+            {
+                horizontalSideLength = Math.Min(baseSideLength, horizontalSideLength);
+            }
+
+            if (verticalSideLength > 0.0)
+            {
+                verticalSideLength = Math.Min(baseSideLength, verticalSideLength);
+            }
+
+            double horizontalSideHalf = horizontalSideLength / 2.0;
+            double verticalSideHalf = verticalSideLength / 2.0;
 
             var markerBrush = new SolidColorBrush(this.thisHighlightColor, 1.0);
 
@@ -273,22 +297,29 @@ namespace Tabs.TabSchematics
             double centerX = rect.Center.X;
             double centerY = rect.Center.Y;
 
-            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, top - halfThickness, cornerLength, markerThickness));
-            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, top - halfThickness, markerThickness, cornerLength));
+            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, top - halfThickness, cornerLengthX, markerThickness));
+            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, top - halfThickness, markerThickness, cornerLengthY));
 
-            context.DrawRectangle(markerBrush, null, new Rect(right - cornerLength + halfThickness, top - halfThickness, cornerLength, markerThickness));
-            context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, top - halfThickness, markerThickness, cornerLength));
+            context.DrawRectangle(markerBrush, null, new Rect(right - cornerLengthX + halfThickness, top - halfThickness, cornerLengthX, markerThickness));
+            context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, top - halfThickness, markerThickness, cornerLengthY));
 
-            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, bottom - halfThickness, cornerLength, markerThickness));
-            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, bottom - cornerLength + halfThickness, markerThickness, cornerLength));
+            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, bottom - halfThickness, cornerLengthX, markerThickness));
+            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, bottom - cornerLengthY + halfThickness, markerThickness, cornerLengthY));
 
-            context.DrawRectangle(markerBrush, null, new Rect(right - cornerLength + halfThickness, bottom - halfThickness, cornerLength, markerThickness));
-            context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, bottom - cornerLength + halfThickness, markerThickness, cornerLength));
+            context.DrawRectangle(markerBrush, null, new Rect(right - cornerLengthX + halfThickness, bottom - halfThickness, cornerLengthX, markerThickness));
+            context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, bottom - cornerLengthY + halfThickness, markerThickness, cornerLengthY));
 
-            context.DrawRectangle(markerBrush, null, new Rect(centerX - sideHalf, top - halfThickness, sideLength, markerThickness));
-            context.DrawRectangle(markerBrush, null, new Rect(centerX - sideHalf, bottom - halfThickness, sideLength, markerThickness));
-            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, centerY - sideHalf, markerThickness, sideLength));
-            context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, centerY - sideHalf, markerThickness, sideLength));
+            if (horizontalSideLength > 0.0)
+            {
+                context.DrawRectangle(markerBrush, null, new Rect(centerX - horizontalSideHalf, top - halfThickness, horizontalSideLength, markerThickness));
+                context.DrawRectangle(markerBrush, null, new Rect(centerX - horizontalSideHalf, bottom - halfThickness, horizontalSideLength, markerThickness));
+            }
+
+            if (verticalSideLength > 0.0)
+            {
+                context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, centerY - verticalSideHalf, markerThickness, verticalSideLength));
+                context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, centerY - verticalSideHalf, markerThickness, verticalSideLength));
+            }
         }
 
         // ###########################################################################################
@@ -378,6 +409,10 @@ namespace Tabs.TabSchematics
 
             this.InvalidateVisual();
         }
+
+
+        
+
 
 
     }
