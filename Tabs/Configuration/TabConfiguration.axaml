@@ -1,26 +1,85 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="CRT.TabConfiguration">
+
+	<UserControl.Styles>
+		<Style Selector="ComboBox">
+			<Setter Property="Background" Value="{DynamicResource Form_Bg}" />
+			<Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource Form_Border}" />
+		</Style>
+
+		<Style Selector="ComboBoxItem">
+			<Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
+		</Style>
+
+		<Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Form_Selected_Hover_Bg}" />
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected /template/ ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Form_Selected_Bg}" />
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected">
+			<Setter Property="Foreground" Value="{DynamicResource Form_Selected_Fg}" />
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Form_Selected_Hover_Bg}" />
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected:pointerover">
+			<Setter Property="Foreground" Value="{DynamicResource Form_Selected_Fg}" />
+		</Style>
+	</UserControl.Styles>
+
 	<StackPanel Spacing="8"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
                 Margin="16">
+
 
 		<TextBlock Text="Appearance"
                    FontSize="12"
                    FontWeight="SemiBold"
                    Margin="0,0,0,4" />
 
-		<CheckBox x:Name="ThemeToggleSwitch"
-                  Content="Use dark theme" />
+		<TextBlock Text="Theme" />
+
+		<ComboBox x:Name="ThemeVariantComboBox"
+                  MinWidth="180">
+			<ComboBoxItem Content="Light" />
+			<ComboBoxItem Content="Dark" />
+			<ComboBoxItem Content="User preference" />
+		</ComboBox>
+
+		<Button x:Name="ReloadUserPreferenceThemeButton"
+                Content="Reload user preference colors"
+                HorizontalAlignment="Left"
+                Click="OnReloadUserPreferenceThemeClick" />
 
 		<TextBlock Text="Component Information Popup"
-                   FontSize="12"
-                   FontWeight="SemiBold"
-                   Margin="0,16,0,4" />
+           FontSize="12"
+           FontWeight="SemiBold"
+           Margin="0,16,0,4" />
 
 		<CheckBox x:Name="MultipleInstancesForComponentPopupToggleSwitch"
-                  Content="Open multiple windows for popup" />
+				  Content="Open multiple windows for popup" />
+
+		<TextBlock Text="Interactive CAD traces"
+				   FontSize="12"
+				   FontWeight="SemiBold"
+				   Margin="0,16,0,4" />
+
+		<RadioButton x:Name="InteractiveCadTraceHoverAlwaysRadioButton"
+					 GroupName="InteractiveCadTraceHoverModeGroup"
+					 Content="Always highlight traces on hover"
+					 IsChecked="True" />
+
+		<RadioButton x:Name="InteractiveCadTraceHoverHoldShiftRadioButton"
+					 GroupName="InteractiveCadTraceHoverModeGroup"
+					 Content="Hold SHIFT to highlight traces on hover" />
 
 		<TextBlock Text="Application Update"
                    FontSize="12"

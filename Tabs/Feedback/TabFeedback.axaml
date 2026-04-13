@@ -9,29 +9,27 @@
                 Text="Email address (optional, but required if you want any reply):" FontSize="12" />
             <TextBox
                 x:Name="EmailTextBox"
-                Watermark="your.email@example.com"
-                FontSize="12"
-                Background="{DynamicResource Main_InputField_Bg}"
-                Foreground="{DynamicResource Main_InputField_Fg}">
+                PlaceholderText="your.email@example.com"
+                FontSize="12" >
 
                 <TextBox.Styles>
                     <!-- Prevent Background and Border changes on Hover -->
                     <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
-                        <Setter Property="Background" Value="{DynamicResource Main_InputField_Bg}" />
+                        <Setter Property="Background" Value="{DynamicResource Form_Bg}" />
                     </Style>
 
                     <!-- Prevent Background changes on Click/Focus -->
                     <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
-                        <Setter Property="Background" Value="{DynamicResource Main_InputField_Bg}" />
+                        <Setter Property="Background" Value="{DynamicResource Form_Bg}" />
                     </Style>
 
                     <!-- Prevent Foreground changes on Hover and Focus -->
                     <Style Selector="TextBox:pointerover">
-                        <Setter Property="Foreground" Value="{DynamicResource Main_InputField_Fg}" />
+                        <Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
                     </Style>
 
                     <Style Selector="TextBox:focus">
-                        <Setter Property="Foreground" Value="{DynamicResource Main_InputField_Fg}" />
+                        <Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
                     </Style>
                 </TextBox.Styles>
             </TextBox>
@@ -41,29 +39,29 @@
         <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="0,0,0,16">
             <TextBlock Grid.Row="0" Text="Your feedback:" FontSize="12" Margin="0,0,0,4" />
             <TextBox Grid.Row="1" x:Name="FeedbackTextBox"
-                     Background="{DynamicResource Main_TextField_Bg}"
-                     Foreground="{DynamicResource Main_TextField_Fg}"
+                     Background="{DynamicResource Form_Bg}"
+                     Foreground="{DynamicResource Form_Fg}"
                      AcceptsReturn="True" TextWrapping="Wrap"
-                     Watermark="Describe your issue, suggestion or question...">
+                     PlaceholderText="Describe your issue, suggestion or question...">
                 <TextBox.Styles>
 
                     <!-- Prevent Background and Border changes on Hover -->
                     <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
-                        <Setter Property="Background" Value="{DynamicResource Main_TextField_Bg}" />
+                        <Setter Property="Background" Value="{DynamicResource Form_Bg}" />
                     </Style>
 
                     <!-- Prevent Background changes on Click/Focus -->
                     <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
-                        <Setter Property="Background" Value="{DynamicResource Main_TextField_Bg}" />
+                        <Setter Property="Background" Value="{DynamicResource Form_Bg}" />
                     </Style>
 
                     <!-- Prevent Foreground changes on Hover and Focus -->
                     <Style Selector="TextBox:pointerover">
-                        <Setter Property="Foreground" Value="{DynamicResource Main_TextField_Fg}" />
+                        <Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
                     </Style>
 
                     <Style Selector="TextBox:focus">
-                        <Setter Property="Foreground" Value="{DynamicResource Main_TextField_Fg}" />
+                        <Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
                     </Style>
                 </TextBox.Styles>
             </TextBox>
@@ -82,7 +80,7 @@
 				<Button x:Name="ClearAttachmentsButton" Content="Clear attachments" Click="OnClearAttachmentsClick" IsEnabled="False" />
 			</StackPanel>
 			<ListBox x:Name="AttachmentsListBox" Height="160"
-			         Background="{DynamicResource List_Bg}"
+			         Background="{DynamicResource Form_Bg}"
 			         BorderBrush="{DynamicResource Panel_Border}" BorderThickness="1" CornerRadius="4">
 				<ListBox.Styles>
 					<Style Selector="ListBoxItem">
@@ -109,11 +107,11 @@
 			<TextBlock.Styles>
 				<!-- When the code adds the "success" class, use the themed resource -->
 				<Style Selector="TextBlock.success">
-					<Setter Property="Foreground" Value="{DynamicResource Feedback_SubmittedOk_Fg}" />
+					<Setter Property="Foreground" Value="{DynamicResource Text_Success_Fg}" />
 				</Style>
 				<!-- When the code adds the "error" class, use OrangeRed -->
 				<Style Selector="TextBlock.error">
-					<Setter Property="Foreground" Value="{DynamicResource Feedback_SubmittedFail_Fg}" />
+					<Setter Property="Foreground" Value="{DynamicResource Text_Fail_Fg}" />
 				</Style>
 			</TextBlock.Styles>
 		</TextBlock>

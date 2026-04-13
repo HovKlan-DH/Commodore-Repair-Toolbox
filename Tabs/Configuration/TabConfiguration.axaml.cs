@@ -14,13 +14,20 @@ namespace CRT
         {
             this.InitializeComponent();
 
-            // Determine if Dark Theme is actively evaluated during startup.
-            var isDark = Application.Current?.RequestedThemeVariant == Avalonia.Styling.ThemeVariant.Dark ||
-                         (Application.Current?.RequestedThemeVariant == Avalonia.Styling.ThemeVariant.Default &&
-                          Application.Current?.ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark);
+            this.ThemeVariantComboBox.SelectedIndex = UserSettings.ThemeVariant switch
+            {
+                "Dark" => 1,
+                "UserPreference" => 2,
+                _ => 0
+            };
 
-            this.ThemeToggleSwitch.IsChecked = isDark;
             this.MultipleInstancesForComponentPopupToggleSwitch.IsChecked = UserSettings.MultipleInstancesForComponentPopup;
+
+            bool isInteractiveCadTraceHoverHoldShiftMode =
+                string.Equals(UserSettings.InteractiveCadTraceHoverMode, "HoldShift", StringComparison.Ordinal);
+
+            this.InteractiveCadTraceHoverAlwaysRadioButton.IsChecked = !isInteractiveCadTraceHoverHoldShiftMode;
+            this.InteractiveCadTraceHoverHoldShiftRadioButton.IsChecked = isInteractiveCadTraceHoverHoldShiftMode;
 
             // Initialize configuration checkboxes — subscribe after setting initial values
             // to avoid triggering redundant saves during startup
@@ -30,8 +37,10 @@ namespace CRT
             this.ValidateDataOnLaunchCheckBox.IsChecked = UserSettings.ValidateDataOnLaunch;
             this.DebugLoggingCheckBox.IsChecked = UserSettings.DebugLogging;
 
-            this.ThemeToggleSwitch.IsCheckedChanged += this.OnThemeToggleSwitchChanged;
+            this.ThemeVariantComboBox.SelectionChanged += this.OnThemeVariantSelectionChanged;
             this.MultipleInstancesForComponentPopupToggleSwitch.IsCheckedChanged += this.OnMultipleInstancesForComponentPopupChanged;
+            this.InteractiveCadTraceHoverAlwaysRadioButton.IsCheckedChanged += this.OnInteractiveCadTraceHoverModeChanged;
+            this.InteractiveCadTraceHoverHoldShiftRadioButton.IsCheckedChanged += this.OnInteractiveCadTraceHoverModeChanged;
             this.CheckVersionOnLaunchCheckBox.IsCheckedChanged += this.OnCheckVersionOnLaunchChanged;
             this.CheckDataOnLaunchCheckBox.IsCheckedChanged += this.OnCheckDataOnLaunchChanged;
             this.ShowDevelopmentVersionNotificationCheckBox.IsCheckedChanged += this.OnShowDevelopmentVersionNotificationChanged;
@@ -40,19 +49,40 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Applies and persists the selected application theme dynamically.
+        // Persists the global interactive CAD trace hover mode selected in configuration.
         // ###########################################################################################
-        private void OnThemeToggleSwitchChanged(object? sender, RoutedEventArgs e)
+        private void OnInteractiveCadTraceHoverModeChanged(object? sender, RoutedEventArgs e)
         {
-            var isDark = this.ThemeToggleSwitch.IsChecked == true;
-            var newVariant = isDark ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light;
-
-            if (Application.Current != null)
+            if (this.InteractiveCadTraceHoverAlwaysRadioButton.IsChecked == true)
             {
-                Application.Current.RequestedThemeVariant = newVariant;
+                UserSettings.InteractiveCadTraceHoverMode = "Always";
+                return;
             }
 
-            UserSettings.ThemeVariant = isDark ? "Dark" : "Light";
+            if (this.InteractiveCadTraceHoverHoldShiftRadioButton.IsChecked == true)
+            {
+                UserSettings.InteractiveCadTraceHoverMode = "HoldShift";
+            }
+        }
+
+        // ###########################################################################################
+        // Applies and persists the selected application theme from the drop-down list.
+        // ###########################################################################################
+        private void OnThemeVariantSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            var themeVariant = this.ThemeVariantComboBox.SelectedIndex switch
+            {
+                1 => "Dark",
+                2 => "UserPreference",
+                _ => "Light"
+            };
+
+            UserSettings.ThemeVariant = themeVariant;
+
+            if (Application.Current is App app)
+            {
+                app.ApplyConfiguredTheme();
+            }
         }
 
         // ###########################################################################################
@@ -136,5 +166,26 @@ namespace CRT
                 Logger.Warning($"Failed to open app data folder - [{directory}] - [{ex.Message}]");
             }
         }
+
+        // ###########################################################################################
+        // Reloads user preference colors from the settings file and reapplies the current theme.
+        // ###########################################################################################
+        private void OnReloadUserPreferenceThemeClick(object? sender, RoutedEventArgs e)
+        {
+            if (Application.Current is App app)
+            {
+                app.ApplyConfiguredTheme();
+            }
+        }
+
+
+
+
+
+
+
+
+
+
     }
 }

@@ -19,12 +19,12 @@
 					   VerticalAlignment="Center"
 					   FontSize="14"
 					   FontWeight="SemiBold"
-					   Foreground="{DynamicResource Main_Fg}" />
+					   Foreground="{DynamicResource Fg}" />
 		</Border>
 
 		<!-- Splitter shown when showing fullscreen image -->
 		<Border Grid.Column="1"
-				Background="{DynamicResource Main_Splitter}" />
+				Background="{DynamicResource Splitter}" />
 
 		<ListBox x:Name="SchematicsThumbnailListPlaceholder"
                  Grid.Column="2"
@@ -104,7 +104,7 @@
 									<TextBlock Text="Missing Image"
 											   HorizontalAlignment="Center"
 											   VerticalAlignment="Center"
-											   Foreground="{DynamicResource Main_Fg}"
+											   Foreground="{DynamicResource Fg}"
 											   FontSize="11"
 											   Padding="8,16"
 											   TextAlignment="Center"

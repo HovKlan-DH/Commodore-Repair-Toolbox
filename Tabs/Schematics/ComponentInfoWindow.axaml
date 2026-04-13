@@ -36,7 +36,7 @@
 
 		<Style Selector="Button.ComponentResourceLinkButton">
 			<Setter Property="Background" Value="Transparent" />
-			<Setter Property="Foreground" Value="{DynamicResource Main_Link_Fg}" />
+			<Setter Property="Foreground" Value="{DynamicResource Link_Fg}" />
 			<Setter Property="Padding" Value="0" />
 			<Setter Property="BorderThickness" Value="0" />
 			<Setter Property="Cursor" Value="Hand" />
@@ -56,7 +56,7 @@
 		</Style>
 
 		<Style Selector="Button.ComponentResourceLinkButton:pointerover TextBlock">
-			<Setter Property="Foreground" Value="{DynamicResource Main_LinkHover_Fg}" />
+			<Setter Property="Foreground" Value="{DynamicResource LinkHover_Fg}" />
 		</Style>
 
 		<Style Selector="Button.ComponentResourceLinkButton:pressed /template/ ContentPresenter">
@@ -74,7 +74,7 @@
 		<Style Selector="TextBlock.ComponentResourceHeaderText">
 			<Setter Property="FontWeight" Value="Bold" />
 			<Setter Property="FontSize" Value="12" />
-			<Setter Property="Foreground" Value="{DynamicResource Main_Header_Fg}" />
+			<Setter Property="Foreground" Value="{DynamicResource Fg}" />
 		</Style>
 		
 	</Window.Styles>
@@ -98,7 +98,7 @@
 							   HorizontalAlignment="Center"
 							   VerticalAlignment="Center"
 							   FontSize="12"
-							   Foreground="{DynamicResource Main_Header_Fg}" />
+							   Foreground="{DynamicResource Fg}" />
 
 					<!-- Wrap the Image in a Border to apply the background tightly to the image bounds -->
 					<Border x:Name="MainImageContainer"
@@ -300,8 +300,7 @@
 			<!-- Horizontal splitter -->
 			<GridSplitter Grid.Row="1"
                           ResizeDirection="Rows"
-                          HorizontalAlignment="Stretch"
-                          Background="{DynamicResource Main_Splitter}" />
+                          HorizontalAlignment="Stretch" />
 
 			<!-- Bottom: horizontally scrollable thumbnail gallery -->
 			<Border Grid.Row="2"
@@ -348,7 +347,7 @@
 									Width="110"
 									Margin="0"
 									CornerRadius="2"
-									Background="{DynamicResource Main_Bg}">
+									Background="{DynamicResource Bg}">
 
 								<!-- Single cell: image + label overlay -->
 								<Grid MinHeight="40">
@@ -357,7 +356,7 @@
 											   HorizontalAlignment="Center"
 											   VerticalAlignment="Center"
 											   FontSize="10"
-											   Foreground="{DynamicResource Main_Header_Fg}" />
+											   Foreground="{DynamicResource Fg}" />
 
 									<!-- Match the large image behavior exactly: background only, no border -->
 									<Border HorizontalAlignment="Center"
@@ -396,8 +395,7 @@
 		<!-- Vertical splitter (full height) -->
 		<GridSplitter Grid.Column="1"
                       ResizeDirection="Columns"
-                      HorizontalAlignment="Stretch"
-                      Background="{DynamicResource Main_Splitter}" />
+                      HorizontalAlignment="Stretch" />
 
 		<!-- Right panel: component info -->
 		<Grid Grid.Column="2"
@@ -419,7 +417,7 @@
 					<SelectableTextBlock x:Name="InfoCategoryPartNumber"
 										 TextWrapping="Wrap"
 										 FontSize="12"
-										 Foreground="{DynamicResource Main_Header_Fg}"
+										 Foreground="{DynamicResource Fg}"
 										 IsVisible="False" />
 
 					<!-- 3. Component one-liner (hidden when empty) -->
@@ -432,7 +430,7 @@
 									   Text="Component one-liner"
 									   FontSize="10"
 									   FontWeight="SemiBold"
-									   Foreground="{DynamicResource Main_Header_Fg}" />
+									   Foreground="{DynamicResource Fg}" />
 							<TextBox Grid.Row="1"
 									 x:Name="InfoDescription"
 									 IsReadOnly="True"
@@ -452,7 +450,7 @@
 									   Text="Image note"
 									   FontSize="10"
 									   FontWeight="SemiBold"
-									   Foreground="{DynamicResource Main_Header_Fg}" />
+									   Foreground="{DynamicResource Fg}" />
 							<TextBox Grid.Row="1"
 									 x:Name="InfoNote"
 									 IsReadOnly="True"
@@ -556,7 +554,7 @@
 			<!-- Footer controls: local region, mousewheel behavior, keyboard handling, close -->
 			<Border x:Name="RegionControlsBorder"
 					Grid.Row="2"
-					BorderBrush="{DynamicResource Main_Divider}"
+					BorderBrush="{DynamicResource Splitter}"
 					BorderThickness="0,1,0,0"
 					Padding="0,6,0,0"
 					Margin="0,6,0,0">

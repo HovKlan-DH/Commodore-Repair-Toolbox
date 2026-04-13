@@ -7,7 +7,7 @@
 		<!-- Minimal hyperlink button style -->
 		<Style Selector="Button.LinkButton">
 			<Setter Property="Background" Value="Transparent" />
-			<Setter Property="Foreground" Value="{DynamicResource Main_Link_Fg}" />
+			<Setter Property="Foreground" Value="{DynamicResource Link_Fg}" />
 			<Setter Property="Padding" Value="8,4" />
 			<Setter Property="BorderThickness" Value="0" />
 			<Setter Property="Cursor" Value="Hand" />
@@ -19,7 +19,7 @@
 			<Setter Property="Background" Value="Transparent" />
 		</Style>
 		<Style Selector="Button.LinkButton:pointerover TextBlock">
-			<Setter Property="Foreground" Value="{DynamicResource Main_LinkHover_Fg}" />
+			<Setter Property="Foreground" Value="{DynamicResource LinkHover_Fg}" />
 		</Style>
 
 		<Style Selector="Button.LinkButton:pressed /template/ ContentPresenter">
@@ -79,7 +79,7 @@
                         BorderThickness="0"
 						Cursor="Hand"
                         Background="Transparent"
-                        Foreground="{DynamicResource Main_Link_Fg}"
+                        Foreground="{DynamicResource Link_Fg}"
                         Click="OnGitHubProjectPageClick" />
 			</StackPanel>
 
@@ -93,7 +93,7 @@
 						BorderThickness="0"
 						Cursor="Hand"
 						Background="Transparent"
-						Foreground="{DynamicResource Main_Link_Fg}"
+						Foreground="{DynamicResource Link_Fg}"
 						Click="OnHelperPageClick" />
 			</StackPanel>
 
@@ -198,7 +198,7 @@
 			<TextBlock Margin="0,16,0,0"
 					   TextWrapping="Wrap"
                        Text="Credits will in many cases not be fully represented, but the idea is that at least the main author or contributor should be listed. If more than one person, then the one with the most contribution is placed on top, though this also probably sometimes can be quite hard figuring out exactly. Small contributions are not listed, and the amount contributed for a place here should be &quot;substantial&quot;."
-					   Foreground="{DynamicResource Main_Header_Fg}"
+					   Foreground="{DynamicResource Fg}"
 					   />
 			
 		</StackPanel>

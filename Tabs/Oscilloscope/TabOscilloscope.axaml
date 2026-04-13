@@ -18,7 +18,7 @@
 					<TextBlock Grid.Row="0"
 							   Text="Vendor"
 							   FontSize="11"
-							   Foreground="{DynamicResource Main_Header_Fg}" />
+							   Foreground="{DynamicResource Fg}" />
 					<ComboBox Grid.Row="1"
 							  x:Name="VendorComboBox"
 							  HorizontalAlignment="Stretch" />
@@ -30,7 +30,7 @@
 					<TextBlock Grid.Row="0"
 							   Text="Series or model"
 							   FontSize="11"
-							   Foreground="{DynamicResource Main_Header_Fg}" />
+							   Foreground="{DynamicResource Fg}" />
 					<ComboBox Grid.Row="1"
 							  x:Name="SeriesOrModelComboBox"
 							  HorizontalAlignment="Stretch" />
@@ -46,13 +46,13 @@
 								   Grid.Column="0"
 								   Text="IP address or FQDN"
 								   FontSize="11"
-								   Foreground="{DynamicResource Main_Header_Fg}" />
+								   Foreground="{DynamicResource Fg}" />
 
 						<TextBlock Grid.Row="0"
 								   Grid.Column="2"
 								   Text="TCP port"
 								   FontSize="11"
-								   Foreground="{DynamicResource Main_Header_Fg}" />
+								   Foreground="{DynamicResource Fg}" />
 
 						<TextBox Grid.Row="1"
 								 Grid.Column="0"
@@ -60,10 +60,8 @@
 								 FontSize="12"
 								 MinHeight="0"
 								 Padding="6,4"
-								 Background="{DynamicResource Main_InputField_Bg}"
-								 Foreground="{DynamicResource Main_InputField_Fg}"
 								 VerticalContentAlignment="Center"
-								 Watermark="192.168.0.100 or scope.local" />
+								 PlaceholderText="192.168.0.100 or scope.local" />
 
 						<TextBox Grid.Row="1"
 								 Grid.Column="2"
@@ -73,8 +71,6 @@
 								 FontSize="12"
 								 MinHeight="0"
 								 Padding="6,4"
-								 Background="{DynamicResource Main_InputField_Bg}"
-								 Foreground="{DynamicResource Main_InputField_Fg}"
 								 VerticalContentAlignment="Center"
 								 HorizontalContentAlignment="Right"
 								 TextInput="OnPortTextBoxTextInput"
@@ -85,19 +81,17 @@
 						<TextBlock Grid.Row="0"
 								   Text="Image save folder"
 								   FontSize="11"
-								   Foreground="{DynamicResource Main_Header_Fg}" />
+								   Foreground="{DynamicResource Fg}" />
 
 						<TextBox Grid.Row="1"
 								 x:Name="OscilloscopeImageFolderTextBox"
 								 FontSize="12"
 								 MinHeight="0"
 								 Padding="6,4"
-								 Background="{DynamicResource Main_InputField_Bg}"
-								 Foreground="{DynamicResource Main_InputField_Fg}"
 								 VerticalContentAlignment="Center"
 								 IsReadOnly="True"
 								 TextWrapping="Wrap"
-								 Watermark="No folder selected" />
+								 PlaceholderText="No folder selected" />
 					</Grid>
 
 					<StackPanel Orientation="Horizontal"
@@ -147,8 +141,7 @@
 
 		<GridSplitter Grid.Column="1"
 					  ResizeDirection="Columns"
-					  HorizontalAlignment="Stretch"
-					  Background="{DynamicResource Main_Splitter}" />
+					  HorizontalAlignment="Stretch" />
 
 		<Border Grid.Column="2"
 				Padding="0">

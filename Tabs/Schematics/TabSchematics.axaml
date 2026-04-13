@@ -30,7 +30,7 @@
                            VerticalAlignment="Center"
                            FontSize="14"
                            FontWeight="SemiBold"
-                           Foreground="{DynamicResource Main_Fg}"
+                           Foreground="{DynamicResource Fg}"
                            IsVisible="False" />
 
 				<Image x:Name="SchematicsImage"
@@ -105,15 +105,15 @@
 
 					<Border x:Name="SchematicsNameBorder"
 							IsVisible="False"
-				Background="{DynamicResource Schematics_Name_Bg}"
-				BorderBrush="{DynamicResource Schematics_Name_Border}"
-				BorderThickness="1"
-				CornerRadius="4"
-				Padding="8,4">
+							Background="{DynamicResource Schematics_Name_Bg}"
+							BorderBrush="{DynamicResource Schematics_Name_Border}"
+							BorderThickness="1"
+							CornerRadius="4"
+							Padding="8,4">
 						<TextBlock x:Name="SchematicsNameLabel"
-					   FontSize="11"
-					   FontWeight="Normal"
-					   Foreground="{DynamicResource Schematics_Name_Fg}" />
+						   FontSize="11"
+						   FontWeight="Normal"
+						   Foreground="{DynamicResource Schematics_Name_Fg}" />
 					</Border>
 
 					<Border x:Name="SchematicsRegionBorder"
@@ -257,7 +257,36 @@
 							</StackPanel>
 
 							<StackPanel x:Name="BoardSettingsListPanel" Spacing="4">
-								<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnBoardHoverHighlightsTracesRowClicked">
+
+								<StackPanel x:Name="BoardMarkPin1OnSelectedComponentRow"
+									IsVisible="False"
+									Orientation="Horizontal"
+									Spacing="6"
+									Background="Transparent"
+									Cursor="Hand"
+									PointerPressed="OnBoardMarkPin1OnSelectedComponentRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckBoardMarkPin1OnSelectedComponent"
+												  MinHeight="0"
+												  Margin="0"
+												  Padding="0"
+												  CornerRadius="2"
+												  IsChecked="False"
+												  IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Mark first pin on component"
+											   FontSize="11"
+											   Foreground="{DynamicResource SchematicsPanels_Fg}"
+											   VerticalAlignment="Center"
+											   IsHitTestVisible="False"/>
+								</StackPanel>
+								
+								<StackPanel x:Name="BoardHoverHighlightsTracesRow"
+									Orientation="Horizontal"
+									Spacing="6"
+									Background="Transparent"
+									Cursor="Hand"
+									PointerPressed="OnBoardHoverHighlightsTracesRowClicked">
 									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
 										<CheckBox x:Name="CheckBoardHoverHighlightsTraces" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="True" IsHitTestVisible="False" />
 									</Viewbox>
@@ -350,7 +379,6 @@
 
 						<TextBlock Text="🗑"
 								   FontSize="16"
-								   Foreground="IndianRed"
 								   Cursor="Hand"
 								   PointerPressed="OnPaletteDeleteClicked"
 								   VerticalAlignment="Center"
@@ -421,8 +449,7 @@
 		<GridSplitter x:Name="SchematicsSplitter"
                       Grid.Column="1"
                       ResizeDirection="Columns"
-                      HorizontalAlignment="Stretch"
-                      Background="{DynamicResource Main_Splitter}" />
+                      HorizontalAlignment="Stretch" />
 
 		<ListBox x:Name="SchematicsThumbnailList"
                  Grid.Column="2"
@@ -522,7 +549,7 @@
 									<TextBlock Text="Missing Image"
 											   HorizontalAlignment="Center"
 											   VerticalAlignment="Center"
-											   Foreground="{DynamicResource Main_Fg}"
+											   Foreground="{DynamicResource Fg}"
 											   FontSize="11"
 											   Padding="8,16"
 											   TextAlignment="Center"
@@ -614,37 +641,37 @@
 						Content="Enable component label editor"
 						HorizontalAlignment="Stretch" />
 
+				<Button x:Name="CopyKiCadWorldPointCandidatesButton"
+					Content="Copy KiCad calibration points"
+					HorizontalAlignment="Stretch" />
+				
 				<Button x:Name="BeginKiCadCalibrationButton"
 									Content="Capture image calibration point"
-									HorizontalAlignment="Stretch" />
-
-				<Button x:Name="CopyKiCadWorldPointCandidatesButton"
-									Content="Copy CAD reference points"
 									HorizontalAlignment="Stretch" />
 
 				<Button x:Name="CancelKiCadCalibrationButton"
                         Content="Cancel image calibration capture"
                         IsVisible="False"
                         HorizontalAlignment="Stretch"
-                        Foreground="{DynamicResource Button_Discard_Fg}"
-                        Background="{DynamicResource Button_Discard_Bg}"
-                        BorderBrush="{DynamicResource Button_Discard_Border}" />
+                        Foreground="{DynamicResource Button_Cancel_Fg}"
+                        Background="{DynamicResource Button_Cancel_Bg}"
+                        BorderBrush="{DynamicResource Button_Cancel_Border}" />
 
 				<Button x:Name="CancelLabelEditorChangesButton"
 						Content="Discard all editor changes"
 						IsVisible="False"
 						HorizontalAlignment="Stretch"
-						Foreground="{DynamicResource Button_Discard_Fg}"
-						Background="{DynamicResource Button_Discard_Bg}"
-						BorderBrush="{DynamicResource Button_Discard_Border}" />
+						Foreground="{DynamicResource Button_Cancel_Fg}"
+						Background="{DynamicResource Button_Cancel_Bg}"
+						BorderBrush="{DynamicResource Button_Cancel_Border}" />
 
 				<Button x:Name="ApplyLabelEditorChangesButton"
 						Content="Apply all editor changes"
 						IsVisible="False"
 						HorizontalAlignment="Stretch"
-						Foreground="{DynamicResource Button_Apply_Fg}"
-						Background="{DynamicResource Button_Apply_Bg}"
-						BorderBrush="{DynamicResource Button_Apply_Border}" />
+						Foreground="{DynamicResource Button_Ok_Fg}"
+						Background="{DynamicResource Button_Ok_Bg}"
+						BorderBrush="{DynamicResource Button_Ok_Border}" />
 			</StackPanel>
 		</Border>
 

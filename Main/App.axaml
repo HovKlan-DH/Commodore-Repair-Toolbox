@@ -14,47 +14,47 @@
                 <ResourceDictionary x:Key="Light">
 
 					<!-- Light, Generic colors -->
-					<SolidColorBrush x:Key="Main_TabUnderline_Selected">IndianRed</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_TabUnderline_Hover">#ecc3c3</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_Link_Fg">Blue</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_LinkHover_Fg">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_Border">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_Bg">White</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_Fg">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_Header_Fg">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_InputField_Bg">White</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_InputField_Fg">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_TextField_Bg">White</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_TextField_Fg">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_Splitter">Gray</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_Divider">Gray</SolidColorBrush>
-					<SolidColorBrush x:Key="List_Bg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="List_Fg">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="List_Selected_Bg">LightBlue</SolidColorBrush>
-					<SolidColorBrush x:Key="List_Selected_Hover_Bg">SkyBlue</SolidColorBrush>
-					<SolidColorBrush x:Key="List_Selected_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="List_Border">Gray</SolidColorBrush>
+					<SolidColorBrush x:Key="Bg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Fg">Black</SolidColorBrush>
+					<SolidColorBrush x:Key="Border">Black</SolidColorBrush>
+					<SolidColorBrush x:Key="Form_Bg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Form_Fg">Black</SolidColorBrush>
+					<SolidColorBrush x:Key="Form_Border">Gray</SolidColorBrush>
+					<SolidColorBrush x:Key="Form_Selected_Bg">LightBlue</SolidColorBrush>
+					<SolidColorBrush x:Key="Form_Selected_Fg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Form_Selected_Hover_Bg">SkyBlue</SolidColorBrush>
+					<SolidColorBrush x:Key="Splitter">Gray</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Bg">LightGray</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Fg">Black</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Border">DarkGray</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Ok_Bg">#4F8A5B</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Ok_Fg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Ok_Border">#3E6E48</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Cancel_Bg">IndianRed</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Cancel_Fg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Cancel_Border">#B85C5C</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Highlighted_Bg">IndianRed</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Highlighted_Fg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Highlighted_Border">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Panel_Border">Gray</SolidColorBrush>
+					<SolidColorBrush x:Key="Link_Fg">Blue</SolidColorBrush>
+					<SolidColorBrush x:Key="LinkHover_Fg">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="Table_Header_Bg">LightGray</SolidColorBrush>
 					<SolidColorBrush x:Key="Table_Header_Fg">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="Table_Bg">White</SolidColorBrush>
 					<SolidColorBrush x:Key="Table_Fg">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="Table_BorderRowLine">#EEEEEE</SolidColorBrush>
 					<SolidColorBrush x:Key="Table_RowHover_Bg">#E1F0FA</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Highlighted_Bg">IndianRed</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Highlighted_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Discard_Bg">IndianRed</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Discard_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Discard_Border">#B85C5C</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Apply_Bg">#4F8A5B</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Apply_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Apply_Border">#3E6E48</SolidColorBrush>
-					<SolidColorBrush x:Key="Panel_Border">Gray</SolidColorBrush>
-
-					<!-- Light, Main, banners -->
-					<SolidColorBrush x:Key="MainBanner_Bg">#4C1515</SolidColorBrush>
-					<SolidColorBrush x:Key="MainBanner_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="MainBannerButtonsHover_Bg">#4F3528</SolidColorBrush>
-					<SolidColorBrush x:Key="MainBannerButtonsHover_Fg">#DDE0DA</SolidColorBrush>
+					<SolidColorBrush x:Key="Text_Success_Fg">#547131</SolidColorBrush>
+					<SolidColorBrush x:Key="Text_Fail_Fg">IndianRed</SolidColorBrush>
+					
+					<!-- Light, Main -->
+					<SolidColorBrush x:Key="Main_TabUnderline_Selected">IndianRed</SolidColorBrush>
+					<SolidColorBrush x:Key="Main_TabUnderline_Hover">#ecc3c3</SolidColorBrush>
+					<SolidColorBrush x:Key="Main_Banner_Bg">#4C1515</SolidColorBrush>
+					<SolidColorBrush x:Key="Main_Banner_Fg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Main_BannerButtonsHover_Bg">#4F3528</SolidColorBrush>
+					<SolidColorBrush x:Key="Main_BannerButtonsHover_Fg">#DDE0DA</SolidColorBrush>
 					
                     <!-- Light, Schematics tab -->
                     <SolidColorBrush x:Key="Schematics_Name_Bg">Khaki</SolidColorBrush>
@@ -109,15 +109,11 @@
 					<SolidColorBrush x:Key="ComponentPopup_KeyboardTyping_Fg">White</SolidColorBrush>
 					<SolidColorBrush x:Key="ComponentPopup_KeyboardTyping_Border">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="ComponentPopup_ImageTransparent_Bg">White</SolidColorBrush>
-					<!-- Replace "ComponentPopup_BulletList_Fg" with same table style as rest -->
 					<SolidColorBrush x:Key="ComponentPopup_BulletList_Fg">Red</SolidColorBrush>
 					
                     <!-- Light, Feedback tab -->
                     <SolidColorBrush x:Key="Feedback_TrashIcon_Fg">IndianRed</SolidColorBrush>
-                    <SolidColorBrush x:Key="Feedback_Submit_Fg">White</SolidColorBrush>
-                    <SolidColorBrush x:Key="Feedback_SubmittedOk_Fg">#547131</SolidColorBrush>
-                    <SolidColorBrush x:Key="Feedback_SubmittedFail_Fg">IndianRed</SolidColorBrush>
-
+                    
                 </ResourceDictionary>
 
 				<!-- ########################################################################### -->
@@ -127,49 +123,49 @@
                 <ResourceDictionary x:Key="Dark">
 
                     <!-- Dark, Generic colors -->
-					<SolidColorBrush x:Key="Main_TabUnderline_Selected">IndianRed</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_TabUnderline_Hover">#ecc3c3</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_Link_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_LinkHover_Fg">#E8DDCF</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_Border">LightGray</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_Bg">#201C1A</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_Fg">#E8E0DA</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_Header_Fg">#A3938A</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_InputField_Bg">#2A2421</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_InputField_Fg">#E8DDCF</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_TextField_Bg">#2A2421</SolidColorBrush>
-                    <SolidColorBrush x:Key="Main_TextField_Fg">#E8DDCF</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_Splitter">Gray</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_Divider">Gray</SolidColorBrush>
-					<SolidColorBrush x:Key="List_Bg">#2A2421</SolidColorBrush>
-					<SolidColorBrush x:Key="List_Fg">#E8DDCF</SolidColorBrush>
-					<SolidColorBrush x:Key="List_Selected_Bg">#735443</SolidColorBrush>
-					<SolidColorBrush x:Key="List_Selected_Hover_Bg">#5E4334</SolidColorBrush>
-					<SolidColorBrush x:Key="List_Selected_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="List_Border">#524842</SolidColorBrush>
+					<SolidColorBrush x:Key="Bg">#201C1A</SolidColorBrush>
+					<SolidColorBrush x:Key="Fg">#E8E0DA</SolidColorBrush>
+					<SolidColorBrush x:Key="Border">LightGray</SolidColorBrush>
+					<SolidColorBrush x:Key="Form_Bg">#2A2421</SolidColorBrush>
+					<SolidColorBrush x:Key="Form_Fg">#E8DDCF</SolidColorBrush>
+					<SolidColorBrush x:Key="Form_Border">#524842</SolidColorBrush>
+					<SolidColorBrush x:Key="Form_Selected_Bg">#735443</SolidColorBrush>
+					<SolidColorBrush x:Key="Form_Selected_Fg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Form_Selected_Hover_Bg">#5E4334</SolidColorBrush>
+					<SolidColorBrush x:Key="Splitter">Gray</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Bg">#3E342F</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Fg">#E8E0D4</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Border">#524842</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Ok_Bg">#4F8A5B</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Ok_Fg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Ok_Border">#3E6E48</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Cancel_Bg">IndianRed</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Cancel_Fg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Cancel_Border">#B85C5C</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Highlighted_Bg">#B87352</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Highlighted_Fg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Button_Highlighted_Border">#B87352</SolidColorBrush>
+					<SolidColorBrush x:Key="Panel_Border">#524842</SolidColorBrush>
+					<SolidColorBrush x:Key="Link_Fg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="LinkHover_Fg">#E8DDCF</SolidColorBrush>
 					<SolidColorBrush x:Key="Table_Header_Bg">#3E342F</SolidColorBrush>
 					<SolidColorBrush x:Key="Table_Header_Fg">#E8DDCF</SolidColorBrush>
 					<SolidColorBrush x:Key="Table_Bg">#2A2421</SolidColorBrush>
 					<SolidColorBrush x:Key="Table_Fg">#E8DDCF</SolidColorBrush>
 					<SolidColorBrush x:Key="Table_BorderRowLine">#3E342F</SolidColorBrush>
 					<SolidColorBrush x:Key="Table_RowHover_Bg">#3C2F28</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Highlighted_Bg">#B87352</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Highlighted_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Discard_Bg">IndianRed</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Discard_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Discard_Border">#B85C5C</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Apply_Bg">#4F8A5B</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Apply_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Apply_Border">#3E6E48</SolidColorBrush>
-					<SolidColorBrush x:Key="Panel_Border">#524842</SolidColorBrush>
-					
+					<SolidColorBrush x:Key="Text_Success_Fg">#4ADE80</SolidColorBrush>
+					<SolidColorBrush x:Key="Text_Fail_Fg">#EF4444</SolidColorBrush>
+
 					<!-- Dark, Main, banners -->
-					<SolidColorBrush x:Key="MainBanner_Bg">#38241A</SolidColorBrush>
-					<SolidColorBrush x:Key="MainBanner_Fg">#E8E0DA</SolidColorBrush>
-					<SolidColorBrush x:Key="MainBannerButtonsHover_Bg">#4F3528</SolidColorBrush>
-					<SolidColorBrush x:Key="MainBannerButtonsHover_Fg">#DDE0DA</SolidColorBrush>
-					
-                    <!-- Dark, Schematics tab -->
+					<SolidColorBrush x:Key="Main_TabUnderline_Selected">IndianRed</SolidColorBrush>
+					<SolidColorBrush x:Key="Main_TabUnderline_Hover">#ecc3c3</SolidColorBrush>
+					<SolidColorBrush x:Key="Main_Banner_Bg">#38241A</SolidColorBrush>
+					<SolidColorBrush x:Key="Main_Banner_Fg">#E8E0DA</SolidColorBrush>
+					<SolidColorBrush x:Key="Main_BannerButtonsHover_Bg">#4F3528</SolidColorBrush>
+					<SolidColorBrush x:Key="Main_BannerButtonsHover_Fg">#DDE0DA</SolidColorBrush>
+
+					<!-- Dark, Schematics tab -->
                     <SolidColorBrush x:Key="Schematics_Name_Bg">Khaki</SolidColorBrush>
                     <SolidColorBrush x:Key="Schematics_Name_Fg">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_Name_Border">Black</SolidColorBrush>
@@ -194,6 +190,14 @@
                     <Color x:Key="Schematics_TracePalette_Color3">#0BC419</Color>
                     <Color x:Key="Schematics_TracePalette_Color4">#E6E600</Color>
 
+					<!-- Dark, Thumbnail -->
+					<SolidColorBrush x:Key="Thumbnail_Border">LightGray</SolidColorBrush>
+					<SolidColorBrush x:Key="Thumbnail_BorderSelected">IndianRed</SolidColorBrush>
+					<SolidColorBrush x:Key="Thumbnail_Bg">#3D302A</SolidColorBrush>
+					<SolidColorBrush x:Key="Thumbnail_Fg">LightGray</SolidColorBrush>
+					<SolidColorBrush x:Key="Thumbnail_Selection_Bg">#4682B4</SolidColorBrush>
+					<SolidColorBrush x:Key="Thumbnail_Selection_Fg">White</SolidColorBrush>
+					
 					<!-- Dark, Component info popup -->
 					<SolidColorBrush x:Key="ComponentPopup_Name_Bg">Khaki</SolidColorBrush>
 					<SolidColorBrush x:Key="ComponentPopup_Name_Fg">Black</SolidColorBrush>
@@ -214,22 +218,10 @@
 					<SolidColorBrush x:Key="ComponentPopup_KeyboardTyping_Fg">DarkOliveGreen</SolidColorBrush>
 					<SolidColorBrush x:Key="ComponentPopup_KeyboardTyping_Border">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="ComponentPopup_ImageTransparent_Bg">#A99F99</SolidColorBrush>
-					<!-- Replace "ComponentPopup_BulletList_Fg" with same table style as rest -->
 					<SolidColorBrush x:Key="ComponentPopup_BulletList_Fg">Blue</SolidColorBrush>
-					
-					<!-- Dark, Thumbnail -->
-					<SolidColorBrush x:Key="Thumbnail_Border">LightGray</SolidColorBrush>
-					<SolidColorBrush x:Key="Thumbnail_BorderSelected">IndianRed</SolidColorBrush>
-					<SolidColorBrush x:Key="Thumbnail_Bg">#3D302A</SolidColorBrush>
-					<SolidColorBrush x:Key="Thumbnail_Fg">LightGray</SolidColorBrush>
-					<SolidColorBrush x:Key="Thumbnail_Selection_Bg">#4682B4</SolidColorBrush>
-					<SolidColorBrush x:Key="Thumbnail_Selection_Fg">White</SolidColorBrush>
 					
                     <!-- Dark, Feedback tab -->
                     <SolidColorBrush x:Key="Feedback_TrashIcon_Fg">IndianRed</SolidColorBrush>
-                    <SolidColorBrush x:Key="Feedback_Submit_Fg">White</SolidColorBrush>
-                    <SolidColorBrush x:Key="Feedback_SubmittedOk_Fg">#4ADE80</SolidColorBrush>
-                    <SolidColorBrush x:Key="Feedback_SubmittedFail_Fg">#EF4444</SolidColorBrush>
 
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
@@ -252,7 +244,157 @@
             </FluentTheme.Palettes>
         </FluentTheme>
 
-        <!-- Give the ColorPicker in "Schematics" tab its visual layout -->
+		<!-- ### -->
+		
+		<!-- Tab, Hover -->
+		<Style Selector="TabItem:pointerover /template/ Border#PART_SelectedPipe">
+			<Setter Property="Background" Value="{DynamicResource Main_TabUnderline_Hover}" />
+		</Style>
+
+		<!-- Tab, Selected -->
+		<Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
+			<Setter Property="Background" Value="{DynamicResource Main_TabUnderline_Selected}" />
+		</Style>
+
+		<!-- Banner install button: explicit hover/pressed backgrounds -->
+		<Style Selector="Button.BannerInstallButton">
+			<Setter Property="Background" Value="{DynamicResource Button_Highlighted_Bg}" />
+		</Style>
+		<Style Selector="Button.BannerInstallButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Button_Highlighted_Bg}" />
+		</Style>
+		<Style Selector="Button.BannerInstallButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Button_Highlighted_Bg}" />
+		</Style>
+
+		<!-- Banner dismiss button: subtle hover on dark background -->
+		<Style Selector="Button.BannerDismissButton">
+			<Setter Property="Foreground" Value="{DynamicResource Main_Banner_Fg}" />
+			<Setter Property="Background" Value="Transparent" />
+		</Style>
+		<Style Selector="Button.BannerDismissButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Main_BannerButtonsHover_Bg}" />
+			<Setter Property="Foreground" Value="{DynamicResource Main_BannerButtonsHover_Fg}" />
+		</Style>
+
+		<Style Selector="ListBox">
+			<Setter Property="Background" Value="{DynamicResource Form_Bg}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource Form_Border}" />
+		</Style>
+
+		<Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Form_Selected_Hover_Bg}" />
+		</Style>
+		<Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Form_Selected_Bg}" />
+		</Style>
+		<Style Selector="ListBoxItem:selected">
+			<Setter Property="Foreground" Value="{DynamicResource Form_Selected_Fg}" />
+		</Style>
+		<Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Form_Selected_Hover_Bg}" />
+		</Style>
+		<Style Selector="ListBoxItem:selected:pointerover">
+			<Setter Property="Foreground" Value="{DynamicResource Form_Selected_Fg}" />
+		</Style>
+
+		<Style Selector="ListBoxItem">
+			<Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
+		</Style>
+
+		<Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Form_Selected_Hover_Bg}" />
+		</Style>
+
+		<!-- Selected state -->
+		<Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Form_Selected_Bg}" />
+		</Style>
+		<Style Selector="ListBoxItem:selected">
+			<Setter Property="Foreground" Value="{DynamicResource Form_Selected_Fg}" />
+		</Style>
+
+		<!-- Selected hover state -->
+		<Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Form_Selected_Hover_Bg}" />
+		</Style>
+		<Style Selector="ListBoxItem:selected:pointerover">
+			<Setter Property="Foreground" Value="{DynamicResource Form_Selected_Fg}" />
+		</Style>
+
+		<!-- This is INPUT field -->
+		<Style Selector="TextBox">
+			<Setter Property="Background" Value="{DynamicResource Form_Bg}" />
+			<Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
+		</Style>
+
+		<!-- Prevent Background and Border changes on Hover -->
+		<Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+			<Setter Property="Background" Value="{DynamicResource Form_Bg}" />
+		</Style>
+
+		<!-- Prevent Background changes on Click/Focus -->
+		<Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+			<Setter Property="Background" Value="{DynamicResource Form_Bg}" />
+		</Style>
+
+		<!-- Prevent Foreground changes on Hover and Focus -->
+		<Style Selector="TextBox:pointerover">
+			<Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
+		</Style>
+
+		<Style Selector="TextBox:focus">
+			<Setter Property="Background" Value="{DynamicResource Form_Bg}" />
+			<Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
+		</Style>
+
+		<Style Selector="ComboBox">
+			<Setter Property="Background" Value="{DynamicResource Form_Bg}" />
+			<Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource Form_Border}" />
+		</Style>
+
+		<Style Selector="ComboBoxItem">
+			<Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
+		</Style>
+
+		<Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Form_Selected_Hover_Bg}" />
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected /template/ ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Form_Selected_Bg}" />
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected">
+			<Setter Property="Foreground" Value="{DynamicResource Form_Selected_Fg}" />
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Form_Selected_Hover_Bg}" />
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected:pointerover">
+			<Setter Property="Foreground" Value="{DynamicResource Form_Selected_Fg}" />
+		</Style>
+
+		<Style Selector="GridSplitter">
+			<Setter Property="Background" Value="{DynamicResource Splitter}" />
+		</Style>
+
+		<Style Selector="TextBlock">
+			<Setter Property="Foreground" Value="{DynamicResource Fg}" />
+		</Style>
+
+		<Style Selector="Button">
+			<Setter Property="Background" Value="{DynamicResource Button_Bg}" />
+			<Setter Property="Foreground" Value="{DynamicResource Button_Fg}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource Button_Border}" />
+		</Style>
+
+		<!-- ### -->
+
+		<!-- Give the ColorPicker in "Schematics" tab its visual layout -->
         <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
 
     </Application.Styles>

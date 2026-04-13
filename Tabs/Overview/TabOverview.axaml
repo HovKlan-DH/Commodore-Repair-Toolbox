@@ -41,7 +41,6 @@
 		<Style Selector="TextBlock.OverviewHeaderText">
 			<Setter Property="FontWeight" Value="Bold" />
 			<Setter Property="FontSize" Value="12" />
-			<Setter Property="Foreground" Value="{DynamicResource Main_Header_Fg}" />
 		</Style>
 
 		<Style Selector="Button.OverviewFloatingPrintButton">
@@ -201,7 +200,7 @@
 										        Cursor="Hand"
 										        Click="OnComponentClick">
 											<TextBlock Text="{Binding Component}"
-											           Foreground="{DynamicResource Main_Link_Fg}" />
+											           Foreground="{DynamicResource Link_Fg}" />
 										</Button>
 
 										<SelectableTextBlock Grid.Column="1"
@@ -257,7 +256,7 @@
 															           IsVisible="{Binding IsWebLink}"
 															           Foreground="{DynamicResource Table_Fg}" />
 															<TextBlock Text="{Binding Name}"
-															           Foreground="{DynamicResource Main_Link_Fg}"
+															           Foreground="{DynamicResource Link_Fg}"
 															           TextWrapping="Wrap" />
 														</StackPanel>
 													</Button>

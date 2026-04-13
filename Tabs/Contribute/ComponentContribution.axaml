@@ -7,19 +7,19 @@
         Height="900"
         MinWidth="900"
         MinHeight="600"
-        Background="{DynamicResource Main_Bg}"
-        Foreground="{DynamicResource Main_Fg}">
+        Background="{DynamicResource Bg}"
+        Foreground="{DynamicResource Fg}">
 
 	<Window.Styles>
 		<Style Selector="Expander">
 			<Setter Property="HorizontalAlignment" Value="Stretch" />
 			<Setter Property="HorizontalContentAlignment" Value="Stretch" />
-			<Setter Property="Background" Value="{DynamicResource Main_Bg}" />
+			<Setter Property="Background" Value="{DynamicResource Bg}" />
 		</Style>
 
 		<!-- Content area stays on the normal window background -->
 		<Style Selector="Expander /template/ ContentPresenter">
-			<Setter Property="Background" Value="{DynamicResource Main_Bg}" />
+			<Setter Property="Background" Value="{DynamicResource Bg}" />
 		</Style>
 
 		<!-- Only the top expand/collapse header gets the alternate background -->
@@ -29,7 +29,7 @@
 		</Style>
 
 		<Style Selector="Expander /template/ Border">
-			<Setter Property="Background" Value="{DynamicResource Main_Bg}" />
+			<Setter Property="Background" Value="{DynamicResource Bg}" />
 		</Style>
 
 		<Style Selector="Button.HighlightAddRowButton">
@@ -55,19 +55,19 @@
 					<TextBlock x:Name="ComponentTitleTextBlock"
 					           FontSize="14"
 					           FontWeight="SemiBold"
-					           Foreground="{DynamicResource Main_Header_Fg}" />
+					           Foreground="{DynamicResource Fg}" />
 					<TextBlock x:Name="HardwareContextTextBlock"
 							   FontSize="12"
 							   FontFamily="Consolas,Courier New,monospace"
-							   Foreground="{DynamicResource Main_Header_Fg}" />
+							   Foreground="{DynamicResource Fg}" />
 					<TextBlock x:Name="BoardContextTextBlock"
 							   FontSize="12"
 							   FontFamily="Consolas,Courier New,monospace"
-							   Foreground="{DynamicResource Main_Header_Fg}" />
+							   Foreground="{DynamicResource Fg}" />
 					<TextBlock x:Name="RegionContextTextBlock"
 							   FontSize="12"
 							   FontFamily="Consolas,Courier New,monospace"
-							   Foreground="{DynamicResource Main_Header_Fg}" />
+							   Foreground="{DynamicResource Fg}" />
 				</StackPanel>
 			</Grid>
 		</Border>
@@ -87,7 +87,7 @@
 						           FontSize="15"
 						           FontWeight="Bold" />
 						<TextBlock TextWrapping="Wrap"
-						           Foreground="{DynamicResource Main_Fg}">
+						           Foreground="{DynamicResource Fg}">
 							All data below is editable suggestions. The current values are preloaded from the board data. When submitted, the full payload is sent to the developer for review together with your comment.
 						</TextBlock>
 					</StackPanel>
@@ -109,7 +109,7 @@
 						            HorizontalAlignment="Stretch">
 							<TextBlock Text="Component"
 							           FontSize="12"
-							           Foreground="{DynamicResource Main_Header_Fg}" />
+							           Foreground="{DynamicResource Fg}" />
 
 							<ItemsControl x:Name="ComponentRowsItemsControl">
 								<ItemsControl.ItemTemplate>
@@ -187,7 +187,7 @@
 								<TextBlock x:Name="ComponentImagesRegionTextBlock"
 									   FontSize="12"
 									   VerticalAlignment="Center"
-									   Foreground="{DynamicResource Main_Header_Fg}" />
+									   Foreground="{DynamicResource Fg}" />
 								<Button Grid.Column="1"
 								        Classes="HighlightAddRowButton"
 								        Content="Add new component image"
@@ -318,11 +318,11 @@
 								<StackPanel Grid.Column="0" Spacing="2">
 									<TextBlock Text="Describe all files specifically for this component."
 											   FontSize="12"
-											   Foreground="{DynamicResource Main_Header_Fg}" />
+											   Foreground="{DynamicResource Fg}" />
 									<TextBlock Text="This could e.g. be datasheets, technical instructions, manuals or whatever is relevant specifically for this component."
 											   FontSize="12"
 											   TextWrapping="Wrap"
-											   Foreground="{DynamicResource Main_Header_Fg}" />
+											   Foreground="{DynamicResource Fg}" />
 								</StackPanel>
 								<Button Grid.Column="1"
 										Classes="HighlightAddRowButton"
@@ -398,11 +398,11 @@
 								<StackPanel Grid.Column="0" Spacing="2">
 									<TextBlock Text="Describe all links specifically for this component."
 											   FontSize="12"
-											   Foreground="{DynamicResource Main_Header_Fg}" />
+											   Foreground="{DynamicResource Fg}" />
 									<TextBlock Text="This could links for technical instructions or basically any link relevant specifically for this component."
 											   FontSize="12"
 											   TextWrapping="Wrap"
-											   Foreground="{DynamicResource Main_Header_Fg}" />
+											   Foreground="{DynamicResource Fg}" />
 								</StackPanel>
 								<Button Grid.Column="1"
 										Classes="HighlightAddRowButton"
@@ -466,11 +466,11 @@
 								<StackPanel Grid.Column="0" Spacing="2">
 									<TextBlock Text="Describe all files specifically for the board."
 											   FontSize="12"
-											   Foreground="{DynamicResource Main_Header_Fg}" />
+											   Foreground="{DynamicResource Fg}" />
 									<TextBlock Text="These files are more generic and cover e.g. service or troubleshooting manuals, that can be used for the entire board."
 											   FontSize="12"
 											   TextWrapping="Wrap"
-											   Foreground="{DynamicResource Main_Header_Fg}" />
+											   Foreground="{DynamicResource Fg}" />
 								</StackPanel>
 								<Button Grid.Column="1"
 										Classes="HighlightAddRowButton"
@@ -546,11 +546,11 @@
 								<StackPanel Grid.Column="0" Spacing="2">
 									<TextBlock Text="Describe all links specifically for the board."
 											   FontSize="12"
-											   Foreground="{DynamicResource Main_Header_Fg}" />
+											   Foreground="{DynamicResource Fg}" />
 									<TextBlock Text="These links could typically be for content covering this board, e.g. board repairing histories or YouTube videos specifically for this board."
 											   FontSize="12"
 											   TextWrapping="Wrap"
-											   Foreground="{DynamicResource Main_Header_Fg}" />
+											   Foreground="{DynamicResource Fg}" />
 								</StackPanel>
 								<Button Grid.Column="1"
 										Classes="HighlightAddRowButton"
@@ -601,22 +601,22 @@
 						           FontWeight="Bold" />
 						<TextBlock Text="Describe what you have changed, what was wrong or missing, and anything the developer should verify."
 						           FontSize="11"
-						           Foreground="{DynamicResource Main_Header_Fg}"
+						           Foreground="{DynamicResource Fg}"
 						           TextWrapping="Wrap" />
 
 						<Grid RowDefinitions="Auto,Auto">
 							<TextBlock Grid.Row="0"
 							           Text="Also do document your specific board revision, as that maybe be important (if board has more revisions)."
 							           FontSize="11"
-							           Foreground="{DynamicResource Main_Header_Fg}"
+							           Foreground="{DynamicResource Fg}"
 							           TextWrapping="Wrap" />
 							<TextBox Grid.Row="1"
 							         x:Name="MandatoryCommentTextBox"
 							         AcceptsReturn="True"
 							         TextWrapping="Wrap"
 							         MinHeight="180"
-							         Background="{DynamicResource Main_TextField_Bg}"
-							         Foreground="{DynamicResource Main_TextField_Fg}" />
+							         Background="{DynamicResource Form_Bg}"
+							         Foreground="{DynamicResource Form_Fg}" />
 						</Grid>
 					</StackPanel>
 				</Border>
@@ -633,9 +633,7 @@
 
 			<TextBox x:Name="EmailTextBox"
 					 Grid.Column="1"
-					 Watermark="required@example.com"
-					 Background="{DynamicResource Main_InputField_Bg}"
-					 Foreground="{DynamicResource Main_InputField_Fg}"
+				     PlaceholderText="required@example.com"
 					 VerticalAlignment="Center"
 					 LostFocus="OnEmailTextBoxLostFocus" />
 
@@ -646,10 +644,10 @@
 					   IsVisible="False">
 				<TextBlock.Styles>
 					<Style Selector="TextBlock.success">
-						<Setter Property="Foreground" Value="{DynamicResource Feedback_SubmittedOk_Fg}" />
+						<Setter Property="Foreground" Value="{DynamicResource Text_Success_Fg}" />
 					</Style>
 					<Style Selector="TextBlock.error">
-						<Setter Property="Foreground" Value="{DynamicResource Feedback_SubmittedFail_Fg}" />
+						<Setter Property="Foreground" Value="{DynamicResource Text_Fail_Fg}" />
 					</Style>
 				</TextBlock.Styles>
 			</TextBlock>
@@ -666,7 +664,8 @@
 				<Button x:Name="SubmitButton"
 						Content="Send contribution update"
 						Background="{DynamicResource Button_Highlighted_Bg}"
-						Foreground="{DynamicResource Feedback_Submit_Fg}"
+						Foreground="{DynamicResource Button_Highlighted_Fg}"
+						BorderBrush="{DynamicResource Button_Highlighted_Border}"
 						Click="OnSubmitClick" />
 			</StackPanel>
 		</Grid>

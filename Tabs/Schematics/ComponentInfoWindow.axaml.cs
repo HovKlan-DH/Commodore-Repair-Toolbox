@@ -9,7 +9,6 @@ using Handlers.DataHandling;
 using Handlers.Oscilloscope;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -103,10 +102,14 @@ namespace CRT
             this.PointerPressed += (_, _) => this.Focus();
             this.PointerEntered += (_, _) => this.Focus();
 
+            this.Opened += (_, _) => this.RestoreKeyboardFocusToPopup();
+            this.Activated += (_, _) => this.RestoreKeyboardFocusToPopup();
+
             // Seed the normal-size tracker and restore saved window size, splitters and state
             this._normalWidth = UserSettings.HasComponentInfoWindowLayout
                 ? UserSettings.ComponentInfoWindowWidth
                 : 680.0;
+
             this._normalHeight = UserSettings.HasComponentInfoWindowLayout
                 ? UserSettings.ComponentInfoWindowHeight
                 : 420.0;
@@ -217,6 +220,22 @@ namespace CRT
                     bmp.Dispose();
                 this._loadedBitmaps.Clear();
             };
+        }
+
+        // ###########################################################################################
+        // Restores a keyboard focus target inside the popup whenever it opens or becomes active.
+        // This keeps Escape and other keyboard shortcuts working after clicking the native window frame.
+        // ###########################################################################################
+        private void RestoreKeyboardFocusToPopup()
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (!this.IsVisible)
+                    return;
+
+                this.Focus();
+                this.RootGrid.Focus();
+            }, DispatcherPriority.Input);
         }
 
         // ###########################################################################################

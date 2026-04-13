@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -15,6 +16,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Tabs.TabSchematics;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace CRT;
 
@@ -59,8 +61,8 @@ public partial class TabSchematics : UserControl
     private SchematicThumbnail? thisThumbnailDropPlaceholder;
     private double thisDraggedThumbnailWidth = 160.0;
     private Point thisThumbnailDragPointerOffsetInItem;
-    private int thisThumbnailCurrentInsertIndex = -1;
-    private Point thisThumbnailDragStartPointInList;
+//    private int thisThumbnailCurrentInsertIndex = -1;
+//    private Point thisThumbnailDragStartPointInList;
     private double thisThumbnailLastPointerYInList = double.NaN;
     private double thisThumbnailDragGhostFixedX;
     private bool thisSuppressThumbnailSelectionChanged;
@@ -75,7 +77,7 @@ public partial class TabSchematics : UserControl
 
     // KiCad import / overlay
     private KiCadProjectBundle? thisKiCadProject;
-    private string thisKiCadProjectPath = string.Empty;
+//    private string thisKiCadProjectPath = string.Empty;
     private readonly HashSet<string> thisSelectedKiCadReferences = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> thisSelectedKiCadNormalizedNetNames = new(StringComparer.OrdinalIgnoreCase);
     private bool thisIsKiCadCalibrationCaptureMode;
@@ -86,9 +88,11 @@ public partial class TabSchematics : UserControl
     private bool thisIsKiCadOverlayRefreshQueued;
     private int thisKiCadOverlayRefreshRequestVersion;
     private int thisKiCadOverlayLastRenderedVersion;
+    private bool thisIsInteractiveCadTraceHoverShiftPressed;
 
     private string? thisHoveredComponentBoardLabel;
     private bool thisSuppressBoardSettingsChanged;
+    private PointerPressedEventArgs? thisThumbnailDragStartEventArgs;
 
     private sealed class KiCadViewCalibration
     {
@@ -172,11 +176,11 @@ public partial class TabSchematics : UserControl
 
     // Label editor
     private bool thisIsLabelEditorMode;
-//    private bool thisHasPendingLabelEditorChanges;
     private bool thisIsShowingLabelEditorMenu;
     private Point thisLastLabelEditorMenuPoint;
     private string thisLabelEditorSchematicName = string.Empty;
     private readonly List<EditableComponentHighlight> thisLabelEditorWorkingHighlights = new();
+    private readonly HashSet<EditableComponentHighlight> thisSelectedLabelEditorHighlights = new();
     private EditableComponentHighlight? thisSelectedLabelEditorHighlight;
     private bool thisIsDrawingLabelEditorRectangle;
     private Point thisLabelEditorDrawStartPixelPoint;
@@ -184,7 +188,8 @@ public partial class TabSchematics : UserControl
     private EditableComponentHighlight? thisPendingNewLabelEditorHighlight;
     private LabelEditorDragMode thisLabelEditorDragMode;
     private Point thisLabelEditorDragStartPixelPoint;
-    private Rect thisLabelEditorOriginalDragRectangle;
+    private Rect thisLabelEditorOriginalSelectionBounds;
+    private readonly Dictionary<EditableComponentHighlight, Rect> thisLabelEditorOriginalDragRectangles = new();
 
     public TabSchematics()
     {
@@ -261,6 +266,7 @@ public partial class TabSchematics : UserControl
         this.CheckLabelSelectedOnly.IsChecked = UserSettings.SchematicsLabelSelectedOnly;
 
         this.thisSuppressBoardSettingsChanged = true;
+        this.CheckBoardMarkPin1OnSelectedComponent.IsChecked = true;
         this.CheckBoardHoverHighlightsTraces.IsChecked = true;
         this.CheckBoardContributorMode.IsChecked = UserSettings.ContributorMode;
         this.BoardSettingsPanel.IsEnabled = false;
@@ -276,6 +282,14 @@ public partial class TabSchematics : UserControl
             this.OnSchematicsKeyDown,
             RoutingStrategies.Tunnel,
             handledEventsToo: true);
+
+        this.AddHandler(
+            InputElement.KeyUpEvent,
+            this.OnSchematicsKeyUp,
+            RoutingStrategies.Tunnel,
+            handledEventsToo: true);
+
+        UserSettings.InteractiveCadTraceHoverModeChanged += this.OnInteractiveCadTraceHoverModeChanged;
 
         bool isLabelsExpanded = UserSettings.SchematicsLabelsPanelExpanded;
         this.LabelsListPanel.IsVisible = isLabelsExpanded;
@@ -304,6 +318,26 @@ public partial class TabSchematics : UserControl
         {
             UserSettings.SchematicsLabelSelectedOnly = this.CheckLabelSelectedOnly.IsChecked == true;
             this.UpdateComponentLabels();
+        };
+
+        this.CheckBoardMarkPin1OnSelectedComponent.IsCheckedChanged += (s, e) =>
+        {
+            if (this.thisSuppressBoardSettingsChanged)
+            {
+                return;
+            }
+
+            var boardKey = this.MainWindow?.GetCurrentBoardKey();
+            if (string.IsNullOrWhiteSpace(boardKey))
+            {
+                return;
+            }
+
+            UserSettings.SetSchematicsMarkPin1OnSelectedComponentForBoard(
+                boardKey,
+                this.CheckBoardMarkPin1OnSelectedComponent.IsChecked == true);
+
+            this.RefreshKiCadOverlay(forceImmediate: true);
         };
 
         this.CheckBoardHoverHighlightsTraces.IsCheckedChanged += (s, e) =>
@@ -454,6 +488,8 @@ public partial class TabSchematics : UserControl
 
         this.SchematicsThumbnailList.SelectionChanged += this.OnSchematicsThumbnailSelectionChanged;
         this.SchematicsContainer.PointerExited += this.OnSchematicsPointerExited;
+
+        this.UpdateInteractiveCadTraceHoverModeUi();
     }
 
     private void OnTraceColorPickerPropertyChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
@@ -687,6 +723,8 @@ public partial class TabSchematics : UserControl
         var point = e.GetPosition(this.SchematicsContainer);
         var pointer = e.GetCurrentPoint(this.SchematicsContainer);
 
+        this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
+
         if (this.IsPointerInsideKiCadNetConnectionsPanel(point))
         {
             this.ClearTransientHoverForKiCadNetConnectionsPanel();
@@ -728,27 +766,54 @@ public partial class TabSchematics : UserControl
 
             if (pointer.Properties.IsLeftButtonPressed)
             {
-                if (this.TryGetLabelEditorPixelPoint(point, out var pixelPoint))
+                bool isCtrlDown = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+
+                if (!this.TryGetLabelEditorPixelPoint(point, out var pixelPoint))
                 {
-                    if (this.TryGetSelectedLabelEditorHandleAtContainerPoint(point, out var resizeMode))
-                    {
-                        int selectedIndex = this.thisLabelEditorWorkingHighlights.IndexOf(this.thisSelectedLabelEditorHighlight!);
-                        this.StartLabelEditorDrag(selectedIndex, pixelPoint, resizeMode);
-                    }
-                    else if (this.TryGetLabelEditorHighlightAtContainerPoint(point, out var workingIndex))
-                    {
-                        this.StartLabelEditorDrag(workingIndex, pixelPoint, LabelEditorDragMode.Move);
-                    }
-                    else
+                    if (!isCtrlDown)
                     {
                         this.ClearSelectedLabelEditorHighlight();
-                        this.StartDrawingLabelEditorRectangle(pixelPoint);
                     }
+
+                    e.Handled = true;
+                    return;
                 }
-                else
+
+                if (isCtrlDown)
                 {
-                    this.ClearSelectedLabelEditorHighlight();
+                    if (this.TryGetLabelEditorHighlightAtContainerPoint(point, out var toggleIndex))
+                    {
+                        this.ToggleSelectedLabelEditorHighlight(this.thisLabelEditorWorkingHighlights[toggleIndex]);
+                    }
+
+                    e.Handled = true;
+                    return;
                 }
+
+                if (this.TryGetSelectedLabelEditorHandleAtContainerPoint(point, out var handleIndex, out var resizeMode))
+                {
+                    this.StartLabelEditorDrag(handleIndex, pixelPoint, resizeMode);
+                    e.Handled = true;
+                    return;
+                }
+
+                if (this.TryGetSelectedLabelEditorHighlightAtContainerPoint(point, out var selectedWorkingIndex))
+                {
+                    this.StartLabelEditorDrag(selectedWorkingIndex, pixelPoint, LabelEditorDragMode.Move);
+                    e.Handled = true;
+                    return;
+                }
+
+                if (this.TryGetLabelEditorHighlightAtContainerPoint(point, out var workingIndex))
+                {
+                    this.SetSingleSelectedLabelEditorHighlight(this.thisLabelEditorWorkingHighlights[workingIndex], refresh: false);
+                    this.StartLabelEditorDrag(workingIndex, pixelPoint, LabelEditorDragMode.Move);
+                    e.Handled = true;
+                    return;
+                }
+
+                this.ClearSelectedLabelEditorHighlights(refresh: false);
+                this.StartDrawingLabelEditorRectangle(pixelPoint);
 
                 e.Handled = true;
                 return;
@@ -780,9 +845,9 @@ public partial class TabSchematics : UserControl
         }
 
         bool hoveringComponent = this.TryGetHoveredBoardLabel(point, out var boardLabel, out var displayText);
-        bool hoveringKiCadNet = !string.IsNullOrWhiteSpace(this.thisHoveredKiCadNetName);
+        string? activeHoveredKiCadNetName = this.GetActiveHoveredKiCadNetName();
+        bool hoveringKiCadNet = !string.IsNullOrWhiteSpace(activeHoveredKiCadNetName);
 
-        // Bypass polyline manager completely if user is attempting to click an existing KiCad hover.
         if (TryInvert(this.schematicsMatrix, out var inv) && !hoveringKiCadNet)
         {
             var localPoint = new Point(
@@ -816,17 +881,14 @@ public partial class TabSchematics : UserControl
 
             if (hoveringKiCadNet)
             {
-                // Explicitly loop and toggle on/off locks via left click, so it reliably stays.
-                if (this.thisLockedKiCadNetNames.Contains(this.thisHoveredKiCadNetName!))
+                if (this.thisLockedKiCadNetNames.Contains(activeHoveredKiCadNetName!))
                 {
-                    this.thisLockedKiCadNetNames.Remove(this.thisHoveredKiCadNetName!);
-
-                    // Clear hover cache temporarily so it instantly blanks out visually mapped rendering states
+                    this.thisLockedKiCadNetNames.Remove(activeHoveredKiCadNetName!);
                     this.thisHoveredKiCadNetName = null;
                 }
                 else
                 {
-                    this.thisLockedKiCadNetNames.Add(this.thisHoveredKiCadNetName!);
+                    this.thisLockedKiCadNetNames.Add(activeHoveredKiCadNetName!);
                 }
 
                 lockedChanged = true;
@@ -834,20 +896,20 @@ public partial class TabSchematics : UserControl
                 this.RefreshBlinkStateFromCurrentSelection();
             }
 
-            // Bypasses pure panning events AND component popup if KiCad trace selection locked successfully
             if (lockedChanged)
             {
                 e.Handled = true;
                 return;
             }
 
-            // Executes when a physical component boundary click occurs independently from pads
             if (hoveringComponent)
             {
                 this.SelectComponentByBoardLabel(boardLabel);
 
                 if (e.ClickCount == 1 && this.MainWindow != null)
+                {
                     this.MainWindow.OpenComponentInfoPopup(boardLabel, displayText);
+                }
 
                 e.Handled = true;
                 return;
@@ -863,6 +925,7 @@ public partial class TabSchematics : UserControl
     {
         var point = e.GetPosition(this.SchematicsContainer);
         bool isShiftDown = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
 
         if (!this.isPanning && this.IsPointerInsideKiCadNetConnectionsPanel(point))
         {
@@ -877,7 +940,7 @@ public partial class TabSchematics : UserControl
 
             if (this.TryGetLabelEditorPixelPoint(point, out var pixelPoint))
             {
-                this.UpdateLabelEditorDrag(pixelPoint);
+                this.UpdateLabelEditorDrag(pixelPoint, e.KeyModifiers);
             }
 
             e.Handled = true;
@@ -927,14 +990,14 @@ public partial class TabSchematics : UserControl
 
         if (this.thisIsLabelEditorMode)
         {
-            int selectedIndex = this.thisSelectedLabelEditorHighlight != null
-                ? this.thisLabelEditorWorkingHighlights.IndexOf(this.thisSelectedLabelEditorHighlight)
-                : -1;
-
-            this.SchematicsLabelEditorOverlay.HoveredIndex =
-                selectedIndex >= 0 && this.IsPointerOverSelectedLabelEditorInteraction(point)
-                    ? selectedIndex
-                    : -1;
+            if (this.TryGetSelectedLabelEditorHighlightAtContainerPoint(point, out var hoveredSelectedIndex))
+            {
+                this.SchematicsLabelEditorOverlay.HoveredIndex = hoveredSelectedIndex;
+            }
+            else
+            {
+                this.SchematicsLabelEditorOverlay.HoveredIndex = -1;
+            }
         }
 
         this.UpdateSchematicsHoverUi(point);
@@ -946,7 +1009,7 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     private bool IsPointerOverSelectedLabelEditorInteraction(Point pointerInContainer)
     {
-        if (this.thisSelectedLabelEditorHighlight == null)
+        if (!this.HasSelectedLabelEditorHighlightsForCurrentSchematic())
         {
             return false;
         }
@@ -956,14 +1019,7 @@ public partial class TabSchematics : UserControl
             return true;
         }
 
-        if (!this.TryGetLabelEditorHighlightAtContainerPoint(pointerInContainer, out var workingIndex))
-        {
-            return false;
-        }
-
-        return workingIndex >= 0 &&
-               workingIndex < this.thisLabelEditorWorkingHighlights.Count &&
-               ReferenceEquals(this.thisLabelEditorWorkingHighlights[workingIndex], this.thisSelectedLabelEditorHighlight);
+        return this.TryGetSelectedLabelEditorHighlightAtContainerPoint(pointerInContainer, out _);
     }
 
     // ###########################################################################################
@@ -974,6 +1030,8 @@ public partial class TabSchematics : UserControl
     private void OnSchematicsPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         var point = e.GetPosition(this.SchematicsContainer);
+
+        this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
 
         if (!this.isPanning && this.IsPointerInsideKiCadNetConnectionsPanel(point))
         {
@@ -1049,14 +1107,16 @@ public partial class TabSchematics : UserControl
             }
             else
             {
+                string? activeHoveredKiCadNetName = this.GetActiveHoveredKiCadNetName();
+
                 if (this.TryGetHoveredBoardLabel(point, out var boardLabel, out _))
                 {
                     this.ToggleComponentSelectionByBoardLabel(boardLabel);
                 }
-                else if (!string.IsNullOrWhiteSpace(this.thisHoveredKiCadNetName) && this.thisLockedKiCadNetNames.Contains(this.thisHoveredKiCadNetName))
+                else if (!string.IsNullOrWhiteSpace(activeHoveredKiCadNetName) && this.thisLockedKiCadNetNames.Contains(activeHoveredKiCadNetName))
                 {
                     // Deselects the currently hovered item with a right click
-                    this.thisLockedKiCadNetNames.Remove(this.thisHoveredKiCadNetName);
+                    this.thisLockedKiCadNetNames.Remove(activeHoveredKiCadNetName);
                     this.thisHoveredKiCadNetName = null; // Clear hover state immediately
                     this.RefreshKiCadOverlay();
                     this.RefreshBlinkStateFromCurrentSelection();
@@ -1282,6 +1342,16 @@ public partial class TabSchematics : UserControl
         this.thisIsKiCadCalibrationCaptureMode = false;
         this.thisKiCadCalibrationImagePoints.Clear();
 
+        this.thisIsDraggingThumbnail = false;
+        this.thisDraggedThumbnail = null;
+        this.thisDraggedThumbnailOriginalIndex = -1;
+        this.thisDraggedThumbnailWasSelected = false;
+        //        this.thisThumbnailCurrentInsertIndex = -1;
+        this.thisThumbnailLastPointerYInList = double.NaN;
+        this.thisThumbnailDragStartEventArgs = null;
+        this.ClearThumbnailDropPlaceholder();
+        this.HideThumbnailDragGhost();
+
         this.polylineManager?.Reset();
         this.SchematicsLabelsCanvas.Children.Clear();
 
@@ -1316,16 +1386,22 @@ public partial class TabSchematics : UserControl
 
         this.thisIsLabelEditorMode = false;
         this.thisLabelEditorSchematicName = string.Empty;
+        this.thisSelectedLabelEditorHighlights.Clear();
         this.thisSelectedLabelEditorHighlight = null;
         this.thisPendingNewLabelEditorHighlight = null;
         this.thisIsDrawingLabelEditorRectangle = false;
         this.thisLabelEditorDraftRectangle = null;
+        this.thisLabelEditorDragMode = LabelEditorDragMode.None;
+        this.thisLabelEditorOriginalSelectionBounds = default;
+        this.thisLabelEditorOriginalDragRectangles.Clear();
         this.thisLabelEditorWorkingHighlights.Clear();
         this.HideLabelEditorMenu();
         this.HideNewLabelEditorPrompt();
 
         this.SchematicsLabelEditorOverlay.Rectangles = Array.Empty<Rect>();
         this.SchematicsLabelEditorOverlay.SelectedIndex = -1;
+        this.SchematicsLabelEditorOverlay.SelectedIndices = Array.Empty<int>();
+        this.SchematicsLabelEditorOverlay.SelectionBounds = null;
         this.SchematicsLabelEditorOverlay.DraftRectangle = null;
         this.SchematicsLabelEditorOverlay.BitmapPixelSize = new PixelSize(0, 0);
         this.SchematicsLabelEditorOverlay.ViewMatrix = this.schematicsMatrix;
@@ -1993,9 +2069,11 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     // Clears hover label and resets schematic cursor.
     // ###########################################################################################
-    private void HideSchematicsHoverUi()
+    public void HideSchematicsHoverUi()
     {
         this.SetHoveredComponentBoardLabel(null);
+        this.SetHoveredKiCadNet(null);
+        this.thisHoveredKiCadPadNumber = null;
         this.SchematicsHoverLabelBorder.IsVisible = false;
         this.SchematicsHoverLabelText.Text = string.Empty;
         this.SchematicsHoverPadBorder.IsVisible = false;
@@ -2069,10 +2147,6 @@ public partial class TabSchematics : UserControl
 
         bool hoveringComponent = this.TryGetHoveredBoardLabel(pointerInContainer, out var hoveredBoardLabel, out var displayText);
 
-        string hoveredPadNumber = this.thisHoveredKiCadPadNumber?.Trim() ?? string.Empty;
-        string hoveredNetName = this.thisHoveredKiCadNetName?.Trim() ?? string.Empty;
-        bool hoveringPad = !string.IsNullOrWhiteSpace(hoveredPadNumber);
-
         if (hoveringComponent)
         {
             this.SetHoveredComponentBoardLabel(hoveredBoardLabel);
@@ -2088,20 +2162,9 @@ public partial class TabSchematics : UserControl
             this.SchematicsHoverLabelText.Text = string.Empty;
         }
 
-        if (hoveringPad)
-        {
-            this.SchematicsHoverPadText.Text = string.IsNullOrWhiteSpace(hoveredNetName)
-                ? hoveredPadNumber
-                : $"{hoveredPadNumber} | {hoveredNetName}";
-            this.SchematicsHoverPadBorder.IsVisible = true;
-        }
-        else
-        {
-            this.SchematicsHoverPadBorder.IsVisible = false;
-            this.SchematicsHoverPadText.Text = string.Empty;
-        }
+        this.RefreshKiCadHoverPadUi();
 
-        if (hoveringComponent || hoveringPad)
+        if (hoveringComponent || this.SchematicsHoverPadBorder.IsVisible)
         {
             this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.Hand);
         }
@@ -2381,8 +2444,9 @@ public partial class TabSchematics : UserControl
         if (sender is not Control control || control.DataContext is not SchematicThumbnail thumbnail || thumbnail.IsDropPlaceholder)
             return;
 
+        this.thisThumbnailDragStartEventArgs = e;
         this.thisThumbnailDragStartPoint = e.GetPosition(this);
-        this.thisThumbnailDragStartPointInList = e.GetPosition(this.SchematicsThumbnailList);
+//        this.thisThumbnailDragStartPointInList = e.GetPosition(this.SchematicsThumbnailList);
         this.thisThumbnailDragPointerOffsetInItem = e.GetPosition(control);
         this.thisIsDraggingThumbnail = true;
         this.thisDraggedThumbnail = thumbnail;
@@ -2436,13 +2500,30 @@ public partial class TabSchematics : UserControl
         }
 
         this.currentThumbnails.RemoveAt(this.thisDraggedThumbnailOriginalIndex);
-        this.thisThumbnailCurrentInsertIndex = this.thisDraggedThumbnailOriginalIndex;
+//        this.thisThumbnailCurrentInsertIndex = this.thisDraggedThumbnailOriginalIndex;
         this.ShowThumbnailDropPlaceholder(this.thisDraggedThumbnailOriginalIndex);
         this.ShowThumbnailDragGhost(this.thisDraggedThumbnail, pointerInList);
 
+        if (this.thisThumbnailDragStartEventArgs == null)
+        {
+            this.RestoreDraggedThumbnail();
+            this.HideThumbnailDragGhost();
+            this.ClearThumbnailDropPlaceholder();
+            this.thisDraggedThumbnail = null;
+            this.thisDraggedThumbnailOriginalIndex = -1;
+            this.thisDraggedThumbnailWasSelected = false;
+//            this.thisThumbnailCurrentInsertIndex = -1;
+            this.thisThumbnailLastPointerYInList = double.NaN;
+            this.thisThumbnailDragStartEventArgs = null;
+            return;
+        }
+
         var dragData = new DataTransfer();
 
-        var effect = await DragDrop.DoDragDropAsync(e, dragData, DragDropEffects.Move);
+        var effect = await DragDrop.DoDragDropAsync(
+            this.thisThumbnailDragStartEventArgs,
+            dragData,
+            DragDropEffects.Move);
 
         if (effect != DragDropEffects.Move && this.thisDraggedThumbnail != null)
         {
@@ -2454,8 +2535,9 @@ public partial class TabSchematics : UserControl
         this.thisDraggedThumbnail = null;
         this.thisDraggedThumbnailOriginalIndex = -1;
         this.thisDraggedThumbnailWasSelected = false;
-        this.thisThumbnailCurrentInsertIndex = -1;
+//        this.thisThumbnailCurrentInsertIndex = -1;
         this.thisThumbnailLastPointerYInList = double.NaN;
+        this.thisThumbnailDragStartEventArgs = null;
 
         e.Handled = true;
     }
@@ -2519,27 +2601,8 @@ public partial class TabSchematics : UserControl
         }
 
         this.thisIsDraggingThumbnail = false;
+        this.thisThumbnailDragStartEventArgs = null;
     }
-
-/*
-    // ###########################################################################################
-    // Resolves the thumbnail container border from the current visual source.
-    // ###########################################################################################
-    private Control? GetThumbnailContainer(Control? start)
-    {
-        Control? current = start;
-
-        while (current != null)
-        {
-            if (current is Border border && border.Classes.Contains("ThumbnailBorder"))
-                return border;
-
-            current = current.Parent as Control;
-        }
-
-        return null;
-    }
-*/
 
     // ###########################################################################################
     // Creates or moves the temporary placeholder item to the requested insert index.
@@ -2563,7 +2626,7 @@ public partial class TabSchematics : UserControl
 
         if (existingIndex == insertIndex)
         {
-            this.thisThumbnailCurrentInsertIndex = insertIndex;
+//            this.thisThumbnailCurrentInsertIndex = insertIndex;
             return;
         }
 
@@ -2574,7 +2637,7 @@ public partial class TabSchematics : UserControl
 
         insertIndex = Math.Clamp(insertIndex, 0, this.currentThumbnails.Count);
         this.currentThumbnails.Insert(insertIndex, this.thisThumbnailDropPlaceholder);
-        this.thisThumbnailCurrentInsertIndex = insertIndex;
+//        this.thisThumbnailCurrentInsertIndex = insertIndex;
     }
 
     // ###########################################################################################
@@ -2609,7 +2672,7 @@ public partial class TabSchematics : UserControl
         }
 
         this.currentThumbnails.Insert(restoreIndex, this.thisDraggedThumbnail);
-        this.thisThumbnailCurrentInsertIndex = restoreIndex;
+//        this.thisThumbnailCurrentInsertIndex = restoreIndex;
         this.thisThumbnailLastPointerYInList = double.NaN;
 
         if (this.thisDraggedThumbnailWasSelected)
@@ -2618,6 +2681,7 @@ public partial class TabSchematics : UserControl
         }
 
         this.thisSuppressThumbnailSelectionChanged = false;
+        this.thisThumbnailDragStartEventArgs = null;
     }
 
     // ###########################################################################################
@@ -2762,7 +2826,7 @@ public partial class TabSchematics : UserControl
         }
 
         this.currentThumbnails.Insert(insertIndex, this.thisDraggedThumbnail);
-        this.thisThumbnailCurrentInsertIndex = insertIndex;
+//        this.thisThumbnailCurrentInsertIndex = insertIndex;
 
         if (this.thisDraggedThumbnailWasSelected)
         {
@@ -2775,9 +2839,10 @@ public partial class TabSchematics : UserControl
         this.thisDraggedThumbnail = null;
         this.thisDraggedThumbnailOriginalIndex = -1;
         this.thisDraggedThumbnailWasSelected = false;
-        this.thisThumbnailCurrentInsertIndex = -1;
+//        this.thisThumbnailCurrentInsertIndex = -1;
         this.thisThumbnailLastPointerYInList = double.NaN;
         this.thisSuppressThumbnailSelectionChanged = false;
+        this.thisThumbnailDragStartEventArgs = null;
 
         e.Handled = true;
     }
@@ -2798,6 +2863,7 @@ public partial class TabSchematics : UserControl
         this.thisRestoreRightColumnMinWidth = this.SchematicsInnerGrid.ColumnDefinitions[2].MinWidth;
 
         this.thisIsDraggingThumbnail = false;
+        this.thisThumbnailDragStartEventArgs = null;
         this.ClearThumbnailDropPlaceholder();
         this.HideThumbnailDragGhost();
 
@@ -2951,7 +3017,9 @@ public partial class TabSchematics : UserControl
     private void LoadLabelEditorWorkingCopyForCurrentSchematic()
     {
         this.thisLabelEditorWorkingHighlights.Clear();
+        this.thisSelectedLabelEditorHighlights.Clear();
         this.thisSelectedLabelEditorHighlight = null;
+        this.thisLabelEditorOriginalDragRectangles.Clear();
         this.thisLabelEditorSchematicName = this.GetCurrentSchematicName();
 
         var boardData = this.MainWindow?.CurrentBoardData;
@@ -3017,11 +3085,14 @@ public partial class TabSchematics : UserControl
     {
         this.thisIsLabelEditorMode = false;
         this.thisLabelEditorSchematicName = string.Empty;
+        this.thisSelectedLabelEditorHighlights.Clear();
         this.thisSelectedLabelEditorHighlight = null;
         this.thisPendingNewLabelEditorHighlight = null;
         this.thisIsDrawingLabelEditorRectangle = false;
         this.thisLabelEditorDraftRectangle = null;
         this.thisLabelEditorDragMode = LabelEditorDragMode.None;
+        this.thisLabelEditorOriginalSelectionBounds = default;
+        this.thisLabelEditorOriginalDragRectangles.Clear();
         this.thisLabelEditorWorkingHighlights.Clear();
 
         this.HideLabelEditorMenu();
@@ -3094,11 +3165,14 @@ public partial class TabSchematics : UserControl
         BoardDataReader.ClearCache(cacheKey);
 
         this.thisIsLabelEditorMode = false;
+        this.thisSelectedLabelEditorHighlights.Clear();
         this.thisSelectedLabelEditorHighlight = null;
         this.thisPendingNewLabelEditorHighlight = null;
         this.thisIsDrawingLabelEditorRectangle = false;
         this.thisLabelEditorDraftRectangle = null;
         this.thisLabelEditorDragMode = LabelEditorDragMode.None;
+        this.thisLabelEditorOriginalSelectionBounds = default;
+        this.thisLabelEditorOriginalDragRectangles.Clear();
         this.thisLabelEditorWorkingHighlights.Clear();
 
         this.HideLabelEditorMenu();
@@ -3122,8 +3196,11 @@ public partial class TabSchematics : UserControl
             this.SchematicsLabelEditorOverlay.IsVisible = false;
             this.SchematicsLabelEditorOverlay.Rectangles = Array.Empty<Rect>();
             this.SchematicsLabelEditorOverlay.SelectedIndex = -1;
+            this.SchematicsLabelEditorOverlay.SelectedIndices = Array.Empty<int>();
+            this.SchematicsLabelEditorOverlay.SelectionBounds = null;
             this.SchematicsLabelEditorOverlay.HoveredIndex = -1;
             this.SchematicsLabelEditorOverlay.DraftRectangle = null;
+            this.SchematicsLabelEditorOverlay.SnapGuides = Array.Empty<(Point Start, Point End)>();
             this.SchematicsLabelEditorOverlay.BitmapPixelSize = this.currentFullResBitmap?.PixelSize ?? new PixelSize(0, 0);
             this.SchematicsLabelEditorOverlay.ViewMatrix = this.schematicsMatrix;
             this.UpdateComponentLabels();
@@ -3146,6 +3223,12 @@ public partial class TabSchematics : UserControl
             selectedIndex = itemsForCurrentSchematic.IndexOf(this.thisSelectedLabelEditorHighlight);
         }
 
+        var selectedIndices = itemsForCurrentSchematic
+            .Select((row, index) => new { row, index })
+            .Where(x => this.thisSelectedLabelEditorHighlights.Contains(x.row))
+            .Select(x => x.index)
+            .ToList();
+
         Color highlightColor = Colors.IndianRed;
         double highlightOpacity = 0.20;
 
@@ -3158,8 +3241,11 @@ public partial class TabSchematics : UserControl
 
         this.SchematicsLabelEditorOverlay.Rectangles = rects;
         this.SchematicsLabelEditorOverlay.SelectedIndex = selectedIndex;
+        this.SchematicsLabelEditorOverlay.SelectedIndices = selectedIndices;
+        this.SchematicsLabelEditorOverlay.SelectionBounds = null;
         this.SchematicsLabelEditorOverlay.HoveredIndex = -1;
         this.SchematicsLabelEditorOverlay.DraftRectangle = this.thisLabelEditorDraftRectangle;
+        this.SchematicsLabelEditorOverlay.SnapGuides = Array.Empty<(Point Start, Point End)>();
         this.SchematicsLabelEditorOverlay.BitmapPixelSize = this.currentFullResBitmap.PixelSize;
         this.SchematicsLabelEditorOverlay.ViewMatrix = this.schematicsMatrix;
         this.SchematicsLabelEditorOverlay.HighlightColor = highlightColor;
@@ -3167,6 +3253,393 @@ public partial class TabSchematics : UserControl
         this.SchematicsLabelEditorOverlay.IsVisible = true;
 
         this.UpdateComponentLabels();
+    }
+
+    // ###########################################################################################
+    // Snaps active resize edges to nearby neighbor edges within 2 px.
+    // Snap candidates are rejected when another component blocks the path to that neighbor.
+    // Only components currently visible in the viewport can participate in snap alignment.
+    // When multiple visible neighbors align to the same snapped edge, guides are shown to all.
+    // ###########################################################################################
+    private void ApplyLabelEditorResizeSnap(
+        EditableComponentHighlight currentHighlight,
+        ref double left,
+        ref double top,
+        ref double right,
+        ref double bottom,
+        List<(Point Start, Point End)> snapGuides,
+        bool suppressSnap)
+    {
+        const double snapThreshold = 2.0;
+        const double epsilon = 0.001;
+
+        if (suppressSnap ||
+            this.thisLabelEditorDragMode == LabelEditorDragMode.None ||
+            this.thisLabelEditorDragMode == LabelEditorDragMode.Move)
+        {
+            return;
+        }
+
+        string schematicName = this.GetCurrentSchematicName();
+
+        bool resizesTop =
+            this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeTop ||
+            this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeTopLeft ||
+            this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeTopRight;
+
+        bool resizesBottom =
+            this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeBottom ||
+            this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeBottomLeft ||
+            this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeBottomRight;
+
+        bool resizesLeft =
+            this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeLeft ||
+            this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeTopLeft ||
+            this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeBottomLeft;
+
+        bool resizesRight =
+            this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeRight ||
+            this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeTopRight ||
+            this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeBottomRight;
+
+        static bool RangesOverlap(double a1, double a2, double b1, double b2)
+        {
+            return Math.Min(a2, b2) > Math.Max(a1, b1);
+        }
+
+        static Rect BuildCurrentRect(double leftValue, double topValue, double rightValue, double bottomValue)
+        {
+            return new Rect(
+                leftValue,
+                topValue,
+                Math.Max(1.0, rightValue - leftValue),
+                Math.Max(1.0, bottomValue - topValue));
+        }
+
+        Rect? visiblePixelRect = null;
+
+        if (this.currentFullResBitmap != null &&
+            this.SchematicsContainer.Bounds.Width > 0 &&
+            this.SchematicsContainer.Bounds.Height > 0 &&
+            TryInvert(this.schematicsMatrix, out var inverseMatrix))
+        {
+            var contentRect = this.GetLabelEditorImageContentRect();
+
+            if (contentRect.Width > 0 && contentRect.Height > 0)
+            {
+                var containerRect = new Rect(this.SchematicsContainer.Bounds.Size);
+                var visibleLocalRect = containerRect.TransformToAABB(inverseMatrix);
+
+                double clippedLeft = Math.Max(contentRect.Left, visibleLocalRect.Left);
+                double clippedTop = Math.Max(contentRect.Top, visibleLocalRect.Top);
+                double clippedRight = Math.Min(contentRect.Right, visibleLocalRect.Right);
+                double clippedBottom = Math.Min(contentRect.Bottom, visibleLocalRect.Bottom);
+
+                if (clippedRight > clippedLeft && clippedBottom > clippedTop)
+                {
+                    double bitmapWidth = this.currentFullResBitmap.PixelSize.Width;
+                    double bitmapHeight = this.currentFullResBitmap.PixelSize.Height;
+
+                    double pixelLeft = Math.Clamp(
+                        ((clippedLeft - contentRect.X) / contentRect.Width) * bitmapWidth,
+                        0.0,
+                        bitmapWidth);
+
+                    double pixelTop = Math.Clamp(
+                        ((clippedTop - contentRect.Y) / contentRect.Height) * bitmapHeight,
+                        0.0,
+                        bitmapHeight);
+
+                    double pixelRight = Math.Clamp(
+                        ((clippedRight - contentRect.X) / contentRect.Width) * bitmapWidth,
+                        0.0,
+                        bitmapWidth);
+
+                    double pixelBottom = Math.Clamp(
+                        ((clippedBottom - contentRect.Y) / contentRect.Height) * bitmapHeight,
+                        0.0,
+                        bitmapHeight);
+
+                    if (pixelRight > pixelLeft && pixelBottom > pixelTop)
+                    {
+                        visiblePixelRect = new Rect(
+                            pixelLeft,
+                            pixelTop,
+                            pixelRight - pixelLeft,
+                            pixelBottom - pixelTop);
+                    }
+                }
+            }
+        }
+
+        bool IsRectVisibleInCurrentView(Rect rect)
+        {
+            if (!visiblePixelRect.HasValue)
+            {
+                return true;
+            }
+
+            var visibleRect = visiblePixelRect.Value;
+
+            return rect.Right > visibleRect.Left &&
+                   rect.Left < visibleRect.Right &&
+                   rect.Bottom > visibleRect.Top &&
+                   rect.Top < visibleRect.Bottom;
+        }
+
+        bool IsVerticalPathBlocked(double sourceY, double targetY, Rect currentRect, EditableComponentHighlight targetHighlight)
+        {
+            double minY = Math.Min(sourceY, targetY);
+            double maxY = Math.Max(sourceY, targetY);
+
+            foreach (var other in this.thisLabelEditorWorkingHighlights)
+            {
+                if (ReferenceEquals(other, currentHighlight) ||
+                    ReferenceEquals(other, targetHighlight) ||
+                    !string.Equals(other.SchematicName, schematicName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var otherRect = new Rect(other.X, other.Y, other.Width, other.Height);
+
+                if (!RangesOverlap(currentRect.Left, currentRect.Right, otherRect.Left, otherRect.Right))
+                {
+                    continue;
+                }
+
+                if (otherRect.Bottom > minY && otherRect.Top < maxY)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        bool IsHorizontalPathBlocked(double sourceX, double targetX, Rect currentRect, EditableComponentHighlight targetHighlight)
+        {
+            double minX = Math.Min(sourceX, targetX);
+            double maxX = Math.Max(sourceX, targetX);
+
+            foreach (var other in this.thisLabelEditorWorkingHighlights)
+            {
+                if (ReferenceEquals(other, currentHighlight) ||
+                    ReferenceEquals(other, targetHighlight) ||
+                    !string.Equals(other.SchematicName, schematicName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var otherRect = new Rect(other.X, other.Y, other.Width, other.Height);
+
+                if (!RangesOverlap(currentRect.Top, currentRect.Bottom, otherRect.Top, otherRect.Bottom))
+                {
+                    continue;
+                }
+
+                if (otherRect.Right > minX && otherRect.Left < maxX)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        static bool TryBuildHorizontalGuide(Rect currentRect, Rect targetRect, double y, out (Point Start, Point End) guide)
+        {
+            guide = default;
+
+            if (currentRect.Right < targetRect.Left)
+            {
+                guide = (new Point(currentRect.Right, y), new Point(targetRect.Left, y));
+                return targetRect.Left - currentRect.Right > 0;
+            }
+
+            if (targetRect.Right < currentRect.Left)
+            {
+                guide = (new Point(targetRect.Right, y), new Point(currentRect.Left, y));
+                return currentRect.Left - targetRect.Right > 0;
+            }
+
+            return false;
+        }
+
+        static bool TryBuildVerticalGuide(Rect currentRect, Rect targetRect, double x, out (Point Start, Point End) guide)
+        {
+            guide = default;
+
+            if (currentRect.Bottom < targetRect.Top)
+            {
+                guide = (new Point(x, currentRect.Bottom), new Point(x, targetRect.Top));
+                return targetRect.Top - currentRect.Bottom > 0;
+            }
+
+            if (targetRect.Bottom < currentRect.Top)
+            {
+                guide = (new Point(x, targetRect.Bottom), new Point(x, currentRect.Top));
+                return currentRect.Top - targetRect.Bottom > 0;
+            }
+
+            return false;
+        }
+
+        if (resizesTop || resizesBottom)
+        {
+            Rect currentRect = BuildCurrentRect(left, top, right, bottom);
+            double sourceY = resizesTop ? currentRect.Top : currentRect.Bottom;
+            double bestDistance = snapThreshold + 0.001;
+            double bestY = sourceY;
+            var bestTargets = new List<EditableComponentHighlight>();
+
+            void ConsiderVerticalCandidate(EditableComponentHighlight other, double candidateY)
+            {
+                double distance = Math.Abs(sourceY - candidateY);
+                if (distance > snapThreshold ||
+                    IsVerticalPathBlocked(sourceY, candidateY, currentRect, other))
+                {
+                    return;
+                }
+
+                if (distance < bestDistance - epsilon)
+                {
+                    bestDistance = distance;
+                    bestY = candidateY;
+                    bestTargets.Clear();
+                    bestTargets.Add(other);
+                    return;
+                }
+
+                if (Math.Abs(distance - bestDistance) <= epsilon &&
+                    Math.Abs(candidateY - bestY) <= epsilon &&
+                    !bestTargets.Contains(other))
+                {
+                    bestTargets.Add(other);
+                }
+            }
+
+            foreach (var other in this.thisLabelEditorWorkingHighlights)
+            {
+                if (ReferenceEquals(other, currentHighlight) ||
+                    this.IsSelectedLabelEditorHighlight(other) ||
+                    !string.Equals(other.SchematicName, schematicName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var otherRect = new Rect(other.X, other.Y, other.Width, other.Height);
+                if (!IsRectVisibleInCurrentView(otherRect))
+                {
+                    continue;
+                }
+
+                ConsiderVerticalCandidate(other, otherRect.Top);
+                ConsiderVerticalCandidate(other, otherRect.Bottom);
+            }
+
+            if (bestTargets.Count > 0)
+            {
+                if (resizesTop)
+                {
+                    top = bestY;
+                }
+                else
+                {
+                    bottom = bestY;
+                }
+
+                currentRect = BuildCurrentRect(left, top, right, bottom);
+
+                foreach (var bestTarget in bestTargets)
+                {
+                    var targetRect = new Rect(bestTarget.X, bestTarget.Y, bestTarget.Width, bestTarget.Height);
+
+                    if (TryBuildHorizontalGuide(currentRect, targetRect, bestY, out var guide))
+                    {
+                        snapGuides.Add(guide);
+                    }
+                }
+            }
+        }
+
+        if (resizesLeft || resizesRight)
+        {
+            Rect currentRect = BuildCurrentRect(left, top, right, bottom);
+            double sourceX = resizesLeft ? currentRect.Left : currentRect.Right;
+            double bestDistance = snapThreshold + 0.001;
+            double bestX = sourceX;
+            var bestTargets = new List<EditableComponentHighlight>();
+
+            void ConsiderHorizontalCandidate(EditableComponentHighlight other, double candidateX)
+            {
+                double distance = Math.Abs(sourceX - candidateX);
+                if (distance > snapThreshold ||
+                    IsHorizontalPathBlocked(sourceX, candidateX, currentRect, other))
+                {
+                    return;
+                }
+
+                if (distance < bestDistance - epsilon)
+                {
+                    bestDistance = distance;
+                    bestX = candidateX;
+                    bestTargets.Clear();
+                    bestTargets.Add(other);
+                    return;
+                }
+
+                if (Math.Abs(distance - bestDistance) <= epsilon &&
+                    Math.Abs(candidateX - bestX) <= epsilon &&
+                    !bestTargets.Contains(other))
+                {
+                    bestTargets.Add(other);
+                }
+            }
+
+            foreach (var other in this.thisLabelEditorWorkingHighlights)
+            {
+                if (ReferenceEquals(other, currentHighlight) ||
+                    this.IsSelectedLabelEditorHighlight(other) ||
+                    !string.Equals(other.SchematicName, schematicName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var otherRect = new Rect(other.X, other.Y, other.Width, other.Height);
+                if (!IsRectVisibleInCurrentView(otherRect))
+                {
+                    continue;
+                }
+
+                ConsiderHorizontalCandidate(other, otherRect.Left);
+                ConsiderHorizontalCandidate(other, otherRect.Right);
+            }
+
+            if (bestTargets.Count > 0)
+            {
+                if (resizesLeft)
+                {
+                    left = bestX;
+                }
+                else
+                {
+                    right = bestX;
+                }
+
+                currentRect = BuildCurrentRect(left, top, right, bottom);
+
+                foreach (var bestTarget in bestTargets)
+                {
+                    var targetRect = new Rect(bestTarget.X, bestTarget.Y, bestTarget.Width, bestTarget.Height);
+
+                    if (TryBuildVerticalGuide(currentRect, targetRect, bestX, out var guide))
+                    {
+                        snapGuides.Add(guide);
+                    }
+                }
+            }
+        }
     }
 
     // ###########################################################################################
@@ -3276,30 +3749,12 @@ public partial class TabSchematics : UserControl
         return false;
     }
 
-/*
-    // ###########################################################################################
-    // Selects a working-copy editor highlight and refreshes the visual selection markers.
-    // ###########################################################################################
-    private void SelectLabelEditorHighlight(int workingIndex)
-    {
-        if (workingIndex < 0 || workingIndex >= this.thisLabelEditorWorkingHighlights.Count)
-        {
-            this.ClearSelectedLabelEditorHighlight();
-            return;
-        }
-
-        this.thisSelectedLabelEditorHighlight = this.thisLabelEditorWorkingHighlights[workingIndex];
-        this.RefreshLabelEditorOverlay();
-    }
-*/
-
     // ###########################################################################################
     // Clears the current label-editor selection and removes visible selection markers.
     // ###########################################################################################
     private void ClearSelectedLabelEditorHighlight()
     {
-        this.thisSelectedLabelEditorHighlight = null;
-        this.RefreshLabelEditorOverlay();
+        this.ClearSelectedLabelEditorHighlights();
     }
 
     // ###########################################################################################
@@ -3314,10 +3769,12 @@ public partial class TabSchematics : UserControl
 
         var deleted = this.thisLabelEditorWorkingHighlights[workingIndex];
         this.thisLabelEditorWorkingHighlights.RemoveAt(workingIndex);
+        this.thisSelectedLabelEditorHighlights.Remove(deleted);
+        this.thisLabelEditorOriginalDragRectangles.Remove(deleted);
 
         if (ReferenceEquals(this.thisSelectedLabelEditorHighlight, deleted))
         {
-            this.thisSelectedLabelEditorHighlight = null;
+            this.thisSelectedLabelEditorHighlight = this.GetFirstSelectedLabelEditorHighlightForCurrentSchematic();
         }
 
         this.RefreshLabelEditorOverlay();
@@ -3431,7 +3888,7 @@ public partial class TabSchematics : UserControl
         };
 
         this.thisLabelEditorWorkingHighlights.Add(newRow);
-        this.thisSelectedLabelEditorHighlight = newRow;
+        this.SetSingleSelectedLabelEditorHighlight(newRow, refresh: false);
         this.thisPendingNewLabelEditorHighlight = newRow;
 
         this.RefreshLabelEditorOverlay();
@@ -3520,6 +3977,7 @@ public partial class TabSchematics : UserControl
         if (this.thisPendingNewLabelEditorHighlight != null)
         {
             this.thisLabelEditorWorkingHighlights.Remove(this.thisPendingNewLabelEditorHighlight);
+            this.thisSelectedLabelEditorHighlights.Remove(this.thisPendingNewLabelEditorHighlight);
             this.thisPendingNewLabelEditorHighlight = null;
             this.thisSelectedLabelEditorHighlight = null;
         }
@@ -3582,53 +4040,11 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Tries to hit one of the selected rectangle's resize handles or sides.
+    // Compatibility overload used by cursor and hover logic.
     // ###########################################################################################
     private bool TryGetSelectedLabelEditorHandleAtContainerPoint(Point pointerInContainer, out LabelEditorDragMode dragMode)
     {
-        dragMode = LabelEditorDragMode.None;
-
-        if (this.thisSelectedLabelEditorHighlight == null || this.currentFullResBitmap == null)
-        {
-            return false;
-        }
-
-        if (!this.TryGetLabelEditorLocalPoint(pointerInContainer, out var localPoint))
-        {
-            return false;
-        }
-
-        var rect = new Rect(
-            this.thisSelectedLabelEditorHighlight.X,
-            this.thisSelectedLabelEditorHighlight.Y,
-            this.thisSelectedLabelEditorHighlight.Width,
-            this.thisSelectedLabelEditorHighlight.Height);
-
-        var localRect = this.ConvertLabelEditorPixelRectToLocalRect(rect);
-
-        double scale = Math.Max(0.0001, this.schematicsMatrix.M11);
-        double handleSize = Math.Clamp(10.0 / scale, 5.0, 18.0);
-        double half = handleSize / 2.0;
-
-        var topLeft = new Rect(localRect.Left - half, localRect.Top - half, handleSize, handleSize);
-        var top = new Rect(localRect.Center.X - half, localRect.Top - half, handleSize, handleSize);
-        var topRight = new Rect(localRect.Right - half, localRect.Top - half, handleSize, handleSize);
-        var right = new Rect(localRect.Right - half, localRect.Center.Y - half, handleSize, handleSize);
-        var bottomRight = new Rect(localRect.Right - half, localRect.Bottom - half, handleSize, handleSize);
-        var bottom = new Rect(localRect.Center.X - half, localRect.Bottom - half, handleSize, handleSize);
-        var bottomLeft = new Rect(localRect.Left - half, localRect.Bottom - half, handleSize, handleSize);
-        var left = new Rect(localRect.Left - half, localRect.Center.Y - half, handleSize, handleSize);
-
-        if (topLeft.Contains(localPoint)) { dragMode = LabelEditorDragMode.ResizeTopLeft; return true; }
-        if (top.Contains(localPoint)) { dragMode = LabelEditorDragMode.ResizeTop; return true; }
-        if (topRight.Contains(localPoint)) { dragMode = LabelEditorDragMode.ResizeTopRight; return true; }
-        if (right.Contains(localPoint)) { dragMode = LabelEditorDragMode.ResizeRight; return true; }
-        if (bottomRight.Contains(localPoint)) { dragMode = LabelEditorDragMode.ResizeBottomRight; return true; }
-        if (bottom.Contains(localPoint)) { dragMode = LabelEditorDragMode.ResizeBottom; return true; }
-        if (bottomLeft.Contains(localPoint)) { dragMode = LabelEditorDragMode.ResizeBottomLeft; return true; }
-        if (left.Contains(localPoint)) { dragMode = LabelEditorDragMode.ResizeLeft; return true; }
-
-        return false;
+        return this.TryGetSelectedLabelEditorHandleAtContainerPoint(pointerInContainer, out _, out dragMode);
     }
 
     // ###########################################################################################
@@ -3641,91 +4057,110 @@ public partial class TabSchematics : UserControl
             return;
         }
 
-        this.thisSelectedLabelEditorHighlight = this.thisLabelEditorWorkingHighlights[workingIndex];
+        var anchorHighlight = this.thisLabelEditorWorkingHighlights[workingIndex];
+
+        if (!this.IsSelectedLabelEditorHighlight(anchorHighlight))
+        {
+            this.SetSingleSelectedLabelEditorHighlight(anchorHighlight, refresh: false);
+        }
+        else
+        {
+            this.thisSelectedLabelEditorHighlight = anchorHighlight;
+        }
+
         this.thisLabelEditorDragMode = dragMode;
         this.thisLabelEditorDragStartPixelPoint = startPixelPoint;
-        this.thisLabelEditorOriginalDragRectangle = new Rect(
-            this.thisSelectedLabelEditorHighlight.X,
-            this.thisSelectedLabelEditorHighlight.Y,
-            this.thisSelectedLabelEditorHighlight.Width,
-            this.thisSelectedLabelEditorHighlight.Height);
+        this.thisLabelEditorOriginalSelectionBounds = new Rect(
+            anchorHighlight.X,
+            anchorHighlight.Y,
+            anchorHighlight.Width,
+            anchorHighlight.Height);
 
+        this.CaptureSelectedLabelEditorDragState();
         this.RefreshLabelEditorOverlay();
     }
 
     // ###########################################################################################
     // Applies the current drag delta to the selected rectangle for move or resize operations.
+    // Holding Shift during mouse-resize suppresses snap alignment.
     // ###########################################################################################
-    private void UpdateLabelEditorDrag(Point currentPixelPoint)
+    private void UpdateLabelEditorDrag(Point currentPixelPoint, KeyModifiers modifiers)
     {
-        if (this.thisSelectedLabelEditorHighlight == null || this.thisLabelEditorDragMode == LabelEditorDragMode.None)
+        if (!this.HasSelectedLabelEditorHighlightsForCurrentSchematic() ||
+            this.thisLabelEditorDragMode == LabelEditorDragMode.None)
         {
             return;
         }
 
         double dx = currentPixelPoint.X - this.thisLabelEditorDragStartPixelPoint.X;
         double dy = currentPixelPoint.Y - this.thisLabelEditorDragStartPixelPoint.Y;
+        bool suppressSnap = modifiers.HasFlag(KeyModifiers.Shift);
 
-        double left = this.thisLabelEditorOriginalDragRectangle.Left;
-        double top = this.thisLabelEditorOriginalDragRectangle.Top;
-        double right = this.thisLabelEditorOriginalDragRectangle.Right;
-        double bottom = this.thisLabelEditorOriginalDragRectangle.Bottom;
+        var snapGuides = new List<(Point Start, Point End)>();
 
-        switch (this.thisLabelEditorDragMode)
+        foreach (var row in this.GetSelectedLabelEditorHighlightsForCurrentSchematic())
         {
-            case LabelEditorDragMode.Move:
-                left += dx;
-                right += dx;
-                top += dy;
-                bottom += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeTopLeft:
-                left += dx;
-                top += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeTop:
-                top += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeTopRight:
-                right += dx;
-                top += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeRight:
-                right += dx;
-                break;
-
-            case LabelEditorDragMode.ResizeBottomRight:
-                right += dx;
-                bottom += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeBottom:
-                bottom += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeBottomLeft:
-                left += dx;
-                bottom += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeLeft:
-                left += dx;
-                break;
-        }
-
-        const double minimumSize = 1.0;
-
-        if (right < left + minimumSize)
-        {
-            if (this.thisLabelEditorDragMode == LabelEditorDragMode.Move)
+            if (!this.thisLabelEditorOriginalDragRectangles.TryGetValue(row, out var originalRect))
             {
-                right = left + this.thisLabelEditorOriginalDragRectangle.Width;
+                originalRect = new Rect(row.X, row.Y, row.Width, row.Height);
             }
-            else
+
+            double left = originalRect.Left;
+            double top = originalRect.Top;
+            double right = originalRect.Right;
+            double bottom = originalRect.Bottom;
+
+            switch (this.thisLabelEditorDragMode)
+            {
+                case LabelEditorDragMode.Move:
+                    left += dx;
+                    right += dx;
+                    top += dy;
+                    bottom += dy;
+                    break;
+
+                case LabelEditorDragMode.ResizeTopLeft:
+                    left += dx;
+                    top += dy;
+                    break;
+
+                case LabelEditorDragMode.ResizeTop:
+                    top += dy;
+                    break;
+
+                case LabelEditorDragMode.ResizeTopRight:
+                    right += dx;
+                    top += dy;
+                    break;
+
+                case LabelEditorDragMode.ResizeRight:
+                    right += dx;
+                    break;
+
+                case LabelEditorDragMode.ResizeBottomRight:
+                    right += dx;
+                    bottom += dy;
+                    break;
+
+                case LabelEditorDragMode.ResizeBottom:
+                    bottom += dy;
+                    break;
+
+                case LabelEditorDragMode.ResizeBottomLeft:
+                    left += dx;
+                    bottom += dy;
+                    break;
+
+                case LabelEditorDragMode.ResizeLeft:
+                    left += dx;
+                    break;
+            }
+
+            this.ApplyLabelEditorResizeSnap(row, ref left, ref top, ref right, ref bottom, snapGuides, suppressSnap);
+
+            const double minimumSize = 1.0;
+
+            if (right < left + minimumSize)
             {
                 if (this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeLeft ||
                     this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeTopLeft ||
@@ -3738,15 +4173,8 @@ public partial class TabSchematics : UserControl
                     right = left + minimumSize;
                 }
             }
-        }
 
-        if (bottom < top + minimumSize)
-        {
-            if (this.thisLabelEditorDragMode == LabelEditorDragMode.Move)
-            {
-                bottom = top + this.thisLabelEditorOriginalDragRectangle.Height;
-            }
-            else
+            if (bottom < top + minimumSize)
             {
                 if (this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeTop ||
                     this.thisLabelEditorDragMode == LabelEditorDragMode.ResizeTopLeft ||
@@ -3759,22 +4187,26 @@ public partial class TabSchematics : UserControl
                     bottom = top + minimumSize;
                 }
             }
+
+            row.X = left;
+            row.Y = top;
+            row.Width = Math.Max(1.0, right - left);
+            row.Height = Math.Max(1.0, bottom - top);
         }
 
-        this.thisSelectedLabelEditorHighlight.X = left;
-        this.thisSelectedLabelEditorHighlight.Y = top;
-        this.thisSelectedLabelEditorHighlight.Width = right - left;
-        this.thisSelectedLabelEditorHighlight.Height = bottom - top;
-
         this.RefreshLabelEditorOverlay();
+        this.SchematicsLabelEditorOverlay.SnapGuides = snapGuides;
     }
 
     // ###########################################################################################
     // Finishes the current move or resize operation for the selected rectangle.
+    // Clears any temporary snap guides drawn during resize.
     // ###########################################################################################
     private void CompleteLabelEditorDrag()
     {
         this.thisLabelEditorDragMode = LabelEditorDragMode.None;
+        this.thisLabelEditorOriginalDragRectangles.Clear();
+        this.SchematicsLabelEditorOverlay.SnapGuides = Array.Empty<(Point Start, Point End)>();
     }
 
     // ###########################################################################################
@@ -3785,7 +4217,7 @@ public partial class TabSchematics : UserControl
     private bool ApplySelectedLabelEditorKeyboardStep(Key key, KeyModifiers modifiers)
     {
         if (!this.thisIsLabelEditorMode ||
-            this.thisSelectedLabelEditorHighlight == null ||
+            !this.HasSelectedLabelEditorHighlightsForCurrentSchematic() ||
             this.SchematicsNewLabelPromptBorder.IsVisible)
         {
             return false;
@@ -3796,118 +4228,132 @@ public partial class TabSchematics : UserControl
             return false;
         }
 
+        var selectedRows = this.GetSelectedLabelEditorHighlightsForCurrentSchematic();
+        if (selectedRows.Count == 0)
+        {
+            return false;
+        }
+
+        var sourceRects = selectedRows.ToDictionary(
+            row => row,
+            row => new Rect(row.X, row.Y, row.Width, row.Height));
+
         bool isShift = modifiers.HasFlag(KeyModifiers.Shift);
         bool isAlt = modifiers.HasFlag(KeyModifiers.Alt);
-
-        double x = this.thisSelectedLabelEditorHighlight.X;
-        double y = this.thisSelectedLabelEditorHighlight.Y;
-        double width = this.thisSelectedLabelEditorHighlight.Width;
-        double height = this.thisSelectedLabelEditorHighlight.Height;
-
         const double step = 1.0;
         bool changed = false;
 
-        if (!isShift && !isAlt)
+        foreach (var row in selectedRows)
         {
-            switch (key)
+            var originalRect = sourceRects[row];
+
+            double x = originalRect.X;
+            double y = originalRect.Y;
+            double width = originalRect.Width;
+            double height = originalRect.Height;
+
+            if (!isShift && !isAlt)
             {
-                case Key.Left:
-                    x -= step;
-                    changed = true;
-                    break;
-
-                case Key.Right:
-                    x += step;
-                    changed = true;
-                    break;
-
-                case Key.Up:
-                    y -= step;
-                    changed = true;
-                    break;
-
-                case Key.Down:
-                    y += step;
-                    changed = true;
-                    break;
-            }
-        }
-        else if (isShift)
-        {
-            switch (key)
-            {
-                case Key.Left:
-                    x -= step;
-                    width += step;
-                    changed = true;
-                    break;
-
-                case Key.Right:
-                    width += step;
-                    changed = true;
-                    break;
-
-                case Key.Up:
-                    y -= step;
-                    height += step;
-                    changed = true;
-                    break;
-
-                case Key.Down:
-                    height += step;
-                    changed = true;
-                    break;
-            }
-        }
-        else if (isAlt)
-        {
-            switch (key)
-            {
-                case Key.Left:
-                    if (width > step)
-                    {
-                        width -= step;
+                switch (key)
+                {
+                    case Key.Left:
+                        x -= step;
                         changed = true;
-                    }
-                    break;
+                        break;
 
-                case Key.Right:
-                    if (width > step)
-                    {
+                    case Key.Right:
                         x += step;
-                        width -= step;
                         changed = true;
-                    }
-                    break;
+                        break;
 
-                case Key.Up:
-                    if (height > step)
-                    {
-                        height -= step;
+                    case Key.Up:
+                        y -= step;
                         changed = true;
-                    }
-                    break;
+                        break;
 
-                case Key.Down:
-                    if (height > step)
-                    {
+                    case Key.Down:
                         y += step;
-                        height -= step;
                         changed = true;
-                    }
-                    break;
+                        break;
+                }
             }
+            else if (isShift)
+            {
+                switch (key)
+                {
+                    case Key.Left:
+                        x -= step;
+                        width += step;
+                        changed = true;
+                        break;
+
+                    case Key.Right:
+                        width += step;
+                        changed = true;
+                        break;
+
+                    case Key.Up:
+                        y -= step;
+                        height += step;
+                        changed = true;
+                        break;
+
+                    case Key.Down:
+                        height += step;
+                        changed = true;
+                        break;
+                }
+            }
+            else if (isAlt)
+            {
+                switch (key)
+                {
+                    case Key.Left:
+                        if (width > step)
+                        {
+                            width -= step;
+                            changed = true;
+                        }
+                        break;
+
+                    case Key.Right:
+                        if (width > step)
+                        {
+                            x += step;
+                            width -= step;
+                            changed = true;
+                        }
+                        break;
+
+                    case Key.Up:
+                        if (height > step)
+                        {
+                            height -= step;
+                            changed = true;
+                        }
+                        break;
+
+                    case Key.Down:
+                        if (height > step)
+                        {
+                            y += step;
+                            height -= step;
+                            changed = true;
+                        }
+                        break;
+                }
+            }
+
+            row.X = x;
+            row.Y = y;
+            row.Width = Math.Max(1.0, width);
+            row.Height = Math.Max(1.0, height);
         }
 
         if (!changed)
         {
             return false;
         }
-
-        this.thisSelectedLabelEditorHighlight.X = x;
-        this.thisSelectedLabelEditorHighlight.Y = y;
-        this.thisSelectedLabelEditorHighlight.Width = Math.Max(1.0, width);
-        this.thisSelectedLabelEditorHighlight.Height = Math.Max(1.0, height);
 
         this.RefreshLabelEditorOverlay();
         return true;
@@ -3918,6 +4364,8 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     private void OnSchematicsKeyDown(object? sender, KeyEventArgs e)
     {
+        this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
+
         if (this.thisIsKiCadCalibrationCaptureMode && e.Key == Key.Escape)
         {
             this.CancelKiCadCalibrationCapture();
@@ -3936,85 +4384,13 @@ public partial class TabSchematics : UserControl
         }
     }
 
-    /*
-        // ###########################################################################################
-        // Writes the current schematic's working-copy label editor rectangles back into the active
-        // in-memory board data, replacing only the edited schematic rows.
-        // ###########################################################################################
-        private void ApplyWorkingLabelEditorHighlightsToCurrentBoard()
-        {
-            var boardData = this.MainWindow?.CurrentBoardData;
-            string schematicName = this.GetCurrentSchematicName();
-
-            if (boardData == null || string.IsNullOrWhiteSpace(schematicName))
-            {
-                return;
-            }
-
-            for (int i = boardData.ComponentHighlights.Count - 1; i >= 0; i--)
-            {
-                if (string.Equals(boardData.ComponentHighlights[i].SchematicName, schematicName, StringComparison.OrdinalIgnoreCase))
-                {
-                    boardData.ComponentHighlights.RemoveAt(i);
-                }
-            }
-
-            foreach (var row in this.thisLabelEditorWorkingHighlights.Where(row =>
-                         string.Equals(row.SchematicName, schematicName, StringComparison.OrdinalIgnoreCase) &&
-                         !string.IsNullOrWhiteSpace(row.BoardLabel)))
-            {
-                boardData.ComponentHighlights.Add(new ComponentHighlightEntry
-                {
-                    SchematicName = row.SchematicName.Trim(),
-                    BoardLabel = row.BoardLabel.Trim(),
-                    X = row.X.ToString(CultureInfo.InvariantCulture),
-                    Y = row.Y.ToString(CultureInfo.InvariantCulture),
-                    Width = row.Width.ToString(CultureInfo.InvariantCulture),
-                    Height = row.Height.ToString(CultureInfo.InvariantCulture)
-                });
-            }
-        }
-
-        // ###########################################################################################
-        // Ensures any newly introduced board labels from the editor exist in the in-memory component
-        // list so they are available immediately in the current session after Apply.
-        // ###########################################################################################
-        private void EnsureLabelEditorBoardLabelsExistInCurrentBoard()
-        {
-            var boardData = this.MainWindow?.CurrentBoardData;
-            if (boardData == null)
-            {
-                return;
-            }
-
-            string localRegion = this.MainWindow?.LocalRegion?.Trim() ?? string.Empty;
-
-            foreach (var row in this.thisLabelEditorWorkingHighlights
-                         .Where(row => !string.IsNullOrWhiteSpace(row.BoardLabel))
-                         .GroupBy(row => row.BoardLabel.Trim(), StringComparer.OrdinalIgnoreCase)
-                         .Select(group => group.First()))
-            {
-                bool exists = boardData.Components.Any(component =>
-                    string.Equals(component.BoardLabel, row.BoardLabel, StringComparison.OrdinalIgnoreCase));
-
-                if (exists)
-                {
-                    continue;
-                }
-
-                boardData.Components.Add(new ComponentEntry
-                {
-                    BoardLabel = row.BoardLabel.Trim(),
-                    FriendlyName = string.Empty,
-                    TechnicalNameOrValue = string.Empty,
-                    PartNumber = string.Empty,
-                    Category = string.IsNullOrWhiteSpace(row.Category) ? "General" : row.Category.Trim(),
-                    Region = localRegion,
-                    Description = string.Empty
-                });
-            }
-        }
-    */
+    // ###########################################################################################
+    // Tracks key releases so SHIFT-based KiCad hover highlighting updates immediately.
+    // ###########################################################################################
+    private void OnSchematicsKeyUp(object? sender, KeyEventArgs e)
+    {
+        this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
+    }
 
     // ###########################################################################################
     // Builds the available category list for the new-label prompt and ensures at least one item
@@ -4175,6 +4551,12 @@ public partial class TabSchematics : UserControl
         if (this.TryGetSelectedLabelEditorHandleAtContainerPoint(pointerInContainer, out _))
         {
             this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.Hand);
+            return;
+        }
+
+        if (this.TryGetSelectedLabelEditorHighlightAtContainerPoint(pointerInContainer, out _))
+        {
+            this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.SizeAll);
             return;
         }
 
@@ -4399,7 +4781,7 @@ public partial class TabSchematics : UserControl
         string jsonPath = this.GetKiCadProjectJsonPathForCurrentBoard();
 
         this.thisKiCadProject = null;
-        this.thisKiCadProjectPath = jsonPath;
+//        this.thisKiCadProjectPath = jsonPath;
         this.thisSelectedKiCadReferences.Clear();
         this.thisSelectedKiCadNormalizedNetNames.Clear();
         this.thisLockedKiCadNetNames.Clear();
@@ -4570,6 +4952,7 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     // Renders PCB copper geometry for the currently selected normalized net names.
     // Uses a spatial overlap adjacency solver to prevent network trace flooding.
+    // Also renders a pin-1-only marker for selected or hovered components when enabled.
     // ###########################################################################################
     private void RenderKiCadPcbGeometry(KiCadProjectView view)
     {
@@ -4605,11 +4988,11 @@ public partial class TabSchematics : UserControl
         }
 
         double translatedOpacity = Math.Clamp(baseOpacity + 0.25, 0.0, 1.0);
-        bool includeHoveredKiCadNet = this.IsBoardHoverHighlightsTracesEnabled();
+        string? activeHoveredKiCadNetName = this.GetActiveHoveredKiCadNetName();
 
         var activeNets = new HashSet<string>(this.thisSelectedKiCadNormalizedNetNames, StringComparer.OrdinalIgnoreCase);
         foreach (var locked in this.thisLockedKiCadNetNames) activeNets.Add(locked);
-        if (includeHoveredKiCadNet && !string.IsNullOrWhiteSpace(this.thisHoveredKiCadNetName)) activeNets.Add(this.thisHoveredKiCadNetName);
+        if (!string.IsNullOrWhiteSpace(activeHoveredKiCadNetName)) activeNets.Add(activeHoveredKiCadNetName);
 
         var matchingNetIds = pcb.Nets.List
             .Where(net => !string.IsNullOrWhiteSpace(net.NormalizedName) &&
@@ -4622,6 +5005,58 @@ public partial class TabSchematics : UserControl
         string requiredLayer = string.Equals(view.Type, "pcb_bottom", StringComparison.OrdinalIgnoreCase)
             ? "B.Cu" : "F.Cu";
 
+        void AddPadShape(KiCadPcbPad pad, IBrush padBrush)
+        {
+            if (pad.AbsoluteCenter == null)
+            {
+                return;
+            }
+
+            Point center = this.MapKiCadWorldToLocal(
+                pad.AbsoluteCenter.X,
+                pad.AbsoluteCenter.Y,
+                worldBounds,
+                contentRect,
+                calibration);
+
+            double width = this.MapKiCadWorldLengthToLocal(pad.Size?.X ?? 1.2, worldBounds, contentRect, calibration);
+            double height = this.MapKiCadWorldLengthToLocal(pad.Size?.Y ?? 1.2, worldBounds, contentRect, calibration);
+
+            Control shape;
+
+            if (string.Equals(pad.Shape?.Trim(), "rect", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(pad.Shape?.Trim(), "roundrect", StringComparison.OrdinalIgnoreCase))
+            {
+                shape = new Rectangle
+                {
+                    Width = Math.Max(2.0, width),
+                    Height = Math.Max(2.0, height),
+                    Stroke = padBrush,
+                    Fill = padBrush,
+                    StrokeThickness = 1.2,
+                    RadiusX = 2,
+                    RadiusY = 2,
+                    IsHitTestVisible = false
+                };
+            }
+            else
+            {
+                shape = new Ellipse
+                {
+                    Width = Math.Max(2.0, width),
+                    Height = Math.Max(2.0, height),
+                    Stroke = padBrush,
+                    Fill = padBrush,
+                    StrokeThickness = 1.2,
+                    IsHitTestVisible = false
+                };
+            }
+
+            Canvas.SetLeft(shape, center.X - (shape.Width / 2.0));
+            Canvas.SetTop(shape, center.Y - (shape.Height / 2.0));
+            this.SchematicsKiCadOverlayCanvas.Children.Add(shape);
+        }
+
         foreach (var netInfo in matchingNetIds)
         {
             if (!pcb.HighlightIndex.TryGetValue(netInfo.Id.ToString(CultureInfo.InvariantCulture), out var bucket))
@@ -4629,8 +5064,7 @@ public partial class TabSchematics : UserControl
                 continue;
             }
 
-            bool isHoveredNet = includeHoveredKiCadNet &&
-                                string.Equals(this.thisHoveredKiCadNetName, netInfo.Name, StringComparison.OrdinalIgnoreCase);
+            bool isHoveredNet = string.Equals(activeHoveredKiCadNetName, netInfo.Name, StringComparison.OrdinalIgnoreCase);
             bool isLockedNet = this.thisLockedKiCadNetNames.Contains(netInfo.Name);
             bool isExplicitHighlight = isLockedNet || isHoveredNet;
 
@@ -4897,51 +5331,44 @@ public partial class TabSchematics : UserControl
                 var footprint = pcb.Footprints[padRef.FootprintIndex];
                 var pad = footprint.Pads[padRef.PadIndex];
 
-                Point center = this.MapKiCadWorldToLocal(
-                    pad.AbsoluteCenter!.X,
-                    pad.AbsoluteCenter.Y,
-                    worldBounds,
-                    contentRect,
-                    calibration);
+                bool isSelectedComponentPin1 = this.ShouldUseSelectedComponentPin1Highlight(footprint, pad, requiredLayer);
+                IBrush padBrush = isSelectedComponentPin1
+                    ? new SolidColorBrush(Colors.Orange, 1.0)
+                    : fillBrush;
 
-                double width = this.MapKiCadWorldLengthToLocal(pad.Size?.X ?? 1.2, worldBounds, contentRect, calibration);
-                double height = this.MapKiCadWorldLengthToLocal(pad.Size?.Y ?? 1.2, worldBounds, contentRect, calibration);
+                AddPadShape(pad, padBrush);
+            }
+        }
 
-                Control shape;
+        if (!this.HasPin1HighlightTargetReference())
+        {
+            return;
+        }
 
-                if (string.Equals(pad.Shape?.Trim(), "rect", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(pad.Shape?.Trim(), "roundrect", StringComparison.OrdinalIgnoreCase))
+        foreach (var footprint in pcb.Footprints)
+        {
+            string reference = footprint.Reference?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(reference))
+            {
+                continue;
+            }
+
+            if (!this.thisSelectedKiCadReferences.Contains(reference) &&
+                !string.Equals(this.thisHoveredComponentBoardLabel, reference, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            foreach (var pad in footprint.Pads)
+            {
+                if (pad.AbsoluteCenter == null ||
+                    !TabSchematics.IsKiCadPcbPointVisibleOnSide(pad.Layers, requiredLayer) ||
+                    !TabSchematics.IsPrimaryPadForPin1Highlight(footprint, pad, requiredLayer))
                 {
-                    var rect = new Rectangle
-                    {
-                        Width = Math.Max(2.0, width),
-                        Height = Math.Max(2.0, height),
-                        Stroke = strokeBrush,
-                        Fill = fillBrush,
-                        StrokeThickness = 1.2,
-                        RadiusX = 2,
-                        RadiusY = 2,
-                        IsHitTestVisible = false
-                    };
-                    shape = rect;
-                }
-                else
-                {
-                    var ellipse = new Ellipse
-                    {
-                        Width = Math.Max(2.0, width),
-                        Height = Math.Max(2.0, height),
-                        Stroke = strokeBrush,
-                        Fill = fillBrush,
-                        StrokeThickness = 1.2,
-                        IsHitTestVisible = false
-                    };
-                    shape = ellipse;
+                    continue;
                 }
 
-                Canvas.SetLeft(shape, center.X - (shape.Width / 2.0));
-                Canvas.SetTop(shape, center.Y - (shape.Height / 2.0));
-                this.SchematicsKiCadOverlayCanvas.Children.Add(shape);
+                AddPadShape(pad, new SolidColorBrush(Colors.Orange, 1.0));
             }
         }
     }
@@ -4988,11 +5415,11 @@ public partial class TabSchematics : UserControl
         }
 
         double translatedOpacity = Math.Clamp(baseOpacity + 0.25, 0.0, 1.0);
-        bool includeHoveredKiCadNet = this.IsBoardHoverHighlightsTracesEnabled();
+        string? activeHoveredKiCadNetName = this.GetActiveHoveredKiCadNetName();
 
         var activeNets = new HashSet<string>(this.thisSelectedKiCadNormalizedNetNames, StringComparer.OrdinalIgnoreCase);
         foreach (var locked in this.thisLockedKiCadNetNames) activeNets.Add(locked);
-        if (includeHoveredKiCadNet && !string.IsNullOrWhiteSpace(this.thisHoveredKiCadNetName)) activeNets.Add(this.thisHoveredKiCadNetName);
+        if (!string.IsNullOrWhiteSpace(activeHoveredKiCadNetName)) activeNets.Add(activeHoveredKiCadNetName);
 
         foreach (string normalizedNetName in activeNets)
         {
@@ -5001,8 +5428,9 @@ public partial class TabSchematics : UserControl
                 continue;
             }
 
-            bool isHoveredNet = includeHoveredKiCadNet &&
-                                string.Equals(this.thisHoveredKiCadNetName, normalizedNetName, StringComparison.OrdinalIgnoreCase);
+//            bool isHoveredNet = includeHoveredKiCadNet &&
+//                                string.Equals(this.thisHoveredKiCadNetName, normalizedNetName, StringComparison.OrdinalIgnoreCase);
+            bool isHoveredNet = string.Equals(activeHoveredKiCadNetName, normalizedNetName, StringComparison.OrdinalIgnoreCase);
             bool isLockedNet = this.thisLockedKiCadNetNames.Contains(normalizedNetName);
 
             bool isSelectionDerivedNet = this.thisSelectedKiCadNormalizedNetNames.Contains(normalizedNetName);
@@ -5439,12 +5867,13 @@ public partial class TabSchematics : UserControl
         Logger.Info(
             $"Image calibration point captured for schematic [{this.GetCurrentSchematicName()}] -> ImageX=[{pixelPoint.X.ToString("0.##", CultureInfo.InvariantCulture)}] ImageY=[{pixelPoint.Y.ToString("0.##", CultureInfo.InvariantCulture)}]");
 
-        // Use CurrentCulture so the decimal delimiter (like commas vs dots) naturally matches your local Excel format 
-        string clipboardText = $"'{pixelPoint.X.ToString("0.######", CultureInfo.InvariantCulture)}\t'{pixelPoint.Y.ToString("0.######", CultureInfo.InvariantCulture)}";
+        string xText = pixelPoint.X.ToString("0.######", CultureInfo.InvariantCulture);
+        string yText = pixelPoint.Y.ToString("0.######", CultureInfo.InvariantCulture);
+        string clipboardText = $"'{xText}\t'{yText}";
 
         if (TopLevel.GetTopLevel(this) is TopLevel topLevel && topLevel.Clipboard != null)
         {
-            await topLevel.Clipboard.SetTextAsync(clipboardText);
+            await ClipboardExtensions.SetTextAsync(topLevel.Clipboard, clipboardText);
         }
 
         this.thisIsKiCadCalibrationCaptureMode = false;
@@ -5842,6 +6271,19 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
+    // Returns true when a KiCad calibration candidate is allowed in clipboard export.
+    // Only pad entries and component reference-text entries are copied.
+    // ###########################################################################################
+    private static bool IsClipboardEligibleKiCadCalibrationWorldPointCandidate(KiCadCalibrationWorldPointCandidate candidate)
+    {
+        string label = candidate.Label?.Trim() ?? string.Empty;
+
+        return label.StartsWith("Pad ", StringComparison.OrdinalIgnoreCase) ||
+               label.Contains(" pad ", StringComparison.OrdinalIgnoreCase) ||
+               label.Contains(" reference text ", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ###########################################################################################
     // Builds tab-separated clipboard text for KiCad world-point candidates so they can be pasted
     // into Excel or inspected in a text editor.
     // ###########################################################################################
@@ -5865,44 +6307,57 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Copies candidate KiCad world points for the current view to the clipboard.
-    // PCB views always include all visible component pads on the current board side.
+    // Only pad entries and component reference-text entries are exported.
     // ###########################################################################################
     private async void CopyKiCadWorldPointCandidatesAsync()
     {
-        var candidates = this.BuildCurrentKiCadCalibrationWorldPointCandidates();
+        var allCandidates = this.BuildCurrentKiCadCalibrationWorldPointCandidates();
+        var clipboardCandidates = allCandidates
+            .Where(TabSchematics.IsClipboardEligibleKiCadCalibrationWorldPointCandidate)
+            .ToList();
+
         string schematicName = this.GetCurrentSchematicName();
 
-        if (candidates.Count == 0)
+        if (clipboardCandidates.Count == 0)
         {
-            // Update the UI so it explicitly tells you the name matching failed
-            this.SchematicsHoverLabelText.Text = $"No KiCad match found for '{schematicName}'. Names must match.";
+            this.SchematicsHoverLabelText.Text = allCandidates.Count == 0
+                ? $"No KiCad match found for '{schematicName}'. Names must match."
+                : $"No pad or reference text entries found for '{schematicName}'.";
             this.SchematicsHoverLabelBorder.IsVisible = true;
             this.HideLabelEditorMenu();
             this.SchematicsContainer.Focus();
 
-            // Clear the clipboard so you aren't tricked by stale leftover coordinates!
             if (TopLevel.GetTopLevel(this) is TopLevel topLevelClear && topLevelClear.Clipboard != null)
             {
                 await topLevelClear.Clipboard.ClearAsync();
             }
 
-            Logger.Warning($"KiCad calibration copy failed. Excel name '{schematicName}' not found in traces JSON.");
+            if (allCandidates.Count == 0)
+            {
+                Logger.Warning($"KiCad calibration copy failed. Excel name '{schematicName}' not found in traces JSON.");
+            }
+            else
+            {
+                Logger.Warning($"KiCad calibration copy found no pad/reference-text entries for schematic [{schematicName}].");
+            }
+
             return;
         }
 
-        string clipboardText = this.BuildKiCadWorldPointCandidatesClipboardText(candidates);
+        string clipboardText = this.BuildKiCadWorldPointCandidatesClipboardText(clipboardCandidates);
 
         if (TopLevel.GetTopLevel(this) is TopLevel topLevel && topLevel.Clipboard != null)
         {
-            await topLevel.Clipboard.SetTextAsync(clipboardText);
+            //            await topLevel.Clipboard.SetTextAsync(clipboardText);
+            await ClipboardExtensions.SetTextAsync(topLevel.Clipboard, clipboardText);
         }
 
-        this.SchematicsHoverLabelText.Text = $"Copied {candidates.Count} KiCad world point candidates";
+        this.SchematicsHoverLabelText.Text = $"Copied {clipboardCandidates.Count} KiCad calibration points";
         this.SchematicsHoverLabelBorder.IsVisible = true;
         this.HideLabelEditorMenu();
         this.SchematicsContainer.Focus();
 
-        Logger.Info($"Copied [{candidates.Count}] KiCad world point candidates for schematic [{schematicName}]");
+        Logger.Info($"Copied [{clipboardCandidates.Count}] KiCad calibration points for schematic [{schematicName}]");
     }
 
     // ###########################################################################################
@@ -6162,11 +6617,11 @@ public partial class TabSchematics : UserControl
     private void UpdateKiCadNetConnectionsPanel()
     {
         var activeNets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        bool includeHoveredKiCadNet = this.IsBoardHoverHighlightsTracesEnabled();
+        string? activeHoveredKiCadNetName = this.GetActiveHoveredKiCadNetName();
 
-        if (includeHoveredKiCadNet && !string.IsNullOrWhiteSpace(this.thisHoveredKiCadNetName))
+        if (!string.IsNullOrWhiteSpace(activeHoveredKiCadNetName))
         {
-            activeNets.Add(this.thisHoveredKiCadNetName);
+            activeNets.Add(activeHoveredKiCadNetName);
         }
 
         foreach (string lockedNet in this.thisLockedKiCadNetNames)
@@ -6309,19 +6764,20 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     // Rebuilds the currently visible KiCad overlay for the selected image view immediately.
     // PCB views render copper geometry, while schematic views render resolved wire paths.
+    // Also allows a pin-1-only render path for hovered components even when no traces are active.
     // ###########################################################################################
     private void RefreshKiCadOverlayNow()
     {
         this.ClearKiCadOverlay();
         this.UpdateKiCadNetConnectionsPanel();
 
-        bool includeHoveredKiCadNet = this.IsBoardHoverHighlightsTracesEnabled();
+        string? activeHoveredKiCadNetName = this.GetActiveHoveredKiCadNetName();
+        bool hasActiveKiCadNets =
+            this.thisSelectedKiCadNormalizedNetNames.Count > 0 ||
+            this.thisLockedKiCadNetNames.Count > 0 ||
+            !string.IsNullOrWhiteSpace(activeHoveredKiCadNetName);
 
-        if (this.thisKiCadProject == null ||
-            this.currentFullResBitmap == null ||
-            (this.thisSelectedKiCadNormalizedNetNames.Count == 0 &&
-             this.thisLockedKiCadNetNames.Count == 0 &&
-             (!includeHoveredKiCadNet || string.IsNullOrWhiteSpace(this.thisHoveredKiCadNetName))))
+        if (this.thisKiCadProject == null || this.currentFullResBitmap == null)
         {
             return;
         }
@@ -6335,7 +6791,17 @@ public partial class TabSchematics : UserControl
         if (string.Equals(currentView.Type, "pcb_top", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(currentView.Type, "pcb_bottom", StringComparison.OrdinalIgnoreCase))
         {
+            if (!hasActiveKiCadNets && !this.HasPin1HighlightTargetReference())
+            {
+                return;
+            }
+
             this.RenderKiCadPcbGeometry(currentView);
+            return;
+        }
+
+        if (!hasActiveKiCadNets)
+        {
             return;
         }
 
@@ -6346,7 +6812,79 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
+    // Compares KiCad pad designators so numeric pins sort numerically and non-numeric pins sort
+    // alphabetically. This lets footprints like B/C/E choose B as the primary highlighted pin.
+    // ###########################################################################################
+    private static int CompareKiCadPadDesignators(string? left, string? right)
+    {
+        string leftValue = left?.Trim() ?? string.Empty;
+        string rightValue = right?.Trim() ?? string.Empty;
+
+        bool leftIsNumber = int.TryParse(leftValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out int leftNumber);
+        bool rightIsNumber = int.TryParse(rightValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out int rightNumber);
+
+        if (leftIsNumber && rightIsNumber)
+        {
+            return leftNumber.CompareTo(rightNumber);
+        }
+
+        if (leftIsNumber != rightIsNumber)
+        {
+            return leftIsNumber ? -1 : 1;
+        }
+
+        return StringComparer.OrdinalIgnoreCase.Compare(leftValue, rightValue);
+    }
+
+    // ###########################################################################################
+    // Returns true when the given pad is the primary pad that should receive the special marker.
+    // Prefers pad "1" when it exists; otherwise falls back to the first visible pad designator.
+    // ###########################################################################################
+    private static bool IsPrimaryPadForPin1Highlight(
+        KiCadPcbFootprint footprint,
+        KiCadPcbPad pad,
+        string requiredLayer)
+    {
+        string currentPadDesignator = pad.Number?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(currentPadDesignator))
+        {
+            return false;
+        }
+
+        if (string.Equals(currentPadDesignator, "1", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var visiblePadDesignators = footprint.Pads
+            .Where(candidate => candidate.AbsoluteCenter != null)
+            .Where(candidate => TabSchematics.IsKiCadPcbPointVisibleOnSide(candidate.Layers, requiredLayer))
+            .Select(candidate => candidate.Number?.Trim() ?? string.Empty)
+            .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (visiblePadDesignators.Count == 0)
+        {
+            return false;
+        }
+
+        if (visiblePadDesignators.Any(candidate =>
+                string.Equals(candidate, "1", StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        string primaryDesignator = visiblePadDesignators
+            .OrderBy(candidate => candidate, Comparer<string>.Create(TabSchematics.CompareKiCadPadDesignators))
+            .First();
+
+        return string.Equals(currentPadDesignator, primaryDesignator, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ###########################################################################################
     // Updates the currently hovered component board label and rebuilds the hover-only overlay.
+    // Also refreshes the KiCad overlay immediately so pin-1 hover markers appear in sync.
     // ###########################################################################################
     private void SetHoveredComponentBoardLabel(string? boardLabel)
     {
@@ -6357,6 +6895,7 @@ public partial class TabSchematics : UserControl
 
         this.thisHoveredComponentBoardLabel = boardLabel;
         this.RefreshHoveredComponentHighlightOverlay();
+        this.RefreshKiCadOverlay(forceImmediate: true);
     }
 
     // ###########################################################################################
@@ -6537,11 +7076,13 @@ public partial class TabSchematics : UserControl
         this.thisSuppressBoardSettingsChanged = true;
 
         bool hasBoard = !string.IsNullOrWhiteSpace(boardKey);
-        bool hasKiCadTracesForCurrentSchematic = this.HasCurrentSchematicKiCadTraces();
 
         this.BoardSettingsPanel.IsEnabled = hasBoard;
 
-        this.CheckBoardHoverHighlightsTraces.IsEnabled = hasBoard && hasKiCadTracesForCurrentSchematic;
+        this.CheckBoardMarkPin1OnSelectedComponent.IsChecked = hasBoard
+            ? UserSettings.GetSchematicsMarkPin1OnSelectedComponentForBoard(boardKey)
+            : false;
+
         this.CheckBoardHoverHighlightsTraces.IsChecked = hasBoard
             ? UserSettings.GetSchematicsHoverHighlightsTracesForBoard(boardKey)
             : true;
@@ -6552,6 +7093,8 @@ public partial class TabSchematics : UserControl
             : UserSettings.ContributorMode;
 
         this.thisSuppressBoardSettingsChanged = false;
+
+        this.UpdateInteractiveCadTraceHoverModeUi();
     }
 
     // ###########################################################################################
@@ -6559,10 +7102,19 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     private bool IsBoardHoverHighlightsTracesEnabled()
     {
+        if (!this.HasCurrentSchematicKiCadTraces())
+        {
+            return false;
+        }
+
+        if (string.Equals(UserSettings.InteractiveCadTraceHoverMode, "HoldShift", StringComparison.Ordinal))
+        {
+            return this.thisIsInteractiveCadTraceHoverShiftPressed;
+        }
+
         var boardKey = this.MainWindow?.GetCurrentBoardKey();
 
         return !string.IsNullOrWhiteSpace(boardKey) &&
-               this.HasCurrentSchematicKiCadTraces() &&
                UserSettings.GetSchematicsHoverHighlightsTracesForBoard(boardKey);
     }
 
@@ -6608,5 +7160,473 @@ public partial class TabSchematics : UserControl
 
         return false;
     }
+
+    // ###########################################################################################
+    // Updates cached SHIFT state for interactive KiCad hover highlighting.
+    // ###########################################################################################
+    private void UpdateInteractiveCadTraceHoverShiftState(KeyModifiers modifiers)
+    {
+        bool isShiftPressed = modifiers.HasFlag(KeyModifiers.Shift);
+
+        if (this.thisIsInteractiveCadTraceHoverShiftPressed == isShiftPressed)
+        {
+            return;
+        }
+
+        this.thisIsInteractiveCadTraceHoverShiftPressed = isShiftPressed;
+        this.RefreshKiCadHoverPadUi();
+        this.RefreshKiCadOverlay();
+    }
+
+    // ###########################################################################################
+    // Refreshes the transient KiCad pad hover label based on the active hover mode.
+    // ###########################################################################################
+    private void RefreshKiCadHoverPadUi()
+    {
+        string hoveredPadNumber = this.GetActiveHoveredKiCadPadNumber()?.Trim() ?? string.Empty;
+        string hoveredNetName = this.GetActiveHoveredKiCadNetName()?.Trim() ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(hoveredPadNumber))
+        {
+            this.SchematicsHoverPadText.Text = string.IsNullOrWhiteSpace(hoveredNetName)
+                ? hoveredPadNumber
+                : $"{hoveredPadNumber} | {hoveredNetName}";
+            this.SchematicsHoverPadBorder.IsVisible = true;
+        }
+        else
+        {
+            this.SchematicsHoverPadBorder.IsVisible = false;
+            this.SchematicsHoverPadText.Text = string.Empty;
+        }
+    }
+
+    // ###########################################################################################
+    // Reacts to global interactive CAD trace hover mode changes from configuration.
+    // ###########################################################################################
+    private void OnInteractiveCadTraceHoverModeChanged()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            this.UpdateInteractiveCadTraceHoverModeUi();
+            this.RefreshKiCadHoverPadUi();
+            this.RefreshKiCadOverlay();
+        });
+    }
+
+    // ###########################################################################################
+    // Updates schematics board-settings visibility for the global interactive CAD trace mode.
+    // ###########################################################################################
+    private void UpdateInteractiveCadTraceHoverModeUi()
+    {
+        bool isAlwaysMode = string.Equals(UserSettings.InteractiveCadTraceHoverMode, "Always", StringComparison.Ordinal);
+        bool hasBoard = this.BoardSettingsPanel.IsEnabled;
+        bool hasKiCadTraces = this.HasCurrentSchematicKiCadTraces();
+        bool hasKiCadPcbPadData = this.HasCurrentSchematicKiCadPcbPadData();
+
+        this.BoardMarkPin1OnSelectedComponentRow.IsVisible = hasBoard && hasKiCadPcbPadData;
+        this.CheckBoardMarkPin1OnSelectedComponent.IsEnabled = hasBoard && hasKiCadPcbPadData;
+
+        this.BoardHoverHighlightsTracesRow.IsVisible = isAlwaysMode && hasBoard && hasKiCadTraces;
+        this.CheckBoardHoverHighlightsTraces.IsEnabled =
+            isAlwaysMode &&
+            hasBoard &&
+            hasKiCadTraces;
+    }
+
+    // ###########################################################################################
+    // Returns the active hovered KiCad net name, honoring the current hover mode settings.
+    // ###########################################################################################
+    private string? GetActiveHoveredKiCadNetName()
+    {
+        return this.IsBoardHoverHighlightsTracesEnabled()
+            ? this.thisHoveredKiCadNetName
+            : null;
+    }
+
+    // ###########################################################################################
+    // Returns the active hovered KiCad pad number, honoring the current hover mode settings.
+    // ###########################################################################################
+    private string? GetActiveHoveredKiCadPadNumber()
+    {
+        return this.IsBoardHoverHighlightsTracesEnabled()
+            ? this.thisHoveredKiCadPadNumber
+            : null;
+    }
+
+    // ###########################################################################################
+    // Returns the currently selected editor highlights for the active schematic in working-list order.
+    // ###########################################################################################
+    private List<EditableComponentHighlight> GetSelectedLabelEditorHighlightsForCurrentSchematic()
+    {
+        string schematicName = this.GetCurrentSchematicName();
+
+        return this.thisLabelEditorWorkingHighlights
+            .Where(row => string.Equals(row.SchematicName, schematicName, StringComparison.OrdinalIgnoreCase))
+            .Where(row => this.thisSelectedLabelEditorHighlights.Contains(row))
+            .ToList();
+    }
+
+    // ###########################################################################################
+    // Returns the first selected editor highlight for the active schematic, or null when none exist.
+    // ###########################################################################################
+    private EditableComponentHighlight? GetFirstSelectedLabelEditorHighlightForCurrentSchematic()
+    {
+        return this.GetSelectedLabelEditorHighlightsForCurrentSchematic().FirstOrDefault();
+    }
+
+    // ###########################################################################################
+    // Returns true when the given highlight is part of the current editor selection.
+    // ###########################################################################################
+    private bool IsSelectedLabelEditorHighlight(EditableComponentHighlight highlight)
+    {
+        return this.thisSelectedLabelEditorHighlights.Contains(highlight);
+    }
+
+    // ###########################################################################################
+    // Clears the current multi-selection and optionally refreshes the editor overlay.
+    // ###########################################################################################
+    private void ClearSelectedLabelEditorHighlights(bool refresh = true)
+    {
+        this.thisSelectedLabelEditorHighlights.Clear();
+        this.thisSelectedLabelEditorHighlight = null;
+
+        if (refresh)
+        {
+            this.RefreshLabelEditorOverlay();
+        }
+    }
+
+    // ###########################################################################################
+    // Replaces the current multi-selection with one highlight and sets it as the primary selection.
+    // ###########################################################################################
+    private void SetSingleSelectedLabelEditorHighlight(EditableComponentHighlight highlight, bool refresh = true)
+    {
+        this.thisSelectedLabelEditorHighlights.Clear();
+        this.thisSelectedLabelEditorHighlights.Add(highlight);
+        this.thisSelectedLabelEditorHighlight = highlight;
+
+        if (refresh)
+        {
+            this.RefreshLabelEditorOverlay();
+        }
+    }
+
+    // ###########################################################################################
+    // Toggles one highlight inside the current multi-selection and updates the primary selection.
+    // ###########################################################################################
+    private void ToggleSelectedLabelEditorHighlight(EditableComponentHighlight highlight)
+    {
+        if (this.thisSelectedLabelEditorHighlights.Contains(highlight))
+        {
+            this.thisSelectedLabelEditorHighlights.Remove(highlight);
+
+            if (ReferenceEquals(this.thisSelectedLabelEditorHighlight, highlight))
+            {
+                this.thisSelectedLabelEditorHighlight = this.GetFirstSelectedLabelEditorHighlightForCurrentSchematic();
+            }
+        }
+        else
+        {
+            this.thisSelectedLabelEditorHighlights.Add(highlight);
+            this.thisSelectedLabelEditorHighlight = highlight;
+        }
+
+        this.RefreshLabelEditorOverlay();
+    }
+
+    // ###########################################################################################
+    // Returns true when there is at least one selected editor highlight on the current schematic.
+    // ###########################################################################################
+    private bool HasSelectedLabelEditorHighlightsForCurrentSchematic()
+    {
+        return this.GetSelectedLabelEditorHighlightsForCurrentSchematic().Count > 0;
+    }
+
+    // ###########################################################################################
+    // Computes the combined selection bounds for all selected editor highlights on the current schematic.
+    // ###########################################################################################
+    private bool TryGetSelectedLabelEditorBounds(out Rect selectionBounds)
+    {
+        selectionBounds = default;
+
+        var selected = this.GetSelectedLabelEditorHighlightsForCurrentSchematic();
+        if (selected.Count == 0)
+        {
+            return false;
+        }
+
+        double left = selected.Min(row => row.X);
+        double top = selected.Min(row => row.Y);
+        double right = selected.Max(row => row.X + row.Width);
+        double bottom = selected.Max(row => row.Y + row.Height);
+
+        selectionBounds = new Rect(left, top, right - left, bottom - top);
+        return true;
+    }
+
+    // ###########################################################################################
+    // Returns true when the pointer is inside the current selection bounds so grouped move can start.
+    // ###########################################################################################
+    private bool IsPointerInsideSelectedLabelEditorBounds(Point pointerInContainer)
+    {
+        if (!this.TryGetSelectedLabelEditorBounds(out var selectionBounds))
+        {
+            return false;
+        }
+
+        if (!this.TryGetLabelEditorLocalPoint(pointerInContainer, out var localPoint))
+        {
+            return false;
+        }
+
+        var localRect = this.ConvertLabelEditorPixelRectToLocalRect(selectionBounds);
+        return localRect.Contains(localPoint);
+    }
+
+    // ###########################################################################################
+    // Captures the original rectangles of all selected highlights before a move or resize starts.
+    // ###########################################################################################
+    private void CaptureSelectedLabelEditorDragState()
+    {
+        this.thisLabelEditorOriginalDragRectangles.Clear();
+
+        foreach (var row in this.GetSelectedLabelEditorHighlightsForCurrentSchematic())
+        {
+            this.thisLabelEditorOriginalDragRectangles[row] = new Rect(row.X, row.Y, row.Width, row.Height);
+        }
+    }
+
+    // ###########################################################################################
+    // Applies a transformed group bounds rectangle back onto all selected highlights proportionally.
+    // ###########################################################################################
+    private void ApplyTransformedBoundsToSelectedLabelEditorHighlights(
+        Rect originalSelectionBounds,
+        Rect newSelectionBounds,
+        IReadOnlyDictionary<EditableComponentHighlight, Rect>? sourceRects = null)
+    {
+        var selected = this.GetSelectedLabelEditorHighlightsForCurrentSchematic();
+        if (selected.Count == 0)
+        {
+            return;
+        }
+
+        double originalWidth = Math.Max(1.0, originalSelectionBounds.Width);
+        double originalHeight = Math.Max(1.0, originalSelectionBounds.Height);
+        double newWidth = Math.Max(1.0, newSelectionBounds.Width);
+        double newHeight = Math.Max(1.0, newSelectionBounds.Height);
+
+        foreach (var row in selected)
+        {
+            Rect sourceRect = sourceRects != null && sourceRects.TryGetValue(row, out var storedRect)
+                ? storedRect
+                : new Rect(row.X, row.Y, row.Width, row.Height);
+
+            double relativeLeft = (sourceRect.Left - originalSelectionBounds.Left) / originalWidth;
+            double relativeTop = (sourceRect.Top - originalSelectionBounds.Top) / originalHeight;
+            double relativeRight = (sourceRect.Right - originalSelectionBounds.Left) / originalWidth;
+            double relativeBottom = (sourceRect.Bottom - originalSelectionBounds.Top) / originalHeight;
+
+            double left = newSelectionBounds.Left + (relativeLeft * newWidth);
+            double top = newSelectionBounds.Top + (relativeTop * newHeight);
+            double right = newSelectionBounds.Left + (relativeRight * newWidth);
+            double bottom = newSelectionBounds.Top + (relativeBottom * newHeight);
+
+            row.X = left;
+            row.Y = top;
+            row.Width = Math.Max(1.0, right - left);
+            row.Height = Math.Max(1.0, bottom - top);
+        }
+    }
+
+    // ###########################################################################################
+    // Returns the selected editor highlight under the pointer, if any.
+    // ###########################################################################################
+    private bool TryGetSelectedLabelEditorHighlightAtContainerPoint(Point pointerInContainer, out int workingIndex)
+    {
+        workingIndex = -1;
+
+        if (!this.TryGetLabelEditorHighlightAtContainerPoint(pointerInContainer, out var hitIndex))
+        {
+            return false;
+        }
+
+        var hitHighlight = this.thisLabelEditorWorkingHighlights[hitIndex];
+        if (!this.IsSelectedLabelEditorHighlight(hitHighlight))
+        {
+            return false;
+        }
+
+        workingIndex = hitIndex;
+        return true;
+    }
+
+    // ###########################################################################################
+    // Tries to hit one of the resize handles of any selected rectangle under the pointer.
+    // Returns the matching working-list index so drag behavior follows the hovered rectangle.
+    // ###########################################################################################
+    private bool TryGetSelectedLabelEditorHandleAtContainerPoint(
+        Point pointerInContainer,
+        out int workingIndex,
+        out LabelEditorDragMode dragMode)
+    {
+        workingIndex = -1;
+        dragMode = LabelEditorDragMode.None;
+
+        if (this.currentFullResBitmap == null)
+        {
+            return false;
+        }
+
+        if (!this.TryGetLabelEditorLocalPoint(pointerInContainer, out var localPoint))
+        {
+            return false;
+        }
+
+        double scale = Math.Max(0.0001, this.schematicsMatrix.M11);
+        double handleSize = Math.Clamp(10.0 / scale, 5.0, 18.0);
+        double half = handleSize / 2.0;
+
+        string schematicName = this.GetCurrentSchematicName();
+
+        for (int i = this.thisLabelEditorWorkingHighlights.Count - 1; i >= 0; i--)
+        {
+            var row = this.thisLabelEditorWorkingHighlights[i];
+
+            if (!string.Equals(row.SchematicName, schematicName, StringComparison.OrdinalIgnoreCase) ||
+                !this.IsSelectedLabelEditorHighlight(row))
+            {
+                continue;
+            }
+
+            var localRect = this.ConvertLabelEditorPixelRectToLocalRect(new Rect(row.X, row.Y, row.Width, row.Height));
+
+            var topLeft = new Rect(localRect.Left - half, localRect.Top - half, handleSize, handleSize);
+            var top = new Rect(localRect.Center.X - half, localRect.Top - half, handleSize, handleSize);
+            var topRight = new Rect(localRect.Right - half, localRect.Top - half, handleSize, handleSize);
+            var right = new Rect(localRect.Right - half, localRect.Center.Y - half, handleSize, handleSize);
+            var bottomRight = new Rect(localRect.Right - half, localRect.Bottom - half, handleSize, handleSize);
+            var bottom = new Rect(localRect.Center.X - half, localRect.Bottom - half, handleSize, handleSize);
+            var bottomLeft = new Rect(localRect.Left - half, localRect.Bottom - half, handleSize, handleSize);
+            var left = new Rect(localRect.Left - half, localRect.Center.Y - half, handleSize, handleSize);
+
+            if (topLeft.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeTopLeft; return true; }
+            if (top.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeTop; return true; }
+            if (topRight.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeTopRight; return true; }
+            if (right.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeRight; return true; }
+            if (bottomRight.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeBottomRight; return true; }
+            if (bottom.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeBottom; return true; }
+            if (bottomLeft.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeBottomLeft; return true; }
+            if (left.Contains(localPoint)) { workingIndex = i; dragMode = LabelEditorDragMode.ResizeLeft; return true; }
+        }
+
+        return false;
+    }
+
+    // ###########################################################################################
+    // Handle manual row clicks for board-specific pin-1 marking.
+    // ###########################################################################################
+    private void OnBoardMarkPin1OnSelectedComponentRowClicked(object? sender, PointerPressedEventArgs e)
+    {
+        if (!this.CheckBoardMarkPin1OnSelectedComponent.IsEnabled)
+        {
+            return;
+        }
+
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            this.CheckBoardMarkPin1OnSelectedComponent.IsChecked = !this.CheckBoardMarkPin1OnSelectedComponent.IsChecked;
+            e.Handled = true;
+        }
+    }
+
+    // ###########################################################################################
+    // Returns true when the current schematic is a KiCad-backed PCB replica view with pad data.
+    // Pin-1 marking is only available there because the current KiCad JSON exposes pad geometry.
+    // ###########################################################################################
+    private bool HasCurrentSchematicKiCadPcbPadData()
+    {
+        if (this.thisKiCadProject?.Root?.Project == null)
+        {
+            return false;
+        }
+
+        var view = this.ResolveKiCadViewForCurrentSchematic();
+        if (view == null)
+        {
+            return false;
+        }
+
+        if (!string.Equals(view.Type, "pcb_top", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(view.Type, "pcb_bottom", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return view.SourceIndex >= 0 &&
+               view.SourceIndex < this.thisKiCadProject.Root.Pcb.Count;
+    }
+
+    // ###########################################################################################
+    // Returns true when the current board enables the special orange pin-1 marker.
+    // ###########################################################################################
+    private bool IsBoardMarkPin1OnSelectedComponentEnabled()
+    {
+        if (!this.HasCurrentSchematicKiCadPcbPadData())
+        {
+            return false;
+        }
+
+        var boardKey = this.MainWindow?.GetCurrentBoardKey();
+        return !string.IsNullOrWhiteSpace(boardKey) &&
+               UserSettings.GetSchematicsMarkPin1OnSelectedComponentForBoard(boardKey);
+    }
+
+    // ###########################################################################################
+    // Returns true when the supplied pad belongs to a selected or hovered component and should
+    // receive the special primary-pin highlight.
+    // ###########################################################################################
+    private bool ShouldUseSelectedComponentPin1Highlight(
+        KiCadPcbFootprint footprint,
+        KiCadPcbPad pad,
+        string requiredLayer)
+    {
+        if (!this.IsBoardMarkPin1OnSelectedComponentEnabled())
+        {
+            return false;
+        }
+
+        string normalizedReference = footprint.Reference?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedReference))
+        {
+            return false;
+        }
+
+        bool isTargetComponent =
+            this.thisSelectedKiCadReferences.Contains(normalizedReference) ||
+            string.Equals(this.thisHoveredComponentBoardLabel, normalizedReference, StringComparison.OrdinalIgnoreCase);
+
+        if (!isTargetComponent)
+        {
+            return false;
+        }
+
+        return TabSchematics.IsPrimaryPadForPin1Highlight(footprint, pad, requiredLayer);
+    }
+
+    // ###########################################################################################
+    // Returns true when there is a selected or hovered component reference that can receive a
+    // special pin-1 marker on the current PCB KiCad overlay.
+    // ###########################################################################################
+    private bool HasPin1HighlightTargetReference()
+    {
+        if (!this.IsBoardMarkPin1OnSelectedComponentEnabled())
+        {
+            return false;
+        }
+
+        return this.thisSelectedKiCadReferences.Count > 0 ||
+               !string.IsNullOrWhiteSpace(this.thisHoveredComponentBoardLabel);
+    }
+
 
 }

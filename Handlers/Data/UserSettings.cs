@@ -4,8 +4,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Security;
-using System.Security.Cryptography.Xml;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -51,7 +49,8 @@ namespace Handlers.DataHandling
         [JsonPropertyName("lastBoardByHardware")] public Dictionary<string, string> LastBoardByHardware { get; set; } = new();
         [JsonPropertyName("lastSchematicByBoard")] public Dictionary<string, string> LastSchematicByBoard { get; set; } = new();
         [JsonPropertyName("region")] public string Region { get; set; } = "PAL";
-        [JsonPropertyName("theme")] public string ThemeVariant { get; set; } = "Default";
+        [JsonPropertyName("theme")] public string ThemeVariant { get; set; } = "Light";
+        [JsonPropertyName("userThemeColors")] public Dictionary<string, string> UserThemeColors { get; set; } = new();
         [JsonPropertyName("hasWindowPlacement")] public bool HasWindowPlacement { get; set; } = false;
         [JsonPropertyName("windowState")] public string WindowState { get; set; } = "Normal";
         [JsonPropertyName("windowWidth")] public double WindowWidth { get; set; } = 1024.0;
@@ -90,6 +89,8 @@ namespace Handlers.DataHandling
         [JsonPropertyName("oscilloscopeSyncEnabled")] public bool? ComponentInfoOscilloscopeSyncEnabled { get; set; }
         [JsonPropertyName("schematicsHoverHighlightsTracesByBoard")] public Dictionary<string, bool> SchematicsHoverHighlightsTracesByBoard { get; set; } = new();
         [JsonPropertyName("contributorModeByBoard")] public Dictionary<string, bool> ContributorModeByBoard { get; set; } = new();
+        [JsonPropertyName("interactiveCadTraceHoverMode")] public string InteractiveCadTraceHoverMode { get; set; } = "Always";
+        [JsonPropertyName("schematicsMarkPin1OnSelectedComponentByBoard")] public Dictionary<string, bool> SchematicsMarkPin1OnSelectedComponentByBoard { get; set; } = new();
     }
 
     // ###########################################################################################
@@ -100,6 +101,130 @@ namespace Handlers.DataHandling
     {
         private static UserSettingsData _data = new();
         private static string _settingsFilePath = string.Empty;
+
+        private static readonly Dictionary<string, string> UserThemeDefaultColors = new(StringComparer.Ordinal)
+        {
+            { "Bg", "#E0E4D9" },
+            { "Fg", "Black" },
+            { "Border", "Black" },
+            { "Form_Bg", "White" },
+            { "Form_Fg", "Black" },
+            { "Form_Border", "Gray" },
+            { "Form_Selected_Bg", "LightBlue" },
+            { "Form_Selected_Fg", "White" },
+            { "Form_Selected_Hover_Bg", "SkyBlue" },
+            { "Splitter", "Gray" },
+            { "Button_Bg", "LightGray" },
+            { "Button_Fg", "Black" },
+            { "Button_Border", "DarkGray" },
+            { "Button_Ok_Bg", "#4F8A5B" },
+            { "Button_Ok_Fg", "White" },
+            { "Button_Ok_Border", "#3E6E48" },
+            { "Button_Cancel_Bg", "IndianRed" },
+            { "Button_Cancel_Fg", "White" },
+            { "Button_Cancel_Border", "#B85C5C" },
+            { "Button_Highlighted_Bg", "IndianRed" },
+            { "Button_Highlighted_Fg", "White" },
+            { "Button_Highlighted_Border", "White" },
+            { "Panel_Border", "Gray" },
+            { "Link_Fg", "Blue" },
+            { "LinkHover_Fg", "Black" },
+            { "Table_Header_Bg", "LightGray" },
+            { "Table_Header_Fg", "Black" },
+            { "Table_Bg", "White" },
+            { "Table_Fg", "Black" },
+            { "Table_BorderRowLine", "#EEEEEE" },
+            { "Table_RowHover_Bg", "#E1F0FA" },
+            { "Text_Success_Fg", "#547131" },
+            { "Text_Fail_Fg", "IndianRed" },
+            { "Main_TabUnderline_Selected", "IndianRed" },
+            { "Main_TabUnderline_Hover", "#ecc3c3" },
+            { "Main_Banner_Bg", "#4C1515" },
+            { "Main_Banner_Fg", "White" },
+            { "Main_BannerButtonsHover_Bg", "#4F3528" },
+            { "Main_BannerButtonsHover_Fg", "#DDE0DA" },
+            { "Schematics_Name_Bg", "Khaki" },
+            { "Schematics_Name_Fg", "Black" },
+            { "Schematics_Name_Border", "Black" },
+            { "Schematics_Region_PAL_Bg", "IndianRed" },
+            { "Schematics_Region_PAL_Fg", "White" },
+            { "Schematics_Region_PAL_Border", "Black" },
+            { "Schematics_Region_NTSC_Bg", "#CBD6E5" },
+            { "Schematics_Region_NTSC_Fg", "Black" },
+            { "Schematics_Region_NTSC_Border", "Black" },
+            { "Schematics_ComponentHover_Bg", "Khaki" },
+            { "Schematics_ComponentHover_Fg", "Black" },
+            { "Schematics_ComponentHover_Border", "Black" },
+            { "Schematics_Panels_Bg", "#F2F2F2" },
+            { "Schematics_Panels_Fg", "Black" },
+            { "Schematics_Panels_Border", "Gray" },
+            { "Schematics_ComponentLabel_Bg", "#222113" },
+            { "Schematics_ComponentLabel_Fg", "#ECEEEF" },
+            { "Schematics_ComponentLabel_Border", "Gray" },
+            { "Schematics_Panel_TracesVisible_Trace_Border", "Gray" },
+            { "Schematics_TracePalette_Color1", "#F40000" },
+            { "Schematics_TracePalette_Color2", "#1564F4" },
+            { "Schematics_TracePalette_Color3", "#0BC419" },
+            { "Schematics_TracePalette_Color4", "#E6E600" },
+            { "Thumbnail_Border", "Black" },
+            { "Thumbnail_BorderSelected", "IndianRed" },
+            { "Thumbnail_Bg", "Khaki" },
+            { "Thumbnail_Fg", "Black" },
+            { "Thumbnail_Selection_Bg", "#4682B4" },
+            { "Thumbnail_Selection_Fg", "White" },
+            { "ComponentPopup_Name_Bg", "Khaki" },
+            { "ComponentPopup_Name_Fg", "Black" },
+            { "ComponentPopup_Name_Border", "Black" },
+            { "ComponentPopup_Pin_Bg", "Khaki" },
+            { "ComponentPopup_Pin_Fg", "Black" },
+            { "ComponentPopup_Pin_Border", "Black" },
+            { "ComponentPopup_OscilloscopeExpected_Bg", "#B0D8EC" },
+            { "ComponentPopup_OscilloscopeExpected_Fg", "Black" },
+            { "ComponentPopup_OscilloscopeExpected_Border", "Black" },
+            { "ComponentPopup_OscilloscopeSyncData_Bg", "LightGray" },
+            { "ComponentPopup_OscilloscopeSyncData_Fg", "Black" },
+            { "ComponentPopup_OscilloscopeSyncData_Border", "Black" },
+            { "ComponentPopup_ImageXofY_Bg", "#BB000000" },
+            { "ComponentPopup_ImageXofY_Border", "Black" },
+            { "ComponentPopup_ImageXofY_Fg", "White" },
+            { "ComponentPopup_KeyboardTyping_Bg", "#778461" },
+            { "ComponentPopup_KeyboardTyping_Fg", "White" },
+            { "ComponentPopup_KeyboardTyping_Border", "Black" },
+            { "ComponentPopup_ImageTransparent_Bg", "White" },
+            { "ComponentPopup_BulletList_Fg", "Red" },
+            { "Feedback_TrashIcon_Fg", "IndianRed" }
+        };
+
+        private static readonly HashSet<string> UserThemeColorResourceKeys = new(StringComparer.Ordinal)
+        {
+            "Schematics_TracePalette_Color1",
+            "Schematics_TracePalette_Color2",
+            "Schematics_TracePalette_Color3",
+            "Schematics_TracePalette_Color4"
+        };
+
+        public static event Action? InteractiveCadTraceHoverModeChanged;
+
+        public static string InteractiveCadTraceHoverMode
+        {
+            get => string.Equals(_data.InteractiveCadTraceHoverMode, "HoldShift", StringComparison.OrdinalIgnoreCase)
+                ? "HoldShift"
+                : "Always";
+            set
+            {
+                string normalized = string.Equals(value, "HoldShift", StringComparison.OrdinalIgnoreCase)
+                    ? "HoldShift"
+                    : "Always";
+
+                if (string.Equals(_data.InteractiveCadTraceHoverMode, normalized, StringComparison.Ordinal))
+                    return;
+
+                _data.InteractiveCadTraceHoverMode = normalized;
+                Logger.Info($"Setting changed: [InteractiveCadTraceHoverMode] [{normalized}]");
+                Save();
+                InteractiveCadTraceHoverModeChanged?.Invoke();
+            }
+        }
 
         public static bool ComponentInfoOscilloscopeSyncEnabled
         {
@@ -214,11 +339,20 @@ namespace Handlers.DataHandling
 
         public static string ThemeVariant
         {
-            get => _data.ThemeVariant;
+            get => string.Equals(_data.ThemeVariant, "Dark", StringComparison.OrdinalIgnoreCase) ? "Dark"
+                : string.Equals(_data.ThemeVariant, "UserPreference", StringComparison.OrdinalIgnoreCase) ? "UserPreference"
+                : "Light";
             set
             {
-                _data.ThemeVariant = value;
-                Logger.Info($"Setting changed: [Theme] [{value}]");
+                var normalized = string.Equals(value, "Dark", StringComparison.OrdinalIgnoreCase) ? "Dark"
+                    : string.Equals(value, "UserPreference", StringComparison.OrdinalIgnoreCase) ? "UserPreference"
+                    : "Light";
+
+                if (string.Equals(_data.ThemeVariant, normalized, StringComparison.Ordinal))
+                    return;
+
+                _data.ThemeVariant = normalized;
+                Logger.Info($"Setting changed: [Theme] [{normalized}]");
                 Save();
             }
         }
@@ -399,6 +533,39 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
+        // Returns the persisted user-defined theme colors loaded from configuration.
+        // ###########################################################################################
+        public static IReadOnlyDictionary<string, string> GetUserThemeColors()
+            => _data.UserThemeColors;
+
+        // ###########################################################################################
+        // Returns whether a resource key should be applied as a raw Color instead of a brush.
+        // ###########################################################################################
+        public static bool IsUserThemeColorResourceKey(string resourceKey)
+            => UserThemeColorResourceKeys.Contains(resourceKey);
+
+        // ###########################################################################################
+        // Ensures all JSON-backed user theme color entries exist, seeding missing values from Light.
+        // ###########################################################################################
+        private static bool EnsureUserThemeColors()
+        {
+            _data.UserThemeColors ??= new Dictionary<string, string>();
+
+            var changed = false;
+
+            foreach (var entry in UserThemeDefaultColors)
+            {
+                if (!_data.UserThemeColors.TryGetValue(entry.Key, out var value) || string.IsNullOrWhiteSpace(value))
+                {
+                    _data.UserThemeColors[entry.Key] = entry.Value;
+                    changed = true;
+                }
+            }
+
+            return changed;
+        }
+
+        // ###########################################################################################
         // Resolves the settings file path and loads persisted values.
         // Falls back to defaults silently on any failure.
         // ###########################################################################################
@@ -436,7 +603,16 @@ namespace Handlers.DataHandling
                 // Now evaluate settings
                 if (!File.Exists(_settingsFilePath))
                 {
+                    var createdUserThemeDefaults = EnsureUserThemeColors();
+
                     Logger.Info("Configuration file not found - using defaults");
+
+                    if (createdUserThemeDefaults)
+                    {
+                        Save();
+                        Logger.Info($"Created [UserThemeColors] defaults [{_data.UserThemeColors.Count} entries]");
+                    }
+
                     return;
                 }
 
@@ -445,6 +621,8 @@ namespace Handlers.DataHandling
                 if (loaded != null)
                 {
                     _data = loaded;
+
+                    var addedUserThemeDefaults = EnsureUserThemeColors();
                     Logger.IsDebugEnabled = DebugLogging;
 
                     Logger.Info("Settings loaded:");
@@ -463,6 +641,7 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [ComponentInfoScrollAction] [{ComponentInfoScrollAction}]");
                     Logger.Info($"        [ContactEmail] [{(string.IsNullOrWhiteSpace(ContactEmail) ? "empty" : "set")}]");
                     Logger.Info($"        [ContributorMode] [{ContributorMode}]");
+                    Logger.Info($"        [InteractiveCadTraceHoverMode] [{InteractiveCadTraceHoverMode}]");
                     Logger.Info($"        [LeftPanelWidth] [{_data.LeftPanelWidth:F1}]");
                     Logger.Info($"        [Region] [{Region}]");
                     Logger.Info($"        [SchematicsLabelsPanelExpanded] [{SchematicsLabelsPanelExpanded}]");
@@ -471,6 +650,7 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [SchematicsLabelTechnical] [{SchematicsLabelTechnical}]");
                     Logger.Info($"        [SchematicsLabelFriendly] [{SchematicsLabelFriendly}]");
                     Logger.Info($"        [SchematicsLabelSelectedOnly] [{SchematicsLabelSelectedOnly}]");
+                    Logger.Info($"        [UserThemeColors] [{_data.UserThemeColors.Count} entries]");
                     Logger.Info($"        [WindowPlacement] [{_data.WindowState}] [{_data.WindowWidth:F0}x{_data.WindowHeight:F0}]");
                     Logger.Info($"    Various hardware/board specific settings:");
                     Logger.Info($"        [LastBoardByHardware] [{_data.LastBoardByHardware.Count} entries]");
@@ -485,6 +665,12 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [OscilloscopeHost] [{_data.OscilloscopeHost}]");
                     Logger.Info($"        [OscilloscopePort] [{_data.OscilloscopePort}]");
                     Logger.Info($"        [OscilloscopeSyncEnabled] [{ComponentInfoOscilloscopeSyncEnabled}]");
+
+                    if (addedUserThemeDefaults)
+                    {
+                        Save();
+                        Logger.Info("Missing [UserThemeColors] entries were added to configuration");
+                    }
                 }
             }
             catch (Exception ex)
@@ -821,6 +1007,86 @@ namespace Handlers.DataHandling
             Logger.Info($"Setting changed: [ContributorModeByBoard] [{boardKey}] [{enabled}]");
             Save();
         }
+
+        // ###########################################################################################
+        // Reloads only the user preference theme colors from the settings file while the app runs.
+        // ###########################################################################################
+        public static void ReloadUserThemeColors()
+        {
+            if (string.IsNullOrWhiteSpace(_settingsFilePath))
+            {
+                return;
+            }
+
+            try
+            {
+                if (!File.Exists(_settingsFilePath))
+                {
+                    var createdDefaults = EnsureUserThemeColors();
+
+                    if (createdDefaults)
+                    {
+                        Save();
+                        Logger.Info($"Created [UserThemeColors] defaults [{_data.UserThemeColors.Count} entries]");
+                    }
+
+                    return;
+                }
+
+                var json = File.ReadAllText(_settingsFilePath);
+                var loaded = JsonSerializer.Deserialize<UserSettingsData>(json);
+
+                if (loaded == null)
+                {
+                    Logger.Warning("Failed to reload user theme colors: settings file could not be deserialized");
+                    return;
+                }
+
+                _data.UserThemeColors = loaded.UserThemeColors ?? new Dictionary<string, string>();
+
+                var addedMissingDefaults = EnsureUserThemeColors();
+
+                if (addedMissingDefaults)
+                {
+                    Save();
+                    Logger.Info("Missing [UserThemeColors] entries were added to configuration during reload");
+                }
+
+                Logger.Info($"Reloaded [UserThemeColors] [{_data.UserThemeColors.Count} entries]");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to reload user theme colors: [{ex.Message}]");
+            }
+        }
+
+        // ###########################################################################################
+        // Returns whether pin 1 should be specially marked for selected components on the given board.
+        // Defaults to true unless explicitly disabled for that board.
+        // ###########################################################################################
+        public static bool GetSchematicsMarkPin1OnSelectedComponentForBoard(string boardKey)
+        {
+            if (string.IsNullOrWhiteSpace(boardKey))
+                return true;
+
+            return _data.SchematicsMarkPin1OnSelectedComponentByBoard.TryGetValue(boardKey, out var enabled)
+                ? enabled
+                : true;
+        }
+
+        // ###########################################################################################
+        // Persists whether pin 1 should be specially marked for selected components on the given board.
+        // ###########################################################################################
+        public static void SetSchematicsMarkPin1OnSelectedComponentForBoard(string boardKey, bool enabled)
+        {
+            if (string.IsNullOrWhiteSpace(boardKey))
+                return;
+
+            _data.SchematicsMarkPin1OnSelectedComponentByBoard[boardKey] = enabled;
+            Logger.Info($"Setting changed: [SchematicsMarkPin1OnSelectedComponent] [{boardKey}] [{enabled}]");
+            Save();
+        }
+
 
     }
 }

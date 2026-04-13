@@ -3,15 +3,15 @@
         x:Class="CRT.Splash"
         Width="600" Height="400"
         WindowStartupLocation="CenterScreen"
-        SystemDecorations="None"
+        WindowDecorations="None"
         CanResize="False"
         ShowInTaskbar="False"
         Topmost="True"
-        Background="{DynamicResource Main_Bg}"
+        Background="{DynamicResource Bg}"
         TransparencyLevelHint="Transparent">
 
-    <Border Background="{DynamicResource Main__Bg}"
-            BorderBrush="{DynamicResource Main_Border}"
+    <Border Background="{DynamicResource Bg}"
+            BorderBrush="{DynamicResource Border}"
             BorderThickness="1"
             CornerRadius="4"
             ClipToBounds="True">
@@ -26,12 +26,12 @@
             <TextBlock Text="Classic Repair Toolbox"
                        FontSize="36"
                        FontWeight="SemiBold"
-                       Foreground="{DynamicResource Main_Fg}"
+                       Foreground="{DynamicResource Fg}"
                        HorizontalAlignment="Center" />
 
 			<TextBlock x:Name="VersionLabel"
                        FontSize="12"
-                       Foreground="{DynamicResource Main_Fg}"
+                       Foreground="{DynamicResource Fg}"
                        Opacity="0.7"
                        HorizontalAlignment="Center"
                        Margin="0,-4,0,36">
@@ -44,13 +44,13 @@
             <TextBlock x:Name="StatusLabel"
                        Text="Loading, please wait..."
                        FontSize="14"
-                       Foreground="{DynamicResource Main_Fg}"
+                       Foreground="{DynamicResource Fg}"
                        HorizontalAlignment="Center" />
 
             <TextBlock x:Name="FileLabel"
                        Text=""
                        FontSize="12"
-                       Foreground="{DynamicResource Main_Fg}"
+                       Foreground="{DynamicResource Fg}"
                        FontWeight="Bold"
                        HorizontalAlignment="Center"
                        MaxWidth="520"

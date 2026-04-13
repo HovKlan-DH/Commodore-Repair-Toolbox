@@ -2,11 +2,11 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using Handlers.DataHandling;
 using Handlers.OnlineHandling;
 using System;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace CRT
@@ -145,6 +145,72 @@ namespace CRT
         }
 
         // ###########################################################################################
+        // Applies the persisted theme mode, including JSON-defined user preference colors.
+        // ###########################################################################################
+        public void ApplyConfiguredTheme()
+        {
+            if (UserSettings.ThemeVariant == "UserPreference")
+            {
+                UserSettings.ReloadUserThemeColors();
+            }
+
+            this.ClearUserPreferenceThemeResources();
+
+            switch (UserSettings.ThemeVariant)
+            {
+                case "Dark":
+                    this.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+                    break;
+
+                case "UserPreference":
+                    this.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+                    this.ApplyUserPreferenceThemeResources();
+                    break;
+
+                default:
+                    this.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+                    break;
+            }
+        }
+
+        // ###########################################################################################
+        // Removes any previously applied JSON-backed theme overrides from application resources.
+        // ###########################################################################################
+        private void ClearUserPreferenceThemeResources()
+        {
+            foreach (var resourceKey in UserSettings.GetUserThemeColors().Keys)
+            {
+                this.Resources.Remove(resourceKey);
+            }
+        }
+
+        // ###########################################################################################
+        // Applies JSON-backed user theme colors by overriding the existing application resources.
+        // ###########################################################################################
+        private void ApplyUserPreferenceThemeResources()
+        {
+            foreach (var entry in UserSettings.GetUserThemeColors())
+            {
+                if (!Color.TryParse(entry.Value, out var color))
+                {
+                    Logger.Warning($"Skipped invalid user theme color: [{entry.Key}] [{entry.Value}]");
+                    continue;
+                }
+
+                if (UserSettings.IsUserThemeColorResourceKey(entry.Key))
+                {
+                    this.Resources[entry.Key] = color;
+                }
+                else
+                {
+                    this.Resources[entry.Key] = new SolidColorBrush(color);
+                }
+            }
+
+            Logger.Info($"Applied user preference theme colors: [{UserSettings.GetUserThemeColors().Count} entries]");
+        }
+
+        // ###########################################################################################
         // Registers global exception handlers to capture unexpected crashes into the log.
         // ###########################################################################################
         private void SetupGlobalExceptionLogging()
@@ -177,12 +243,7 @@ namespace CRT
             UserSettings.Load();
 
             // Apply selected theme early
-            if (UserSettings.ThemeVariant == "Dark")
-                this.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
-            else if (UserSettings.ThemeVariant == "Light")
-                this.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
-            else
-                this.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Default;
+            this.ApplyConfiguredTheme();
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {

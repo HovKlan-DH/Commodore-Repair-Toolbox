@@ -20,34 +20,11 @@
 		<!-- Hover: show a faint underline indicator -->
 		<Style Selector="TabItem:pointerover /template/ Border#PART_SelectedPipe">
 			<Setter Property="IsVisible" Value="True" />
-			<Setter Property="Background" Value="{DynamicResource Main_TabUnderline_Hover}" />
-		</Style>
-
-		<!-- Selected: solid underline indicator -->
-		<Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
-			<Setter Property="Background" Value="{DynamicResource Main_TabUnderline_Selected}" />
-		</Style>
-
-		<!-- Banner install button: explicit hover/pressed backgrounds -->
-		<Style Selector="Button.BannerInstallButton">
-			<Setter Property="Background" Value="{DynamicResource Button_Highlighted_Bg}" />
-		</Style>
-		<Style Selector="Button.BannerInstallButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="Background" Value="{DynamicResource Button_Highlighted_Bg}" />
-		</Style>
-		<Style Selector="Button.BannerInstallButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="Background" Value="{DynamicResource Button_Highlighted_Bg}" />
 		</Style>
 		
 		<!-- Banner dismiss button: subtle hover on dark background -->
 		<Style Selector="Button.BannerDismissButton">
-			<Setter Property="Foreground" Value="{DynamicResource MainBanner_Fg}" />
-			<Setter Property="Background" Value="Transparent" />
 			<Setter Property="BorderThickness" Value="0" />
-		</Style>
-		<Style Selector="Button.BannerDismissButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="Background" Value="{DynamicResource MainBannerButtonsHover_Bg}" />
-			<Setter Property="Foreground" Value="{DynamicResource MainBannerButtonsHover_Fg}" />
 		</Style>
 
 		<!-- Region toggle buttons -->
@@ -74,7 +51,7 @@
 			<Setter Property="Background" Value="{DynamicResource Schematics_Region_NTSC_Bg}" />
 			<Setter Property="BorderBrush" Value="{DynamicResource Schematics_Region_NTSC_Bg}" />
 		</Style>
-	
+
 	</Window.Styles>
 
 	<Grid x:Name="RootGrid">
@@ -85,6 +62,8 @@
 		</Grid.ColumnDefinitions>
 
 		<Border x:Name="LeftPanel"
+			Background="{DynamicResource Bg}"
+			BorderBrush="{DynamicResource Border}"
 			Grid.Column="0"
 			Padding="16">
 			<Grid>
@@ -110,8 +89,7 @@
 
 					<TextBlock Grid.Row="0"
 							   Text="Hardware"
-							   FontSize="11"
-							   Foreground="{DynamicResource Main_Header_Fg}" />
+							   FontSize="11" />
 					<ComboBox Grid.Row="1"
 							  x:Name="HardwareComboBox"
 							  HorizontalAlignment="Stretch"
@@ -119,7 +97,7 @@
 					<TextBlock Grid.Row="2"
 							   Text="Board"
 							   FontSize="11"
-							   Foreground="{DynamicResource Main_Header_Fg}"
+							   Foreground="{DynamicResource Fg}"
 							   Margin="0,8,0,0" />
 					<ComboBox Grid.Row="3"
 							  x:Name="BoardComboBox"
@@ -128,14 +106,12 @@
 					<TextBlock Grid.Row="4"
 							   Text="Category"
 							   FontSize="11"
-							   Foreground="{DynamicResource Main_Header_Fg}"
+							   Foreground="{DynamicResource Fg}"
 							   Margin="0,8,0,0" />
 					<ListBox Grid.Row="5"
 							 x:Name="CategoryFilterListBox"
 							 SelectionMode="Multiple,Toggle"
 							 Margin="0,8,0,0"
-							 Background="{DynamicResource List_Bg}"
-							 BorderBrush="{DynamicResource List_Border}"
 							 BorderThickness="1"
 							 CornerRadius="4"
 							 ClipToBounds="True"
@@ -155,35 +131,18 @@
 								<Setter Property="MinHeight" Value="0" />
 								<Setter Property="FontSize" Value="11" />
 							</Style>
-							<Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-								<Setter Property="Background" Value="{DynamicResource List_Selected_Hover_Bg}" />
-							</Style>
-							<Style Selector="ListBoxItem:selected /template/ ContentPresenter">
-								<Setter Property="Background" Value="{DynamicResource List_Selected_Bg}" />
-							</Style>
-							<Style Selector="ListBoxItem:selected">
-								<Setter Property="Foreground" Value="{DynamicResource List_Selected_Fg}" />
-							</Style>
-							<Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter">
-								<Setter Property="Background" Value="{DynamicResource List_Selected_Hover_Bg}" />
-							</Style>
-							<Style Selector="ListBoxItem:selected:pointerover">
-								<Setter Property="Foreground" Value="{DynamicResource List_Selected_Fg}" />
-							</Style>
 						</ListBox.Styles>
 					</ListBox>
 
 					<TextBlock Grid.Row="6"
 							   Text="Component"
 							   FontSize="11"
-							   Foreground="{DynamicResource Main_Header_Fg}"
+							   Foreground="{DynamicResource Fg}"
 							   Margin="0,8,0,0" />
 					<ListBox Grid.Row="7"
 							 x:Name="ComponentFilterListBox"
 							 SelectionMode="Multiple,Toggle"
 							 Margin="0,8,0,0"
-							 Background="{DynamicResource List_Bg}"
-							 BorderBrush="{DynamicResource List_Border}"
 							 BorderThickness="1"
 							 CornerRadius="4"
 							 ClipToBounds="True"
@@ -204,27 +163,6 @@
 								<Setter Property="Padding" Value="8,3" />
 								<Setter Property="MinHeight" Value="0" />
 								<Setter Property="FontSize" Value="11" />
-								<Setter Property="Foreground" Value="{DynamicResource List_Fg}" />
-							</Style>
-
-							<Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-								<Setter Property="Background" Value="{DynamicResource List_Selected_Hover_Bg}" />
-							</Style>
-
-							<!-- Selected state -->
-							<Style Selector="ListBoxItem:selected /template/ ContentPresenter">
-								<Setter Property="Background" Value="{DynamicResource List_Selected_Bg}" />
-							</Style>
-							<Style Selector="ListBoxItem:selected">
-								<Setter Property="Foreground" Value="{DynamicResource List_Selected_Fg}" />
-							</Style>
-
-							<!-- Selected hover state -->
-							<Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter">
-								<Setter Property="Background" Value="{DynamicResource List_Selected_Hover_Bg}" />
-							</Style>
-							<Style Selector="ListBoxItem:selected:pointerover">
-								<Setter Property="Foreground" Value="{DynamicResource List_Selected_Fg}" />
 							</Style>
 						</ListBox.Styles>
 					</ListBox>
@@ -233,34 +171,11 @@
 				<!-- Action Controls -->
 				<StackPanel Grid.Row="2" Margin="0,12,0,0" Spacing="4">
 					<TextBox x:Name="ComponentSearchTextBox"
-				 FontSize="12"
-				 MinHeight="0"
-				 Padding="4"
-				 Background="{DynamicResource Main_InputField_Bg}"
-				 Foreground="{DynamicResource Main_InputField_Fg}"
-				VerticalContentAlignment="Center"
-				TextChanged="OnComponentSearchTextChanged">
-
-						<TextBox.Styles>
-							<!-- Prevent Background and Border changes on Hover -->
-							<Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
-								<Setter Property="Background" Value="{DynamicResource Main_InputField_Bg}" />
-							</Style>
-
-							<!-- Prevent Background changes on Click/Focus -->
-							<Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
-								<Setter Property="Background" Value="{DynamicResource Main_InputField_Bg}" />
-							</Style>
-
-							<!-- Prevent Foreground changes on Hover and Focus -->
-							<Style Selector="TextBox:pointerover">
-								<Setter Property="Foreground" Value="{DynamicResource Main_InputField_Fg}" />
-							</Style>
-
-							<Style Selector="TextBox:focus">
-								<Setter Property="Foreground" Value="{DynamicResource Main_InputField_Fg}" />
-							</Style>
-						</TextBox.Styles>
+							 FontSize="12"
+							 MinHeight="0"
+							 Padding="4"
+							VerticalContentAlignment="Center"
+							TextChanged="OnComponentSearchTextChanged">
 					</TextBox>
 
 					<!-- Selection Actions -->
@@ -330,13 +245,13 @@
 		<GridSplitter x:Name="MainSplitter"
 					  Grid.Column="1"
 					  ResizeDirection="Columns"
-					  HorizontalAlignment="Stretch"
-					  Background="{DynamicResource Main_Splitter}" />
+					  HorizontalAlignment="Stretch" />
 
 		<!-- Right Panel -->
 		<Border x:Name="RightPanel"
 				Grid.Column="2"
-				BorderBrush="{DynamicResource Main_Bg}"
+				Background="{DynamicResource Bg}"
+				BorderBrush="{DynamicResource Border}"
 				BorderThickness="1"
 				Padding="0,0,0,0">
 			<Grid>
@@ -350,7 +265,7 @@
 				<Border x:Name="UpdateBanner"
 									Grid.Row="0"
 									IsVisible="False"
-									Background="{DynamicResource MainBanner_Bg}"
+									Background="{DynamicResource Main_Banner_Bg}"
 									CornerRadius="4"
 									Margin="0,8,0,4"
 									Padding="12,6">
@@ -365,7 +280,7 @@
 						<TextBlock x:Name="UpdateBannerText"
 								   Grid.Column="0"
 								   VerticalAlignment="Center"
-								   Foreground="{DynamicResource MainBanner_Fg}"
+								   Foreground="{DynamicResource Main_Banner_Fg}"
 								   FontSize="12" />
 
 						<Button x:Name="UpdateBannerViewNotesButton"
@@ -373,7 +288,6 @@
 								Classes="BannerDismissButton"
 								Content="View release notes"
 								Margin="12,0,4,0"
-								Background="Transparent"
 								FontSize="11"
 								Padding="6,3"
 								Click="OnViewReleaseNotesClick" />
@@ -384,7 +298,8 @@
 								Content="Install"
 								Margin="0,0,4,0"
 								Background="{DynamicResource Button_Highlighted_Bg}"
-								Foreground="{DynamicResource MainBanner_Fg}"
+								Foreground="{DynamicResource Button_Highlighted_Fg}"
+								BorderBrush="{DynamicResource Button_Highlighted_Border}"
 								FontSize="11"
 								Padding="10,3"
 								Click="OnInstallUpdateClick" />
@@ -393,7 +308,6 @@
 								Grid.Column="3"
 								Classes="BannerDismissButton"
 								Content="✕"
-								Background="Transparent"
 								FontSize="11"
 								Padding="6,3"
 								Click="OnUpdateBannerDismiss" />
@@ -404,7 +318,7 @@
 				<Border x:Name="SyncBanner"
 											Grid.Row="1"
 											IsVisible="False"
-											Background="{DynamicResource MainBanner_Bg}"
+											Background="{DynamicResource Main_Banner_Bg}"
 											CornerRadius="4"
 											Margin="0,0,0,4"
 											Padding="12,6"
@@ -420,7 +334,7 @@
 						<TextBlock x:Name="SyncBannerText"
 									Grid.Column="0"
 									VerticalAlignment="Center"
-									Foreground="{DynamicResource MainBanner_Fg}"
+									Foreground="{DynamicResource Main_Banner_Fg}"
 									FontSize="12" />
 
 						<Button x:Name="SyncBannerRefreshButton"
@@ -430,7 +344,8 @@
 								IsVisible="False"
 								Margin="12,0,4,0"
 								Background="{DynamicResource Button_Highlighted_Bg}"
-								Foreground="{DynamicResource MainBanner_Fg}"
+								Foreground="{DynamicResource Button_Highlighted_Fg}"
+								BorderBrush="{DynamicResource Button_Highlighted_Border}"
 								FontSize="11"
 								Padding="10,3"
 								Click="OnRefreshBoardClick" />
@@ -439,7 +354,6 @@
 								Grid.Column="2"
 								Classes="BannerDismissButton"
 								Content="✕"
-								Background="Transparent"
 								FontSize="11"
 								Padding="6,3"
 								Click="OnSyncBannerDismiss" />

@@ -13,6 +13,7 @@ namespace Tabs.TabSchematics
     public sealed class ComponentLabelEditorOverlay : Control
     {
         private IReadOnlyList<Rect> thisRectangles = Array.Empty<Rect>();
+        private IReadOnlyList<int> thisSelectedIndices = Array.Empty<int>();
         private int thisSelectedIndex = -1;
         private int thisHoveredIndex = -1;
         private PixelSize thisBitmapPixelSize = new(0, 0);
@@ -20,6 +21,8 @@ namespace Tabs.TabSchematics
         private Color thisHighlightColor = Colors.IndianRed;
         private double thisHighlightOpacity = 0.20;
         private Rect? thisDraftRectangle;
+        private Rect? thisSelectionBounds;
+        private IReadOnlyList<(Point Start, Point End)> thisSnapGuides = Array.Empty<(Point Start, Point End)>();
 
         public IReadOnlyList<Rect> Rectangles
         {
@@ -27,6 +30,26 @@ namespace Tabs.TabSchematics
             set
             {
                 this.thisRectangles = value ?? Array.Empty<Rect>();
+                this.InvalidateVisual();
+            }
+        }
+
+        public IReadOnlyList<int> SelectedIndices
+        {
+            get => this.thisSelectedIndices;
+            set
+            {
+                this.thisSelectedIndices = value ?? Array.Empty<int>();
+                this.InvalidateVisual();
+            }
+        }
+
+        public IReadOnlyList<(Point Start, Point End)> SnapGuides
+        {
+            get => this.thisSnapGuides;
+            set
+            {
+                this.thisSnapGuides = value ?? Array.Empty<(Point Start, Point End)>();
                 this.InvalidateVisual();
             }
         }
@@ -101,6 +124,16 @@ namespace Tabs.TabSchematics
             }
         }
 
+        public Rect? SelectionBounds
+        {
+            get => this.thisSelectionBounds;
+            set
+            {
+                this.thisSelectionBounds = value;
+                this.InvalidateVisual();
+            }
+        }
+
         // ###########################################################################################
         // Forces a redraw whenever arrange changes so overlay stays aligned after layout changes.
         // ###########################################################################################
@@ -140,6 +173,32 @@ namespace Tabs.TabSchematics
             var selectedPen = new Pen(new SolidColorBrush(this.thisHighlightColor, 1.0), borderThickness);
             var draftFillBrush = new SolidColorBrush(this.thisHighlightColor, Math.Min(0.12, fillOpacity));
             var draftPen = new Pen(new SolidColorBrush(this.thisHighlightColor, 1.0), borderThickness);
+            var snapPen = new Pen(
+                new SolidColorBrush(this.thisHighlightColor, 1.0),
+                2.0 / scale,
+                new DashStyle(
+                    new[]
+                    {
+                        Math.Clamp(6.0 / scale, 2.0, 6.0),
+                        Math.Clamp(4.0 / scale, 2.0, 4.0)
+                    },
+                    0),
+                PenLineCap.Round,
+                PenLineJoin.Round);
+
+            var selectedIndices = new HashSet<int>();
+
+            if (this.thisSelectedIndices.Count > 0)
+            {
+                foreach (int index in this.thisSelectedIndices)
+                {
+                    selectedIndices.Add(index);
+                }
+            }
+            else if (this.thisSelectedIndex >= 0)
+            {
+                selectedIndices.Add(this.thisSelectedIndex);
+            }
 
             for (int i = 0; i < this.thisRectangles.Count; i++)
             {
@@ -147,8 +206,8 @@ namespace Tabs.TabSchematics
                 var localRect = PixelToLocalRect(pixelRect, contentRect, this.thisBitmapPixelSize);
                 var borderRect = InsetRectForStroke(localRect, borderThickness);
 
-                bool isSelected = i == this.thisSelectedIndex;
-                bool showMarkers = isSelected && i == this.thisHoveredIndex; 
+                bool isSelected = selectedIndices.Contains(i);
+                bool showMarkers = isSelected && i == this.thisHoveredIndex;
 
                 context.DrawRectangle(fillBrush, null, localRect);
                 context.DrawRectangle(null, isSelected ? selectedPen : normalPen, borderRect);
@@ -156,6 +215,17 @@ namespace Tabs.TabSchematics
                 if (showMarkers)
                 {
                     this.DrawSelectionMarkers(context, borderRect, scale);
+                }
+            }
+
+            foreach (var guide in this.thisSnapGuides)
+            {
+                var start = PixelToLocalPoint(guide.Start, contentRect, this.thisBitmapPixelSize);
+                var end = PixelToLocalPoint(guide.End, contentRect, this.thisBitmapPixelSize);
+
+                if (Math.Abs(start.X - end.X) > 0.01 || Math.Abs(start.Y - end.Y) > 0.01)
+                {
+                    context.DrawLine(snapPen, start, end);
                 }
             }
 
@@ -188,9 +258,6 @@ namespace Tabs.TabSchematics
         // ###########################################################################################
         private void DrawSelectionMarkers(DrawingContext context, Rect rect, double scale)
         {
-            //            double markerThickness = Math.Clamp(3.0 / scale, 1.25, 3.0);
-            //            double cornerLength = Math.Clamp(8.0 / scale, 3.5, 8.0);
-            //            double sideLength = Math.Clamp(6.0 / scale, 3.0, 7.0);
             double markerThickness = Math.Clamp(2.5 / scale, 1.0, 2.5);
             double cornerLength = Math.Clamp(6.5 / scale, 3.0, 6.5);
             double sideLength = Math.Clamp(5.0 / scale, 2.5, 5.5);
@@ -206,69 +273,22 @@ namespace Tabs.TabSchematics
             double centerX = rect.Center.X;
             double centerY = rect.Center.Y;
 
-            // Top-left
-            context.DrawRectangle(
-                markerBrush,
-                null,
-                new Rect(left - halfThickness, top - halfThickness, cornerLength, markerThickness));
-            context.DrawRectangle(
-                markerBrush,
-                null,
-                new Rect(left - halfThickness, top - halfThickness, markerThickness, cornerLength));
+            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, top - halfThickness, cornerLength, markerThickness));
+            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, top - halfThickness, markerThickness, cornerLength));
 
-            // Top-right
-            context.DrawRectangle(
-                markerBrush,
-                null,
-                new Rect(right - cornerLength + halfThickness, top - halfThickness, cornerLength, markerThickness));
-            context.DrawRectangle(
-                markerBrush,
-                null,
-                new Rect(right - halfThickness, top - halfThickness, markerThickness, cornerLength));
+            context.DrawRectangle(markerBrush, null, new Rect(right - cornerLength + halfThickness, top - halfThickness, cornerLength, markerThickness));
+            context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, top - halfThickness, markerThickness, cornerLength));
 
-            // Bottom-left
-            context.DrawRectangle(
-                markerBrush,
-                null,
-                new Rect(left - halfThickness, bottom - halfThickness, cornerLength, markerThickness));
-            context.DrawRectangle(
-                markerBrush,
-                null,
-                new Rect(left - halfThickness, bottom - cornerLength + halfThickness, markerThickness, cornerLength));
+            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, bottom - halfThickness, cornerLength, markerThickness));
+            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, bottom - cornerLength + halfThickness, markerThickness, cornerLength));
 
-            // Bottom-right
-            context.DrawRectangle(
-                markerBrush,
-                null,
-                new Rect(right - cornerLength + halfThickness, bottom - halfThickness, cornerLength, markerThickness));
-            context.DrawRectangle(
-                markerBrush,
-                null,
-                new Rect(right - halfThickness, bottom - cornerLength + halfThickness, markerThickness, cornerLength));
+            context.DrawRectangle(markerBrush, null, new Rect(right - cornerLength + halfThickness, bottom - halfThickness, cornerLength, markerThickness));
+            context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, bottom - cornerLength + halfThickness, markerThickness, cornerLength));
 
-            // Top center
-            context.DrawRectangle(
-                markerBrush,
-                null,
-                new Rect(centerX - sideHalf, top - halfThickness, sideLength, markerThickness));
-
-            // Bottom center
-            context.DrawRectangle(
-                markerBrush,
-                null,
-                new Rect(centerX - sideHalf, bottom - halfThickness, sideLength, markerThickness));
-
-            // Left center
-            context.DrawRectangle(
-                markerBrush,
-                null,
-                new Rect(left - halfThickness, centerY - sideHalf, markerThickness, sideLength));
-
-            // Right center
-            context.DrawRectangle(
-                markerBrush,
-                null,
-                new Rect(right - halfThickness, centerY - sideHalf, markerThickness, sideLength));
+            context.DrawRectangle(markerBrush, null, new Rect(centerX - sideHalf, top - halfThickness, sideLength, markerThickness));
+            context.DrawRectangle(markerBrush, null, new Rect(centerX - sideHalf, bottom - halfThickness, sideLength, markerThickness));
+            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, centerY - sideHalf, markerThickness, sideLength));
+            context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, centerY - sideHalf, markerThickness, sideLength));
         }
 
         // ###########################################################################################
@@ -311,5 +331,22 @@ namespace Tabs.TabSchematics
 
             return new Rect(x, y, w, h);
         }
+
+        // ###########################################################################################
+        // Converts a pixel-space point into the overlay's local coordinate system.
+        // ###########################################################################################
+        private static Point PixelToLocalPoint(Point pixelPoint, Rect contentRect, PixelSize pixelSize)
+        {
+            double sx = contentRect.Width / pixelSize.Width;
+            double sy = contentRect.Height / pixelSize.Height;
+
+            return new Point(
+                contentRect.X + (pixelPoint.X * sx),
+                contentRect.Y + (pixelPoint.Y * sy));
+        }
+
+
+
+
     }
 }
