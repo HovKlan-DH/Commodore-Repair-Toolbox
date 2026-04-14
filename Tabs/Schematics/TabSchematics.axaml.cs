@@ -111,6 +111,45 @@ public partial class TabSchematics : UserControl
 
     private readonly Dictionary<string, KiCadPcbNetRenderCache> thisKiCadPcbNetRenderCacheByKey = new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly Dictionary<string, KiCadPcbHoverHitTestCache> thisKiCadPcbHoverHitTestCacheByKey = new(StringComparer.OrdinalIgnoreCase);
+
+    private sealed class KiCadPcbHoverPadCandidate
+    {
+        public KiCadNetRef Net { get; init; } = null!;
+        public string PadNumber { get; init; } = string.Empty;
+        public Point CenterWorld { get; init; }
+        public double HitRadiusWorld { get; init; }
+    }
+
+    private sealed class KiCadPcbHoverSegmentCandidate
+    {
+        public KiCadNetRef Net { get; init; } = null!;
+        public Point StartWorld { get; init; }
+        public Point EndWorld { get; init; }
+        public double HitRadiusWorld { get; init; }
+    }
+
+    private sealed class KiCadPcbHoverViaCandidate
+    {
+        public KiCadNetRef Net { get; init; } = null!;
+        public Point CenterWorld { get; init; }
+        public double HitRadiusWorld { get; init; }
+    }
+
+    private sealed class KiCadPcbHoverHitTestCache
+    {
+        public double CellSizeWorld { get; init; } = 2.0;
+        public double MaxHitRadiusWorld { get; set; } = 0.8;
+
+        public List<KiCadPcbHoverPadCandidate> PadCandidates { get; init; } = new();
+        public List<KiCadPcbHoverSegmentCandidate> SegmentCandidates { get; init; } = new();
+        public List<KiCadPcbHoverViaCandidate> ViaCandidates { get; init; } = new();
+
+        public Dictionary<long, List<int>> PadIndicesByCell { get; init; } = new();
+        public Dictionary<long, List<int>> SegmentIndicesByCell { get; init; } = new();
+        public Dictionary<long, List<int>> ViaIndicesByCell { get; init; } = new();
+    }
+
     private sealed class KiCadPcbPadRenderNode
     {
         public KiCadGraphNode Info { get; init; } = new();
@@ -1418,7 +1457,7 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Clears the main schematics image and resets the zoom and highlight overlay state.
-    // Also clears cached KiCad PCB graph data so the next board starts from a clean state.
+    // Also clears cached KiCad PCB graph and hover-hit-test data.
     // ###########################################################################################
     public void ResetSchematicsViewer()
     {
@@ -1426,6 +1465,7 @@ public partial class TabSchematics : UserControl
         this.thisKiCadOverlayRefreshRequestVersion = 0;
         this.thisKiCadOverlayLastRenderedVersion = 0;
         this.thisKiCadPcbNetRenderCacheByKey.Clear();
+        this.thisKiCadPcbHoverHitTestCacheByKey.Clear();
 
         this.SchematicsKiCadOverlayCanvas.ClearGeometry();
         ((MatrixTransform)this.SchematicsKiCadOverlayCanvas.RenderTransform!).Matrix = this.schematicsMatrix;
@@ -5123,7 +5163,7 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Loads the KiCad JSON file that resides next to the currently selected board Excel file.
-    // Clears all KiCad runtime caches so the next render uses fresh project data.
+    // Clears all KiCad runtime caches so the next render and hover pass use fresh project data.
     // ###########################################################################################
     public async Task LoadKiCadProjectForCurrentBoardAsync()
     {
@@ -5131,6 +5171,7 @@ public partial class TabSchematics : UserControl
 
         this.thisKiCadProject = null;
         this.thisKiCadPcbNetRenderCacheByKey.Clear();
+        this.thisKiCadPcbHoverHitTestCacheByKey.Clear();
         this.thisSelectedKiCadReferences.Clear();
         this.thisSelectedKiCadNormalizedNetNames.Clear();
         this.thisLockedKiCadNetNames.Clear();
@@ -6755,8 +6796,8 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Reverses affine tracking matrices rapidly detecting any 2D intersection hit between
-    // local mouse input vs world-tracked components mathematically.
+    // Performs PCB hover hit-testing using a spatial cache so pointer movement no longer scans
+    // every pad, segment, and via on the board.
     // ###########################################################################################
     private void HitTestKiCadOverlayForHover(Point pointerInContainer)
     {
@@ -6772,7 +6813,6 @@ public partial class TabSchematics : UserControl
 
         if (!isTop && !isBottom)
         {
-            // Only perform hover-hit-tests on pure PCB rendering right now.
             this.SetHoveredKiCadNet(null);
             return;
         }
@@ -6806,62 +6846,103 @@ public partial class TabSchematics : UserControl
             return;
         }
 
+        var cache = this.GetOrCreateKiCadPcbHoverHitTestCache(pcb, view.SourceIndex, requiredLayer);
+
+        double searchRadiusWorld = Math.Max(0.8, cache.MaxHitRadiusWorld);
+
+        int minCellX = TabSchematics.GetKiCadHoverCellCoord(worldPoint.X - searchRadiusWorld, cache.CellSizeWorld);
+        int maxCellX = TabSchematics.GetKiCadHoverCellCoord(worldPoint.X + searchRadiusWorld, cache.CellSizeWorld);
+        int minCellY = TabSchematics.GetKiCadHoverCellCoord(worldPoint.Y - searchRadiusWorld, cache.CellSizeWorld);
+        int maxCellY = TabSchematics.GetKiCadHoverCellCoord(worldPoint.Y + searchRadiusWorld, cache.CellSizeWorld);
+
         double closestDist = double.MaxValue;
         KiCadNetRef? bestNet = null;
         string? bestPadNumber = null;
-        double baseThresholdWorld = 0.5; // Baseline threshold in KiCad units (~0.5mm limit)
 
-        foreach (var footprint in pcb.Footprints)
+        var testedPadIndices = new HashSet<int>();
+        var testedSegmentIndices = new HashSet<int>();
+        var testedViaIndices = new HashSet<int>();
+
+        for (int cellY = minCellY; cellY <= maxCellY; cellY++)
         {
-            foreach (var pad in footprint.Pads)
+            for (int cellX = minCellX; cellX <= maxCellX; cellX++)
             {
-                if (pad.Net == null || string.IsNullOrWhiteSpace(pad.Net.NormalizedName)) continue;
-                if (!TabSchematics.IsKiCadPcbPointVisibleOnSide(pad.Layers, requiredLayer)) continue;
-                if (pad.AbsoluteCenter == null) continue;
+                long cellKey = TabSchematics.BuildKiCadHoverCellKey(cellX, cellY);
 
-                double dx = pad.AbsoluteCenter.X - worldPoint.X;
-                double dy = pad.AbsoluteCenter.Y - worldPoint.Y;
-                double dist = Math.Sqrt(dx * dx + dy * dy);
-
-                if (dist < closestDist && dist < (pad.Size?.X / 2.0 ?? baseThresholdWorld) + 0.3)
+                if (cache.PadIndicesByCell.TryGetValue(cellKey, out var padIndices))
                 {
-                    closestDist = dist;
-                    bestNet = pad.Net;
-                    bestPadNumber = pad.Number;
+                    foreach (int padIndex in padIndices)
+                    {
+                        if (!testedPadIndices.Add(padIndex))
+                        {
+                            continue;
+                        }
+
+                        var candidate = cache.PadCandidates[padIndex];
+
+                        double dx = candidate.CenterWorld.X - worldPoint.X;
+                        double dy = candidate.CenterWorld.Y - worldPoint.Y;
+                        double dist = Math.Sqrt((dx * dx) + (dy * dy));
+
+                        if (dist < closestDist && dist < candidate.HitRadiusWorld)
+                        {
+                            closestDist = dist;
+                            bestNet = candidate.Net;
+                            bestPadNumber = candidate.PadNumber;
+                        }
+                    }
                 }
-            }
-        }
 
-        foreach (var segment in pcb.Routing.Segments)
-        {
-            if (segment.Net == null || string.IsNullOrWhiteSpace(segment.Net.NormalizedName)) continue;
-            if (!string.Equals(segment.Layer?.Trim(), requiredLayer, StringComparison.OrdinalIgnoreCase)) continue;
-            if (segment.Start == null || segment.End == null) continue;
+                if (cache.SegmentIndicesByCell.TryGetValue(cellKey, out var segmentIndices))
+                {
+                    foreach (int segmentIndex in segmentIndices)
+                    {
+                        if (!testedSegmentIndices.Add(segmentIndex))
+                        {
+                            continue;
+                        }
 
-            double dist = DistanceToSegment(worldPoint, segment.Start.X, segment.Start.Y, segment.End.X, segment.End.Y);
-            if (dist < closestDist && dist < (segment.Width / 2.0 ?? 0.25) + 0.3)
-            {
-                closestDist = dist;
-                bestNet = segment.Net;
-                bestPadNumber = null;
-            }
-        }
+                        var candidate = cache.SegmentCandidates[segmentIndex];
 
-        foreach (var via in pcb.Routing.Vias)
-        {
-            if (via.Net == null || string.IsNullOrWhiteSpace(via.Net.NormalizedName)) continue;
-            if (!TabSchematics.IsKiCadPcbPointVisibleOnSide(via.Layers, requiredLayer)) continue;
-            if (via.At == null) continue;
+                        double dist = TabSchematics.DistanceToSegment(
+                            worldPoint,
+                            candidate.StartWorld.X,
+                            candidate.StartWorld.Y,
+                            candidate.EndWorld.X,
+                            candidate.EndWorld.Y);
 
-            double dx = via.At.X - worldPoint.X;
-            double dy = via.At.Y - worldPoint.Y;
-            double dist = Math.Sqrt(dx * dx + dy * dy);
+                        if (dist < closestDist && dist < candidate.HitRadiusWorld)
+                        {
+                            closestDist = dist;
+                            bestNet = candidate.Net;
+                            bestPadNumber = null;
+                        }
+                    }
+                }
 
-            if (dist < closestDist && dist < (via.Size / 2.0 ?? 0.4) + 0.3)
-            {
-                closestDist = dist;
-                bestNet = via.Net;
-                bestPadNumber = null;
+                if (cache.ViaIndicesByCell.TryGetValue(cellKey, out var viaIndices))
+                {
+                    foreach (int viaIndex in viaIndices)
+                    {
+                        if (!testedViaIndices.Add(viaIndex))
+                        {
+                            continue;
+                        }
+
+                        var candidate = cache.ViaCandidates[viaIndex];
+
+                        double dx = candidate.CenterWorld.X - worldPoint.X;
+                        double dy = candidate.CenterWorld.Y - worldPoint.Y;
+                        double dist = Math.Sqrt((dx * dx) + (dy * dy));
+
+                        if (dist < closestDist && dist < candidate.HitRadiusWorld)
+                        {
+                            closestDist = dist;
+                            bestNet = candidate.Net;
+                            bestPadNumber = null;
+                        }
+                    }
+                }
             }
         }
 
@@ -9033,5 +9114,212 @@ public partial class TabSchematics : UserControl
 
         return activeDrawIds;
     }
+
+    // ###########################################################################################
+    // Builds a stable cache key for one PCB-side hover lookup cache.
+    // ###########################################################################################
+    private static string BuildKiCadPcbHoverHitTestCacheKey(int pcbIndex, string requiredLayer)
+    {
+        return string.Join(
+            "\u001F",
+            pcbIndex.ToString(CultureInfo.InvariantCulture),
+            requiredLayer.Trim());
+    }
+
+    // ###########################################################################################
+    // Packs one grid-cell coordinate pair into a stable dictionary key.
+    // ###########################################################################################
+    private static long BuildKiCadHoverCellKey(int cellX, int cellY)
+    {
+        return ((long)cellX << 32) ^ (uint)cellY;
+    }
+
+    // ###########################################################################################
+    // Converts one world coordinate into the hover-grid cell coordinate for spatial lookup.
+    // ###########################################################################################
+    private static int GetKiCadHoverCellCoord(double worldCoord, double cellSizeWorld)
+    {
+        return (int)Math.Floor(worldCoord / Math.Max(0.0001, cellSizeWorld));
+    }
+
+    // ###########################################################################################
+    // Adds one candidate index to every spatial cell touched by its expanded hit area.
+    // ###########################################################################################
+    private static void AddKiCadHoverIndexToCellRange(
+        Dictionary<long, List<int>> cellMap,
+        int minCellX,
+        int maxCellX,
+        int minCellY,
+        int maxCellY,
+        int candidateIndex)
+    {
+        for (int cellY = minCellY; cellY <= maxCellY; cellY++)
+        {
+            for (int cellX = minCellX; cellX <= maxCellX; cellX++)
+            {
+                long key = TabSchematics.BuildKiCadHoverCellKey(cellX, cellY);
+
+                if (!cellMap.TryGetValue(key, out var indices))
+                {
+                    indices = new List<int>();
+                    cellMap[key] = indices;
+                }
+
+                indices.Add(candidateIndex);
+            }
+        }
+    }
+
+    // ###########################################################################################
+    // Returns the cached PCB hover-hit-test data for the requested board side, building it once
+    // on demand.
+    // ###########################################################################################
+    private KiCadPcbHoverHitTestCache GetOrCreateKiCadPcbHoverHitTestCache(
+        KiCadPcb pcb,
+        int pcbIndex,
+        string requiredLayer)
+    {
+        string cacheKey = TabSchematics.BuildKiCadPcbHoverHitTestCacheKey(pcbIndex, requiredLayer);
+
+        if (this.thisKiCadPcbHoverHitTestCacheByKey.TryGetValue(cacheKey, out var cache))
+        {
+            return cache;
+        }
+
+        cache = this.BuildKiCadPcbHoverHitTestCache(pcb, requiredLayer);
+        this.thisKiCadPcbHoverHitTestCacheByKey[cacheKey] = cache;
+        return cache;
+    }
+
+    // ###########################################################################################
+    // Builds one spatial hover cache for a PCB side so pointer hover no longer scans every pad,
+    // segment, and via in the board on every move event.
+    // ###########################################################################################
+    private KiCadPcbHoverHitTestCache BuildKiCadPcbHoverHitTestCache(KiCadPcb pcb, string requiredLayer)
+    {
+        var cache = new KiCadPcbHoverHitTestCache
+        {
+            CellSizeWorld = 2.0,
+            MaxHitRadiusWorld = 0.8
+        };
+
+        foreach (var footprint in pcb.Footprints)
+        {
+            foreach (var pad in footprint.Pads)
+            {
+                if (pad.Net == null ||
+                    string.IsNullOrWhiteSpace(pad.Net.NormalizedName) ||
+                    pad.AbsoluteCenter == null ||
+                    !TabSchematics.IsKiCadPcbPointVisibleOnSide(pad.Layers, requiredLayer))
+                {
+                    continue;
+                }
+
+                double hitRadiusWorld = Math.Max(pad.Size?.X ?? 0.5, pad.Size?.Y ?? 0.5) / 2.0 + 0.3;
+                cache.MaxHitRadiusWorld = Math.Max(cache.MaxHitRadiusWorld, hitRadiusWorld);
+
+                int candidateIndex = cache.PadCandidates.Count;
+
+                cache.PadCandidates.Add(new KiCadPcbHoverPadCandidate
+                {
+                    Net = pad.Net,
+                    PadNumber = pad.Number?.Trim() ?? string.Empty,
+                    CenterWorld = new Point(pad.AbsoluteCenter.X, pad.AbsoluteCenter.Y),
+                    HitRadiusWorld = hitRadiusWorld
+                });
+
+                int minCellX = TabSchematics.GetKiCadHoverCellCoord(pad.AbsoluteCenter.X - hitRadiusWorld, cache.CellSizeWorld);
+                int maxCellX = TabSchematics.GetKiCadHoverCellCoord(pad.AbsoluteCenter.X + hitRadiusWorld, cache.CellSizeWorld);
+                int minCellY = TabSchematics.GetKiCadHoverCellCoord(pad.AbsoluteCenter.Y - hitRadiusWorld, cache.CellSizeWorld);
+                int maxCellY = TabSchematics.GetKiCadHoverCellCoord(pad.AbsoluteCenter.Y + hitRadiusWorld, cache.CellSizeWorld);
+
+                TabSchematics.AddKiCadHoverIndexToCellRange(
+                    cache.PadIndicesByCell,
+                    minCellX,
+                    maxCellX,
+                    minCellY,
+                    maxCellY,
+                    candidateIndex);
+            }
+        }
+
+        foreach (var segment in pcb.Routing.Segments)
+        {
+            if (segment.Net == null ||
+                string.IsNullOrWhiteSpace(segment.Net.NormalizedName) ||
+                segment.Start == null ||
+                segment.End == null ||
+                !string.Equals(segment.Layer?.Trim(), requiredLayer, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            double hitRadiusWorld = (segment.Width ?? 0.25) / 2.0 + 0.3;
+            cache.MaxHitRadiusWorld = Math.Max(cache.MaxHitRadiusWorld, hitRadiusWorld);
+
+            int candidateIndex = cache.SegmentCandidates.Count;
+
+            cache.SegmentCandidates.Add(new KiCadPcbHoverSegmentCandidate
+            {
+                Net = segment.Net,
+                StartWorld = new Point(segment.Start.X, segment.Start.Y),
+                EndWorld = new Point(segment.End.X, segment.End.Y),
+                HitRadiusWorld = hitRadiusWorld
+            });
+
+            double minX = Math.Min(segment.Start.X, segment.End.X) - hitRadiusWorld;
+            double maxX = Math.Max(segment.Start.X, segment.End.X) + hitRadiusWorld;
+            double minY = Math.Min(segment.Start.Y, segment.End.Y) - hitRadiusWorld;
+            double maxY = Math.Max(segment.Start.Y, segment.End.Y) + hitRadiusWorld;
+
+            TabSchematics.AddKiCadHoverIndexToCellRange(
+                cache.SegmentIndicesByCell,
+                TabSchematics.GetKiCadHoverCellCoord(minX, cache.CellSizeWorld),
+                TabSchematics.GetKiCadHoverCellCoord(maxX, cache.CellSizeWorld),
+                TabSchematics.GetKiCadHoverCellCoord(minY, cache.CellSizeWorld),
+                TabSchematics.GetKiCadHoverCellCoord(maxY, cache.CellSizeWorld),
+                candidateIndex);
+        }
+
+        foreach (var via in pcb.Routing.Vias)
+        {
+            if (via.Net == null ||
+                string.IsNullOrWhiteSpace(via.Net.NormalizedName) ||
+                via.At == null ||
+                !TabSchematics.IsKiCadPcbPointVisibleOnSide(via.Layers, requiredLayer))
+            {
+                continue;
+            }
+
+            double hitRadiusWorld = (via.Size ?? 0.4) / 2.0 + 0.3;
+            cache.MaxHitRadiusWorld = Math.Max(cache.MaxHitRadiusWorld, hitRadiusWorld);
+
+            int candidateIndex = cache.ViaCandidates.Count;
+
+            cache.ViaCandidates.Add(new KiCadPcbHoverViaCandidate
+            {
+                Net = via.Net,
+                CenterWorld = new Point(via.At.X, via.At.Y),
+                HitRadiusWorld = hitRadiusWorld
+            });
+
+            int minCellX = TabSchematics.GetKiCadHoverCellCoord(via.At.X - hitRadiusWorld, cache.CellSizeWorld);
+            int maxCellX = TabSchematics.GetKiCadHoverCellCoord(via.At.X + hitRadiusWorld, cache.CellSizeWorld);
+            int minCellY = TabSchematics.GetKiCadHoverCellCoord(via.At.Y - hitRadiusWorld, cache.CellSizeWorld);
+            int maxCellY = TabSchematics.GetKiCadHoverCellCoord(via.At.Y + hitRadiusWorld, cache.CellSizeWorld);
+
+            TabSchematics.AddKiCadHoverIndexToCellRange(
+                cache.ViaIndicesByCell,
+                minCellX,
+                maxCellX,
+                minCellY,
+                maxCellY,
+                candidateIndex);
+        }
+
+        return cache;
+    }
+
+
 
 }

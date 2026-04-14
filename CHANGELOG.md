@@ -4,13 +4,14 @@
   - Added option for how KiCad traces should be highlighted on hover in "Configuration" tab
     - You can choose to only highlight traces on hover when holding down `SHIFT`
   - Added option for highlighting first pin on component, if schematic has KiCad data
+  - Added user configurable theme colors (editable through configuration file)
   - Changed all components can now always be selected or highlighted in "Schematics" image, not being dependent on category any more
   - Changes in "Enable component label editor":
     - Added component multi-select
     - Added component snap-align
     - Added an "undo" and "redo" stack with `CTRL`+`Z` and `CTRL`+`Y`
-  - Added user configurable theme colors (editable through configuration file)
   - Changed KiCad calibration points only includes pads and reference texts (only relevant for KiCad contributors)
+  - Refactored zooming/panning with many components selected has better performance
 - **Data**
   - **Commodore 64**
     - **250407**
