@@ -3465,7 +3465,11 @@ public partial class TabSchematics : UserControl
         this.RefreshLabelEditorOverlay();
         this.SchematicsContainer.Focus();
 
-        this.MainWindow?.ReloadCurrentBoardFromDisk(schematicName);
+        if (this.MainWindow != null)
+        {
+            await this.MainWindow.DisableLaunchDataSyncAfterLocalBoardEditAsync();
+            this.MainWindow.ReloadCurrentBoardFromDisk(schematicName);
+        }
 
         Logger.Info($"Label editor changes saved and reload requested for schematic [{schematicName}]");
     }
@@ -8517,34 +8521,36 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     private static List<(Rect HitRect, LabelEditorDragMode DragMode)> BuildLabelEditorHandleHitRects(Rect localRect, double scale)
     {
-        double handleSize = Math.Clamp(10.0 / scale, 5.0, 18.0);
-        double half = handleSize / 2.0;
-        double minimumGap = Math.Clamp(2.0 / scale, 1.0, 4.0);
+        double cornerHandleSize = Math.Clamp(9.0 / scale, 4.0, 12.0);
+        double sideHandleThickness = Math.Clamp(6.0 / scale, 2.5, 7.0);
+        double cornerHalf = cornerHandleSize / 2.0;
+        double sideHalf = sideHandleThickness / 2.0;
+        double minimumGap = Math.Clamp(2.0 / scale, 1.0, 3.0);
 
         var hitRects = new List<(Rect HitRect, LabelEditorDragMode DragMode)>(8)
         {
-            (new Rect(localRect.Left - half, localRect.Top - half, handleSize, handleSize), LabelEditorDragMode.ResizeTopLeft),
-            (new Rect(localRect.Right - half, localRect.Top - half, handleSize, handleSize), LabelEditorDragMode.ResizeTopRight),
-            (new Rect(localRect.Right - half, localRect.Bottom - half, handleSize, handleSize), LabelEditorDragMode.ResizeBottomRight),
-            (new Rect(localRect.Left - half, localRect.Bottom - half, handleSize, handleSize), LabelEditorDragMode.ResizeBottomLeft)
+            (new Rect(localRect.Left - cornerHalf, localRect.Top - cornerHalf, cornerHandleSize, cornerHandleSize), LabelEditorDragMode.ResizeTopLeft),
+            (new Rect(localRect.Right - cornerHalf, localRect.Top - cornerHalf, cornerHandleSize, cornerHandleSize), LabelEditorDragMode.ResizeTopRight),
+            (new Rect(localRect.Right - cornerHalf, localRect.Bottom - cornerHalf, cornerHandleSize, cornerHandleSize), LabelEditorDragMode.ResizeBottomRight),
+            (new Rect(localRect.Left - cornerHalf, localRect.Bottom - cornerHalf, cornerHandleSize, cornerHandleSize), LabelEditorDragMode.ResizeBottomLeft)
         };
 
-        double horizontalSideHitLength = Math.Max(0.0, localRect.Width - handleSize - minimumGap);
+        double horizontalSideHitLength = Math.Max(0.0, localRect.Width - (cornerHandleSize * 2.0) - minimumGap);
         if (horizontalSideHitLength > 0.0)
         {
             double horizontalSideLeft = localRect.Center.X - (horizontalSideHitLength / 2.0);
 
-            hitRects.Add((new Rect(horizontalSideLeft, localRect.Top - half, horizontalSideHitLength, handleSize), LabelEditorDragMode.ResizeTop));
-            hitRects.Add((new Rect(horizontalSideLeft, localRect.Bottom - half, horizontalSideHitLength, handleSize), LabelEditorDragMode.ResizeBottom));
+            hitRects.Add((new Rect(horizontalSideLeft, localRect.Top - sideHalf, horizontalSideHitLength, sideHandleThickness), LabelEditorDragMode.ResizeTop));
+            hitRects.Add((new Rect(horizontalSideLeft, localRect.Bottom - sideHalf, horizontalSideHitLength, sideHandleThickness), LabelEditorDragMode.ResizeBottom));
         }
 
-        double verticalSideHitLength = Math.Max(0.0, localRect.Height - handleSize - minimumGap);
+        double verticalSideHitLength = Math.Max(0.0, localRect.Height - (cornerHandleSize * 2.0) - minimumGap);
         if (verticalSideHitLength > 0.0)
         {
             double verticalSideTop = localRect.Center.Y - (verticalSideHitLength / 2.0);
 
-            hitRects.Add((new Rect(localRect.Right - half, verticalSideTop, handleSize, verticalSideHitLength), LabelEditorDragMode.ResizeRight));
-            hitRects.Add((new Rect(localRect.Left - half, verticalSideTop, handleSize, verticalSideHitLength), LabelEditorDragMode.ResizeLeft));
+            hitRects.Add((new Rect(localRect.Right - sideHalf, verticalSideTop, sideHandleThickness, verticalSideHitLength), LabelEditorDragMode.ResizeRight));
+            hitRects.Add((new Rect(localRect.Left - sideHalf, verticalSideTop, sideHandleThickness, verticalSideHitLength), LabelEditorDragMode.ResizeLeft));
         }
 
         return hitRects;

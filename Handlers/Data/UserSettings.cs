@@ -259,14 +259,22 @@ namespace Handlers.DataHandling
             }
         }
 
+        public static event Action<bool>? CheckDataOnLaunchChanged;
+
+
         public static bool CheckDataOnLaunch
         {
             get => _data.CheckDataOnLaunch ?? true;
             set
             {
+                bool currentValue = _data.CheckDataOnLaunch ?? true;
+                if (currentValue == value)
+                    return;
+
                 _data.CheckDataOnLaunch = value;
                 Logger.Info($"Setting changed: [CheckDataOnLaunch] [{value}]");
                 Save();
+                CheckDataOnLaunchChanged?.Invoke(value);
             }
         }
 

@@ -1,10 +1,13 @@
 using Avalonia;
-using Avalonia.Data;
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using Handlers.DataHandling;
+using Handlers.OnlineHandling;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -13,8 +16,6 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Tabs.TabSchematics;
-using Handlers.OnlineHandling;
-using Handlers.DataHandling;
 
 namespace CRT
 {
@@ -41,6 +42,7 @@ namespace CRT
         private DispatcherTimer? _blinkSelectedTimer;
         private bool _blinkSelectedPhaseVisible = true;
         private bool _blinkSelectedEnabled;
+        private bool _isShowingDataSyncDisabledBanner;
 
         // Region toggle: local override, does not affect the global setting
         private string _localRegion = UserSettings.Region;
@@ -65,6 +67,8 @@ namespace CRT
             this.TabSchematicsControl.Initialize(this);
             this.TabOverview.Initialize(this);
             this.TabContribute.Initialize(this);
+
+            UserSettings.CheckDataOnLaunchChanged += this.OnCheckDataOnLaunchSettingChanged;
 
             // Restore left panel width from settings
             this.RootGrid.ColumnDefinitions[0].Width = new GridLength(UserSettings.LeftPanelWidth);
@@ -268,6 +272,7 @@ namespace CRT
         // ###########################################################################################
         private void OnSyncBannerDismiss(object? sender, RoutedEventArgs e)
         {
+            this._isShowingDataSyncDisabledBanner = false;
             this.SyncBanner.IsVisible = false;
         }
 
@@ -276,6 +281,7 @@ namespace CRT
         // ###########################################################################################
         private void OnSyncBannerPointerPressed(object? sender, PointerPressedEventArgs e)
         {
+            this._isShowingDataSyncDisabledBanner = false;
             this.SyncBanner.IsVisible = false;
         }
 
@@ -893,6 +899,8 @@ namespace CRT
         // ###########################################################################################
         private void OnWindowClosed(object? sender, EventArgs e)
         {
+            UserSettings.CheckDataOnLaunchChanged -= this.OnCheckDataOnLaunchSettingChanged;
+
             if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
             {
                 Dispatcher.UIThread.Post(() =>
@@ -1776,6 +1784,125 @@ namespace CRT
             this.TabSchematicsControl.UpdateComponentLabels();
             this.TabOverview.LoadData(this._currentBoardData);
             this.TabContribute.LoadData(this._currentBoardData, this._localRegion);
+        }
+
+        // ###########################################################################################
+        // Reacts to "Check for new or updated data at application launch" changes by showing or
+        // hiding the main-window banner that explains synchronization is disabled.
+        // ###########################################################################################
+        private void OnCheckDataOnLaunchSettingChanged(bool isEnabled)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (isEnabled)
+                {
+                    this.HideDataSyncDisabledBanner();
+                    return;
+                }
+
+                this.ShowDataSyncDisabledBanner();
+            });
+        }
+
+        // ###########################################################################################
+        // Shows a dismissable main-window banner explaining that launch-time data synchronization
+        // is disabled and must be re-enabled manually in Configuration when appropriate.
+        // ###########################################################################################
+        private void ShowDataSyncDisabledBanner()
+        {
+            this.SyncBannerText.Text =
+                "Data synchronization has been disabled because the board Excel data was edited locally. Re-enable it in the Configuration tab when safe.";
+            this.SyncBannerRefreshButton.IsVisible = false;
+            this.SyncBanner.IsVisible = true;
+            this._isShowingDataSyncDisabledBanner = true;
+        }
+
+        // ###########################################################################################
+        // Hides the synchronization-disabled banner without affecting other sync banner flows.
+        // ###########################################################################################
+        private void HideDataSyncDisabledBanner()
+        {
+            if (!this._isShowingDataSyncDisabledBanner)
+            {
+                return;
+            }
+
+            this.SyncBanner.IsVisible = false;
+            this.SyncBannerRefreshButton.IsVisible = false;
+            this._isShowingDataSyncDisabledBanner = false;
+        }
+
+        // ###########################################################################################
+        // Disables launch-time data synchronization after a local board Excel edit, updates the
+        // Configuration tab checkbox, and shows a warning dialog to explain the safety change.
+        // ###########################################################################################
+        internal async Task DisableLaunchDataSyncAfterLocalBoardEditAsync()
+        {
+            if (!UserSettings.CheckDataOnLaunch)
+            {
+                this.ShowDataSyncDisabledBanner();
+                return;
+            }
+
+            this.TabConfiguration.SetCheckDataOnLaunchCheckBoxValue(false);
+            UserSettings.CheckDataOnLaunch = false;
+
+            await this.ShowDataSyncDisabledAfterLocalBoardEditDialogAsync();
+        }
+
+        // ###########################################################################################
+        // Shows a modal warning dialog explaining why launch-time data synchronization was turned
+        // off after the component label editor saved changes to the board Excel file.
+        // ###########################################################################################
+        private async Task ShowDataSyncDisabledAfterLocalBoardEditDialogAsync()
+        {
+            var closeButton = new Button
+            {
+                Content = "OK",
+                MinWidth = 110,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Center
+            };
+
+            var dialog = new Window
+            {
+                Title = "Data synchronization disabled",
+                Width = 520,
+                MinWidth = 420,
+                CanResize = false,
+                ShowInTaskbar = false,
+                SizeToContent = SizeToContent.Height,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+
+            closeButton.Click += (_, _) => dialog.Close();
+
+            dialog.Content = new Border
+            {
+                Padding = new Thickness(18),
+                Child = new StackPanel
+                {
+                    Spacing = 14,
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Text =
+                                "To avoid potential data loss, \"Check for new or updated data at application launch\" has been disabled because the board Excel data was changed by the component label editor.",
+                            TextWrapping = TextWrapping.Wrap
+                        },
+                        new TextBlock
+                        {
+                            Text =
+                                "A dismissable banner is now shown in the main window to indicate that synchronization is disabled.",
+                            TextWrapping = TextWrapping.Wrap
+                        },
+                        closeButton
+                    }
+                }
+            };
+
+            await dialog.ShowDialog(this);
         }
 
 

@@ -10,6 +10,8 @@ namespace CRT
 {
     public partial class TabConfiguration : UserControl
     {
+        private bool thisSuppressCheckDataOnLaunchChanged;
+
         public TabConfiguration()
         {
             this.InitializeComponent();
@@ -106,7 +108,23 @@ namespace CRT
         // ###########################################################################################
         private void OnCheckDataOnLaunchChanged(object? sender, RoutedEventArgs e)
         {
+            if (this.thisSuppressCheckDataOnLaunchChanged)
+            {
+                return;
+            }
+
             UserSettings.CheckDataOnLaunch = this.CheckDataOnLaunchCheckBox.IsChecked == true;
+        }
+
+        // ###########################################################################################
+        // Updates the "Check for new or updated data at launch" checkbox from outside this tab
+        // without triggering its persistence handler a second time.
+        // ###########################################################################################
+        public void SetCheckDataOnLaunchCheckBoxValue(bool isChecked)
+        {
+            this.thisSuppressCheckDataOnLaunchChanged = true;
+            this.CheckDataOnLaunchCheckBox.IsChecked = isChecked;
+            this.thisSuppressCheckDataOnLaunchChanged = false;
         }
 
         // ###########################################################################################
