@@ -11,6 +11,7 @@ using Handlers.DataHandling;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -102,6 +103,58 @@ public partial class TabSchematics : UserControl
     private readonly List<TextBlock> thisStandardLabelTextBlocks = new();
     private readonly List<ScaleTransform> thisStandardLabelScaleTransforms = new();
     private string thisLastStandardLabelVisualSignature = string.Empty;
+
+    private Point thisLastKiCadHoverHitTestContainerPoint = new(double.NaN, double.NaN);
+    private long thisLastKiCadHoverHitTestTimestamp;
+    private string thisLastKiCadNetConnectionsSignature = string.Empty;
+    private string thisLastThumbnailHighlightSignature = string.Empty;
+
+    private readonly Dictionary<string, KiCadPcbNetRenderCache> thisKiCadPcbNetRenderCacheByKey = new(StringComparer.OrdinalIgnoreCase);
+
+    private sealed class KiCadPcbPadRenderNode
+    {
+        public KiCadGraphNode Info { get; init; } = new();
+        public KiCadPcbFootprint Footprint { get; init; } = null!;
+        public KiCadPcbPad Pad { get; init; } = null!;
+        public Point CenterWorld { get; init; }
+        public double RadiusWorld { get; init; }
+    }
+
+    private sealed class KiCadPcbSegmentRenderNode
+    {
+        public KiCadGraphNode Info { get; init; } = new();
+        public Point StartWorld { get; init; }
+        public Point EndWorld { get; init; }
+        public double WidthWorld { get; init; }
+    }
+
+    private sealed class KiCadPcbViaRenderNode
+    {
+        public KiCadGraphNode Info { get; init; } = new();
+        public Point CenterWorld { get; init; }
+        public double DiameterWorld { get; init; }
+    }
+
+    private sealed class KiCadPcbArcRenderNode
+    {
+        public KiCadGraphNode Info { get; init; } = new();
+        public Point StartWorld { get; init; }
+        public Point MidWorld { get; init; }
+        public Point EndWorld { get; init; }
+        public double WidthWorld { get; init; }
+    }
+
+    private sealed class KiCadPcbNetRenderCache
+    {
+        public Dictionary<string, KiCadGraphNode> NodesById { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, HashSet<string>> AdjacencyByNodeId { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> PadReferenceByNodeId { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> AllNodeIds { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+        public List<KiCadPcbPadRenderNode> PadNodes { get; init; } = new();
+        public List<KiCadPcbSegmentRenderNode> SegmentNodes { get; init; } = new();
+        public List<KiCadPcbViaRenderNode> ViaNodes { get; init; } = new();
+        public List<KiCadPcbArcRenderNode> ArcNodes { get; init; } = new();
+    }
 
     private sealed class LabelEditorUndoHighlightState
     {
@@ -1024,7 +1077,10 @@ public partial class TabSchematics : UserControl
 
         if (!this.thisIsLabelEditorMode && !this.thisIsKiCadCalibrationCaptureMode)
         {
-            this.HitTestKiCadOverlayForHover(point);
+            if (this.ShouldProcessKiCadHoverHitTest(point))
+            {
+                this.HitTestKiCadOverlayForHover(point);
+            }
         }
 
         if (this.thisIsLabelEditorMode)
@@ -1239,6 +1295,8 @@ public partial class TabSchematics : UserControl
 
         this.thisHoveredComponentBoardLabel = null;
 
+        this.ResetKiCadHoverHitTestThrottle();
+
         this.SchematicsImage.Source = null;
         this.SchematicsMissingImageText.IsVisible = false; // Hide while loading
         this.schematicsMatrix = Matrix.Identity;
@@ -1360,14 +1418,16 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Clears the main schematics image and resets the zoom and highlight overlay state.
+    // Also clears cached KiCad PCB graph data so the next board starts from a clean state.
     // ###########################################################################################
     public void ResetSchematicsViewer()
     {
         this.thisIsKiCadOverlayRefreshQueued = false;
         this.thisKiCadOverlayRefreshRequestVersion = 0;
         this.thisKiCadOverlayLastRenderedVersion = 0;
+        this.thisKiCadPcbNetRenderCacheByKey.Clear();
 
-        this.SchematicsKiCadOverlayCanvas.Children.Clear();
+        this.SchematicsKiCadOverlayCanvas.ClearGeometry();
         ((MatrixTransform)this.SchematicsKiCadOverlayCanvas.RenderTransform!).Matrix = this.schematicsMatrix;
 
         this.KiCadNetConnectionsPanel.IsVisible = false;
@@ -1400,6 +1460,10 @@ public partial class TabSchematics : UserControl
 
         this.SetTraceColorPickerColor(Colors.White);
         this.CustomColorButton.Background = Brushes.White;
+
+        this.ResetKiCadHoverHitTestThrottle();
+        this.thisLastKiCadNetConnectionsSignature = string.Empty;
+        this.thisLastThumbnailHighlightSignature = string.Empty;
 
         this.fullResLoadCts?.Cancel();
         this.fullResLoadCts = null;
@@ -1916,8 +1980,8 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Applies current highlight visuals (including blink phase) to main schematic and thumbnails.
-    // Forces immediate KiCad overlay refresh for blink-driven updates while still letting normal
-    // hover and layout refreshes use the queued overlay refresh path.
+    // Blink-only updates no longer regenerate all thumbnail bitmaps unless the actual selection
+    // set changed, which avoids heavy redraw churn during blinking.
     // ###########################################################################################
     public void ApplyHighlightVisuals(bool hasSelection, double blinkFactor)
     {
@@ -1931,7 +1995,8 @@ public partial class TabSchematics : UserControl
             this.SchematicsHighlightsOverlay.HighlightIndex = mainIndex;
             this.SchematicsHighlightsOverlay.BitmapPixelSize = this.currentFullResBitmap?.PixelSize ?? new PixelSize(0, 0);
             this.SchematicsHighlightsOverlay.HighlightColor = ParseColorOrDefault(mainSchematic.MainImageHighlightColor, Colors.IndianRed);
-            this.SchematicsHighlightsOverlay.HighlightOpacity = ParseOpacityOrDefault(mainSchematic.MainHighlightOpacity, 0.20) * this.thisCurrentHighlightBlinkFactor;
+            this.SchematicsHighlightsOverlay.HighlightOpacity =
+                ParseOpacityOrDefault(mainSchematic.MainHighlightOpacity, 0.20) * this.thisCurrentHighlightBlinkFactor;
         }
         else
         {
@@ -1943,44 +2008,63 @@ public partial class TabSchematics : UserControl
         bool hasKiCadSelection = this.HasKiCadSelectionForThumbnailDimming();
         bool hasAnyThumbnailSelection = hasSelection || hasKiCadSelection;
 
-        foreach (var thumb in this.currentThumbnails)
+        string thumbnailSignature = this.BuildThumbnailHighlightSignature(hasSelection, hasKiCadSelection);
+
+        if (!string.Equals(this.thisLastThumbnailHighlightSignature, thumbnailSignature, StringComparison.Ordinal))
         {
-            if (thumb.BaseThumbnail == null)
-                continue;
+            this.thisLastThumbnailHighlightSignature = thumbnailSignature;
 
-            bool hasComponentMatch = false;
-            bool hasKiCadMatch = false;
-
-            if (this.highlightIndexBySchematic.TryGetValue(thumb.Name, out var thumbIndex) &&
-                this.schematicByName.TryGetValue(thumb.Name, out var thumbSchematic))
+            foreach (var thumb in this.currentThumbnails)
             {
-                hasComponentMatch = true;
-                var highlighted = CreateHighlightedThumbnail(thumb.BaseThumbnail, thumb.OriginalPixelSize, thumbIndex, thumbSchematic, this.thisCurrentHighlightBlinkFactor);
-                var old = thumb.ImageSource;
-                thumb.ImageSource = highlighted;
-                if (!ReferenceEquals(old, thumb.BaseThumbnail))
-                    (old as IDisposable)?.Dispose();
-            }
-            else
-            {
-                if (!ReferenceEquals(thumb.ImageSource, thumb.BaseThumbnail))
+                if (thumb.BaseThumbnail == null)
                 {
-                    var old = thumb.ImageSource;
-                    thumb.ImageSource = thumb.BaseThumbnail;
-                    (old as IDisposable)?.Dispose();
+                    continue;
                 }
+
+                bool hasComponentMatch = false;
+                bool hasKiCadMatch = false;
+
+                if (this.highlightIndexBySchematic.TryGetValue(thumb.Name, out var thumbIndex) &&
+                    this.schematicByName.TryGetValue(thumb.Name, out var thumbSchematic))
+                {
+                    hasComponentMatch = true;
+
+                    var highlighted = CreateHighlightedThumbnail(
+                        thumb.BaseThumbnail,
+                        thumb.OriginalPixelSize,
+                        thumbIndex,
+                        thumbSchematic,
+                        opacityMultiplier: 1.0);
+
+                    var old = thumb.ImageSource;
+                    thumb.ImageSource = highlighted;
+
+                    if (!ReferenceEquals(old, thumb.BaseThumbnail))
+                    {
+                        (old as IDisposable)?.Dispose();
+                    }
+                }
+                else
+                {
+                    if (!ReferenceEquals(thumb.ImageSource, thumb.BaseThumbnail))
+                    {
+                        var old = thumb.ImageSource;
+                        thumb.ImageSource = thumb.BaseThumbnail;
+                        (old as IDisposable)?.Dispose();
+                    }
+                }
+
+                if (hasKiCadSelection)
+                {
+                    hasKiCadMatch = this.DoesSchematicContainSelectedKiCadContent(thumb.Name);
+                }
+
+                bool hasMatch = hasComponentMatch || hasKiCadMatch;
+                bool isRelevantForDimming = !hasAnyThumbnailSelection || hasMatch;
+
+                thumb.VisualOpacity = isRelevantForDimming ? 1.0 : 0.35;
+                thumb.IsMatchForSelection = hasAnyThumbnailSelection && hasMatch;
             }
-
-            if (hasKiCadSelection)
-            {
-                hasKiCadMatch = this.DoesSchematicContainSelectedKiCadContent(thumb.Name);
-            }
-
-            bool hasMatch = hasComponentMatch || hasKiCadMatch;
-            bool isRelevantForDimming = !hasAnyThumbnailSelection || hasMatch;
-
-            thumb.VisualOpacity = isRelevantForDimming ? 1.0 : 0.35;
-            thumb.IsMatchForSelection = hasAnyThumbnailSelection && hasMatch;
         }
 
         this.RefreshKiCadOverlay(forceImmediate: true);
@@ -5039,14 +5123,14 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Loads the KiCad JSON file that resides next to the currently selected board Excel file.
-    // The result is cached and reused while the same board remains active.
+    // Clears all KiCad runtime caches so the next render uses fresh project data.
     // ###########################################################################################
     public async Task LoadKiCadProjectForCurrentBoardAsync()
     {
         string jsonPath = this.GetKiCadProjectJsonPathForCurrentBoard();
 
         this.thisKiCadProject = null;
-//        this.thisKiCadProjectPath = jsonPath;
+        this.thisKiCadPcbNetRenderCacheByKey.Clear();
         this.thisSelectedKiCadReferences.Clear();
         this.thisSelectedKiCadNormalizedNetNames.Clear();
         this.thisLockedKiCadNetNames.Clear();
@@ -5055,6 +5139,9 @@ public partial class TabSchematics : UserControl
         this.thisIsKiCadOverlayRefreshQueued = false;
         this.thisKiCadOverlayRefreshRequestVersion = 0;
         this.thisKiCadOverlayLastRenderedVersion = 0;
+        this.thisLastKiCadNetConnectionsSignature = string.Empty;
+        this.thisLastThumbnailHighlightSignature = string.Empty;
+        this.ResetKiCadHoverHitTestThrottle();
         this.ClearKiCadOverlay();
 
         this.RestoreBoardSettings(this.MainWindow?.GetCurrentBoardKey() ?? string.Empty);
@@ -5163,14 +5250,14 @@ public partial class TabSchematics : UserControl
         }
 
         return result;
-    }        
+    }
 
     // ###########################################################################################
-    // Clears the imported KiCad overlay canvas.
+    // Clears the imported KiCad overlay geometry.
     // ###########################################################################################
     private void ClearKiCadOverlay()
     {
-        this.SchematicsKiCadOverlayCanvas.Children.Clear();
+        this.SchematicsKiCadOverlayCanvas.ClearGeometry();
     }
 
     // ###########################################################################################
@@ -5216,7 +5303,7 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Renders PCB copper geometry for the currently selected normalized net names.
-    // Uses a spatial overlap adjacency solver to prevent network trace flooding.
+    // Uses cached per-net graph topology so adjacency building is not repeated on every refresh.
     // Also renders a pin-1-only marker for selected or hovered components when enabled.
     // ###########################################################################################
     private void RenderKiCadPcbGeometry(KiCadProjectView view)
@@ -5256,8 +5343,15 @@ public partial class TabSchematics : UserControl
         string? activeHoveredKiCadNetName = this.GetActiveHoveredKiCadNetName();
 
         var activeNets = new HashSet<string>(this.thisSelectedKiCadNormalizedNetNames, StringComparer.OrdinalIgnoreCase);
-        foreach (var locked in this.thisLockedKiCadNetNames) activeNets.Add(locked);
-        if (!string.IsNullOrWhiteSpace(activeHoveredKiCadNetName)) activeNets.Add(activeHoveredKiCadNetName);
+        foreach (var locked in this.thisLockedKiCadNetNames)
+        {
+            activeNets.Add(locked);
+        }
+
+        if (!string.IsNullOrWhiteSpace(activeHoveredKiCadNetName))
+        {
+            activeNets.Add(activeHoveredKiCadNetName);
+        }
 
         var matchingNetIds = pcb.Nets.List
             .Where(net => !string.IsNullOrWhiteSpace(net.NormalizedName) &&
@@ -5268,9 +5362,12 @@ public partial class TabSchematics : UserControl
             .ToList();
 
         string requiredLayer = string.Equals(view.Type, "pcb_bottom", StringComparison.OrdinalIgnoreCase)
-            ? "B.Cu" : "F.Cu";
+            ? "B.Cu"
+            : "F.Cu";
 
-        void AddPadShape(KiCadPcbPad pad, IBrush padBrush)
+        var primitives = new List<KiCadOverlayPrimitive>();
+
+        void AddPadPrimitive(KiCadPcbPad pad, IBrush padBrush)
         {
             if (pad.AbsoluteCenter == null)
             {
@@ -5284,42 +5381,47 @@ public partial class TabSchematics : UserControl
                 contentRect,
                 calibration);
 
-            double width = this.MapKiCadWorldLengthToLocal(pad.Size?.X ?? 1.2, worldBounds, contentRect, calibration);
-            double height = this.MapKiCadWorldLengthToLocal(pad.Size?.Y ?? 1.2, worldBounds, contentRect, calibration);
+            double width = this.MapKiCadWorldLengthToLocal(
+                pad.Size?.X ?? 1.2,
+                worldBounds,
+                contentRect,
+                calibration);
 
-            Control shape;
+            double height = this.MapKiCadWorldLengthToLocal(
+                pad.Size?.Y ?? 1.2,
+                worldBounds,
+                contentRect,
+                calibration);
+
+            var rect = new Rect(
+                center.X - (Math.Max(2.0, width) / 2.0),
+                center.Y - (Math.Max(2.0, height) / 2.0),
+                Math.Max(2.0, width),
+                Math.Max(2.0, height));
+
+            var pen = new Pen(padBrush, 1.2);
 
             if (string.Equals(pad.Shape?.Trim(), "rect", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(pad.Shape?.Trim(), "roundrect", StringComparison.OrdinalIgnoreCase))
             {
-                shape = new Rectangle
+                primitives.Add(new KiCadOverlayPrimitive
                 {
-                    Width = Math.Max(2.0, width),
-                    Height = Math.Max(2.0, height),
-                    Stroke = padBrush,
-                    Fill = padBrush,
-                    StrokeThickness = 1.2,
-                    RadiusX = 2,
-                    RadiusY = 2,
-                    IsHitTestVisible = false
-                };
+                    Kind = KiCadOverlayPrimitiveKind.Rectangle,
+                    Rect = rect,
+                    Pen = pen,
+                    Fill = padBrush
+                });
             }
             else
             {
-                shape = new Ellipse
+                primitives.Add(new KiCadOverlayPrimitive
                 {
-                    Width = Math.Max(2.0, width),
-                    Height = Math.Max(2.0, height),
-                    Stroke = padBrush,
-                    Fill = padBrush,
-                    StrokeThickness = 1.2,
-                    IsHitTestVisible = false
-                };
+                    Kind = KiCadOverlayPrimitiveKind.Ellipse,
+                    Rect = rect,
+                    Pen = pen,
+                    Fill = padBrush
+                });
             }
-
-            Canvas.SetLeft(shape, center.X - (shape.Width / 2.0));
-            Canvas.SetTop(shape, center.Y - (shape.Height / 2.0));
-            this.SchematicsKiCadOverlayCanvas.Children.Add(shape);
         }
 
         foreach (var netInfo in matchingNetIds)
@@ -5339,307 +5441,188 @@ public partial class TabSchematics : UserControl
             double blinkFactor = shouldBlinkThisNet ? this.thisCurrentHighlightBlinkFactor : 1.0;
             double effectiveOpacity = Math.Clamp(translatedOpacity * blinkFactor, 0.0, 1.0);
 
-            var strokeBrush = isHoveredNet && !shouldBlinkThisNet
+            IBrush strokeBrush = isHoveredNet && !shouldBlinkThisNet
                 ? new SolidColorBrush(overlayColor, 1.0)
                 : new SolidColorBrush(overlayColor, effectiveOpacity);
 
-            var fillBrush = strokeBrush;
+            IBrush fillBrush = strokeBrush;
 
-            var nodes = new Dictionary<string, KiCadGraphNode>(StringComparer.OrdinalIgnoreCase);
-            var padNodes = new List<(KiCadGraphNode info, Point center, double radius)>();
-            var segNodes = new List<(KiCadGraphNode info, Point start, Point end, double halfW)>();
-            var viaNodes = new List<(KiCadGraphNode info, Point center, double radius)>();
-            var arcNodes = new List<(KiCadGraphNode info, Point start, Point mid, Point end, double halfW)>();
+            var cache = this.GetOrCreateKiCadPcbNetRenderCache(
+                pcb,
+                view.SourceIndex,
+                netInfo.Id,
+                bucket,
+                requiredLayer);
 
-            int idCounter = 0;
+            var activeDrawIds = this.BuildKiCadPcbActiveDrawIds(cache, isExplicitHighlight);
 
-            foreach (var padRef in bucket.Pads)
+            foreach (var segmentNode in cache.SegmentNodes)
             {
-                if (padRef.FootprintIndex < 0 || padRef.FootprintIndex >= pcb.Footprints.Count) continue;
-                var footprint = pcb.Footprints[padRef.FootprintIndex];
-                if (padRef.PadIndex < 0 || padRef.PadIndex >= footprint.Pads.Count) continue;
-                var pad = footprint.Pads[padRef.PadIndex];
-
-                if (pad.AbsoluteCenter == null || !TabSchematics.IsKiCadPcbPointVisibleOnSide(pad.Layers, requiredLayer)) continue;
-
-                string reference = footprint.Reference?.Trim() ?? string.Empty;
-                bool isTarget = this.thisSelectedKiCadReferences.Count == 0 || this.thisSelectedKiCadReferences.Contains(reference);
-
-                var info = new KiCadGraphNode
-                {
-                    Id = $"P{idCounter++}",
-                    IsTargetPad = isTarget,
-                    IsForeignPad = !isTarget,
-                    PadRef = padRef
-                };
-                nodes[info.Id] = info;
-
-                double radius = Math.Max(pad.Size?.X ?? 1.2, pad.Size?.Y ?? 1.2) / 2.0;
-                padNodes.Add((info, new Point(pad.AbsoluteCenter.X, pad.AbsoluteCenter.Y), radius));
-            }
-
-            foreach (int segmentIndex in bucket.Segments)
-            {
-                if (segmentIndex < 0 || segmentIndex >= pcb.Routing.Segments.Count) continue;
-                var segment = pcb.Routing.Segments[segmentIndex];
-                if (segment.Start == null || segment.End == null || !string.Equals(segment.Layer?.Trim(), requiredLayer, StringComparison.OrdinalIgnoreCase)) continue;
-
-                var info = new KiCadGraphNode { Id = $"S{idCounter++}", SegmentIndex = segmentIndex };
-                nodes[info.Id] = info;
-                segNodes.Add((info, new Point(segment.Start.X, segment.Start.Y), new Point(segment.End.X, segment.End.Y), (segment.Width ?? 0.25) / 2.0));
-            }
-
-            foreach (int viaIndex in bucket.Vias)
-            {
-                if (viaIndex < 0 || viaIndex >= pcb.Routing.Vias.Count) continue;
-                var via = pcb.Routing.Vias[viaIndex];
-                if (via.At == null || !TabSchematics.IsKiCadPcbPointVisibleOnSide(via.Layers, requiredLayer)) continue;
-
-                var info = new KiCadGraphNode { Id = $"V{idCounter++}", ViaIndex = viaIndex };
-                nodes[info.Id] = info;
-                viaNodes.Add((info, new Point(via.At.X, via.At.Y), (via.Size ?? 0.8) / 2.0));
-            }
-
-            foreach (int arcIndex in bucket.Arcs)
-            {
-                if (arcIndex < 0 || arcIndex >= pcb.Routing.Arcs.Count) continue;
-                var arc = pcb.Routing.Arcs[arcIndex];
-                if (arc.Start == null || arc.Mid == null || arc.End == null || !string.Equals(arc.Layer?.Trim(), requiredLayer, StringComparison.OrdinalIgnoreCase)) continue;
-
-                var info = new KiCadGraphNode { Id = $"A{idCounter++}", ArcIndex = arcIndex };
-                nodes[info.Id] = info;
-                arcNodes.Add((info, new Point(arc.Start.X, arc.Start.Y), new Point(arc.Mid.X, arc.Mid.Y), new Point(arc.End.X, arc.End.Y), (arc.Width ?? 0.25) / 2.0));
-            }
-
-            var activeDrawIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            if (isExplicitHighlight)
-            {
-                foreach (var id in nodes.Keys) activeDrawIds.Add(id);
-            }
-            else
-            {
-                var adjacency = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-                void AddEdge(string id1, string id2)
-                {
-                    if (!adjacency.TryGetValue(id1, out var s1)) { s1 = new HashSet<string>(StringComparer.OrdinalIgnoreCase); adjacency[id1] = s1; }
-                    s1.Add(id2);
-                    if (!adjacency.TryGetValue(id2, out var s2)) { s2 = new HashSet<string>(StringComparer.OrdinalIgnoreCase); adjacency[id2] = s2; }
-                    s2.Add(id1);
-                }
-
-                for (int i = 0; i < segNodes.Count; i++)
-                {
-                    for (int j = i + 1; j < segNodes.Count; j++)
-                    {
-                        var s1 = segNodes[i]; var s2 = segNodes[j];
-                        double dist = Math.Min(
-                            Math.Min(DistanceToSegment(s1.start, s2.start.X, s2.start.Y, s2.end.X, s2.end.Y),
-                                     DistanceToSegment(s1.end, s2.start.X, s2.start.Y, s2.end.X, s2.end.Y)),
-                            Math.Min(DistanceToSegment(s2.start, s1.start.X, s1.start.Y, s1.end.X, s1.end.Y),
-                                     DistanceToSegment(s2.end, s1.start.X, s1.start.Y, s1.end.X, s1.end.Y))
-                        );
-                        if (dist <= s1.halfW + s2.halfW + 0.05) AddEdge(s1.info.Id, s2.info.Id);
-                    }
-                }
-
-                foreach (var p in padNodes)
-                    foreach (var s in segNodes)
-                        if (DistanceToSegment(p.center, s.start.X, s.start.Y, s.end.X, s.end.Y) <= p.radius + s.halfW + 0.05)
-                            AddEdge(p.info.Id, s.info.Id);
-
-                foreach (var p in padNodes)
-                    foreach (var v in viaNodes)
-                    {
-                        double dist = Math.Sqrt(Math.Pow(p.center.X - v.center.X, 2) + Math.Pow(p.center.Y - v.center.Y, 2));
-                        if (dist <= p.radius + v.radius + 0.05) AddEdge(p.info.Id, v.info.Id);
-                    }
-
-                foreach (var v in viaNodes)
-                    foreach (var s in segNodes)
-                        if (DistanceToSegment(v.center, s.start.X, s.start.Y, s.end.X, s.end.Y) <= v.radius + s.halfW + 0.05)
-                            AddEdge(v.info.Id, s.info.Id);
-
-                foreach (var a in arcNodes)
-                {
-                    foreach (var s in segNodes)
-                    {
-                        double dist = Math.Min(DistanceToSegment(a.start, s.start.X, s.start.Y, s.end.X, s.end.Y),
-                                      Math.Min(DistanceToSegment(a.mid, s.start.X, s.start.Y, s.end.X, s.end.Y),
-                                               DistanceToSegment(a.end, s.start.X, s.start.Y, s.end.X, s.end.Y)));
-                        if (dist <= a.halfW + s.halfW + 0.05) AddEdge(a.info.Id, s.info.Id);
-                    }
-
-                    foreach (var p in padNodes)
-                    {
-                        double dist = Math.Min(Math.Sqrt(Math.Pow(p.center.X - a.start.X, 2) + Math.Pow(p.center.Y - a.start.Y, 2)),
-                                      Math.Min(Math.Sqrt(Math.Pow(p.center.X - a.mid.X, 2) + Math.Pow(p.center.Y - a.mid.Y, 2)),
-                                               Math.Sqrt(Math.Pow(p.center.X - a.end.X, 2) + Math.Pow(p.center.Y - a.end.Y, 2))));
-                        if (dist <= p.radius + a.halfW + 0.05) AddEdge(p.info.Id, a.info.Id);
-                    }
-
-                    foreach (var v in viaNodes)
-                    {
-                        double dist = Math.Min(Math.Sqrt(Math.Pow(v.center.X - a.start.X, 2) + Math.Pow(v.center.Y - a.start.Y, 2)),
-                                      Math.Min(Math.Sqrt(Math.Pow(v.center.X - a.mid.X, 2) + Math.Pow(v.center.Y - a.mid.Y, 2)),
-                                               Math.Sqrt(Math.Pow(v.center.X - a.end.X, 2) + Math.Pow(v.center.Y - a.end.Y, 2))));
-                        if (dist <= v.radius + a.halfW + 0.05) AddEdge(v.info.Id, a.info.Id);
-                    }
-                }
-
-                var queue = new Queue<string>();
-                foreach (var p in padNodes)
-                {
-                    if (p.info.IsTargetPad)
-                    {
-                        activeDrawIds.Add(p.info.Id);
-                        queue.Enqueue(p.info.Id);
-                    }
-                }
-
-                while (queue.Count > 0)
-                {
-                    string currId = queue.Dequeue();
-                    if (adjacency.TryGetValue(currId, out var neighbors))
-                    {
-                        foreach (var nId in neighbors)
-                        {
-                            if (activeDrawIds.Add(nId))
-                            {
-                                var nInfo = nodes[nId];
-                                if (!nInfo.IsForeignPad)
-                                {
-                                    queue.Enqueue(nId);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            foreach (var segmentInfo in segNodes)
-            {
-                if (!activeDrawIds.Contains(segmentInfo.info.Id)) continue;
-                var segment = pcb.Routing.Segments[segmentInfo.info.SegmentIndex];
-
-                Point start = this.MapKiCadWorldToLocal(segment.Start!.X, segment.Start.Y, worldBounds, contentRect, calibration);
-                Point end = this.MapKiCadWorldToLocal(segment.End!.X, segment.End.Y, worldBounds, contentRect, calibration);
-                double thickness = this.MapKiCadWorldLengthToLocal(segment.Width ?? 0.25, worldBounds, contentRect, calibration);
-
-                var line = new Line
-                {
-                    StartPoint = start,
-                    EndPoint = end,
-                    Stroke = strokeBrush,
-                    StrokeThickness = Math.Max(1.0, thickness - 1.0),
-                    StrokeLineCap = PenLineCap.Round,
-                    StrokeJoin = PenLineJoin.Round,
-                    IsHitTestVisible = false
-                };
-
-                this.SchematicsKiCadOverlayCanvas.Children.Add(line);
-            }
-
-            foreach (var viaInfo in viaNodes)
-            {
-                if (!activeDrawIds.Contains(viaInfo.info.Id)) continue;
-                var via = pcb.Routing.Vias[viaInfo.info.ViaIndex];
-
-                Point center = this.MapKiCadWorldToLocal(via.At!.X, via.At.Y, worldBounds, contentRect, calibration);
-                double diameter = this.MapKiCadWorldLengthToLocal(via.Size ?? 0.8, worldBounds, contentRect, calibration);
-
-                var ellipse = new Ellipse
-                {
-                    Width = Math.Max(2.0, diameter),
-                    Height = Math.Max(2.0, diameter),
-                    Stroke = strokeBrush,
-                    Fill = fillBrush,
-                    StrokeThickness = 1.2,
-                    IsHitTestVisible = false
-                };
-
-                Canvas.SetLeft(ellipse, center.X - (ellipse.Width / 2.0));
-                Canvas.SetTop(ellipse, center.Y - (ellipse.Height / 2.0));
-                this.SchematicsKiCadOverlayCanvas.Children.Add(ellipse);
-            }
-
-            foreach (var arcInfo in arcNodes)
-            {
-                if (!activeDrawIds.Contains(arcInfo.info.Id)) continue;
-                var arc = pcb.Routing.Arcs[arcInfo.info.ArcIndex];
-
-                Point start = this.MapKiCadWorldToLocal(arc.Start!.X, arc.Start.Y, worldBounds, contentRect, calibration);
-                Point mid = this.MapKiCadWorldToLocal(arc.Mid!.X, arc.Mid.Y, worldBounds, contentRect, calibration);
-                Point end = this.MapKiCadWorldToLocal(arc.End!.X, arc.End.Y, worldBounds, contentRect, calibration);
-                double thickness = this.MapKiCadWorldLengthToLocal(arc.Width ?? 0.25, worldBounds, contentRect, calibration);
-
-                var polyline = new Polyline
-                {
-                    Stroke = strokeBrush,
-                    StrokeThickness = Math.Max(1.0, thickness - 1.0),
-                    StrokeLineCap = PenLineCap.Round,
-                    StrokeJoin = PenLineJoin.Round,
-                    Points = new Points(this.SampleQuadraticBezier(start, mid, end, 20)),
-                    IsHitTestVisible = false
-                };
-
-                this.SchematicsKiCadOverlayCanvas.Children.Add(polyline);
-            }
-
-            foreach (var padInfo in padNodes)
-            {
-                if (!activeDrawIds.Contains(padInfo.info.Id)) continue;
-
-                var padRef = padInfo.info.PadRef;
-                if (padRef == null) continue;
-
-                var footprint = pcb.Footprints[padRef.FootprintIndex];
-                var pad = footprint.Pads[padRef.PadIndex];
-
-                bool isSelectedComponentPin1 = this.ShouldUseSelectedComponentPin1Highlight(footprint, pad, requiredLayer);
-                IBrush padBrush = isSelectedComponentPin1
-                    ? new SolidColorBrush(Colors.Orange, 1.0)
-                    : fillBrush;
-
-                AddPadShape(pad, padBrush);
-            }
-        }
-
-        if (!this.HasPin1HighlightTargetReference())
-        {
-            return;
-        }
-
-        foreach (var footprint in pcb.Footprints)
-        {
-            string reference = footprint.Reference?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(reference))
-            {
-                continue;
-            }
-
-            if (!this.thisSelectedKiCadReferences.Contains(reference) &&
-                !string.Equals(this.thisHoveredComponentBoardLabel, reference, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            foreach (var pad in footprint.Pads)
-            {
-                if (pad.AbsoluteCenter == null ||
-                    !TabSchematics.IsKiCadPcbPointVisibleOnSide(pad.Layers, requiredLayer) ||
-                    !TabSchematics.IsPrimaryPadForPin1Highlight(footprint, pad, requiredLayer))
+                if (!activeDrawIds.Contains(segmentNode.Info.Id))
                 {
                     continue;
                 }
 
-                AddPadShape(pad, new SolidColorBrush(Colors.Orange, 1.0));
+                Point start = this.MapKiCadWorldToLocal(
+                    segmentNode.StartWorld.X,
+                    segmentNode.StartWorld.Y,
+                    worldBounds,
+                    contentRect,
+                    calibration);
+
+                Point end = this.MapKiCadWorldToLocal(
+                    segmentNode.EndWorld.X,
+                    segmentNode.EndWorld.Y,
+                    worldBounds,
+                    contentRect,
+                    calibration);
+
+                double thickness = this.MapKiCadWorldLengthToLocal(
+                    segmentNode.WidthWorld,
+                    worldBounds,
+                    contentRect,
+                    calibration);
+
+                primitives.Add(new KiCadOverlayPrimitive
+                {
+                    Kind = KiCadOverlayPrimitiveKind.Line,
+                    Start = start,
+                    End = end,
+                    Pen = new Pen(strokeBrush, Math.Max(1.0, thickness - 1.0))
+                });
+            }
+
+            foreach (var viaNode in cache.ViaNodes)
+            {
+                if (!activeDrawIds.Contains(viaNode.Info.Id))
+                {
+                    continue;
+                }
+
+                Point center = this.MapKiCadWorldToLocal(
+                    viaNode.CenterWorld.X,
+                    viaNode.CenterWorld.Y,
+                    worldBounds,
+                    contentRect,
+                    calibration);
+
+                double diameter = this.MapKiCadWorldLengthToLocal(
+                    viaNode.DiameterWorld,
+                    worldBounds,
+                    contentRect,
+                    calibration);
+
+                primitives.Add(new KiCadOverlayPrimitive
+                {
+                    Kind = KiCadOverlayPrimitiveKind.Ellipse,
+                    Rect = new Rect(
+                        center.X - (Math.Max(2.0, diameter) / 2.0),
+                        center.Y - (Math.Max(2.0, diameter) / 2.0),
+                        Math.Max(2.0, diameter),
+                        Math.Max(2.0, diameter)),
+                    Pen = new Pen(strokeBrush, 1.2),
+                    Fill = fillBrush
+                });
+            }
+
+            foreach (var arcNode in cache.ArcNodes)
+            {
+                if (!activeDrawIds.Contains(arcNode.Info.Id))
+                {
+                    continue;
+                }
+
+                Point start = this.MapKiCadWorldToLocal(
+                    arcNode.StartWorld.X,
+                    arcNode.StartWorld.Y,
+                    worldBounds,
+                    contentRect,
+                    calibration);
+
+                Point mid = this.MapKiCadWorldToLocal(
+                    arcNode.MidWorld.X,
+                    arcNode.MidWorld.Y,
+                    worldBounds,
+                    contentRect,
+                    calibration);
+
+                Point end = this.MapKiCadWorldToLocal(
+                    arcNode.EndWorld.X,
+                    arcNode.EndWorld.Y,
+                    worldBounds,
+                    contentRect,
+                    calibration);
+
+                double thickness = this.MapKiCadWorldLengthToLocal(
+                    arcNode.WidthWorld,
+                    worldBounds,
+                    contentRect,
+                    calibration);
+
+                primitives.Add(new KiCadOverlayPrimitive
+                {
+                    Kind = KiCadOverlayPrimitiveKind.Polyline,
+                    Points = this.SampleQuadraticBezier(start, mid, end, 20),
+                    Pen = new Pen(strokeBrush, Math.Max(1.0, thickness - 1.0))
+                });
+            }
+
+            foreach (var padNode in cache.PadNodes)
+            {
+                if (!activeDrawIds.Contains(padNode.Info.Id))
+                {
+                    continue;
+                }
+
+                bool isSelectedComponentPin1 = this.ShouldUseSelectedComponentPin1Highlight(
+                    padNode.Footprint,
+                    padNode.Pad,
+                    requiredLayer);
+
+                IBrush padBrush = isSelectedComponentPin1
+                    ? new SolidColorBrush(Colors.Orange, 1.0)
+                    : fillBrush;
+
+                AddPadPrimitive(padNode.Pad, padBrush);
             }
         }
+
+        if (this.HasPin1HighlightTargetReference())
+        {
+            foreach (var footprint in pcb.Footprints)
+            {
+                string reference = footprint.Reference?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(reference))
+                {
+                    continue;
+                }
+
+                if (!this.thisSelectedKiCadReferences.Contains(reference) &&
+                    !string.Equals(this.thisHoveredComponentBoardLabel, reference, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                foreach (var pad in footprint.Pads)
+                {
+                    if (pad.AbsoluteCenter == null ||
+                        !TabSchematics.IsKiCadPcbPointVisibleOnSide(pad.Layers, requiredLayer) ||
+                        !TabSchematics.IsPrimaryPadForPin1Highlight(footprint, pad, requiredLayer))
+                    {
+                        continue;
+                    }
+
+                    AddPadPrimitive(pad, new SolidColorBrush(Colors.Orange, 1.0));
+                }
+            }
+        }
+
+        this.SchematicsKiCadOverlayCanvas.SetGeometry(primitives);
     }
 
     // ###########################################################################################
     // Renders resolved schematic wire paths for the currently selected normalized net names.
+    // Uses a render-only overlay control instead of creating one Polyline control per path.
     // ###########################################################################################
     private void RenderKiCadSchematicGeometry(KiCadProjectView view)
     {
@@ -5683,8 +5666,17 @@ public partial class TabSchematics : UserControl
         string? activeHoveredKiCadNetName = this.GetActiveHoveredKiCadNetName();
 
         var activeNets = new HashSet<string>(this.thisSelectedKiCadNormalizedNetNames, StringComparer.OrdinalIgnoreCase);
-        foreach (var locked in this.thisLockedKiCadNetNames) activeNets.Add(locked);
-        if (!string.IsNullOrWhiteSpace(activeHoveredKiCadNetName)) activeNets.Add(activeHoveredKiCadNetName);
+        foreach (var locked in this.thisLockedKiCadNetNames)
+        {
+            activeNets.Add(locked);
+        }
+
+        if (!string.IsNullOrWhiteSpace(activeHoveredKiCadNetName))
+        {
+            activeNets.Add(activeHoveredKiCadNetName);
+        }
+
+        var primitives = new List<KiCadOverlayPrimitive>();
 
         foreach (string normalizedNetName in activeNets)
         {
@@ -5693,8 +5685,6 @@ public partial class TabSchematics : UserControl
                 continue;
             }
 
-//            bool isHoveredNet = includeHoveredKiCadNet &&
-//                                string.Equals(this.thisHoveredKiCadNetName, normalizedNetName, StringComparison.OrdinalIgnoreCase);
             bool isHoveredNet = string.Equals(activeHoveredKiCadNetName, normalizedNetName, StringComparison.OrdinalIgnoreCase);
             bool isLockedNet = this.thisLockedKiCadNetNames.Contains(normalizedNetName);
 
@@ -5704,9 +5694,11 @@ public partial class TabSchematics : UserControl
             double blinkFactor = shouldBlinkThisNet ? this.thisCurrentHighlightBlinkFactor : 1.0;
             double effectiveOpacity = Math.Clamp(translatedOpacity * blinkFactor, 0.0, 1.0);
 
-            var strokeBrush = isHoveredNet && !shouldBlinkThisNet
+            IBrush strokeBrush = isHoveredNet && !shouldBlinkThisNet
                 ? new SolidColorBrush(overlayColor, 1.0)
                 : new SolidColorBrush(overlayColor, effectiveOpacity);
+
+            var pen = new Pen(strokeBrush, 1.2);
 
             foreach (var resolvedPath in resolvedPaths)
             {
@@ -5716,22 +5708,24 @@ public partial class TabSchematics : UserControl
                 }
 
                 var localPoints = resolvedPath.Points
-                    .Select(point => this.MapKiCadWorldToLocal(point.X, point.Y, worldBounds, contentRect, calibration))
+                    .Select(point => this.MapKiCadWorldToLocal(
+                        point.X,
+                        point.Y,
+                        worldBounds,
+                        contentRect,
+                        calibration))
                     .ToList();
 
-                var polyline = new Polyline
+                primitives.Add(new KiCadOverlayPrimitive
                 {
-                    Stroke = strokeBrush,
-                    StrokeThickness = 1.2,
-                    StrokeLineCap = PenLineCap.Round,
-                    StrokeJoin = PenLineJoin.Round,
-                    Points = new Points(localPoints),
-                    IsHitTestVisible = false
-                };
-
-                this.SchematicsKiCadOverlayCanvas.Children.Add(polyline);
+                    Kind = KiCadOverlayPrimitiveKind.Polyline,
+                    Points = localPoints,
+                    Pen = pen
+                });
             }
         }
+
+        this.SchematicsKiCadOverlayCanvas.SetGeometry(primitives);
     }
 
     // ###########################################################################################
@@ -6878,6 +6872,7 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Updates the panel displaying connected components and pins for all currently active nets.
+    // Rebuilds the list only when the active net set actually changes.
     // ###########################################################################################
     private void UpdateKiCadNetConnectionsPanel()
     {
@@ -6901,12 +6896,27 @@ public partial class TabSchematics : UserControl
 
         if (activeNets.Count == 0 || this.thisKiCadProject?.Root == null)
         {
+            this.thisLastKiCadNetConnectionsSignature = string.Empty;
+            this.KiCadNetConnectionsNetNameText.Text = string.Empty;
+            this.KiCadNetConnectionsList.ItemsSource = null;
             this.KiCadNetConnectionsPanel.IsVisible = false;
+            return;
+        }
+
+        var sortedNetNames = activeNets
+            .OrderBy(netName => netName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        string signature = string.Join("\u001F", sortedNetNames);
+
+        if (string.Equals(this.thisLastKiCadNetConnectionsSignature, signature, StringComparison.Ordinal))
+        {
             return;
         }
 
         var boardComponents = this.MainWindow?.CurrentBoardData?.Components;
         var orderLookup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
         if (boardComponents != null)
         {
             for (int i = 0; i < boardComponents.Count; i++)
@@ -6927,51 +6937,59 @@ public partial class TabSchematics : UserControl
             foreach (var footprint in pcb.Footprints)
             {
                 string refName = footprint.Reference?.Trim() ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(refName)) continue;
+                if (string.IsNullOrWhiteSpace(refName))
+                {
+                    continue;
+                }
 
                 foreach (var pad in footprint.Pads)
                 {
                     string netName = pad.Net?.NormalizedName?.Trim() ?? string.Empty;
 
-                    if (activeNets.Contains(netName))
+                    if (!activeNets.Contains(netName))
                     {
-                        string padNum = pad.Number?.Trim() ?? "?";
-
-                        // If multiple nets are active, note which net this specific pin belongs to 
-                        string connStr = activeNets.Count > 1
-                            ? $"{refName} pin {padNum} [{netName}]"
-                            : $"{refName} pin {padNum}";
-
-                        if (seen.Add(connStr))
-                        {
-                            int orderIndex = orderLookup.TryGetValue(refName, out int idx) ? idx : int.MaxValue;
-                            int padIndex = int.TryParse(padNum, out int p) ? p : int.MaxValue;
-                            connections.Add((connStr, orderIndex, padIndex));
-                        }
+                        continue;
                     }
+
+                    string padNum = pad.Number?.Trim() ?? "?";
+
+                    string connStr = activeNets.Count > 1
+                        ? $"{refName} pin {padNum} [{netName}]"
+                        : $"{refName} pin {padNum}";
+
+                    if (!seen.Add(connStr))
+                    {
+                        continue;
+                    }
+
+                    int orderIndex = orderLookup.TryGetValue(refName, out int idx) ? idx : int.MaxValue;
+                    int padIndex = int.TryParse(padNum, out int parsedPad) ? parsedPad : int.MaxValue;
+
+                    connections.Add((connStr, orderIndex, padIndex));
                 }
             }
         }
 
-        if (connections.Count > 0)
+        if (connections.Count == 0)
         {
-            var sortedConnections = connections
-                .OrderBy(c => c.OrderIndex)
-                .ThenBy(c => c.PadIndex)
-                .ThenBy(c => c.ConnStr)
-                .Select(c => c.ConnStr)
-                .ToList();
-
-            var sortedNetNames = activeNets.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
-
+            this.thisLastKiCadNetConnectionsSignature = signature;
             this.KiCadNetConnectionsNetNameText.Text = string.Join(Environment.NewLine, sortedNetNames);
-            this.KiCadNetConnectionsList.ItemsSource = sortedConnections;
-            this.KiCadNetConnectionsPanel.IsVisible = true;
-        }
-        else
-        {
+            this.KiCadNetConnectionsList.ItemsSource = null;
             this.KiCadNetConnectionsPanel.IsVisible = false;
+            return;
         }
+
+        var sortedConnections = connections
+            .OrderBy(connection => connection.OrderIndex)
+            .ThenBy(connection => connection.PadIndex)
+            .ThenBy(connection => connection.ConnStr, StringComparer.OrdinalIgnoreCase)
+            .Select(connection => connection.ConnStr)
+            .ToList();
+
+        this.thisLastKiCadNetConnectionsSignature = signature;
+        this.KiCadNetConnectionsNetNameText.Text = string.Join(Environment.NewLine, sortedNetNames);
+        this.KiCadNetConnectionsList.ItemsSource = sortedConnections;
+        this.KiCadNetConnectionsPanel.IsVisible = true;
     }
 
     // ###########################################################################################
@@ -8542,6 +8560,478 @@ public partial class TabSchematics : UserControl
         this.UpdateHighlightsForComponents(boardLabels);
     }
 
+    // ###########################################################################################
+    // Resets the lightweight throttle state used for KiCad hover hit-testing.
+    // ###########################################################################################
+    private void ResetKiCadHoverHitTestThrottle()
+    {
+        this.thisLastKiCadHoverHitTestContainerPoint = new Point(double.NaN, double.NaN);
+        this.thisLastKiCadHoverHitTestTimestamp = 0;
+    }
 
+    // ###########################################################################################
+    // Limits how often expensive KiCad hover hit-tests can run while the pointer is moving.
+    // This keeps dense PCB overlays responsive during fast pan and pointer motion.
+    // ###########################################################################################
+    private bool ShouldProcessKiCadHoverHitTest(Point pointerInContainer)
+    {
+        const double minimumDistance = 3.0;
+        const double minimumIntervalMilliseconds = 16.0;
+
+        long now = Stopwatch.GetTimestamp();
+
+        if (double.IsNaN(this.thisLastKiCadHoverHitTestContainerPoint.X) ||
+            double.IsNaN(this.thisLastKiCadHoverHitTestContainerPoint.Y))
+        {
+            this.thisLastKiCadHoverHitTestContainerPoint = pointerInContainer;
+            this.thisLastKiCadHoverHitTestTimestamp = now;
+            return true;
+        }
+
+        double dx = pointerInContainer.X - this.thisLastKiCadHoverHitTestContainerPoint.X;
+        double dy = pointerInContainer.Y - this.thisLastKiCadHoverHitTestContainerPoint.Y;
+        double distance = Math.Sqrt((dx * dx) + (dy * dy));
+
+        double elapsedMilliseconds =
+            this.thisLastKiCadHoverHitTestTimestamp == 0
+                ? double.MaxValue
+                : ((now - this.thisLastKiCadHoverHitTestTimestamp) * 1000.0) / Stopwatch.Frequency;
+
+        if (distance < minimumDistance && elapsedMilliseconds < minimumIntervalMilliseconds)
+        {
+            return false;
+        }
+
+        this.thisLastKiCadHoverHitTestContainerPoint = pointerInContainer;
+        this.thisLastKiCadHoverHitTestTimestamp = now;
+        return true;
+    }
+
+    // ###########################################################################################
+    // Builds a stable signature for thumbnail highlight state so blink-only updates do not
+    // regenerate all thumbnail bitmaps when the actual selection set has not changed.
+    // ###########################################################################################
+    private string BuildThumbnailHighlightSignature(bool hasComponentSelection, bool hasKiCadSelection)
+    {
+        string componentPart = hasComponentSelection
+            ? string.Join(
+                "\u001E",
+                this.highlightIndexBySchematic.Keys.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+            : string.Empty;
+
+        string selectedNetPart = hasKiCadSelection
+            ? string.Join(
+                "\u001E",
+                this.thisSelectedKiCadNormalizedNetNames.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+            : string.Empty;
+
+        string lockedNetPart = hasKiCadSelection
+            ? string.Join(
+                "\u001E",
+                this.thisLockedKiCadNetNames.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+            : string.Empty;
+
+        return string.Join("\u001F", componentPart, selectedNetPart, lockedNetPart);
+    }
+
+    // ###########################################################################################
+    // Builds a stable cache key for one PCB net graph on one board side.
+    // ###########################################################################################
+    private static string BuildKiCadPcbNetRenderCacheKey(int pcbIndex, int netId, string requiredLayer)
+    {
+        return string.Join(
+            "\u001F",
+            pcbIndex.ToString(CultureInfo.InvariantCulture),
+            netId.ToString(CultureInfo.InvariantCulture),
+            requiredLayer.Trim());
+    }
+
+    // ###########################################################################################
+    // Returns the cached PCB net graph for the requested net/layer, building it once on demand.
+    // ###########################################################################################
+    private KiCadPcbNetRenderCache GetOrCreateKiCadPcbNetRenderCache(
+        KiCadPcb pcb,
+        int pcbIndex,
+        int netId,
+        KiCadPcbHighlightBucket bucket,
+        string requiredLayer)
+    {
+        string cacheKey = TabSchematics.BuildKiCadPcbNetRenderCacheKey(pcbIndex, netId, requiredLayer);
+
+        if (this.thisKiCadPcbNetRenderCacheByKey.TryGetValue(cacheKey, out var cache))
+        {
+            return cache;
+        }
+
+        cache = this.BuildKiCadPcbNetRenderCache(pcb, bucket, requiredLayer);
+        this.thisKiCadPcbNetRenderCacheByKey[cacheKey] = cache;
+        return cache;
+    }
+
+    // ###########################################################################################
+    // Builds one cached PCB net graph containing pads, segments, vias, arcs, and adjacency.
+    // This is the expensive part that should not run on every overlay refresh.
+    // ###########################################################################################
+    private KiCadPcbNetRenderCache BuildKiCadPcbNetRenderCache(
+        KiCadPcb pcb,
+        KiCadPcbHighlightBucket bucket,
+        string requiredLayer)
+    {
+        var cache = new KiCadPcbNetRenderCache();
+
+        int idCounter = 0;
+
+        foreach (var padRef in bucket.Pads)
+        {
+            if (padRef.FootprintIndex < 0 || padRef.FootprintIndex >= pcb.Footprints.Count)
+            {
+                continue;
+            }
+
+            var footprint = pcb.Footprints[padRef.FootprintIndex];
+            if (padRef.PadIndex < 0 || padRef.PadIndex >= footprint.Pads.Count)
+            {
+                continue;
+            }
+
+            var pad = footprint.Pads[padRef.PadIndex];
+            if (pad.AbsoluteCenter == null ||
+                !TabSchematics.IsKiCadPcbPointVisibleOnSide(pad.Layers, requiredLayer))
+            {
+                continue;
+            }
+
+            var info = new KiCadGraphNode
+            {
+                Id = $"P{idCounter++}",
+                PadRef = padRef
+            };
+
+            cache.NodesById[info.Id] = info;
+            cache.AllNodeIds.Add(info.Id);
+            cache.PadReferenceByNodeId[info.Id] = footprint.Reference?.Trim() ?? string.Empty;
+
+            cache.PadNodes.Add(new KiCadPcbPadRenderNode
+            {
+                Info = info,
+                Footprint = footprint,
+                Pad = pad,
+                CenterWorld = new Point(pad.AbsoluteCenter.X, pad.AbsoluteCenter.Y),
+                RadiusWorld = Math.Max(pad.Size?.X ?? 1.2, pad.Size?.Y ?? 1.2) / 2.0
+            });
+        }
+
+        foreach (int segmentIndex in bucket.Segments)
+        {
+            if (segmentIndex < 0 || segmentIndex >= pcb.Routing.Segments.Count)
+            {
+                continue;
+            }
+
+            var segment = pcb.Routing.Segments[segmentIndex];
+            if (segment.Start == null ||
+                segment.End == null ||
+                !string.Equals(segment.Layer?.Trim(), requiredLayer, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var info = new KiCadGraphNode
+            {
+                Id = $"S{idCounter++}",
+                SegmentIndex = segmentIndex
+            };
+
+            cache.NodesById[info.Id] = info;
+            cache.AllNodeIds.Add(info.Id);
+
+            cache.SegmentNodes.Add(new KiCadPcbSegmentRenderNode
+            {
+                Info = info,
+                StartWorld = new Point(segment.Start.X, segment.Start.Y),
+                EndWorld = new Point(segment.End.X, segment.End.Y),
+                WidthWorld = segment.Width ?? 0.25
+            });
+        }
+
+        foreach (int viaIndex in bucket.Vias)
+        {
+            if (viaIndex < 0 || viaIndex >= pcb.Routing.Vias.Count)
+            {
+                continue;
+            }
+
+            var via = pcb.Routing.Vias[viaIndex];
+            if (via.At == null ||
+                !TabSchematics.IsKiCadPcbPointVisibleOnSide(via.Layers, requiredLayer))
+            {
+                continue;
+            }
+
+            var info = new KiCadGraphNode
+            {
+                Id = $"V{idCounter++}",
+                ViaIndex = viaIndex
+            };
+
+            cache.NodesById[info.Id] = info;
+            cache.AllNodeIds.Add(info.Id);
+
+            cache.ViaNodes.Add(new KiCadPcbViaRenderNode
+            {
+                Info = info,
+                CenterWorld = new Point(via.At.X, via.At.Y),
+                DiameterWorld = via.Size ?? 0.8
+            });
+        }
+
+        foreach (int arcIndex in bucket.Arcs)
+        {
+            if (arcIndex < 0 || arcIndex >= pcb.Routing.Arcs.Count)
+            {
+                continue;
+            }
+
+            var arc = pcb.Routing.Arcs[arcIndex];
+            if (arc.Start == null ||
+                arc.Mid == null ||
+                arc.End == null ||
+                !string.Equals(arc.Layer?.Trim(), requiredLayer, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var info = new KiCadGraphNode
+            {
+                Id = $"A{idCounter++}",
+                ArcIndex = arcIndex
+            };
+
+            cache.NodesById[info.Id] = info;
+            cache.AllNodeIds.Add(info.Id);
+
+            cache.ArcNodes.Add(new KiCadPcbArcRenderNode
+            {
+                Info = info,
+                StartWorld = new Point(arc.Start.X, arc.Start.Y),
+                MidWorld = new Point(arc.Mid.X, arc.Mid.Y),
+                EndWorld = new Point(arc.End.X, arc.End.Y),
+                WidthWorld = arc.Width ?? 0.25
+            });
+        }
+
+        void AddEdge(string id1, string id2)
+        {
+            if (!cache.AdjacencyByNodeId.TryGetValue(id1, out var set1))
+            {
+                set1 = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                cache.AdjacencyByNodeId[id1] = set1;
+            }
+
+            set1.Add(id2);
+
+            if (!cache.AdjacencyByNodeId.TryGetValue(id2, out var set2))
+            {
+                set2 = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                cache.AdjacencyByNodeId[id2] = set2;
+            }
+
+            set2.Add(id1);
+        }
+
+        for (int i = 0; i < cache.SegmentNodes.Count; i++)
+        {
+            for (int j = i + 1; j < cache.SegmentNodes.Count; j++)
+            {
+                var s1 = cache.SegmentNodes[i];
+                var s2 = cache.SegmentNodes[j];
+
+                double dist = Math.Min(
+                    Math.Min(
+                        TabSchematics.DistanceToSegment(s1.StartWorld, s2.StartWorld.X, s2.StartWorld.Y, s2.EndWorld.X, s2.EndWorld.Y),
+                        TabSchematics.DistanceToSegment(s1.EndWorld, s2.StartWorld.X, s2.StartWorld.Y, s2.EndWorld.X, s2.EndWorld.Y)),
+                    Math.Min(
+                        TabSchematics.DistanceToSegment(s2.StartWorld, s1.StartWorld.X, s1.StartWorld.Y, s1.EndWorld.X, s1.EndWorld.Y),
+                        TabSchematics.DistanceToSegment(s2.EndWorld, s1.StartWorld.X, s1.StartWorld.Y, s1.EndWorld.X, s1.EndWorld.Y)));
+
+                if (dist <= (s1.WidthWorld / 2.0) + (s2.WidthWorld / 2.0) + 0.05)
+                {
+                    AddEdge(s1.Info.Id, s2.Info.Id);
+                }
+            }
+        }
+
+        foreach (var padNode in cache.PadNodes)
+        {
+            foreach (var segmentNode in cache.SegmentNodes)
+            {
+                if (TabSchematics.DistanceToSegment(
+                        padNode.CenterWorld,
+                        segmentNode.StartWorld.X,
+                        segmentNode.StartWorld.Y,
+                        segmentNode.EndWorld.X,
+                        segmentNode.EndWorld.Y) <= padNode.RadiusWorld + (segmentNode.WidthWorld / 2.0) + 0.05)
+                {
+                    AddEdge(padNode.Info.Id, segmentNode.Info.Id);
+                }
+            }
+        }
+
+        foreach (var padNode in cache.PadNodes)
+        {
+            foreach (var viaNode in cache.ViaNodes)
+            {
+                double dx = padNode.CenterWorld.X - viaNode.CenterWorld.X;
+                double dy = padNode.CenterWorld.Y - viaNode.CenterWorld.Y;
+                double dist = Math.Sqrt((dx * dx) + (dy * dy));
+
+                if (dist <= padNode.RadiusWorld + (viaNode.DiameterWorld / 2.0) + 0.05)
+                {
+                    AddEdge(padNode.Info.Id, viaNode.Info.Id);
+                }
+            }
+        }
+
+        foreach (var viaNode in cache.ViaNodes)
+        {
+            foreach (var segmentNode in cache.SegmentNodes)
+            {
+                if (TabSchematics.DistanceToSegment(
+                        viaNode.CenterWorld,
+                        segmentNode.StartWorld.X,
+                        segmentNode.StartWorld.Y,
+                        segmentNode.EndWorld.X,
+                        segmentNode.EndWorld.Y) <= (viaNode.DiameterWorld / 2.0) + (segmentNode.WidthWorld / 2.0) + 0.05)
+                {
+                    AddEdge(viaNode.Info.Id, segmentNode.Info.Id);
+                }
+            }
+        }
+
+        foreach (var arcNode in cache.ArcNodes)
+        {
+            foreach (var segmentNode in cache.SegmentNodes)
+            {
+                double dist = Math.Min(
+                    TabSchematics.DistanceToSegment(
+                        arcNode.StartWorld,
+                        segmentNode.StartWorld.X,
+                        segmentNode.StartWorld.Y,
+                        segmentNode.EndWorld.X,
+                        segmentNode.EndWorld.Y),
+                    Math.Min(
+                        TabSchematics.DistanceToSegment(
+                            arcNode.MidWorld,
+                            segmentNode.StartWorld.X,
+                            segmentNode.StartWorld.Y,
+                            segmentNode.EndWorld.X,
+                            segmentNode.EndWorld.Y),
+                        TabSchematics.DistanceToSegment(
+                            arcNode.EndWorld,
+                            segmentNode.StartWorld.X,
+                            segmentNode.StartWorld.Y,
+                            segmentNode.EndWorld.X,
+                            segmentNode.EndWorld.Y)));
+
+                if (dist <= (arcNode.WidthWorld / 2.0) + (segmentNode.WidthWorld / 2.0) + 0.05)
+                {
+                    AddEdge(arcNode.Info.Id, segmentNode.Info.Id);
+                }
+            }
+
+            foreach (var padNode in cache.PadNodes)
+            {
+                double dist = Math.Min(
+                    Math.Sqrt(Math.Pow(padNode.CenterWorld.X - arcNode.StartWorld.X, 2) + Math.Pow(padNode.CenterWorld.Y - arcNode.StartWorld.Y, 2)),
+                    Math.Min(
+                        Math.Sqrt(Math.Pow(padNode.CenterWorld.X - arcNode.MidWorld.X, 2) + Math.Pow(padNode.CenterWorld.Y - arcNode.MidWorld.Y, 2)),
+                        Math.Sqrt(Math.Pow(padNode.CenterWorld.X - arcNode.EndWorld.X, 2) + Math.Pow(padNode.CenterWorld.Y - arcNode.EndWorld.Y, 2))));
+
+                if (dist <= padNode.RadiusWorld + (arcNode.WidthWorld / 2.0) + 0.05)
+                {
+                    AddEdge(padNode.Info.Id, arcNode.Info.Id);
+                }
+            }
+
+            foreach (var viaNode in cache.ViaNodes)
+            {
+                double dist = Math.Min(
+                    Math.Sqrt(Math.Pow(viaNode.CenterWorld.X - arcNode.StartWorld.X, 2) + Math.Pow(viaNode.CenterWorld.Y - arcNode.StartWorld.Y, 2)),
+                    Math.Min(
+                        Math.Sqrt(Math.Pow(viaNode.CenterWorld.X - arcNode.MidWorld.X, 2) + Math.Pow(viaNode.CenterWorld.Y - arcNode.MidWorld.Y, 2)),
+                        Math.Sqrt(Math.Pow(viaNode.CenterWorld.X - arcNode.EndWorld.X, 2) + Math.Pow(viaNode.CenterWorld.Y - arcNode.EndWorld.Y, 2))));
+
+                if (dist <= (viaNode.DiameterWorld / 2.0) + (arcNode.WidthWorld / 2.0) + 0.05)
+                {
+                    AddEdge(viaNode.Info.Id, arcNode.Info.Id);
+                }
+            }
+        }
+
+        return cache;
+    }
+
+    // ###########################################################################################
+    // Resolves the currently drawable node ids from a cached PCB net graph.
+    // Explicit hover/lock draws the whole net, while selection-derived rendering starts from the
+    // selected component pads and stops traversal at foreign pads.
+    // ###########################################################################################
+    private HashSet<string> BuildKiCadPcbActiveDrawIds(KiCadPcbNetRenderCache cache, bool isExplicitHighlight)
+    {
+        if (isExplicitHighlight)
+        {
+            return new HashSet<string>(cache.AllNodeIds, StringComparer.OrdinalIgnoreCase);
+        }
+
+        var activeDrawIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var queue = new Queue<string>();
+
+        foreach (var padNode in cache.PadNodes)
+        {
+            string reference = padNode.Footprint.Reference?.Trim() ?? string.Empty;
+            bool isTargetPad = this.thisSelectedKiCadReferences.Count == 0 ||
+                               this.thisSelectedKiCadReferences.Contains(reference);
+
+            if (!isTargetPad)
+            {
+                continue;
+            }
+
+            if (activeDrawIds.Add(padNode.Info.Id))
+            {
+                queue.Enqueue(padNode.Info.Id);
+            }
+        }
+
+        while (queue.Count > 0)
+        {
+            string currentId = queue.Dequeue();
+
+            if (!cache.AdjacencyByNodeId.TryGetValue(currentId, out var neighbors))
+            {
+                continue;
+            }
+
+            foreach (string neighborId in neighbors)
+            {
+                if (!activeDrawIds.Add(neighborId))
+                {
+                    continue;
+                }
+
+                bool isForeignPad =
+                    cache.PadReferenceByNodeId.TryGetValue(neighborId, out string? reference) &&
+                    this.thisSelectedKiCadReferences.Count > 0 &&
+                    !this.thisSelectedKiCadReferences.Contains(reference);
+
+                if (!isForeignPad)
+                {
+                    queue.Enqueue(neighborId);
+                }
+            }
+        }
+
+        return activeDrawIds;
+    }
 
 }

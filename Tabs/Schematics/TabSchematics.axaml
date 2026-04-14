@@ -87,14 +87,13 @@
 					</Canvas.RenderTransform>
 				</Canvas>
 
-				<Canvas x:Name="SchematicsKiCadOverlayCanvas"
-						IsHitTestVisible="False"
-						RenderTransformOrigin="0%,0%"
-						Background="Transparent">
-					<Canvas.RenderTransform>
+				<ts:KiCadOverlayRenderControl x:Name="SchematicsKiCadOverlayCanvas"
+							  IsHitTestVisible="False"
+							  RenderTransformOrigin="0%,0%">
+					<ts:KiCadOverlayRenderControl.RenderTransform>
 						<MatrixTransform />
-					</Canvas.RenderTransform>
-				</Canvas>
+					</ts:KiCadOverlayRenderControl.RenderTransform>
+				</ts:KiCadOverlayRenderControl>
 
 				<StackPanel Orientation="Horizontal"
 							HorizontalAlignment="Left"
