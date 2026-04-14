@@ -91,6 +91,7 @@ public partial class TabSchematics : UserControl
     private bool thisIsInteractiveCadTraceHoverShiftPressed;
 
     private string? thisHoveredComponentBoardLabel;
+    private readonly HashSet<string> thisSchematicsOnlySelectedBoardLabels = new(StringComparer.OrdinalIgnoreCase);
     private bool thisSuppressBoardSettingsChanged;
     private PointerPressedEventArgs? thisThumbnailDragStartEventArgs;
     private readonly List<Border> thisEditorLabelContainers = new();
@@ -1378,6 +1379,7 @@ public partial class TabSchematics : UserControl
         this.thisHoveredKiCadNetName = null;
         this.thisHoveredKiCadPadNumber = null;
         this.thisHoveredComponentBoardLabel = null;
+        this.thisSchematicsOnlySelectedBoardLabels.Clear();
         this.thisLockedKiCadNetNames.Clear();
 
         this.thisIsKiCadCalibrationCaptureMode = false;
@@ -1837,28 +1839,45 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     // Rebuilds highlight indices from the selected board labels, then applies highlight visuals
     // to the main schematic and all thumbnails.
+    // Also preserves schematic-only selections for components hidden by category/search filters.
     // ###########################################################################################
     public void UpdateHighlightsForComponents(List<string> boardLabels)
     {
+        this.ClearVisibleBoardLabelsFromSchematicsOnlySelection();
+
+        var effectiveBoardLabels = new HashSet<string>(
+            boardLabels.Where(label => !string.IsNullOrWhiteSpace(label)),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (string boardLabel in this.thisSchematicsOnlySelectedBoardLabels)
+        {
+            effectiveBoardLabels.Add(boardLabel);
+        }
+
         this.highlightIndexBySchematic = new(StringComparer.OrdinalIgnoreCase);
 
-        if (boardLabels.Count > 0)
+        if (effectiveBoardLabels.Count > 0)
         {
             foreach (var (schematicName, byLabel) in this.highlightRectsBySchematicAndLabel)
             {
                 var rects = new List<Rect>();
-                foreach (var label in boardLabels)
+
+                foreach (string boardLabel in effectiveBoardLabels)
                 {
-                    if (byLabel.TryGetValue(label, out var labelRects))
+                    if (byLabel.TryGetValue(boardLabel, out var labelRects))
+                    {
                         rects.AddRange(labelRects);
+                    }
                 }
 
                 if (rects.Count > 0)
+                {
                     this.highlightIndexBySchematic[schematicName] = new HighlightSpatialIndex(rects);
+                }
             }
         }
 
-        this.UpdateKiCadSelectionFromBoardLabels(boardLabels);
+        this.UpdateKiCadSelectionFromBoardLabels(effectiveBoardLabels);
         this.RefreshBlinkStateFromCurrentSelection();
         this.UpdateComponentLabels();
         this.RefreshHoveredComponentHighlightOverlay();
@@ -2236,25 +2255,34 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Resolves hovered board label and the exact text shown in component selector.
-    // Includes components that are visible in the selector even when not selected/highlighted.
+    // Uses all components for the current board/region so schematic hit-testing remains available
+    // even when the left-side category or search filters hide that component from the list.
     // ###########################################################################################
     private bool TryGetHoveredBoardLabel(Point pointerInContainer, out string boardLabel, out string displayText)
     {
         boardLabel = string.Empty;
         displayText = string.Empty;
 
-        if (this.currentFullResBitmap == null || this.MainWindow == null)
+        if (this.currentFullResBitmap == null || this.MainWindow == null || this.MainWindow.CurrentBoardData == null)
+        {
             return false;
+        }
 
         var selectedThumb = this.SchematicsThumbnailList.SelectedItem as SchematicThumbnail;
         if (selectedThumb == null)
+        {
             return false;
+        }
 
         if (!this.highlightRectsBySchematicAndLabel.TryGetValue(selectedThumb.Name, out var byLabel))
+        {
             return false;
+        }
 
         if (!TryInvert(this.schematicsMatrix, out var inv))
+        {
             return false;
+        }
 
         var localPoint = new Point(
             (pointerInContainer.X * inv.M11) + (pointerInContainer.Y * inv.M21) + inv.M31,
@@ -2262,31 +2290,66 @@ public partial class TabSchematics : UserControl
 
         var contentRect = this.GetImageContentRect();
         if (contentRect.Width <= 0 || contentRect.Height <= 0 || !contentRect.Contains(localPoint))
+        {
             return false;
+        }
 
         double px = ((localPoint.X - contentRect.X) / contentRect.Width) * this.currentFullResBitmap.PixelSize.Width;
         double py = ((localPoint.Y - contentRect.Y) / contentRect.Height) * this.currentFullResBitmap.PixelSize.Height;
         var pixelPoint = new Point(px, py);
 
-        var visibleItems = this.MainWindow.ComponentFilterListBox.ItemsSource?.Cast<Main.ComponentListItem>().ToList() ?? new List<Main.ComponentListItem>();
+        string activeRegion = this.MainWindow.LocalRegion?.Trim() ?? string.Empty;
         var seenLabels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var item in visibleItems)
+        foreach (var component in this.MainWindow.CurrentBoardData.Components)
         {
-            if (string.IsNullOrWhiteSpace(item.BoardLabel))
+            string componentBoardLabel = component.BoardLabel?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(componentBoardLabel))
+            {
                 continue;
+            }
 
-            if (!seenLabels.Add(item.BoardLabel))
+            string componentRegion = component.Region?.Trim() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(componentRegion) &&
+                !string.Equals(componentRegion, activeRegion, StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
-            if (!byLabel.TryGetValue(item.BoardLabel, out var rects))
+            if (!seenLabels.Add(componentBoardLabel))
+            {
                 continue;
+            }
+
+            if (!byLabel.TryGetValue(componentBoardLabel, out var rects))
+            {
+                continue;
+            }
 
             if (!rects.Any(r => r.Contains(pixelPoint)))
+            {
                 continue;
+            }
 
-            boardLabel = item.BoardLabel;
-            displayText = item.DisplayText;
+            var parts = new List<string>(3);
+
+            if (!string.IsNullOrWhiteSpace(componentBoardLabel))
+            {
+                parts.Add(componentBoardLabel);
+            }
+
+            if (!string.IsNullOrWhiteSpace(component.FriendlyName))
+            {
+                parts.Add(component.FriendlyName.Trim());
+            }
+
+            if (!string.IsNullOrWhiteSpace(component.TechnicalNameOrValue))
+            {
+                parts.Add(component.TechnicalNameOrValue.Trim());
+            }
+
+            boardLabel = componentBoardLabel;
+            displayText = parts.Count > 0 ? string.Join(" | ", parts) : componentBoardLabel;
             return true;
         }
 
@@ -2295,33 +2358,65 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Selects first component row matching board label and scrolls it into view.
+    // Falls back to a schematic-only selection when the component is hidden by current filters.
     // ###########################################################################################
     private void SelectComponentByBoardLabel(string boardLabel)
     {
-        if (this.MainWindow == null) return;
-        var items = this.MainWindow.ComponentFilterListBox.ItemsSource?.Cast<Main.ComponentListItem>().ToList() ?? new List<Main.ComponentListItem>();
-        int index = items.FindIndex(i => string.Equals(i.BoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase));
-        if (index < 0)
+        if (this.MainWindow == null)
+        {
             return;
+        }
 
-        this.MainWindow.ComponentFilterListBox.Selection.Select(index);
-        this.MainWindow.ComponentFilterListBox.ScrollIntoView(items[index]);
+        var items = this.MainWindow.ComponentFilterListBox.ItemsSource?.Cast<Main.ComponentListItem>().ToList() ?? new List<Main.ComponentListItem>();
+        int index = items.FindIndex(item => string.Equals(item.BoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase));
+
+        if (index >= 0)
+        {
+            this.thisSchematicsOnlySelectedBoardLabels.Remove(boardLabel);
+            this.MainWindow.ComponentFilterListBox.Selection.Select(index);
+            this.MainWindow.ComponentFilterListBox.ScrollIntoView(items[index]);
+            return;
+        }
+
+        if (this.thisSchematicsOnlySelectedBoardLabels.Add(boardLabel))
+        {
+            this.RefreshHighlightsFromCurrentComponentSelection();
+        }
     }
 
     // ###########################################################################################
     // Deselects all component rows that match the given board label.
+    // Also removes any schematic-only hidden selection for the same board label.
     // ###########################################################################################
     private void DeselectComponentByBoardLabel(string boardLabel)
     {
-        if (this.MainWindow == null) return;
-        var items = this.MainWindow.ComponentFilterListBox.ItemsSource?.Cast<Main.ComponentListItem>().ToList() ?? new List<Main.ComponentListItem>();
-        if (items.Count == 0)
+        bool removedHiddenSelection = this.thisSchematicsOnlySelectedBoardLabels.Remove(boardLabel);
+
+        if (this.MainWindow == null)
+        {
+            if (removedHiddenSelection)
+            {
+                this.RefreshHighlightsFromCurrentComponentSelection();
+            }
+
             return;
+        }
+
+        var items = this.MainWindow.ComponentFilterListBox.ItemsSource?.Cast<Main.ComponentListItem>().ToList() ?? new List<Main.ComponentListItem>();
+        bool removedVisibleSelection = false;
 
         for (int i = 0; i < items.Count; i++)
         {
             if (string.Equals(items[i].BoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase))
+            {
                 this.MainWindow.ComponentFilterListBox.Selection.Deselect(i);
+                removedVisibleSelection = true;
+            }
+        }
+
+        if (removedHiddenSelection && !removedVisibleSelection)
+        {
+            this.RefreshHighlightsFromCurrentComponentSelection();
         }
     }
 
@@ -2330,15 +2425,14 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     private void ToggleComponentSelectionByBoardLabel(string boardLabel)
     {
-        if (this.MainWindow == null) return;
-        bool hasSelectedMatch = this.MainWindow.ComponentFilterListBox.SelectedItems?
-            .Cast<Main.ComponentListItem>()
-            .Any(i => string.Equals(i.BoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase)) ?? false;
-
-        if (hasSelectedMatch)
+        if (this.IsComponentBoardLabelSelected(boardLabel))
+        {
             this.DeselectComponentByBoardLabel(boardLabel);
+        }
         else
+        {
             this.SelectComponentByBoardLabel(boardLabel);
+        }
     }
 
     // ###########################################################################################
@@ -7096,9 +7190,7 @@ public partial class TabSchematics : UserControl
             return;
         }
 
-        bool isAlreadySelected = this.MainWindow?.ComponentFilterListBox.SelectedItems?
-            .Cast<Main.ComponentListItem>()
-            .Any(item => string.Equals(item.BoardLabel, this.thisHoveredComponentBoardLabel, StringComparison.OrdinalIgnoreCase)) ?? false;
+        bool isAlreadySelected = this.IsComponentBoardLabelSelected(this.thisHoveredComponentBoardLabel);
 
         if (isAlreadySelected)
         {
@@ -8382,6 +8474,72 @@ public partial class TabSchematics : UserControl
 
         this.SchematicsInnerGrid.ColumnDefinitions[0].Width = new GridLength(ratio * 100.0, GridUnitType.Star);
         this.SchematicsInnerGrid.ColumnDefinitions[2].Width = new GridLength((1.0 - ratio) * 100.0, GridUnitType.Star);
+    }
+
+    // ###########################################################################################
+    // Clears any schematic-only selections that were created for components hidden by the current
+    // category or search filters.
+    // ###########################################################################################
+    internal void ClearSchematicsOnlySelectedComponents()
+    {
+        this.thisSchematicsOnlySelectedBoardLabels.Clear();
+    }
+
+    // ###########################################################################################
+    // Returns true when the board label is selected either through the visible component list or
+    // through the schematic-only hidden-selection cache.
+    // ###########################################################################################
+    private bool IsComponentBoardLabelSelected(string boardLabel)
+    {
+        if (string.IsNullOrWhiteSpace(boardLabel))
+        {
+            return false;
+        }
+
+        if (this.thisSchematicsOnlySelectedBoardLabels.Contains(boardLabel))
+        {
+            return true;
+        }
+
+        return this.MainWindow?.ComponentFilterListBox.SelectedItems?
+            .Cast<Main.ComponentListItem>()
+            .Any(item => string.Equals(item.BoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase)) ?? false;
+    }
+
+    // ###########################################################################################
+    // Removes schematic-only selections for any labels that are currently visible in the filtered
+    // component list so the visible list remains the active source of truth for those rows.
+    // ###########################################################################################
+    private void ClearVisibleBoardLabelsFromSchematicsOnlySelection()
+    {
+        if (this.MainWindow == null)
+        {
+            return;
+        }
+
+        foreach (var item in this.MainWindow.ComponentFilterListBox.ItemsSource?.Cast<Main.ComponentListItem>() ?? Enumerable.Empty<Main.ComponentListItem>())
+        {
+            if (!string.IsNullOrWhiteSpace(item.BoardLabel))
+            {
+                this.thisSchematicsOnlySelectedBoardLabels.Remove(item.BoardLabel);
+            }
+        }
+    }
+
+    // ###########################################################################################
+    // Rebuilds highlights from the visible component-list selection while preserving any extra
+    // schematic-only selections for components hidden by category or search filters.
+    // ###########################################################################################
+    private void RefreshHighlightsFromCurrentComponentSelection()
+    {
+        var boardLabels = this.MainWindow?.ComponentFilterListBox.SelectedItems?
+            .Cast<Main.ComponentListItem>()
+            .Select(item => item.BoardLabel)
+            .Where(label => !string.IsNullOrWhiteSpace(label))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? new List<string>();
+
+        this.UpdateHighlightsForComponents(boardLabels);
     }
 
 

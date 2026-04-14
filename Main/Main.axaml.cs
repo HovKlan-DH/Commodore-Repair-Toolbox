@@ -1062,7 +1062,9 @@ namespace CRT
         // ###########################################################################################
         private void OnClearComponentsClick(object? sender, RoutedEventArgs e)
         {
+            this.TabSchematicsControl.ClearSchematicsOnlySelectedComponents();
             this.ComponentFilterListBox.SelectedItems?.Clear();
+            this.TabSchematicsControl.UpdateHighlightsForComponents(new List<string>());
         }
 
         // ###########################################################################################
