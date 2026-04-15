@@ -75,6 +75,7 @@ namespace Handlers.DataHandling
         [JsonPropertyName("schematicsLabelSelectedOnly")] public bool SchematicsLabelSelectedOnly { get; set; } = false;
         [JsonPropertyName("schematicsLabelsPanelExpanded")] public bool SchematicsLabelsPanelExpanded { get; set; } = true;
         [JsonPropertyName("schematicsBoardSettingsPanelExpanded")] public bool SchematicsBoardSettingsPanelExpanded { get; set; } = true;
+        [JsonPropertyName("schematicsGlobalSettingsPanelExpanded")] public bool SchematicsGlobalSettingsPanelExpanded { get; set; } = true;
         [JsonPropertyName("blinkSelected")] public bool BlinkSelected { get; set; } = false;
         [JsonPropertyName("schematicsOrderByBoard")] public Dictionary<string, List<string>> SchematicsOrderByBoard { get; set; } = new();
         [JsonPropertyName("contactEmail")] public string ContactEmail { get; set; } = string.Empty;
@@ -91,6 +92,9 @@ namespace Handlers.DataHandling
         [JsonPropertyName("contributorModeByBoard")] public Dictionary<string, bool> ContributorModeByBoard { get; set; } = new();
         [JsonPropertyName("interactiveCadTraceHoverMode")] public string InteractiveCadTraceHoverMode { get; set; } = "Always";
         [JsonPropertyName("schematicsMarkPin1OnSelectedComponentByBoard")] public Dictionary<string, bool> SchematicsMarkPin1OnSelectedComponentByBoard { get; set; } = new();
+        [JsonPropertyName("schematicsShowTracesOnSelectedComponent")] public bool SchematicsShowTracesOnSelectedComponent { get; set; } = true;
+        [JsonPropertyName("schematicsShowTracesOnSelectedComponentByBoard")] public Dictionary<string, bool> SchematicsShowTracesOnSelectedComponentByBoard { get; set; } = new();
+
     }
 
     // ###########################################################################################
@@ -162,6 +166,7 @@ namespace Handlers.DataHandling
             { "Schematics_ComponentLabel_Fg", "#ECEEEF" },
             { "Schematics_ComponentLabel_Border", "Gray" },
             { "Schematics_Panel_TracesVisible_Trace_Border", "Gray" },
+            { "Schematics_FirstPin", "Orange" },
             { "Schematics_TracePalette_Color1", "#F40000" },
             { "Schematics_TracePalette_Color2", "#1564F4" },
             { "Schematics_TracePalette_Color3", "#0BC419" },
@@ -195,6 +200,43 @@ namespace Handlers.DataHandling
             { "Feedback_TrashIcon_Fg", "IndianRed" }
         };
 
+        // ###########################################################################################
+        // Returns true when global contributor mode is enabled.
+        // ###########################################################################################
+        private static bool IsContributorModeEnabled()
+        {
+            return _data.ContributorMode ?? false;
+        }
+
+        // ###########################################################################################
+        // Migrates the removed legacy configuration checkboxes into contributor mode once.
+        // ###########################################################################################
+        private static void MigrateLegacyContributorModeSettings()
+        {
+            if (_data.ContributorMode.HasValue)
+            {
+                return;
+            }
+
+            if (_data.ValidateDataOnLaunch == true &&
+                _data.DebugLogging == true)
+            {
+                _data.ContributorMode = true;
+            }
+        }
+
+        // ###########################################################################################
+        // Keeps the removed legacy settings synchronized with contributor mode.
+        // ###########################################################################################
+        private static void SyncContributorModeLinkedSettings()
+        {
+            bool isEnabled = IsContributorModeEnabled();
+
+            _data.ValidateDataOnLaunch = isEnabled;
+            _data.DebugLogging = isEnabled;
+            Logger.IsDebugEnabled = isEnabled;
+        }
+
         private static readonly HashSet<string> UserThemeColorResourceKeys = new(StringComparer.Ordinal)
         {
             "Schematics_TracePalette_Color1",
@@ -207,14 +249,18 @@ namespace Handlers.DataHandling
 
         public static string InteractiveCadTraceHoverMode
         {
-            get => string.Equals(_data.InteractiveCadTraceHoverMode, "HoldShift", StringComparison.OrdinalIgnoreCase)
-                ? "HoldShift"
-                : "Always";
-            set
-            {
-                string normalized = string.Equals(value, "HoldShift", StringComparison.OrdinalIgnoreCase)
+            get => string.Equals(_data.InteractiveCadTraceHoverMode, "Disabled", StringComparison.OrdinalIgnoreCase)
+                ? "Disabled"
+                : string.Equals(_data.InteractiveCadTraceHoverMode, "HoldShift", StringComparison.OrdinalIgnoreCase)
                     ? "HoldShift"
                     : "Always";
+            set
+            {
+                string normalized = string.Equals(value, "Disabled", StringComparison.OrdinalIgnoreCase)
+                    ? "Disabled"
+                    : string.Equals(value, "HoldShift", StringComparison.OrdinalIgnoreCase)
+                        ? "HoldShift"
+                        : "Always";
 
                 if (string.Equals(_data.InteractiveCadTraceHoverMode, normalized, StringComparison.Ordinal))
                     return;
@@ -257,6 +303,35 @@ namespace Handlers.DataHandling
                 Logger.Info($"Setting changed: [ComponentInfoKeyboardHandling] [{value}]");
                 Save();
             }
+        }     
+
+        public static bool SchematicsLabelsPanelExpanded
+        {
+            get => _data.SchematicsLabelsPanelExpanded;
+            set { _data.SchematicsLabelsPanelExpanded = value; Save(); }
+        }
+
+        public static bool SchematicsBoardSettingsPanelExpanded
+        {
+            get => _data.SchematicsBoardSettingsPanelExpanded;
+            set { _data.SchematicsBoardSettingsPanelExpanded = value; Save(); }
+        }
+
+        public static bool SchematicsGlobalSettingsPanelExpanded
+        {
+            get => _data.SchematicsGlobalSettingsPanelExpanded;
+            set { _data.SchematicsGlobalSettingsPanelExpanded = value; Save(); }
+        }
+
+        public static bool BlinkSelected
+        {
+            get => _data.BlinkSelected;
+            set
+            {
+                _data.BlinkSelected = value;
+                Logger.Info($"Setting changed: [BlinkSelected] [{value}]");
+                Save();
+            }
         }
 
         public static event Action<bool>? CheckDataOnLaunchChanged;
@@ -291,10 +366,11 @@ namespace Handlers.DataHandling
 
         public static bool ValidateDataOnLaunch
         {
-            get => _data.ValidateDataOnLaunch ?? false;
+            get => IsContributorModeEnabled();
             set
             {
-                _data.ValidateDataOnLaunch = value;
+                _data.ContributorMode = value;
+                SyncContributorModeLinkedSettings();
                 Logger.Info($"Setting changed: [ValidateDataOnLaunch] [{value}]");
                 Save();
             }
@@ -302,11 +378,11 @@ namespace Handlers.DataHandling
 
         public static bool DebugLogging
         {
-            get => _data.DebugLogging ?? false;
+            get => IsContributorModeEnabled();
             set
             {
-                _data.DebugLogging = value;
-                Logger.IsDebugEnabled = value;
+                _data.ContributorMode = value;
+                SyncContributorModeLinkedSettings();
                 Logger.Info($"Setting changed: [DebugLogging] [{value}]");
                 Save();
             }
@@ -329,6 +405,7 @@ namespace Handlers.DataHandling
             set
             {
                 _data.ContributorMode = value;
+                SyncContributorModeLinkedSettings();
                 Logger.Info($"Setting changed: [ContributorMode] [{value}]");
                 Save();
             }
@@ -416,28 +493,23 @@ namespace Handlers.DataHandling
             set { _data.SchematicsLabelSelectedOnly = value; Save(); }
         }
 
-        public static bool SchematicsLabelsPanelExpanded
+        // ###########################################################################################
+        // Returns whether selected-component trace preview is enabled globally.
+        // ###########################################################################################
+        public static bool SchematicsShowTracesOnSelectedComponent
         {
-            get => _data.SchematicsLabelsPanelExpanded;
-            set { _data.SchematicsLabelsPanelExpanded = value; Save(); }
-        }
-
-        public static bool SchematicsBoardSettingsPanelExpanded
-        {
-            get => _data.SchematicsBoardSettingsPanelExpanded;
-            set { _data.SchematicsBoardSettingsPanelExpanded = value; Save(); }
-        }
-
-        public static bool BlinkSelected
-        {
-            get => _data.BlinkSelected;
+            get => _data.SchematicsShowTracesOnSelectedComponent;
             set
             {
-                _data.BlinkSelected = value;
-                Logger.Info($"Setting changed: [BlinkSelected] [{value}]");
+                if (_data.SchematicsShowTracesOnSelectedComponent == value)
+                    return;
+
+                _data.SchematicsShowTracesOnSelectedComponent = value;
+                Logger.Info($"Setting changed: [SchematicsShowTracesOnSelectedComponent] [{value}]");
                 Save();
             }
         }
+               
 
         // Window placement — read-only; written atomically via SaveWindowPlacement
         public static bool HasWindowPlacement => _data.HasWindowPlacement;
@@ -630,8 +702,10 @@ namespace Handlers.DataHandling
                 {
                     _data = loaded;
 
+                    MigrateLegacyContributorModeSettings();
+
                     var addedUserThemeDefaults = EnsureUserThemeColors();
-                    Logger.IsDebugEnabled = DebugLogging;
+                    SyncContributorModeLinkedSettings();
 
                     Logger.Info("Settings loaded:");
                     Logger.Info($"    Configuration:");
@@ -654,10 +728,12 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [Region] [{Region}]");
                     Logger.Info($"        [SchematicsLabelsPanelExpanded] [{SchematicsLabelsPanelExpanded}]");
                     Logger.Info($"        [SchematicsBoardSettingsPanelExpanded] [{SchematicsBoardSettingsPanelExpanded}]");
+                    Logger.Info($"        [SchematicsGlobalSettingsPanelExpanded] [{SchematicsGlobalSettingsPanelExpanded}]");
                     Logger.Info($"        [SchematicsLabelBoard] [{SchematicsLabelBoard}]");
                     Logger.Info($"        [SchematicsLabelTechnical] [{SchematicsLabelTechnical}]");
                     Logger.Info($"        [SchematicsLabelFriendly] [{SchematicsLabelFriendly}]");
                     Logger.Info($"        [SchematicsLabelSelectedOnly] [{SchematicsLabelSelectedOnly}]");
+                    Logger.Info($"        [SchematicsShowTracesOnSelectedComponent] [{SchematicsShowTracesOnSelectedComponent}]");
                     Logger.Info($"        [UserThemeColors] [{_data.UserThemeColors.Count} entries]");
                     Logger.Info($"        [WindowPlacement] [{_data.WindowState}] [{_data.WindowWidth:F0}x{_data.WindowHeight:F0}]");
                     Logger.Info($"    Various hardware/board specific settings:");
@@ -962,6 +1038,7 @@ namespace Handlers.DataHandling
             }
         }
 
+/*
         // ###########################################################################################
         // Returns whether KiCad traces should auto-highlight on hover for the given board.
         // Defaults to true so existing behavior is preserved unless explicitly changed.
@@ -988,6 +1065,7 @@ namespace Handlers.DataHandling
             Logger.Info($"Setting changed: [SchematicsHoverHighlightsTraces] [{boardKey}] [{enabled}]");
             Save();
         }
+*/
 
         // ###########################################################################################
         // Returns whether contributor mode is enabled for the given board.
@@ -1095,6 +1173,23 @@ namespace Handlers.DataHandling
             Save();
         }
 
+        // ###########################################################################################
+        // Returns whether selected-component trace preview is enabled globally.
+        // The board key is ignored and only kept for backward call-site compatibility.
+        // ###########################################################################################
+        public static bool GetSchematicsShowTracesOnSelectedComponentForBoard(string boardKey)
+        {
+            return SchematicsShowTracesOnSelectedComponent;
+        }
+
+        // ###########################################################################################
+        // Persists whether selected-component trace preview is enabled globally.
+        // The board key is ignored and only kept for backward call-site compatibility.
+        // ###########################################################################################
+        public static void SetSchematicsShowTracesOnSelectedComponentForBoard(string boardKey, bool enabled)
+        {
+            SchematicsShowTracesOnSelectedComponent = enabled;
+        }
 
     }
 }

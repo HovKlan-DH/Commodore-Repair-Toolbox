@@ -11,7 +11,8 @@ namespace Tabs.TabSchematics
         Line,
         Rectangle,
         Ellipse,
-        Polyline
+        Polyline,
+        Geometry
     }
 
     public sealed class KiCadOverlayPrimitive
@@ -23,29 +24,61 @@ namespace Tabs.TabSchematics
         public IReadOnlyList<Point> Points { get; init; } = Array.Empty<Point>();
         public Pen? Pen { get; init; }
         public IBrush? Fill { get; init; }
+        public Geometry? Geometry { get; init; }
     }
 
     public sealed class KiCadOverlayRenderControl : Control
     {
         private IReadOnlyList<KiCadOverlayPrimitive> thisPrimitives = Array.Empty<KiCadOverlayPrimitive>();
+        private IReadOnlyList<Geometry?> thisCachedPrimitiveGeometries = Array.Empty<Geometry?>();
 
         public IReadOnlyList<KiCadOverlayPrimitive> Primitives => this.thisPrimitives;
 
         // ###########################################################################################
-        // Replaces the current render geometry and triggers a redraw.
+        // Replaces the current render geometry, rebuilds any cached polyline paths, and triggers
+        // a redraw so curved KiCad traces render smoothly without recreating UI child controls.
         // ###########################################################################################
         public void SetGeometry(IReadOnlyList<KiCadOverlayPrimitive>? primitives)
         {
             this.thisPrimitives = primitives ?? Array.Empty<KiCadOverlayPrimitive>();
+            this.thisCachedPrimitiveGeometries = this.BuildCachedPrimitiveGeometries(this.thisPrimitives);
             this.InvalidateVisual();
         }
 
         // ###########################################################################################
-        // Clears all render geometry and triggers a redraw.
+        // Builds cached drawing geometries for primitives that benefit from path rendering.
+        // Currently this is used for polylines so joins and curves render smoothly.
+        // ###########################################################################################
+        private IReadOnlyList<Geometry?> BuildCachedPrimitiveGeometries(IReadOnlyList<KiCadOverlayPrimitive> primitives)
+        {
+            var geometries = new Geometry?[primitives.Count];
+
+            for (int i = 0; i < primitives.Count; i++)
+            {
+                var primitive = primitives[i];
+
+                if (primitive.Kind == KiCadOverlayPrimitiveKind.Polyline &&
+                    primitive.Points.Count >= 2)
+                {
+                    geometries[i] = BuildPolylineGeometry(primitive.Points);
+                }
+                else if (primitive.Kind == KiCadOverlayPrimitiveKind.Geometry &&
+                         primitive.Geometry != null)
+                {
+                    geometries[i] = primitive.Geometry;
+                }
+            }
+
+            return geometries;
+        }
+
+        // ###########################################################################################
+        // Clears all render geometry, resets the cached path list, and triggers a redraw.
         // ###########################################################################################
         public void ClearGeometry()
         {
             this.thisPrimitives = Array.Empty<KiCadOverlayPrimitive>();
+            this.thisCachedPrimitiveGeometries = Array.Empty<Geometry?>();
             this.InvalidateVisual();
         }
 
@@ -57,6 +90,46 @@ namespace Tabs.TabSchematics
             var result = base.ArrangeOverride(finalSize);
             this.InvalidateVisual();
             return result;
+        }
+
+        // ###########################################################################################
+        // Builds one continuous geometry for a polyline so Avalonia can render joins and caps
+        // smoothly instead of drawing each segment as an isolated line.
+        // ###########################################################################################
+        private static Geometry BuildPolylineGeometry(IReadOnlyList<Point> points)
+        {
+            var geometry = new StreamGeometry();
+
+            using (var geometryContext = geometry.Open())
+            {
+                geometryContext.BeginFigure(points[0], isFilled: false);
+
+                for (int i = 1; i < points.Count; i++)
+                {
+                    geometryContext.LineTo(points[i]);
+                }
+
+                geometryContext.EndFigure(isClosed: false);
+            }
+
+            return geometry;
+        }
+
+        // ###########################################################################################
+        // Returns a pen configured for smooth KiCad trace rendering while preserving the original
+        // brush, thickness, dash style, and miter limit.
+        // Uses round caps and round joins to match the original trace appearance without recreating
+        // thousands of UI elements.
+        // ###########################################################################################
+        private static Pen BuildSmoothedPolylinePen(Pen sourcePen)
+        {
+            return new Pen(
+                sourcePen.Brush,
+                sourcePen.Thickness,
+                sourcePen.DashStyle,
+                PenLineCap.Round,
+                PenLineJoin.Round,
+                sourcePen.MiterLimit);
         }
 
         // ###########################################################################################
@@ -104,16 +177,43 @@ namespace Tabs.TabSchematics
                             break;
                         }
 
-                        for (int p = 1; p < primitive.Points.Count; p++)
+                        var cachedPolylineGeometry =
+                            i < this.thisCachedPrimitiveGeometries.Count
+                                ? this.thisCachedPrimitiveGeometries[i]
+                                : null;
+
+                        if (cachedPolylineGeometry == null)
                         {
-                            context.DrawLine(
-                                primitive.Pen,
-                                primitive.Points[p - 1],
-                                primitive.Points[p]);
+                            break;
                         }
+
+                        context.DrawGeometry(
+                            null,
+                            BuildSmoothedPolylinePen(primitive.Pen),
+                            cachedPolylineGeometry);
+                        break;
+
+                    case KiCadOverlayPrimitiveKind.Geometry:
+                        var cachedGeometry =
+                            i < this.thisCachedPrimitiveGeometries.Count
+                                ? this.thisCachedPrimitiveGeometries[i]
+                                : primitive.Geometry;
+
+                        if (cachedGeometry == null)
+                        {
+                            break;
+                        }
+
+                        context.DrawGeometry(
+                            primitive.Fill,
+                            primitive.Pen,
+                            cachedGeometry);
                         break;
                 }
             }
         }
+
+
+
     }
 }

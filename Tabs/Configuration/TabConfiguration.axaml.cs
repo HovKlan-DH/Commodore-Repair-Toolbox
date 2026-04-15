@@ -23,48 +23,16 @@ namespace CRT
                 _ => 0
             };
 
-            this.MultipleInstancesForComponentPopupToggleSwitch.IsChecked = UserSettings.MultipleInstancesForComponentPopup;
-
-            bool isInteractiveCadTraceHoverHoldShiftMode =
-                string.Equals(UserSettings.InteractiveCadTraceHoverMode, "HoldShift", StringComparison.Ordinal);
-
-            this.InteractiveCadTraceHoverAlwaysRadioButton.IsChecked = !isInteractiveCadTraceHoverHoldShiftMode;
-            this.InteractiveCadTraceHoverHoldShiftRadioButton.IsChecked = isInteractiveCadTraceHoverHoldShiftMode;
-
             // Initialize configuration checkboxes — subscribe after setting initial values
             // to avoid triggering redundant saves during startup
             this.CheckVersionOnLaunchCheckBox.IsChecked = UserSettings.CheckVersionOnLaunch;
             this.CheckDataOnLaunchCheckBox.IsChecked = UserSettings.CheckDataOnLaunch;
             this.ShowDevelopmentVersionNotificationCheckBox.IsChecked = UserSettings.ShowDevelopmentVersionNotification;
-            this.ValidateDataOnLaunchCheckBox.IsChecked = UserSettings.ValidateDataOnLaunch;
-            this.DebugLoggingCheckBox.IsChecked = UserSettings.DebugLogging;
 
             this.ThemeVariantComboBox.SelectionChanged += this.OnThemeVariantSelectionChanged;
-            this.MultipleInstancesForComponentPopupToggleSwitch.IsCheckedChanged += this.OnMultipleInstancesForComponentPopupChanged;
-            this.InteractiveCadTraceHoverAlwaysRadioButton.IsCheckedChanged += this.OnInteractiveCadTraceHoverModeChanged;
-            this.InteractiveCadTraceHoverHoldShiftRadioButton.IsCheckedChanged += this.OnInteractiveCadTraceHoverModeChanged;
             this.CheckVersionOnLaunchCheckBox.IsCheckedChanged += this.OnCheckVersionOnLaunchChanged;
             this.CheckDataOnLaunchCheckBox.IsCheckedChanged += this.OnCheckDataOnLaunchChanged;
             this.ShowDevelopmentVersionNotificationCheckBox.IsCheckedChanged += this.OnShowDevelopmentVersionNotificationChanged;
-            this.ValidateDataOnLaunchCheckBox.IsCheckedChanged += this.OnValidateDataOnLaunchChanged;
-            this.DebugLoggingCheckBox.IsCheckedChanged += this.OnDebugLoggingChanged;
-        }
-
-        // ###########################################################################################
-        // Persists the global interactive CAD trace hover mode selected in configuration.
-        // ###########################################################################################
-        private void OnInteractiveCadTraceHoverModeChanged(object? sender, RoutedEventArgs e)
-        {
-            if (this.InteractiveCadTraceHoverAlwaysRadioButton.IsChecked == true)
-            {
-                UserSettings.InteractiveCadTraceHoverMode = "Always";
-                return;
-            }
-
-            if (this.InteractiveCadTraceHoverHoldShiftRadioButton.IsChecked == true)
-            {
-                UserSettings.InteractiveCadTraceHoverMode = "HoldShift";
-            }
         }
 
         // ###########################################################################################
@@ -85,14 +53,6 @@ namespace CRT
             {
                 app.ApplyConfiguredTheme();
             }
-        }
-
-        // ###########################################################################################
-        // Persists the "Multiple instances for component popup" preference when the toggle is changed.
-        // ###########################################################################################
-        private void OnMultipleInstancesForComponentPopupChanged(object? sender, RoutedEventArgs e)
-        {
-            UserSettings.MultipleInstancesForComponentPopup = this.MultipleInstancesForComponentPopupToggleSwitch.IsChecked == true;
         }
 
         // ###########################################################################################
@@ -136,22 +96,6 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Persists the "Validate data at application launch" preference when the checkbox is toggled.
-        // ###########################################################################################
-        private void OnValidateDataOnLaunchChanged(object? sender, RoutedEventArgs e)
-        {
-            UserSettings.ValidateDataOnLaunch = this.ValidateDataOnLaunchCheckBox.IsChecked == true;
-        }
-
-        // ###########################################################################################
-        // Persists the "Enable debug logging" preference when the checkbox is toggled.
-        // ###########################################################################################
-        private void OnDebugLoggingChanged(object? sender, RoutedEventArgs e)
-        {
-            UserSettings.DebugLogging = this.DebugLoggingCheckBox.IsChecked == true;
-        }
-
-        // ###########################################################################################
         // Opens the persistent AppData folder that contains the log and settings files.
         // ###########################################################################################
         private void OnOpenAppDataFolderClick(object? sender, RoutedEventArgs e)
@@ -163,47 +107,31 @@ namespace CRT
             {
                 Directory.CreateDirectory(directory);
 
-                if (OperatingSystem.IsWindows())
+                var psi = new ProcessStartInfo
                 {
-                    Process.Start(new ProcessStartInfo("explorer.exe", $"\"{directory}\"")
-                    {
-                        UseShellExecute = true
-                    });
-                }
-                else if (OperatingSystem.IsMacOS())
-                {
-                    Process.Start("open", directory);
-                }
-                else
-                {
-                    Process.Start("xdg-open", directory);
-                }
+                    FileName = directory,
+                    UseShellExecute = true
+                };
+
+                Process.Start(psi);
             }
             catch (Exception ex)
             {
-                Logger.Warning($"Failed to open app data folder - [{directory}] - [{ex.Message}]");
+                Logger.Warning($"Failed to open AppData folder: [{directory}] - [{ex.Message}]");
             }
         }
 
         // ###########################################################################################
-        // Reloads user preference colors from the settings file and reapplies the current theme.
+        // Reloads user-preference theme colors from settings and reapplies the configured theme.
         // ###########################################################################################
         private void OnReloadUserPreferenceThemeClick(object? sender, RoutedEventArgs e)
         {
+            UserSettings.ReloadUserThemeColors();
+
             if (Application.Current is App app)
             {
                 app.ApplyConfiguredTheme();
             }
         }
-
-
-
-
-
-
-
-
-
-
     }
 }

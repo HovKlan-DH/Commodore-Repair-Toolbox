@@ -59,28 +59,6 @@
                 HorizontalAlignment="Left"
                 Click="OnReloadUserPreferenceThemeClick" />
 
-		<TextBlock Text="Component Information Popup"
-           FontSize="12"
-           FontWeight="SemiBold"
-           Margin="0,16,0,4" />
-
-		<CheckBox x:Name="MultipleInstancesForComponentPopupToggleSwitch"
-				  Content="Open multiple windows for popup" />
-
-		<TextBlock Text="Interactive CAD traces"
-				   FontSize="12"
-				   FontWeight="SemiBold"
-				   Margin="0,16,0,4" />
-
-		<RadioButton x:Name="InteractiveCadTraceHoverAlwaysRadioButton"
-					 GroupName="InteractiveCadTraceHoverModeGroup"
-					 Content="Always highlight traces on hover"
-					 IsChecked="True" />
-
-		<RadioButton x:Name="InteractiveCadTraceHoverHoldShiftRadioButton"
-					 GroupName="InteractiveCadTraceHoverModeGroup"
-					 Content="Hold SHIFT to highlight traces on hover" />
-
 		<TextBlock Text="Application Update"
                    FontSize="12"
                    FontWeight="SemiBold"
@@ -95,20 +73,9 @@
 		<CheckBox x:Name="ShowDevelopmentVersionNotificationCheckBox"
                   Content="Allow notification for BETA versions" />
 
-		<TextBlock Text="Data contribution"
-                   FontSize="12"
-                   FontWeight="SemiBold"
-                   Margin="0,16,0,4" />
-
-		<CheckBox x:Name="ValidateDataOnLaunchCheckBox"
-                  Content="Validate data at application launch" />
-
-		<CheckBox x:Name="DebugLoggingCheckBox"
-                  Content="Enable debug logging" />
-
 		<Button x:Name="OpenAppDataFolderButton"
                 Content="Open data/log/settings folder"
-                Margin="0,8,0,0"
+                Margin="0,16,0,0"
                 HorizontalAlignment="Left"
                 Click="OnOpenAppDataFolderClick" />
 

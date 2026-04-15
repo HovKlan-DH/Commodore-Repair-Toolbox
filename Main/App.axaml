@@ -76,6 +76,7 @@
                     <SolidColorBrush x:Key="Schematics_ComponentLabel_Fg">#ECEEEF</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_ComponentLabel_Border">Gray</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_Panel_TracesVisible_Trace_Border">Gray</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_FirstPin">Orange</SolidColorBrush>
                     <Color x:Key="Schematics_TracePalette_Color1">#F40000</Color>
                     <Color x:Key="Schematics_TracePalette_Color2">#1564F4</Color>
                     <Color x:Key="Schematics_TracePalette_Color3">#0BC419</Color>
@@ -185,6 +186,7 @@
                     <SolidColorBrush x:Key="Schematics_ComponentLabel_Fg">#ECEEEF</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_ComponentLabel_Border">Gray</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_Panel_TracesVisible_Trace_Border">#524842</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_FirstPin">Orange</SolidColorBrush>
                     <Color x:Key="Schematics_TracePalette_Color1">#F40000</Color>
                     <Color x:Key="Schematics_TracePalette_Color2">#1564F4</Color>
                     <Color x:Key="Schematics_TracePalette_Color3">#0BC419</Color>

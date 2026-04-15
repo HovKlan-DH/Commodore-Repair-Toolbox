@@ -172,8 +172,8 @@
 					  ColumnDefinitions="Auto,Auto"
 					  ColumnSpacing="8">
 
-					<!-- LABELS VISIBLE PANEL -->
-					<Border x:Name="LabelsPanel"
+					<!-- GLOBAL SETTINGS PANEL -->
+					<Border x:Name="GlobalSettingsPanel"
 							Grid.Row="0"
 							Grid.Column="0"
 							HorizontalAlignment="Left"
@@ -184,18 +184,175 @@
 							CornerRadius="4"
 							Padding="8,8">
 						<StackPanel Spacing="6">
-							<StackPanel Orientation="Horizontal" Spacing="6">
-								<TextBlock Text="Labels visible"
+							
+							<Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+								<TextBlock Grid.Column="0"
+										   Text="Global settings"
+										   FontSize="11"
+										   VerticalAlignment="Center"
+										   FontWeight="Bold"
+										   Foreground="{DynamicResource Schematics_Panels_Fg}" />
+								<Button x:Name="ToggleGlobalSettingsPanelButton"
+										Grid.Column="1"
+										Content="Collapse"
+										FontSize="9"
+										Padding="6,2"
+										HorizontalAlignment="Right"
+										VerticalAlignment="Top" />
+							</Grid>
+
+							<StackPanel x:Name="GlobalSettingsListPanel" Spacing="4">
+
+								<StackPanel Orientation="Horizontal"
+											Spacing="6"
+											Background="Transparent"
+											Cursor="Hand"
+											PointerPressed="OnMultipleInstancesForComponentPopupInSchematicsRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="MultipleInstancesForComponentPopupInSchematicsCheckBox"
+												  MinHeight="0"
+												  Margin="0"
+												  Padding="0"
+												  CornerRadius="2"
+												  VerticalAlignment="Center"
+												  IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Open multiple windows for popup"
+											   FontSize="11"
+											   Foreground="{DynamicResource SchematicsPanels_Fg}"
+											   VerticalAlignment="Center"
+											   IsHitTestVisible="False" />
+								</StackPanel>
+
+								<StackPanel x:Name="GlobalHoverHighlightsTracesRow"
+											Orientation="Horizontal"
+											Spacing="6"
+											Background="Transparent"
+											Cursor="Hand"
+											PointerPressed="OnGlobalHoverHighlightsTracesRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckGlobalHoverHighlightsTraces"
+												  MinHeight="0"
+												  Margin="0"
+												  Padding="0"
+												  CornerRadius="2"
+												  IsChecked="True"
+												  IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Highlight trace on hover"
+											   FontSize="11"
+											   Foreground="{DynamicResource SchematicsPanels_Fg}"
+											   VerticalAlignment="Center"
+											   IsHitTestVisible="False" />
+								</StackPanel>
+
+								<StackPanel x:Name="SchematicsInteractiveCadTraceHoverHoldShiftRow"
+										IsVisible="False"
+										Orientation="Horizontal"
+										Spacing="6"
+										Background="Transparent"
+										Cursor="Hand"
+										PointerPressed="OnSchematicsInteractiveCadTraceHoverHoldShiftRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="SchematicsInteractiveCadTraceHoverHoldShiftCheckBox"
+												  MinHeight="0"
+												  Margin="0"
+												  Padding="0"
+												  CornerRadius="2"
+												  VerticalAlignment="Center"
+												  IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Hold SHIFT to highlight trace on hover"
+											   FontSize="11"
+											   Foreground="{DynamicResource SchematicsPanels_Fg}"
+											   VerticalAlignment="Center"
+											   IsHitTestVisible="False" />
+								</StackPanel>
+
+
+								<StackPanel x:Name="BoardShowTracesOnSelectedComponentRow"
+											Orientation="Horizontal"
+											Spacing="6"
+											Background="Transparent"
+											Cursor="Hand"
+											PointerPressed="OnBoardShowTracesOnSelectedComponentRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckBoardShowTracesOnSelectedComponent"
+												  MinHeight="0"
+												  Margin="0"
+												  Padding="0"
+												  CornerRadius="2"
+												  IsChecked="True"
+												  IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Highlight component traces on hover"
+											   FontSize="11"
+											   Foreground="{DynamicResource SchematicsPanels_Fg}"
+											   VerticalAlignment="Center"
+											   IsHitTestVisible="False" />
+								</StackPanel>
+
+								<StackPanel x:Name="BoardMarkPin1OnSelectedComponentRow"
+									IsVisible="False"
+									Orientation="Horizontal"
+									Spacing="6"
+									Background="Transparent"
+									Cursor="Hand"
+									PointerPressed="OnBoardMarkPin1OnSelectedComponentRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckBoardMarkPin1OnSelectedComponent"
+												  MinHeight="0"
+												  Margin="0"
+												  Padding="0"
+												  CornerRadius="2"
+												  IsChecked="False"
+												  IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Mark first pin on component"
+											   FontSize="11"
+											   Foreground="{DynamicResource SchematicsPanels_Fg}"
+											   VerticalAlignment="Center"
+											   IsHitTestVisible="False"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnBoardContributorModeRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckBoardContributorMode" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="False" IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Enable contributor mode" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
+								</StackPanel>
+
+							</StackPanel>
+						</StackPanel>
+					</Border>
+										
+					<!-- LABELS VISIBLE PANEL -->
+					<Border x:Name="LabelsPanel"
+							Grid.Row="0"
+							Grid.Column="1"
+							HorizontalAlignment="Left"
+							VerticalAlignment="Bottom"
+							Background="{DynamicResource Schematics_Panels_Bg}"
+							BorderBrush="{DynamicResource Schematics_Panels_Border}"
+							BorderThickness="1"
+							CornerRadius="4"
+							Padding="8,8">
+						<StackPanel Spacing="6">
+							<Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+								<TextBlock Grid.Column="0"
+										   Text="Labels visible"
 										   FontSize="11"
 										   VerticalAlignment="Center"
 										   FontWeight="Bold"
 										   Foreground="{DynamicResource Schematics_Panels_Fg}" />
 								<Button x:Name="ToggleLabelsPanelButton"
+										Grid.Column="1"
 										Content="Collapse"
 										FontSize="9"
 										Padding="6,2"
-										VerticalAlignment="Center" />
-							</StackPanel>
+										HorizontalAlignment="Right"
+										VerticalAlignment="Top" />
+							</Grid>
 
 							<StackPanel x:Name="LabelsListPanel" Spacing="4">
 								<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnLabelBoardRowClicked">
@@ -228,79 +385,7 @@
 							</StackPanel>
 						</StackPanel>
 					</Border>
-
-					<!-- BOARD SETTINGS PANEL -->
-					<Border x:Name="BoardSettingsPanel"
-							Grid.Row="0"
-							Grid.Column="1"
-							IsEnabled="False"
-							HorizontalAlignment="Left"
-							VerticalAlignment="Bottom"
-							Background="{DynamicResource Schematics_Panels_Bg}"
-							BorderBrush="{DynamicResource Schematics_Panels_Border}"
-							BorderThickness="1"
-							CornerRadius="4"
-							Padding="8,8">
-						<StackPanel Spacing="6">
-							<StackPanel Orientation="Horizontal" Spacing="6">
-								<TextBlock Text="Board settings"
-										   FontSize="11"
-										   VerticalAlignment="Center"
-										   FontWeight="Bold"
-										   Foreground="{DynamicResource Schematics_Panels_Fg}" />
-								<Button x:Name="ToggleBoardSettingsPanelButton"
-										Content="Collapse"
-										FontSize="9"
-										Padding="6,2"
-										VerticalAlignment="Center" />
-							</StackPanel>
-
-							<StackPanel x:Name="BoardSettingsListPanel" Spacing="4">
-
-								<StackPanel x:Name="BoardMarkPin1OnSelectedComponentRow"
-									IsVisible="False"
-									Orientation="Horizontal"
-									Spacing="6"
-									Background="Transparent"
-									Cursor="Hand"
-									PointerPressed="OnBoardMarkPin1OnSelectedComponentRowClicked">
-									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
-										<CheckBox x:Name="CheckBoardMarkPin1OnSelectedComponent"
-												  MinHeight="0"
-												  Margin="0"
-												  Padding="0"
-												  CornerRadius="2"
-												  IsChecked="False"
-												  IsHitTestVisible="False" />
-									</Viewbox>
-									<TextBlock Text="Mark first pin on component"
-											   FontSize="11"
-											   Foreground="{DynamicResource SchematicsPanels_Fg}"
-											   VerticalAlignment="Center"
-											   IsHitTestVisible="False"/>
-								</StackPanel>
-								
-								<StackPanel x:Name="BoardHoverHighlightsTracesRow"
-									Orientation="Horizontal"
-									Spacing="6"
-									Background="Transparent"
-									Cursor="Hand"
-									PointerPressed="OnBoardHoverHighlightsTracesRowClicked">
-									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
-										<CheckBox x:Name="CheckBoardHoverHighlightsTraces" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="True" IsHitTestVisible="False" />
-									</Viewbox>
-									<TextBlock Text="Highlight traces on hover" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
-								</StackPanel>
-
-								<StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent" Cursor="Hand" PointerPressed="OnBoardContributorModeRowClicked">
-									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
-										<CheckBox x:Name="CheckBoardContributorMode" MinHeight="0" Margin="0" Padding="0" CornerRadius="2" IsChecked="False" IsHitTestVisible="False" />
-									</Viewbox>
-									<TextBlock Text="Enable contributor mode" FontSize="11" Foreground="{DynamicResource SchematicsPanels_Fg}" VerticalAlignment="Center" IsHitTestVisible="False"/>
-								</StackPanel>
-							</StackPanel>
-						</StackPanel>
-					</Border>
+					
 
 				</Grid>
 

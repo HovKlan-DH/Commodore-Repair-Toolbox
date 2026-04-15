@@ -266,7 +266,7 @@
 									Grid.Row="0"
 									IsVisible="False"
 									Background="{DynamicResource Main_Banner_Bg}"
-									CornerRadius="4"
+									CornerRadius="0"
 									Margin="0,8,0,4"
 									Padding="12,6">
 					<Grid>
@@ -319,7 +319,7 @@
 											Grid.Row="1"
 											IsVisible="False"
 											Background="{DynamicResource Main_Banner_Bg}"
-											CornerRadius="4"
+											CornerRadius="0"
 											Margin="0,0,0,4"
 											Padding="12,6"
 											Cursor="Hand"
