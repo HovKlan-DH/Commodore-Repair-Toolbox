@@ -22,7 +22,6 @@ env:
   EXE_UNIX: Classic-Repair-Toolbox
   PROJECT: Classic-Repair-Toolbox.csproj
   TFM_MODERN: net10.0
-  TFM_LEGACY_X86: net6.0
 
 jobs:
   ###############################################################
@@ -152,104 +151,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: velopack-windows-x64
-          path: velopack-output/*
-
-  ###############################################################
-  # WINDOWS BUILD (x86 with self-contained .NET6)
-  ###############################################################
-  build-windows-x86:
-    name: Build Windows (x86 with self-contained .NET6)
-    runs-on: self-hosted
-    outputs:
-      dotnet_version: ${{ steps.runtime.outputs.dotnet_version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set version
-        id: ver
-        shell: powershell -ExecutionPolicy Bypass -File "{0}"
-        run: |
-          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.tag_name }}" } else { "${{ github.ref_name }}" }
-          "version=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-      - name: Publish Windows (x86)
-        run: |
-          dotnet publish ${{ env.PROJECT }} `
-            -c Release `
-            -f ${{ env.TFM_LEGACY_X86 }} `
-            -r win-x86 `
-            --self-contained `
-            -p:Version=${{ steps.ver.outputs.version }} `
-            -o publish/windows-x86
-
-      - name: Detect bundled .NET version (Windows x86)
-        id: runtime
-        shell: powershell
-        run: |
-          $rcPath = "publish/windows-x86/Classic-Repair-Toolbox.runtimeconfig.json"
-          $rc = Get-Content $rcPath -Raw | ConvertFrom-Json
-          $v = "Unknown"
-          if ($null -ne $rc.runtimeOptions.includedFrameworks) {
-              $app = $rc.runtimeOptions.includedFrameworks | Where-Object { $_.name -eq 'Microsoft.NETCore.App' } | Select-Object -First 1
-              if ($null -ne $app) { $v = $app.version }
-          } elseif ($null -ne $rc.runtimeOptions.framework) {
-              $v = $rc.runtimeOptions.framework.version
-          }
-          "dotnet_version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-      - name: Sign executable
-        shell: powershell
-        env:
-          YUBIKEY_PIN: ${{ secrets.YUBIKEY_PIN }}
-        run: |
-          java -jar C:\tools\jsign-6.0.jar `
-            --storetype YUBIKEY `
-            --storepass "$env:YUBIKEY_PIN" `
-            --tsaurl http://timestamp.digicert.com `
-            --alg SHA-256 `
-            publish/windows-x86/${{ env.EXE_WINDOWS }}
-
-      - name: Copy data pack
-        shell: powershell
-        run: |
-          Copy-Item -Path "Assets/Data" -Destination "publish/windows-x86" -Recurse
-
-      - name: Install vpk
-        shell: powershell
-        run: dotnet tool install -g vpk
-
-      - name: Pack with Velopack
-        shell: powershell
-        run: |
-          vpk pack `
-            --packId ${{ env.PACK_ID }} `
-            --packVersion ${{ steps.ver.outputs.version }} `
-            --packDir publish/windows-x86 `
-            --mainExe ${{ env.EXE_WINDOWS }} `
-            --channel win-x86 `
-            --noPortable `
-            --icon "Assets/CRT_icon.ico" `
-            --packTitle "Classic Repair Toolbox" `
-            --outputDir velopack-output
-
-      - name: Sign Velopack installer
-        shell: powershell
-        env:
-          YUBIKEY_PIN: ${{ secrets.YUBIKEY_PIN }}
-        run: |
-          $installer = Get-ChildItem velopack-output\*-Setup.exe | Select-Object -First 1
-          java -jar C:\tools\jsign-6.0.jar `
-            --storetype YUBIKEY `
-            --storepass "$env:YUBIKEY_PIN" `
-            --tsaurl http://timestamp.digicert.com `
-            --alg SHA-256 `
-            $installer.FullName
-
-      - name: Upload Velopack artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: velopack-windows-x86
           path: velopack-output/*
 
   ###############################################################
@@ -426,7 +327,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-windows, build-windows-x86, build-linux, build-macos, security-scan]
+    needs: [build-windows, build-linux, build-macos, security-scan]
     permissions:
       contents: write
     steps:
@@ -448,7 +349,6 @@ jobs:
             echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
-      # 1. MOVED THIS UP: Determine the release type first
       - name: Determine if Pre-release
         id: prerelease_check
         run: |
@@ -461,41 +361,38 @@ jobs:
               IS_PRE="false"
             fi
           fi
-          
+
           echo "is_prerelease=$IS_PRE" >> $GITHUB_OUTPUT
-          
+
           if [ "$IS_PRE" = "true" ]; then
             echo "release_name=BETA - ${{ steps.tag.outputs.tag }}" >> $GITHUB_OUTPUT
           else
             echo "release_name=${{ steps.tag.outputs.tag }}" >> $GITHUB_OUTPUT
           fi
 
-      # 2. UPDATED THIS: Always read CHANGELOG.md and append texts based on release type
       - name: Read Changelog and append text
         id: changelog
         run: |
           {
             echo 'content<<EOF'
-            
-            # Read the changelog
+
             if [ -f "CHANGELOG.md" ]; then
               cat CHANGELOG.md
             else
               echo "No CHANGELOG.md found."
             fi
-            
-            echo "" # Empty line for spacing
-            
-            # Print bottom text
+
+            echo ""
+
             if [ "${{ steps.prerelease_check.outputs.is_prerelease }}" = "true" ]; then
-              echo "This is a **BETA** release, which means there are some functionalities expected not to work perfectly fine. The release is meant as a test, so do not use this, if you want the most stable experience. Please do report any error you encounter."
+              echo "This is a **BETA** release, which means there are some functionalities expected not to work perfectly fine. The release is meant as a test, so do not use this if you want the most stable experience."
               echo ""
             fi
 
-            echo "Do note that all versions come with .NET embedded, which means you do not need to install any .NET runtime for this. It also does mean, that it will always use this exact same .NET version, even if your OS has a newer version. Most versions uses the newest available LTS (Long-Term Support) at time of release, but the **Windows x86 is self-contained with .NET6** to be able to support older versions like Windows 7."
+            echo "Do note that all versions come with .NET embedded, which means you do not need to install any .NET runtime for this."
             echo ""
             echo "You only need to install the **Classic Repair Toolbox** application once, and thereafter you can update directly from inside the application."
-            
+
             echo EOF
           } >> "$GITHUB_OUTPUT"
 
@@ -506,15 +403,14 @@ jobs:
           name: ${{ steps.prerelease_check.outputs.release_name }}
           body: |
             ${{ steps.changelog.outputs.content }}
-            
+
             ### Direct downloads for different platforms
             | Platform | File |
             |----------|------|
-            | Windows (x64) | [Classic-Repair-Toolbox-win-Setup.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-win-Setup.exe)<br/>Self-contained **.NET ${{ needs.build-windows.outputs.dotnet_version }}** |
-            | Windows (x86) | [Classic-Repair-Toolbox-win-x86-Setup.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-win-x86-Setup.exe)<br/>Self-contained **.NET ${{ needs.build-windows-x86.outputs.dotnet_version }}** |
-            | Linux (x64) | [Classic-Repair-Toolbox.AppImage](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox.AppImage)<br/>Self-contained **.NET ${{ needs.build-linux.outputs.dotnet_version }}** |
-            | macOS Apple Silicon (arm64) | [Classic-Repair-Toolbox-osx-arm64-Setup.pkg](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-osx-arm64-Setup.pkg)<br/>Self-contained **.NET ${{ needs.build-macos.outputs.dotnet_version_arm64 }}** |
-            | macOS Intel (x64) | [Classic-Repair-Toolbox-osx-x64-Setup.pkg](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-osx-x64-Setup.pkg)<br/>Self-contained **.NET ${{ needs.build-macos.outputs.dotnet_version_x64 }}** |
+            | Windows (x64) | [Classic-Repair-Toolbox-win-Setup.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-win-Setup.exe)<br/>Self-contained |
+            | Linux (x64) | [Classic-Repair-Toolbox.AppImage](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox.AppImage)<br/>Self-contained |
+            | macOS Apple Silicon (arm64) | [Classic-Repair-Toolbox-osx-arm64-Setup.pkg](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-osx-arm64-Setup.pkg)<br/>Self-contained |
+            | macOS Intel (x64) | [Classic-Repair-Toolbox-osx-x64-Setup.pkg](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-osx-x64-Setup.pkg)<br/>Self-contained |
           draft: false
           prerelease: ${{ steps.prerelease_check.outputs.is_prerelease == 'true' }}
           files: |
