@@ -407,10 +407,10 @@ jobs:
             ### Direct downloads for different platforms
             | Platform | File |
             |----------|------|
-            | Windows (x64) | [Classic-Repair-Toolbox-win-Setup.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-win-Setup.exe)<br/>Self-contained |
-            | Linux (x64) | [Classic-Repair-Toolbox.AppImage](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox.AppImage)<br/>Self-contained |
-            | macOS Apple Silicon (arm64) | [Classic-Repair-Toolbox-osx-arm64-Setup.pkg](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-osx-arm64-Setup.pkg)<br/>Self-contained |
-            | macOS Intel (x64) | [Classic-Repair-Toolbox-osx-x64-Setup.pkg](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-osx-x64-Setup.pkg)<br/>Self-contained |
+            | Windows (x64) | [Classic-Repair-Toolbox-win-Setup.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-win-Setup.exe)<br/>Self-contained (embedded .NET **${{ needs.build-windows.outputs.dotnet_version }}**) |
+            | Linux (x64) | [Classic-Repair-Toolbox.AppImage](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox.AppImage)<br/>Self-contained (embedded .NET **${{ needs.build-linux.outputs.dotnet_version }}**) |
+            | macOS Apple Silicon (arm64) | [Classic-Repair-Toolbox-osx-arm64-Setup.pkg](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-osx-arm64-Setup.pkg)<br/>Self-contained (embedded .NET **${{ needs.build-macos.outputs.dotnet_version_arm64 }}**) |
+            | macOS Intel (x64) | [Classic-Repair-Toolbox-osx-x64-Setup.pkg](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/Classic-Repair-Toolbox-osx-x64-Setup.pkg)<br/>Self-contained (embedded .NET **${{ needs.build-macos.outputs.dotnet_version_x64 }}**) |
           draft: false
           prerelease: ${{ steps.prerelease_check.outputs.is_prerelease == 'true' }}
           files: |
