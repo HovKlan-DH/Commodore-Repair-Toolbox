@@ -7,7 +7,7 @@ The project is a direct spin-off from an older project, **Commodore Repair Toolb
 
 ## What is it?
 
-With _CRT_ you can easily view technical schematics, zoom, identify components, view chip pinouts, use interactive traces or do manual circuit tracing, study datasheets, view oscilloscope images, ressources and various other information, helping you diagnosing and repairing old vintage hardware.
+With _CRT_ you can easily view technical schematics, zoom, identify components, view chip pinouts, use interactive (KiCad) traces or do manual circuit tracing, study datasheets, view oscilloscope images, ressources and various other information, helping you diagnosing and repairing old vintage hardware.
 
 It is (for now) primarily dedicated to Commodore, and have several built-in profiles for Commodore computers and it has a single Amstrad computer also, but it can support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simple" and have good documentation available, like schematics, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
 
@@ -52,6 +52,10 @@ When a new version is released it will be shown to you in the application, and y
   - **250403** (CR)
     - Oscilloscope baseline measurements for PAL and NTSC
 - **Commodore 64**
+  - **KU-14194HB**
+    - Covers _all_ components
+    - No oscilloscope baseline measurements - can you help?
+    - Interactive (KiCad) traces and netlists
   - **250407** (long board)
     - Covers _all_ components
     - Oscilloscope baseline measurements for PAL and NTSC
@@ -79,7 +83,6 @@ When a new version is released it will be shown to you in the application, and y
 ### Data contributions being worked on currently
 
 - **@Rabs** is doing an oscilloscope baseline for **Amstrad CPC 664**
-- I will create new board data for **C64 KU-14194HB** (excluding oscilloscope baseline, as I do not own any boards)
 - I will do the **PAL** oscilloscope baseline for **C128 DCR** - just need some time
 - Please let me know if you want to contribute with something, so it can be visualized here to avoid duplicate work.
 
@@ -126,16 +129,11 @@ When a new version is released it will be shown to you in the application, and y
 ## Requirements
 
 - Operating systems supported:
-  - **Windows 7** or newer (32-bit and 64-bit)
+  - **Windows 10** or newer (64-bit)
   - **macOS** (64-bit)
   - **Linux** (64-bit)
 
-Note that .NET is embedded in application, which means you do not need to have this installed. It also does mean that even if you have .NET installed on your computer, then it will still use the one embedded in application. As .NET6 is the newest version supported on **Windows 7**, then this is the .NET version included with the Windows 32-bit installer.
-
-> [!CAUTION]
-> .NET6 used for Windows 32-bit has gone **End-of-Life in 2024**, and has not received any security hotfixes since then!
-
-If possible then you should use the newer _CRT_ 64-bit installer, which embeds the newest available [.NET10 LTS](https://github.com/dotnet/core/blob/main/release-notes/10.0/README.md) (Long-Term-Support) at release date.
+Note that the newest .NET LTS (Long-Term Support) is embedded in application, which means you do not need to have this installed. It also does mean that even if you have .NET installed on your computer, then it will still use the one embedded in application. Do note that it is the newest LTS at build time - it will not get updated automatically and will stay as-is.
 
 
 ## Help wanted
@@ -169,7 +167,7 @@ You can view the below _Quick Help_ videos for introduction to specific topics i
 - [Short introduction](https://youtu.be/fwR018x39qg)
 - [How to do manual traces](https://youtu.be/JUNXeCHsrME)
 - [How to sync oscilloscope](https://youtu.be/CbTh1FFp3tU)
-- [How to use component label editor](https://youtu.be/jmYrz2VB3ig)
+- [How to use component label editor](https://youtu.be/u-UkD-m4Z6o)
 - [How to use interactive traces](https://youtu.be/Y55nC_gJbH4)
 
 
@@ -185,7 +183,7 @@ I want to be transparent here, and inform that I am gathering information about 
   - Used for knowing if my rewrite to natively support Linux and macOS was worth it
 - CPU architechture used (32-bit or 64-bit)
   - Ex. `64-bit`
-  - Used for knowing how wide usage that pesky self-contained .NET6 has
+  - Used for knowing how wide usage that pesky self-contained .NET6 has (this is legacy and not used any more)
 
 I am allowing myself to gather this data for me to build the [CRT Fun facts](https://classic-repair-toolbox.dk/funfacts/) page, which is some statistics on usage. As a developer, this is a personal motivational point to see countries using my application and of course one always hope for that "upwards trend usage"... which never happens 🤣 I find this limited non-personal data a fair amount to "pay" for using this application, taking in consideration for the effort being put in to this.
 
