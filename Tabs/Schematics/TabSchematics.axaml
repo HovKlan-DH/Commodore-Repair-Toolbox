@@ -81,7 +81,8 @@
 				<Canvas x:Name="SchematicsLabelsCanvas"
 												IsHitTestVisible="False"
 												RenderTransformOrigin="0%,0%"
-												Background="Transparent">
+												Background="Transparent"
+												Panel.ZIndex="100">
 					<Canvas.RenderTransform>
 						<MatrixTransform />
 					</Canvas.RenderTransform>
@@ -203,27 +204,6 @@
 
 							<StackPanel x:Name="GlobalSettingsListPanel" Spacing="4">
 
-								<StackPanel Orientation="Horizontal"
-											Spacing="6"
-											Background="Transparent"
-											Cursor="Hand"
-											PointerPressed="OnMultipleInstancesForComponentPopupInSchematicsRowClicked">
-									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
-										<CheckBox x:Name="MultipleInstancesForComponentPopupInSchematicsCheckBox"
-												  MinHeight="0"
-												  Margin="0"
-												  Padding="0"
-												  CornerRadius="2"
-												  VerticalAlignment="Center"
-												  IsHitTestVisible="False" />
-									</Viewbox>
-									<TextBlock Text="Open multiple windows for popup"
-											   FontSize="11"
-											   Foreground="{DynamicResource SchematicsPanels_Fg}"
-											   VerticalAlignment="Center"
-											   IsHitTestVisible="False" />
-								</StackPanel>
-
 								<StackPanel x:Name="GlobalHoverHighlightsTracesRow"
 											Orientation="Horizontal"
 											Spacing="6"
@@ -269,7 +249,28 @@
 											   IsHitTestVisible="False" />
 								</StackPanel>
 
-
+								<StackPanel x:Name="GlobalShowTracesOnComponentSelectRow"
+									Orientation="Horizontal"
+									Spacing="6"
+									Background="Transparent"
+									Cursor="Hand"
+									PointerPressed="OnGlobalShowTracesOnComponentSelectRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckGlobalShowTracesOnComponentSelect"
+												  MinHeight="0"
+												  Margin="0"
+												  Padding="0"
+												  CornerRadius="2"
+												  IsChecked="True"
+												  IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Highlight component traces on select"
+											   FontSize="11"
+											   Foreground="{DynamicResource SchematicsPanels_Fg}"
+											   VerticalAlignment="Center"
+											   IsHitTestVisible="False" />
+								</StackPanel>
+								
 								<StackPanel x:Name="BoardShowTracesOnSelectedComponentRow"
 											Orientation="Horizontal"
 											Spacing="6"
@@ -472,59 +473,72 @@
 
 				<!-- KICAD NET CONNECTIONS PANEL -->
 				<Border x:Name="KiCadNetConnectionsPanel"
-									IsVisible="False"
-									HorizontalAlignment="Right"
-									VerticalAlignment="Top"
-									Margin="10,10,10,10"
-									Background="{DynamicResource Schematics_Panels_Bg}"
-									BorderBrush="{DynamicResource Schematics_Panels_Border}"
-									BorderThickness="1"
-									CornerRadius="4"
-									Padding="8,8"
-									MinWidth="120"
-									MaxWidth="250">
+		IsVisible="False"
+		HorizontalAlignment="Right"
+		VerticalAlignment="Top"
+		Margin="10,10,10,10"
+		Background="{DynamicResource Schematics_Panels_Bg}"
+		BorderBrush="{DynamicResource Schematics_Panels_Border}"
+		BorderThickness="1"
+		CornerRadius="4"
+		Padding="8,8"
+		MinWidth="120"
+		MaxWidth="250">
 
-					<Grid RowDefinitions="Auto, *, Auto">
-						<StackPanel Grid.Row="0" Spacing="4">
-							<TextBlock Text="Netlist name:"
-								   FontSize="11"
-								   FontWeight="Bold"
-								   Foreground="{DynamicResource Schematics_Panels_Fg}" />
+					<StackPanel Spacing="6">
+						<Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+							<TextBlock Grid.Column="0"
+									   Text="Netlist names"
+									   FontSize="11"
+									   VerticalAlignment="Center"
+									   FontWeight="Bold"
+									   Foreground="{DynamicResource Schematics_Panels_Fg}" />
+							<Button x:Name="ToggleKiCadNetConnectionsPanelButton"
+									Grid.Column="1"
+									Content="Collapse"
+									FontSize="9"
+									Padding="6,2"
+									HorizontalAlignment="Right"
+									VerticalAlignment="Top" />
+						</Grid>
+
+						<StackPanel x:Name="KiCadNetConnectionsContentPanel" Spacing="4">
 							<TextBlock x:Name="KiCadNetConnectionsNetNameText"
-									FontSize="11"
-									Foreground="{DynamicResource Schematics_Panels_Fg}"
-									TextWrapping="Wrap"
-									Margin="8,0,0,4"/>
+									   FontSize="11"
+									   Foreground="{DynamicResource Schematics_Panels_Fg}"
+									   TextWrapping="Wrap"
+									   Margin="8,0,0,4" />
 
 							<TextBlock Text="Connected to:"
 									   FontSize="11"
 									   FontWeight="Bold"
 									   Foreground="{DynamicResource Schematics_Panels_Fg}" />
+
+							<ScrollViewer HorizontalScrollBarVisibility="Disabled"
+										  Margin="0,4,0,0"
+										  MaxHeight="260">
+								<ItemsControl x:Name="KiCadNetConnectionsList">
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<TextBlock Text="{Binding}"
+													   FontSize="11"
+													   Foreground="{DynamicResource Schematics_Panels_Fg}"
+													   Margin="8,2,0,0"/>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+							</ScrollViewer>
+
+							<Button x:Name="ClearKiCadTraceSelectionButton"
+									Content="Clear All"
+									FontSize="9"
+									Padding="6,2"
+									Margin="0,8,0,0"
+									HorizontalAlignment="Stretch"
+									HorizontalContentAlignment="Center"
+									IsEnabled="False" />
 						</StackPanel>
-
-						<ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,0">
-							<ItemsControl x:Name="KiCadNetConnectionsList">
-								<ItemsControl.ItemTemplate>
-									<DataTemplate>
-										<TextBlock Text="{Binding}"
-												   FontSize="11"
-												   Foreground="{DynamicResource Schematics_Panels_Fg}"
-												   Margin="8,2,0,0"/>
-									</DataTemplate>
-								</ItemsControl.ItemTemplate>
-							</ItemsControl>
-						</ScrollViewer>
-
-						<Button x:Name="ClearKiCadTraceSelectionButton"
-								Grid.Row="2"
-								Content="Clear All"
-								FontSize="9"
-								Padding="6,2"
-								Margin="0,8,0,0"
-								HorizontalAlignment="Stretch"
-								HorizontalContentAlignment="Center"
-								IsEnabled="False" />
-					</Grid>
+					</StackPanel>
 				</Border>
 
 			</Grid>
@@ -716,7 +730,7 @@
 						Spacing="8"
 						Width="235">
 				<TextBlock x:Name="SchematicsLabelEditorMenuStateTextBlock"
-						   Text="Schematic actions"
+						   Text="Contributor mode actions"
 						   FontSize="11"
 						   FontWeight="Bold"
 						   Foreground="{DynamicResource Schematics_Panels_Fg}" />

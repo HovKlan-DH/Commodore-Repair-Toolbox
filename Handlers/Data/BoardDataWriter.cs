@@ -48,6 +48,9 @@ namespace Handlers.DataHandling
         private const string ColWidth = "Width";
         private const string ColHeight = "Height";
 
+        private static readonly IComparer<string> BoardLabelNaturalComparer =
+            Comparer<string>.Create(CompareBoardLabelsNaturally);
+
         private static readonly string[] ComponentHighlightsHeaders = new[]
         {
             ColSchematicName,
@@ -187,12 +190,12 @@ namespace Handlers.DataHandling
                 .Where(item => string.Equals(item.SchematicName, schematicName, StringComparison.OrdinalIgnoreCase))
                 .Where(item => !string.IsNullOrWhiteSpace(item.BoardLabel))
                 .OrderBy(item => item.Category?.Trim() ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(item => item.BoardLabel?.Trim() ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(item => item.BoardLabel?.Trim() ?? string.Empty, BoardLabelNaturalComparer)
                 .ThenBy(item => item.Y)
                 .ThenBy(item => item.X)
                 .ToList();
 
-//            Logger.Debug($"BoardDataWriter deleted highlight rows for schematic [{schematicName}]: [{deletedRowCount}]");
+            //            Logger.Debug($"BoardDataWriter deleted highlight rows for schematic [{schematicName}]: [{deletedRowCount}]");
             Logger.Debug($"BoardDataWriter will write highlight rows for schematic [{schematicName}]: [{orderedRows.Count}]");
 
             int appendRow = (sheet.Dimension?.End.Row ?? headerRow) + 1;
@@ -229,10 +232,10 @@ namespace Handlers.DataHandling
                 .Select(group => group.First())
                 .Where(item => !ComponentExistsInSheet(sheet, colMap, headerRow, item, region))
                 .OrderBy(item => item.Category?.Trim() ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(item => item.BoardLabel?.Trim() ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(item => item.BoardLabel?.Trim() ?? string.Empty, BoardLabelNaturalComparer)
                 .ToList();
 
-//            Logger.Info($"BoardDataWriter missing component rows to insert: [{rowsToInsert.Count}]");
+            //            Logger.Info($"BoardDataWriter missing component rows to insert: [{rowsToInsert.Count}]");
 
             foreach (var item in rowsToInsert)
             {
@@ -249,7 +252,7 @@ namespace Handlers.DataHandling
                 }
 
                 Logger.Info(
-                    $"BoardDataWriter inserting component row at Excel row [{insertRow}] -> Label=[{item.BoardLabel}] Category=[{item.Category}] Region=[{(string.IsNullOrWhiteSpace(item.Region) ? region : item.Region.Trim())}]");
+                    $"BoardDataWriter inserting component row at Excel row [{insertRow}] -> Label=[{item.BoardLabel}] Category=[{item.Category}] Region=[{item.Region.Trim()}]");
 
                 WriteComponentRow(sheet, colMap, insertRow, item, region);
             }
@@ -307,6 +310,105 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
+        // Compares board labels using natural ordering so labels like C2, C10, and C105 sort in
+        // the order humans expect instead of pure lexicographic string order.
+        // ###########################################################################################
+        private static int CompareBoardLabelsNaturally(string? left, string? right)
+        {
+            string leftValue = left?.Trim() ?? string.Empty;
+            string rightValue = right?.Trim() ?? string.Empty;
+
+            int leftIndex = 0;
+            int rightIndex = 0;
+
+            while (leftIndex < leftValue.Length && rightIndex < rightValue.Length)
+            {
+                bool leftIsDigit = char.IsDigit(leftValue[leftIndex]);
+                bool rightIsDigit = char.IsDigit(rightValue[rightIndex]);
+
+                if (leftIsDigit && rightIsDigit)
+                {
+                    int leftDigitStart = leftIndex;
+                    int rightDigitStart = rightIndex;
+
+                    while (leftIndex < leftValue.Length && char.IsDigit(leftValue[leftIndex]))
+                    {
+                        leftIndex++;
+                    }
+
+                    while (rightIndex < rightValue.Length && char.IsDigit(rightValue[rightIndex]))
+                    {
+                        rightIndex++;
+                    }
+
+                    string leftDigits = leftValue[leftDigitStart..leftIndex];
+                    string rightDigits = rightValue[rightDigitStart..rightIndex];
+
+                    string leftTrimmedDigits = leftDigits.TrimStart('0');
+                    string rightTrimmedDigits = rightDigits.TrimStart('0');
+
+                    if (leftTrimmedDigits.Length == 0)
+                    {
+                        leftTrimmedDigits = "0";
+                    }
+
+                    if (rightTrimmedDigits.Length == 0)
+                    {
+                        rightTrimmedDigits = "0";
+                    }
+
+                    if (leftTrimmedDigits.Length != rightTrimmedDigits.Length)
+                    {
+                        return leftTrimmedDigits.Length.CompareTo(rightTrimmedDigits.Length);
+                    }
+
+                    int digitCompare = string.Compare(leftTrimmedDigits, rightTrimmedDigits, StringComparison.Ordinal);
+                    if (digitCompare != 0)
+                    {
+                        return digitCompare;
+                    }
+
+                    int originalDigitLengthCompare = leftDigits.Length.CompareTo(rightDigits.Length);
+                    if (originalDigitLengthCompare != 0)
+                    {
+                        return originalDigitLengthCompare;
+                    }
+
+                    continue;
+                }
+
+                if (leftIsDigit != rightIsDigit)
+                {
+                    return leftIsDigit ? -1 : 1;
+                }
+
+                int leftTextStart = leftIndex;
+                int rightTextStart = rightIndex;
+
+                while (leftIndex < leftValue.Length && !char.IsDigit(leftValue[leftIndex]))
+                {
+                    leftIndex++;
+                }
+
+                while (rightIndex < rightValue.Length && !char.IsDigit(rightValue[rightIndex]))
+                {
+                    rightIndex++;
+                }
+
+                string leftText = leftValue[leftTextStart..leftIndex];
+                string rightText = rightValue[rightTextStart..rightIndex];
+
+                int textCompare = string.Compare(leftText, rightText, StringComparison.OrdinalIgnoreCase);
+                if (textCompare != 0)
+                {
+                    return textCompare;
+                }
+            }
+
+            return leftValue.Length.CompareTo(rightValue.Length);
+        }
+
+        // ###########################################################################################
         // Finds the best insertion row so a new component is placed alongside other rows in the
         // same category and ordered by board label within that category.
         // ###########################################################################################
@@ -342,7 +444,7 @@ namespace Handlers.DataHandling
                 firstRowInCategory ??= row;
                 lastRowInCategory = row;
 
-                if (string.Compare(existingBoardLabel, targetBoardLabel, StringComparison.OrdinalIgnoreCase) > 0)
+                if (CompareBoardLabelsNaturally(existingBoardLabel, targetBoardLabel) > 0)
                 {
                     insertBeforeRowInCategory = row;
                     break;
@@ -380,7 +482,7 @@ namespace Handlers.DataHandling
 
             sheet.Cells[row, colMap[ColBoardLabel]].Value = item.BoardLabel.Trim();
             sheet.Cells[row, colMap[ColCategory]].Value = item.Category.Trim();
-            sheet.Cells[row, colMap[ColRegion]].Value = string.IsNullOrWhiteSpace(item.Region) ? region : item.Region.Trim();
+            sheet.Cells[row, colMap[ColRegion]].Value = item.Region.Trim();
 
             if (colMap.TryGetValue(ColFriendlyName, out int friendlyNameCol))
             {
@@ -424,7 +526,7 @@ namespace Handlers.DataHandling
             string defaultRegion)
         {
             string targetBoardLabel = item.BoardLabel?.Trim() ?? string.Empty;
-            string targetRegion = string.IsNullOrWhiteSpace(item.Region) ? defaultRegion.Trim() : item.Region.Trim();
+            string targetRegion = item.Region?.Trim() ?? string.Empty;
 
             int maxRow = sheet.Dimension?.End.Row ?? headerRow;
 

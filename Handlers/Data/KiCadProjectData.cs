@@ -102,7 +102,8 @@ namespace Handlers.DataHandling
     public sealed class KiCadNetRef
     {
         [JsonPropertyName("id")]
-        public int? Id { get; init; }
+        [JsonConverter(typeof(KiCadStringOrNumberJsonConverter))]
+        public string? Id { get; init; }
 
         [JsonPropertyName("name")]
         public string? Name { get; init; }
@@ -368,6 +369,61 @@ namespace Handlers.DataHandling
 
         [JsonPropertyName("y")]
         public double Y { get; init; }
+    }
+
+    // ###########################################################################################
+    // Deserializes one scalar JSON value that may be either a string or a number into text.
+    // This keeps DTOs tolerant of KiCad exporter revisions that change identifier types.
+    // ###########################################################################################
+    internal sealed class KiCadStringOrNumberJsonConverter : JsonConverter<string?>
+    {
+        // ###########################################################################################
+        // Reads one JSON scalar as text, accepting null, string, integer, or floating-point tokens.
+        // ###########################################################################################
+        public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                return null;
+            }
+
+            if (reader.TokenType == JsonTokenType.String)
+            {
+                return reader.GetString();
+            }
+
+            if (reader.TokenType == JsonTokenType.Number)
+            {
+                using var document = JsonDocument.ParseValue(ref reader);
+                return document.RootElement.GetRawText();
+            }
+
+            if (reader.TokenType == JsonTokenType.True)
+            {
+                return bool.TrueString;
+            }
+
+            if (reader.TokenType == JsonTokenType.False)
+            {
+                return bool.FalseString;
+            }
+
+            throw new JsonException($"Unsupported scalar JSON token [{reader.TokenType}] for string-backed value.");
+        }
+
+        // ###########################################################################################
+        // Writes the scalar value back as JSON text.
+        // ###########################################################################################
+        public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options)
+        {
+            if (value == null)
+            {
+                writer.WriteNullValue();
+                return;
+            }
+
+            writer.WriteStringValue(value);
+        }
     }
 
     // ###########################################################################################
@@ -758,5 +814,4 @@ namespace Handlers.DataHandling
             return result;
         }
     }
-
 }

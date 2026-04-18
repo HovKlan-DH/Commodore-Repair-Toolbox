@@ -76,6 +76,8 @@ namespace Handlers.DataHandling
         [JsonPropertyName("schematicsLabelsPanelExpanded")] public bool SchematicsLabelsPanelExpanded { get; set; } = true;
         [JsonPropertyName("schematicsBoardSettingsPanelExpanded")] public bool SchematicsBoardSettingsPanelExpanded { get; set; } = true;
         [JsonPropertyName("schematicsGlobalSettingsPanelExpanded")] public bool SchematicsGlobalSettingsPanelExpanded { get; set; } = true;
+        [JsonPropertyName("schematicsNetConnectionsPanelExpanded")] public bool SchematicsNetConnectionsPanelExpanded { get; set; } = true;
+        [JsonPropertyName("schematicsShowTracesOnComponentSelect")] public bool SchematicsShowTracesOnComponentSelect { get; set; } = true;
         [JsonPropertyName("blinkSelected")] public bool BlinkSelected { get; set; } = false;
         [JsonPropertyName("schematicsOrderByBoard")] public Dictionary<string, List<string>> SchematicsOrderByBoard { get; set; } = new();
         [JsonPropertyName("contactEmail")] public string ContactEmail { get; set; } = string.Empty;
@@ -199,6 +201,29 @@ namespace Handlers.DataHandling
             { "ComponentPopup_BulletList_Fg", "Red" },
             { "Feedback_TrashIcon_Fg", "IndianRed" }
         };
+
+        // ###########################################################################################
+        // Returns whether selected-component trace preview is enabled globally.
+        // ###########################################################################################
+        public static bool SchematicsShowTracesOnComponentSelect
+        {
+            get => _data.SchematicsShowTracesOnComponentSelect;
+            set
+            {
+                if (_data.SchematicsShowTracesOnComponentSelect == value)
+                    return;
+
+                _data.SchematicsShowTracesOnComponentSelect = value;
+                Logger.Info($"Setting changed: [SchematicsShowTracesOnComponentSelect] [{value}]");
+                Save();
+            }
+        }
+
+        public static bool SchematicsNetConnectionsPanelExpanded
+        {
+            get => _data.SchematicsNetConnectionsPanelExpanded;
+            set { _data.SchematicsNetConnectionsPanelExpanded = value; Save(); }
+        }
 
         // ###########################################################################################
         // Returns true when global contributor mode is enabled.
@@ -559,8 +584,15 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
+        // Returns true when the given board already has a persisted schematics splitter ratio.
+        // ###########################################################################################
+        public static bool HasSchematicsSplitterRatio(string boardKey)
+            => !string.IsNullOrWhiteSpace(boardKey) &&
+               _data.SchematicsSplitterRatios.ContainsKey(boardKey);
+
+        // ###########################################################################################
         // Returns the saved schematics splitter ratio for the given board key.
-        // Defaults to 0.5 (equal split) when no saved value exists.
+        // Defaults to 0.5 (equal split) for legacy callers when no saved value exists.
         // ###########################################################################################
         public static double GetSchematicsSplitterRatio(string boardKey)
             => _data.SchematicsSplitterRatios.TryGetValue(boardKey, out var ratio) ? ratio : 0.5;
@@ -729,6 +761,8 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [SchematicsLabelsPanelExpanded] [{SchematicsLabelsPanelExpanded}]");
                     Logger.Info($"        [SchematicsBoardSettingsPanelExpanded] [{SchematicsBoardSettingsPanelExpanded}]");
                     Logger.Info($"        [SchematicsGlobalSettingsPanelExpanded] [{SchematicsGlobalSettingsPanelExpanded}]");
+                    Logger.Info($"        [SchematicsShowTracesOnComponentSelect] [{SchematicsShowTracesOnComponentSelect}]");
+                    Logger.Info($"        [SchematicsNetConnectionsPanelExpanded] [{SchematicsNetConnectionsPanelExpanded}]");
                     Logger.Info($"        [SchematicsLabelBoard] [{SchematicsLabelBoard}]");
                     Logger.Info($"        [SchematicsLabelTechnical] [{SchematicsLabelTechnical}]");
                     Logger.Info($"        [SchematicsLabelFriendly] [{SchematicsLabelFriendly}]");

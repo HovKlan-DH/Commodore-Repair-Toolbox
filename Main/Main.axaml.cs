@@ -191,7 +191,7 @@ namespace CRT
 
             if (UserSettings.CheckVersionOnLaunch)
             {
-                this.CheckForAppUpdate();
+                _ = this.CheckForAppUpdateNowAsync();
             }
             else if (DataManager.DataUpdateRequiresAppUpdate)
             {
@@ -205,7 +205,69 @@ namespace CRT
             this.StartBackgroundSyncAsync();
         }
 
+        // ###########################################################################################
+        // Checks for an available update and refreshes the banner state immediately.
+        // Can be used both at startup and when the setting is enabled in Configuration.
+        // ###########################################################################################
+        internal async Task CheckForAppUpdateNowAsync()
+        {
+            bool? available = await UpdateService.CheckForUpdateAsync();
 
+            if (available == true)
+            {
+                this.UpdateBannerText.Text = $"Version {UpdateService.PendingVersion} is available";
+                this.UpdateBannerInstallButton.IsVisible = true;
+                this.UpdateBannerViewNotesButton.IsVisible = true;
+                this.UpdateBannerInstallButton.IsEnabled = true;
+                this.UpdateBannerViewNotesButton.IsEnabled = true;
+                this.UpdateBannerDismissButton.IsEnabled = true;
+                this.UpdateBanner.IsVisible = true;
+            }
+            else if (DataManager.DataUpdateRequiresAppUpdate)
+            {
+                this.UpdateBannerText.Text = "Newer main Excel data file is available, but requires a newer application version. No more data updates will be given for this version";
+                this.UpdateBannerInstallButton.IsVisible = false;
+                this.UpdateBannerViewNotesButton.IsVisible = false;
+                this.UpdateBannerDismissButton.IsEnabled = true;
+                this.UpdateBanner.IsVisible = true;
+            }
+            else
+            {
+                this.UpdateBanner.IsVisible = false;
+            }
+        }
+
+        // ###########################################################################################
+        // Performs the launch-time data update check immediately from the running UI, then starts
+        // the existing background sync pass for any remaining non-Excel files.
+        // ###########################################################################################
+        internal async Task CheckForDataUpdatesNowAsync()
+        {
+            this.SyncBannerText.Text = "Checking data from online source - please wait...";
+            this.SyncBannerRefreshButton.IsVisible = false;
+            this.SyncBanner.IsVisible = true;
+
+            bool hasManifest = await DataManager.CheckForDataUpdatesNowAsync(
+                status => Dispatcher.UIThread.Post(() => this.SyncBannerText.Text = status));
+
+            if (!hasManifest)
+            {
+                return;
+            }
+
+            this.PopulateHardwareDropDown();
+            this.StartBackgroundSyncAsync();
+
+            if (!UserSettings.CheckVersionOnLaunch && DataManager.DataUpdateRequiresAppUpdate)
+            {
+                this.UpdateBannerText.Text = "Newer main Excel data file is available, but requires a newer application version. No more data updates will be given for this version";
+                this.UpdateBannerInstallButton.IsVisible = false;
+                this.UpdateBannerViewNotesButton.IsVisible = false;
+                this.UpdateBanner.IsVisible = true;
+            }
+        }
+
+/*
         // ###########################################################################################
         // Checks for an available update on startup and shows the banner if one is found.
         // ###########################################################################################
@@ -227,6 +289,7 @@ namespace CRT
                 this.UpdateBanner.IsVisible = true;
             }
         }
+*/
 
         // ###########################################################################################
         // Shows the sync banner during background sync, then hides it automatically if nothing
@@ -387,6 +450,15 @@ namespace CRT
         {
             this._suppressCategoryFilterSave = true;
 
+            bool thisShouldClearComponentSearch = ReferenceEquals(sender, this.BoardComboBox);
+
+            if (thisShouldClearComponentSearch)
+            {
+                this._suppressComponentSearchRefresh = true;
+                this.ComponentSearchTextBox.Text = string.Empty;
+                this._suppressComponentSearchRefresh = false;
+            }
+
             foreach (var thumb in this.TabSchematicsControl.currentThumbnails)
             {
                 if (!ReferenceEquals(thumb.ImageSource, thumb.BaseThumbnail))
@@ -418,12 +490,20 @@ namespace CRT
             UserSettings.SetLastBoardForHardware(selectedHardware, selectedBoard);
 
             var boardKey = this.GetCurrentBoardKey();
-            var ratio = UserSettings.GetSchematicsSplitterRatio(boardKey);
             var innerGrid = this.TabSchematicsControl.FindControl<Grid>("SchematicsInnerGrid");
             if (innerGrid != null)
             {
-                innerGrid.ColumnDefinitions[0].Width = new GridLength(ratio * 100.0, GridUnitType.Star);
-                innerGrid.ColumnDefinitions[2].Width = new GridLength((1.0 - ratio) * 100.0, GridUnitType.Star);
+                if (UserSettings.HasSchematicsSplitterRatio(boardKey))
+                {
+                    var ratio = UserSettings.GetSchematicsSplitterRatio(boardKey);
+                    innerGrid.ColumnDefinitions[0].Width = new GridLength(ratio * 100.0, GridUnitType.Star);
+                    innerGrid.ColumnDefinitions[2].Width = new GridLength((1.0 - ratio) * 100.0, GridUnitType.Star);
+                }
+                else
+                {
+                    innerGrid.ColumnDefinitions[0].Width = new GridLength(1.0, GridUnitType.Star);
+                    innerGrid.ColumnDefinitions[2].Width = new GridLength(300.0, GridUnitType.Pixel);
+                }
             }
 
             var entry = DataManager.HardwareBoards.FirstOrDefault(ent =>
@@ -707,6 +787,26 @@ namespace CRT
             }
 
             return Path.Combine(DataManager.DataRoot, entry.ExcelDataFile.Replace('/', Path.DirectorySeparatorChar));
+        }
+
+        // ###########################################################################################
+        // Resolves the full path to the currently selected board KiCad JSON file.
+        // Returns empty when the board does not define a KiCad data file.
+        // ###########################################################################################
+        internal string GetCurrentBoardKiCadJsonPath()
+        {
+            var entry = this.GetCurrentBoardEntry();
+            if (entry == null || string.IsNullOrWhiteSpace(entry.KiCadDataFile))
+            {
+                return string.Empty;
+            }
+
+            string relativePath = entry.KiCadDataFile
+                .Trim()
+                .Replace('/', Path.DirectorySeparatorChar)
+                .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            return Path.Combine(DataManager.DataRoot, relativePath);
         }
 
         // ###########################################################################################
@@ -1066,10 +1166,24 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Clears all currently selected items in the Component filter list box.
+        // Clears the component search text, removes all selected items in the Component filter list,
+        // and resets schematic highlights back to an empty selection state.
         // ###########################################################################################
         private void OnClearComponentsClick(object? sender, RoutedEventArgs e)
         {
+            this._suppressComponentSearchRefresh = true;
+            this.ComponentSearchTextBox.Text = string.Empty;
+            this._suppressComponentSearchRefresh = false;
+
+            if (this.TabSchematicsControl.IsLabelEditorActive)
+            {
+                this.TabSchematicsControl.ApplyLabelEditorSearchFilter(string.Empty);
+            }
+            else
+            {
+                this.ApplyNormalComponentSearchFilter(string.Empty);
+            }
+
             this.TabSchematicsControl.ClearSchematicsOnlySelectedComponents();
             this.ComponentFilterListBox.SelectedItems?.Clear();
             this.TabSchematicsControl.UpdateHighlightsForComponents(new List<string>());
@@ -1495,20 +1609,35 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Refreshes the component filter list based on search text, and highlights the result.
+        // Refreshes the component filter list based on search text, or switches to label-editor
+        // search behavior while the component label editor is active.
         // ###########################################################################################
         public void OnComponentSearchTextChanged(object? sender, global::Avalonia.Controls.TextChangedEventArgs e)
         {
             if (this._suppressComponentSearchRefresh || this._currentBoardData == null || this._suppressCategoryFilterSave)
                 return;
 
+            string searchTerm = this.ComponentSearchTextBox?.Text ?? string.Empty;
+
+            if (this.TabSchematicsControl.IsLabelEditorActive)
+            {
+                this.TabSchematicsControl.ApplyLabelEditorSearchFilter(searchTerm);
+                return;
+            }
+
+            this.ApplyNormalComponentSearchFilter(searchTerm);
+        }
+
+        // ###########################################################################################
+        // Applies the normal component search behavior used outside the label editor.
+        // ###########################################################################################
+        private void ApplyNormalComponentSearchFilter(string searchTerm)
+        {
             var activeCategories = new HashSet<string>(
                 this.CategoryFilterListBox.SelectedItems?.Cast<string>() ?? Enumerable.Empty<string>(),
                 StringComparer.OrdinalIgnoreCase);
 
-            var searchTerm = this.ComponentSearchTextBox?.Text ?? string.Empty;
-
-            var componentItems = BuildComponentItems(this._currentBoardData, this._localRegion, activeCategories, searchTerm);
+            var componentItems = BuildComponentItems(this._currentBoardData!, this._localRegion, activeCategories, searchTerm);
 
             this._suppressComponentHighlightUpdate = true;
             this.ComponentFilterListBox.ItemsSource = componentItems;
@@ -1521,7 +1650,7 @@ namespace CRT
 
                 highlightLabels = componentItems
                     .Select(item => item.BoardLabel)
-                    .Where(l => !string.IsNullOrEmpty(l))
+                    .Where(label => !string.IsNullOrEmpty(label))
                     .ToList();
             }
 
@@ -1531,6 +1660,21 @@ namespace CRT
 
             // Forward the search term to filter the Overview tab's list
             this.TabOverview.ApplyFilter(searchTerm);
+        }
+
+        // ###########################################################################################
+        // Updates the component search box text hint so its current behavior is obvious.
+        // ###########################################################################################
+        internal void UpdateComponentSearchTextBoxMode()
+        {
+            if (this.ComponentSearchTextBox == null)
+            {
+                return;
+            }
+
+            this.ComponentSearchTextBox.PlaceholderText = this.TabSchematicsControl.IsLabelEditorActive
+                ? "Find component label or category"
+                : "Filter components";
         }
 
         // ###########################################################################################
@@ -1787,8 +1931,9 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Reacts to "Check for new or updated data at application launch" changes by showing or
-        // hiding the main-window banner that explains synchronization is disabled.
+        // Reacts to "Check for new or updated data at application launch" changes.
+        // Re-enabling hides the local-edit warning banner, but disabling from Configuration must
+        // not show it. That banner is only shown explicitly after label-editor apply.
         // ###########################################################################################
         private void OnCheckDataOnLaunchSettingChanged(bool isEnabled)
         {
@@ -1797,10 +1942,7 @@ namespace CRT
                 if (isEnabled)
                 {
                     this.HideDataSyncDisabledBanner();
-                    return;
                 }
-
-                this.ShowDataSyncDisabledBanner();
             });
         }
 
@@ -1811,7 +1953,7 @@ namespace CRT
         private void ShowDataSyncDisabledBanner()
         {
             this.SyncBannerText.Text =
-                "Data synchronization has been disabled because the board Excel data was edited locally. Re-enable it in the Configuration tab when safe.";
+                "Data synchronization has been disabled because the board Excel data was edited locally. Re-enable it in the \"Configuration\" tab when safe.";
             this.SyncBannerRefreshButton.IsVisible = false;
             this.SyncBanner.IsVisible = true;
             this._isShowingDataSyncDisabledBanner = true;
@@ -1894,7 +2036,7 @@ namespace CRT
                         new TextBlock
                         {
                             Text =
-                                "A dismissable banner is now shown in the main window to indicate that synchronization is disabled.",
+                                "A banner is now shown in the main window to indicate that synchronization is disabled.",
                             TextWrapping = TextWrapping.Wrap
                         },
                         closeButton
@@ -1905,6 +2047,23 @@ namespace CRT
             await dialog.ShowDialog(this);
         }
 
+        // ###########################################################################################
+        // Enables or disables hardware/board navigation while the schematics label editor owns the board state.
+        // ###########################################################################################
+        internal void SetSchematicsEditorNavigationEnabled(bool isEnabled)
+        {
+            this.HardwareComboBox.IsEnabled = isEnabled;
+            this.BoardComboBox.IsEnabled = isEnabled;
+        }
+
+        // ###########################################################################################
+        // Shows or hides the main-window banner indicating that the schematics label editor owns
+        // the current board state and navigation is temporarily locked.
+        // ###########################################################################################
+        internal void SetSchematicsLabelEditorModeBannerVisible(bool isVisible)
+        {
+            this.SchematicsLabelEditorModeBanner.IsVisible = isVisible;
+        }
 
 
         // ###########################################################################################

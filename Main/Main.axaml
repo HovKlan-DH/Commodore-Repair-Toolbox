@@ -258,6 +258,7 @@
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
 					<RowDefinition Height="*" />
 				</Grid.RowDefinitions>
 
@@ -360,7 +361,22 @@
 					</Grid>
 				</Border>
 
-				<TabControl x:Name="MainTabControl" Grid.Row="2" Padding="0">
+				<!-- Component label editor mode banner -->
+				<Border x:Name="SchematicsLabelEditorModeBanner"
+						Grid.Row="2"
+						IsVisible="False"
+						Background="{DynamicResource Main_Banner_Bg}"
+						CornerRadius="0"
+						Margin="0,0,0,4"
+						Padding="12,6">
+					<TextBlock Text="Component label editor mode is active. Hardware, board, and schematic navigation are temporarily locked until changes are applied or discarded."
+							   VerticalAlignment="Center"
+							   Foreground="{DynamicResource Main_Banner_Fg}"
+							   FontSize="12"
+							   TextWrapping="Wrap" />
+				</Border>
+
+				<TabControl x:Name="MainTabControl" Grid.Row="3" Padding="0">
 
 					<TabItem x:Name="SchematicsTabItem" Header="Schematics">
 						<local:TabSchematics x:Name="TabSchematicsControl" />
@@ -377,7 +393,7 @@
 					<TabItem Header="Oscilloscope" IsVisible="True">
 						<local:TabOscilloscope x:Name="TabOscilloscope" />
 					</TabItem>
-					
+
 					<TabItem Header="Contribute">
 						<local:TabContribute x:Name="TabContribute" />
 					</TabItem>

@@ -28,11 +28,13 @@ namespace CRT
             this.CheckVersionOnLaunchCheckBox.IsChecked = UserSettings.CheckVersionOnLaunch;
             this.CheckDataOnLaunchCheckBox.IsChecked = UserSettings.CheckDataOnLaunch;
             this.ShowDevelopmentVersionNotificationCheckBox.IsChecked = UserSettings.ShowDevelopmentVersionNotification;
+            this.MultipleInstancesForComponentPopupCheckBox.IsChecked = UserSettings.MultipleInstancesForComponentPopup;
 
             this.ThemeVariantComboBox.SelectionChanged += this.OnThemeVariantSelectionChanged;
             this.CheckVersionOnLaunchCheckBox.IsCheckedChanged += this.OnCheckVersionOnLaunchChanged;
             this.CheckDataOnLaunchCheckBox.IsCheckedChanged += this.OnCheckDataOnLaunchChanged;
             this.ShowDevelopmentVersionNotificationCheckBox.IsCheckedChanged += this.OnShowDevelopmentVersionNotificationChanged;
+            this.MultipleInstancesForComponentPopupCheckBox.IsCheckedChanged += this.OnMultipleInstancesForComponentPopupChanged;
         }
 
         // ###########################################################################################
@@ -57,23 +59,47 @@ namespace CRT
 
         // ###########################################################################################
         // Persists the "Check for new version at launch" preference when the checkbox is toggled.
+        // Enabling it also performs the check immediately.
         // ###########################################################################################
-        private void OnCheckVersionOnLaunchChanged(object? sender, RoutedEventArgs e)
+        private async void OnCheckVersionOnLaunchChanged(object? sender, RoutedEventArgs e)
         {
-            UserSettings.CheckVersionOnLaunch = this.CheckVersionOnLaunchCheckBox.IsChecked == true;
+            bool isEnabled = this.CheckVersionOnLaunchCheckBox.IsChecked == true;
+            UserSettings.CheckVersionOnLaunch = isEnabled;
+
+            if (!isEnabled)
+            {
+                return;
+            }
+
+            if (TopLevel.GetTopLevel(this) is Main mainWindow)
+            {
+                await mainWindow.CheckForAppUpdateNowAsync();
+            }
         }
 
         // ###########################################################################################
-        // Persists the "Check for new or updated data at launch" preference when the checkbox is toggled.
+        // Persists the "Check for new or updated data at launch" preference when the checkbox is
+        // toggled. Enabling it also performs the check immediately.
         // ###########################################################################################
-        private void OnCheckDataOnLaunchChanged(object? sender, RoutedEventArgs e)
+        private async void OnCheckDataOnLaunchChanged(object? sender, RoutedEventArgs e)
         {
             if (this.thisSuppressCheckDataOnLaunchChanged)
             {
                 return;
             }
 
-            UserSettings.CheckDataOnLaunch = this.CheckDataOnLaunchCheckBox.IsChecked == true;
+            bool isEnabled = this.CheckDataOnLaunchCheckBox.IsChecked == true;
+            UserSettings.CheckDataOnLaunch = isEnabled;
+
+            if (!isEnabled)
+            {
+                return;
+            }
+
+            if (TopLevel.GetTopLevel(this) is Main mainWindow)
+            {
+                await mainWindow.CheckForDataUpdatesNowAsync();
+            }
         }
 
         // ###########################################################################################
@@ -133,5 +159,19 @@ namespace CRT
                 app.ApplyConfiguredTheme();
             }
         }
+
+        // ###########################################################################################
+        // Persists the "Open multiple windows for popup" preference when the checkbox is toggled.
+        // ###########################################################################################
+        private void OnMultipleInstancesForComponentPopupChanged(object? sender, RoutedEventArgs e)
+        {
+            UserSettings.MultipleInstancesForComponentPopup =
+                this.MultipleInstancesForComponentPopupCheckBox.IsChecked == true;
+        }
+
+
+
+
+
     }
 }

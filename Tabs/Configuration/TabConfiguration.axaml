@@ -59,6 +59,14 @@
                 HorizontalAlignment="Left"
                 Click="OnReloadUserPreferenceThemeClick" />
 
+		<TextBlock Text="Behaviour"
+           FontSize="12"
+           FontWeight="SemiBold"
+           Margin="0,16,0,4" />
+
+		<CheckBox x:Name="MultipleInstancesForComponentPopupCheckBox"
+				  Content="Open multiple windows for popup" />
+		
 		<TextBlock Text="Application Update"
                    FontSize="12"
                    FontWeight="SemiBold"

@@ -19,6 +19,7 @@ namespace Handlers.DataHandling
         private const string ColHardwareName = "Hardware name in drop-down";
         private const string ColBoardName = "Board name in drop-down";
         private const string ColExcelDataFile = "Excel data file";
+        private const string ColKiCadDataFile = "KiCad data file";
         private const string ColHardwareNotes = "Hardware notes in \"Overview\" tab";
 
         // Column headers for Oscilloscope
@@ -215,6 +216,90 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
+        // Performs the launch-time data update check immediately while the application is already
+        // running. Main and board Excel files are checked right away, and any remaining files stay
+        // queued for the existing background sync flow.
+        // ###########################################################################################
+        public static async Task<bool> CheckForDataUpdatesNowAsync(Action<string>? onStatus = null, Action<string>? onFile = null)
+        {
+            void ReportStatus(string message)
+            {
+                RaiseStatus(message);
+                onStatus?.Invoke(message);
+            }
+
+            void ReportFile(string filePath)
+            {
+                RaiseFileDownload(filePath);
+                onFile?.Invoke(filePath);
+            }
+
+            if (string.IsNullOrWhiteSpace(_dataRoot))
+            {
+                Logger.Warning("Immediate data update check skipped - data root is not initialized");
+                ReportStatus("Sync failed - data folder is unavailable");
+                return false;
+            }
+
+            bool localDataUpdateRequiresAppUpdate = DataUpdateRequiresAppUpdate;
+
+            ReportStatus("Fetching online file manifest...");
+            _syncManifest = await OnlineServices.FetchManifestAsync(ReportStatus);
+
+            if (_syncManifest == null)
+            {
+                return false;
+            }
+
+            var onlineFileNames = new List<string>();
+
+            await OnlineServices.SyncFilesAsync(
+                _syncManifest,
+                string.Empty,
+                f =>
+                {
+                    onlineFileNames.Add(f);
+                    return false;
+                },
+                null,
+                null);
+
+            DetermineResolvedMainExcel(onlineFileNames);
+            DataUpdateRequiresAppUpdate |= localDataUpdateRequiresAppUpdate;
+
+            ReportStatus("Checking main data file...");
+            await OnlineServices.SyncFilesAsync(
+                _syncManifest,
+                _dataRoot,
+                f => string.Equals(f, ResolvedMainExcelFileName, StringComparison.OrdinalIgnoreCase),
+                ReportStatus,
+                ReportFile,
+                label: "Main Excel data file");
+
+            ReportStatus("Loading hardware definitions...");
+            await Task.Run(LoadMainExcel);
+
+            if (HardwareBoards.Count > 0)
+            {
+                var boardExcelFiles = HardwareBoards
+                    .Select(e => e.ExcelDataFile)
+                    .Where(f => !string.IsNullOrWhiteSpace(f))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                ReportStatus("Checking board Excel data files...");
+                await OnlineServices.SyncFilesAsync(
+                    _syncManifest,
+                    _dataRoot,
+                    f => boardExcelFiles.Contains(f),
+                    ReportStatus,
+                    ReportFile,
+                    label: "board Excel data files");
+            }
+
+            return true;
+        }
+
+        // ###########################################################################################
         // Parses available file lists to find the highest compatible version of the main Excel file.
         // ###########################################################################################
         private static void DetermineResolvedMainExcel(IEnumerable<string> availableFiles)
@@ -348,6 +433,7 @@ namespace Handlers.DataHandling
                     string hardwareName = GetCellText(sheet, row, colMap[ColHardwareName]);
                     string boardName = GetCellText(sheet, row, colMap[ColBoardName]);
                     string excelFile = GetCellText(sheet, row, colMap[ColExcelDataFile]);
+                    string kiCadDataFile = GetCellTextSafe(sheet, row, colMap, ColKiCadDataFile);
                     string notes = GetCellText(sheet, row, colMap[ColHardwareNotes]);
 
                     // Carry forward hardware name for merged/empty cells in that column
@@ -365,6 +451,7 @@ namespace Handlers.DataHandling
                         HardwareName = hardwareName,
                         BoardName = boardName,
                         ExcelDataFile = excelFile,
+                        KiCadDataFile = kiCadDataFile,
                         HardwareNotes = notes
                     });
                 }
@@ -443,7 +530,7 @@ namespace Handlers.DataHandling
             }
             catch (Exception ex)
             {
-                Logger.Critical($"Failed to load main Excel data file - [{ex.Message}]");
+                Logger.Warning($"Failed to load main Excel data file - [{ex.Message}]");
             }
         }
 
