@@ -1,3 +1,8 @@
+- Added icon for showing status and to refresh online data
+
+
+
+
 - **Application**
   - Fixed zoom-in keeps its mouse/image position at first zoom-in
   - Fixed "Clear" button did not clear component filter input field

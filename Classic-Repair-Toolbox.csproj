@@ -66,6 +66,7 @@
  -->
 	<ItemGroup>
 		<AvaloniaResource Include="Assets\CRT_icon.png" />
+		<AvaloniaResource Include="Assets\Fonts\*.otf" />
 	</ItemGroup>
 
   <ItemGroup>

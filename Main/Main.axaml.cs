@@ -44,6 +44,11 @@ namespace CRT
         private bool _blinkSelectedEnabled;
         private bool _isShowingDataSyncDisabledBanner;
 
+        // Font Awesome spinner
+        private DispatcherTimer? _dataSyncStatusIconSpinTimer;
+        private int _dataSyncStatusIconSpinRequestCount;
+        private double _dataSyncStatusIconSpinAngle;
+
         // Region toggle: local override, does not affect the global setting
         private string _localRegion = UserSettings.Region;
 
@@ -67,8 +72,6 @@ namespace CRT
             this.TabSchematicsControl.Initialize(this);
             this.TabOverview.Initialize(this);
             this.TabContribute.Initialize(this);
-
-            UserSettings.CheckDataOnLaunchChanged += this.OnCheckDataOnLaunchSettingChanged;
 
             // Restore left panel width from settings
             this.RootGrid.ColumnDefinitions[0].Width = new GridLength(UserSettings.LeftPanelWidth);
@@ -132,11 +135,11 @@ namespace CRT
                 : "Classic Repair Toolbox";
 
             this.AddHandler(
-    InputElement.PointerPressedEvent,
-    this.OnMainPointerPressedCloseSinglePopup,
-    RoutingStrategies.Bubble,
-    handledEventsToo: true
-);
+                InputElement.PointerPressedEvent,
+                this.OnMainPointerPressedCloseSinglePopup,
+                RoutingStrategies.Bubble,
+                handledEventsToo: true
+            );
 
             this.AddHandler(
                 InputElement.KeyDownEvent,
@@ -202,6 +205,9 @@ namespace CRT
                 this.UpdateBanner.IsVisible = true;
             }
 
+            UserSettings.CheckDataOnLaunchChanged += this.OnCheckDataOnLaunchSettingChanged;
+            this.UpdateDataSyncStatusIcon();
+
             this.StartBackgroundSyncAsync();
         }
 
@@ -240,62 +246,75 @@ namespace CRT
         // ###########################################################################################
         // Performs the launch-time data update check immediately from the running UI, then starts
         // the existing background sync pass for any remaining non-Excel files.
+        // keepBannerTextStatic: when true, the banner keeps its initial text during the full refresh.
         // ###########################################################################################
-        internal async Task CheckForDataUpdatesNowAsync()
+        internal async Task CheckForDataUpdatesNowAsync(bool keepBannerTextStatic = false)
         {
             this.SyncBannerText.Text = "Checking data from online source - please wait...";
             this.SyncBannerRefreshButton.IsVisible = false;
             this.SyncBanner.IsVisible = true;
 
-            bool hasManifest = await DataManager.CheckForDataUpdatesNowAsync(
-                status => Dispatcher.UIThread.Post(() => this.SyncBannerText.Text = status));
+            this.StartDataSyncStatusIconSpin();
 
-            if (!hasManifest)
+            try
             {
-                return;
+                bool hasManifest = await DataManager.CheckForDataUpdatesNowAsync(
+                    status => Dispatcher.UIThread.Post(() =>
+                    {
+                        if (keepBannerTextStatic)
+                        {
+                            return;
+                        }
+
+                        if (status.Contains("up to date", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return;
+                        }
+
+                        this.SyncBannerText.Text = status;
+                    }));
+
+                if (!hasManifest)
+                {
+                    return;
+                }
+
+                this.PopulateHardwareDropDown();
+
+                if (DataManager.HasPendingSync)
+                {
+                    if (!keepBannerTextStatic)
+                    {
+                        this.SyncBannerText.Text = "Checking remaining files from online source - please wait...";
+                    }
+
+                    this.StartBackgroundSyncAsync(keepBannerTextStatic);
+                }
+                else
+                {
+                    this.SyncBanner.IsVisible = false;
+                }
+
+                if (!UserSettings.CheckVersionOnLaunch && DataManager.DataUpdateRequiresAppUpdate)
+                {
+                    this.UpdateBannerText.Text = "Newer main Excel data file is available, but requires a newer application version. No more data updates will be given for this version";
+                    this.UpdateBannerInstallButton.IsVisible = false;
+                    this.UpdateBannerViewNotesButton.IsVisible = false;
+                    this.UpdateBanner.IsVisible = true;
+                }
             }
-
-            this.PopulateHardwareDropDown();
-            this.StartBackgroundSyncAsync();
-
-            if (!UserSettings.CheckVersionOnLaunch && DataManager.DataUpdateRequiresAppUpdate)
+            finally
             {
-                this.UpdateBannerText.Text = "Newer main Excel data file is available, but requires a newer application version. No more data updates will be given for this version";
-                this.UpdateBannerInstallButton.IsVisible = false;
-                this.UpdateBannerViewNotesButton.IsVisible = false;
-                this.UpdateBanner.IsVisible = true;
+                this.StopDataSyncStatusIconSpin();
             }
         }
-
-/*
-        // ###########################################################################################
-        // Checks for an available update on startup and shows the banner if one is found.
-        // ###########################################################################################
-        private async void CheckForAppUpdate()
-        {
-            bool? available = await UpdateService.CheckForUpdateAsync();
-
-            if (available == true)
-            {
-                this.UpdateBannerText.Text = $"Version {UpdateService.PendingVersion} is available";
-                this.UpdateBanner.IsVisible = true;
-            }
-            else if (DataManager.DataUpdateRequiresAppUpdate)
-            {
-                // App Velopack doesn't see an update, but manifest demands one.
-                this.UpdateBannerText.Text = "Newer main Excel data file is available, but requires a newer application version. No more data updates will be given for this version";
-                this.UpdateBannerInstallButton.IsVisible = false;
-                this.UpdateBannerViewNotesButton.IsVisible = false;
-                this.UpdateBanner.IsVisible = true;
-            }
-        }
-*/
 
         // ###########################################################################################
         // Shows the sync banner during background sync, then hides it automatically if nothing
         // changed, or keeps it visible with an update summary and a refresh button.
+        // keepBannerTextStatic: when true, intermediate status text is suppressed during the run.
         // ###########################################################################################
-        private async void StartBackgroundSyncAsync()
+        private async void StartBackgroundSyncAsync(bool keepBannerTextStatic = false)
         {
             if (!DataManager.HasPendingSync)
                 return;
@@ -304,20 +323,42 @@ namespace CRT
             this.SyncBannerRefreshButton.IsVisible = false;
             this.SyncBanner.IsVisible = true;
 
-            int changed = await DataManager.SyncRemainingAsync(status =>
-                Dispatcher.UIThread.Post(() => this.SyncBannerText.Text = status));
+            this.StartDataSyncStatusIconSpin();
 
-            if (changed > 0)
+            try
             {
-                this.SyncBannerText.Text = changed == 1
-                    ? "1 file updated in the background - please refresh board"
-                    : $"{changed} files updated in the background - please refresh board";
+                int changed = await DataManager.SyncRemainingAsync(status =>
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        if (keepBannerTextStatic)
+                        {
+                            return;
+                        }
 
-                this.SyncBannerRefreshButton.IsVisible = true;
+                        if (status.Contains("up to date", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return;
+                        }
+
+                        this.SyncBannerText.Text = status;
+                    }));
+
+                if (changed > 0)
+                {
+                    this.SyncBannerText.Text = changed == 1
+                        ? "1 file updated in the background - please refresh board"
+                        : $"{changed} files updated in the background - please refresh board";
+
+                    this.SyncBannerRefreshButton.IsVisible = true;
+                }
+                else
+                {
+                    this.SyncBanner.IsVisible = false;
+                }
             }
-            else
+            finally
             {
-                this.SyncBanner.IsVisible = false;
+                this.StopDataSyncStatusIconSpin();
             }
         }
 
@@ -1939,6 +1980,8 @@ namespace CRT
         {
             Dispatcher.UIThread.Post(() =>
             {
+                this.UpdateDataSyncStatusIcon();
+
                 if (isEnabled)
                 {
                     this.HideDataSyncDisabledBanner();
@@ -2065,6 +2108,136 @@ namespace CRT
             this.SchematicsLabelEditorModeBanner.IsVisible = isVisible;
         }
 
+        // ###########################################################################################
+        // Updates the global launch-time data-sync status icon, clickability and tooltip in the main window.
+        // ###########################################################################################
+        private void UpdateDataSyncStatusIcon()
+        {
+            bool isEnabled = UserSettings.CheckDataOnLaunch;
+            bool isCheckingOnline = isEnabled && this._dataSyncStatusIconSpinRequestCount > 0;
+            bool isClickable = !isCheckingOnline;
+
+            this.DataSyncStatusIconTextBlock.IsVisible = !isCheckingOnline;
+            this.DataSyncStatusSpinnerCanvas.IsVisible = isCheckingOnline;
+
+            this.DataSyncStatusIconTextBlock.Text = isEnabled
+                ? "\uf021"
+                : "\uf05e";
+
+            if (this.TryFindResource(isEnabled ? "Text_Success_Fg" : "Text_Fail_Fg", out var brushResource) &&
+                brushResource is IBrush brush)
+            {
+                this.DataSyncStatusIconTextBlock.Foreground = brush;
+                this.DataSyncStatusSpinnerEllipse.Stroke = brush;
+            }
+            else
+            {
+                IBrush fallbackBrush = isEnabled
+                    ? Brushes.ForestGreen
+                    : Brushes.IndianRed;
+
+                this.DataSyncStatusIconTextBlock.Foreground = fallbackBrush;
+                this.DataSyncStatusSpinnerEllipse.Stroke = fallbackBrush;
+            }
+
+            this.DataSyncStatusIconBorder.Cursor = new Cursor(
+                isClickable
+                    ? StandardCursorType.Hand
+                    : StandardCursorType.Arrow);
+
+            ToolTip.SetTip(
+                this.DataSyncStatusIconBorder,
+                isCheckingOnline
+                    ? "Checking data from online source..."
+                    : isEnabled
+                        ? "Data update is enabled. Click to refresh data now"
+                        : "Data update is disabled. Click to open \"Configuration\" tab");
+        }
+
+        // ###########################################################################################
+        // Handles clicks on the top-right data-sync status icon.
+        // Enabled opens an immediate refresh; disabled navigates to the Configuration tab.
+        // ###########################################################################################
+        private async void OnDataSyncStatusIconPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            if (this._dataSyncStatusIconSpinRequestCount > 0)
+            {
+                return;
+            }
+
+            e.Handled = true;
+
+            if (!UserSettings.CheckDataOnLaunch)
+            {
+                this.MainTabControl.SelectedItem = this.ConfigurationTabItem;
+                return;
+            }
+
+            await this.CheckForDataUpdatesNowAsync(keepBannerTextStatic: true);
+        }
+
+        // ###########################################################################################
+        // Starts animating the top-right data-sync status spinner while online data checks are running.
+        // Nested calls are reference-counted so overlapping sync flows do not stop the spinner early.
+        // ###########################################################################################
+        private void StartDataSyncStatusIconSpin()
+        {
+            if (!UserSettings.CheckDataOnLaunch)
+            {
+                return;
+            }
+
+            this._dataSyncStatusIconSpinRequestCount++;
+
+            if (this._dataSyncStatusIconSpinTimer == null)
+            {
+                this._dataSyncStatusIconSpinTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(25)
+                };
+
+                this._dataSyncStatusIconSpinTimer.Tick += (_, _) =>
+                {
+                    this._dataSyncStatusIconSpinAngle = (this._dataSyncStatusIconSpinAngle + 1.5) % 52.0;
+                    this.DataSyncStatusSpinnerEllipse.StrokeDashOffset = -this._dataSyncStatusIconSpinAngle;
+                };
+            }
+
+            if (!this._dataSyncStatusIconSpinTimer.IsEnabled)
+            {
+                this.DataSyncStatusSpinnerEllipse.StrokeDashOffset = -this._dataSyncStatusIconSpinAngle;
+                this._dataSyncStatusIconSpinTimer.Start();
+            }
+
+            this.UpdateDataSyncStatusIcon();
+        }
+
+        // ###########################################################################################
+        // Stops animating the top-right data-sync status spinner after online data checks finish.
+        // ###########################################################################################
+        private void StopDataSyncStatusIconSpin()
+        {
+            if (this._dataSyncStatusIconSpinRequestCount > 0)
+            {
+                this._dataSyncStatusIconSpinRequestCount--;
+            }
+
+            if (this._dataSyncStatusIconSpinRequestCount > 0)
+            {
+                return;
+            }
+
+            this._dataSyncStatusIconSpinAngle = 0.0;
+            this._dataSyncStatusIconSpinTimer?.Stop();
+            this.DataSyncStatusSpinnerEllipse.StrokeDashOffset = 0.0;
+
+            this.UpdateDataSyncStatusIcon();
+        }
 
         // ###########################################################################################
     }

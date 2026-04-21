@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CRT"
+		xmlns:shapes="clr-namespace:Avalonia.Controls.Shapes;assembly=Avalonia.Controls"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="CRT.Main"
         Title="Classic Repair Toolbox"
@@ -398,7 +399,7 @@
 						<local:TabContribute x:Name="TabContribute" />
 					</TabItem>
 
-					<TabItem Header="Configuration">
+					<TabItem x:Name="ConfigurationTabItem" Header="Configuration">
 						<local:TabConfiguration x:Name="TabConfiguration" />
 					</TabItem>
 
@@ -411,6 +412,51 @@
 					</TabItem>
 
 				</TabControl>
+
+				<Border x:Name="DataSyncStatusIconBorder"
+						Grid.Row="3"
+						ZIndex="10"
+						HorizontalAlignment="Right"
+						VerticalAlignment="Top"
+						Margin="0,15,15,0"
+						Width="22"
+						Height="22"
+						Background="Transparent"
+						ClipToBounds="True"
+						PointerPressed="OnDataSyncStatusIconPointerPressed">
+					<Grid Width="22"
+						  Height="22"
+						  ClipToBounds="True">
+
+						<TextBlock x:Name="DataSyncStatusIconTextBlock"
+								   Width="22"
+								   Height="22"
+								   FontFamily="{StaticResource FontAwesomeSolid}"
+								   FontWeight="Black"
+								   FontSize="18"
+								   TextAlignment="Center"
+								   HorizontalAlignment="Center"
+								   VerticalAlignment="Center" />
+
+						<Canvas x:Name="DataSyncStatusSpinnerCanvas"
+								Width="22"
+								Height="22"
+								IsVisible="False"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								ClipToBounds="True">
+							<shapes:Ellipse x:Name="DataSyncStatusSpinnerEllipse"
+											Width="20"
+											Height="20"
+											Canvas.Left="3"
+											Canvas.Top="3"
+											StrokeThickness="3"
+											StrokeLineCap="Round"
+											StrokeDashArray="12,40" />
+						</Canvas>
+
+					</Grid>
+				</Border>
 
 			</Grid>
 		</Border>

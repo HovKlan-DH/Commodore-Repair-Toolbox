@@ -3,15 +3,20 @@
              x:Class="CRT.App"
              RequestedThemeVariant="Default">
 
-    <Application.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.ThemeDictionaries>
+	<Application.Resources>
+		<ResourceDictionary>
+
+			<FontFamily x:Key="FontAwesomeSolid">
+				avares://Classic-Repair-Toolbox/Assets/Fonts/Font Awesome 7 Free-Solid-900.otf#Font Awesome 7 Free Solid
+			</FontFamily>
+
+			<ResourceDictionary.ThemeDictionaries>
 
 				<!-- ########################################################################### -->
 				<!-- LIGHT                                                                       -->
 				<!-- ########################################################################### -->
-				
-                <ResourceDictionary x:Key="Light">
+
+				<ResourceDictionary x:Key="Light">
 
 					<!-- Light, Generic colors -->
 					<SolidColorBrush x:Key="Bg">White</SolidColorBrush>
@@ -47,7 +52,7 @@
 					<SolidColorBrush x:Key="Table_RowHover_Bg">#E1F0FA</SolidColorBrush>
 					<SolidColorBrush x:Key="Text_Success_Fg">#547131</SolidColorBrush>
 					<SolidColorBrush x:Key="Text_Fail_Fg">IndianRed</SolidColorBrush>
-					
+
 					<!-- Light, Main -->
 					<SolidColorBrush x:Key="Main_TabUnderline_Selected">IndianRed</SolidColorBrush>
 					<SolidColorBrush x:Key="Main_TabUnderline_Hover">#ecc3c3</SolidColorBrush>
@@ -55,32 +60,32 @@
 					<SolidColorBrush x:Key="Main_Banner_Fg">White</SolidColorBrush>
 					<SolidColorBrush x:Key="Main_BannerButtonsHover_Bg">#4F3528</SolidColorBrush>
 					<SolidColorBrush x:Key="Main_BannerButtonsHover_Fg">#DDE0DA</SolidColorBrush>
-					
-                    <!-- Light, Schematics tab -->
-                    <SolidColorBrush x:Key="Schematics_Name_Bg">Khaki</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Name_Fg">Black</SolidColorBrush>
+
+					<!-- Light, Schematics tab -->
+					<SolidColorBrush x:Key="Schematics_Name_Bg">Khaki</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_Name_Fg">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_Name_Border">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Region_PAL_Bg">IndianRed</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Region_PAL_Fg">White</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_Region_PAL_Bg">IndianRed</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_Region_PAL_Fg">White</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_Region_PAL_Border">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Region_NTSC_Bg">#CBD6E5</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Region_NTSC_Fg">Black</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_Region_NTSC_Bg">#CBD6E5</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_Region_NTSC_Fg">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_Region_NTSC_Border">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_ComponentHover_Bg">Khaki</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_ComponentHover_Fg">Black</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_ComponentHover_Bg">Khaki</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_ComponentHover_Fg">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_ComponentHover_Border">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Panels_Bg">#F2F2F2</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Panels_Fg">Black</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_Panels_Bg">#F2F2F2</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_Panels_Fg">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_Panels_Border">Gray</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_ComponentLabel_Bg">#222113</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_ComponentLabel_Fg">#ECEEEF</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_ComponentLabel_Bg">#222113</SolidColorBrush>
+					<SolidColorBrush x:Key="Schematics_ComponentLabel_Fg">#ECEEEF</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_ComponentLabel_Border">Gray</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_Panel_TracesVisible_Trace_Border">Gray</SolidColorBrush>
 					<SolidColorBrush x:Key="Schematics_FirstPin">Orange</SolidColorBrush>
-                    <Color x:Key="Schematics_TracePalette_Color1">#F40000</Color>
-                    <Color x:Key="Schematics_TracePalette_Color2">#1564F4</Color>
-                    <Color x:Key="Schematics_TracePalette_Color3">#0BC419</Color>
-                    <Color x:Key="Schematics_TracePalette_Color4">#E6E600</Color>
+					<Color x:Key="Schematics_TracePalette_Color1">#F40000</Color>
+					<Color x:Key="Schematics_TracePalette_Color2">#1564F4</Color>
+					<Color x:Key="Schematics_TracePalette_Color3">#0BC419</Color>
+					<Color x:Key="Schematics_TracePalette_Color4">#E6E600</Color>
 
 					<!-- Light, Thumbnail -->
 					<SolidColorBrush x:Key="Thumbnail_Border">Black</SolidColorBrush>
@@ -111,126 +116,126 @@
 					<SolidColorBrush x:Key="ComponentPopup_KeyboardTyping_Border">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="ComponentPopup_ImageTransparent_Bg">White</SolidColorBrush>
 					<SolidColorBrush x:Key="ComponentPopup_BulletList_Fg">Red</SolidColorBrush>
-					
-                    <!-- Light, Feedback tab -->
-                    <SolidColorBrush x:Key="Feedback_TrashIcon_Fg">IndianRed</SolidColorBrush>
-                    
-                </ResourceDictionary>
 
-				<!-- ########################################################################### -->
-				<!-- DARK                                                                        -->
-				<!-- ########################################################################### -->
-				
-                <ResourceDictionary x:Key="Dark">
+					<!-- Light, Feedback tab -->
+					<SolidColorBrush x:Key="Feedback_TrashIcon_Fg">IndianRed</SolidColorBrush>
 
-                    <!-- Dark, Generic colors -->
-					<SolidColorBrush x:Key="Bg">#201C1A</SolidColorBrush>
-					<SolidColorBrush x:Key="Fg">#E8E0DA</SolidColorBrush>
-					<SolidColorBrush x:Key="Border">LightGray</SolidColorBrush>
-					<SolidColorBrush x:Key="Form_Bg">#2A2421</SolidColorBrush>
-					<SolidColorBrush x:Key="Form_Fg">#E8DDCF</SolidColorBrush>
-					<SolidColorBrush x:Key="Form_Border">#524842</SolidColorBrush>
-					<SolidColorBrush x:Key="Form_Selected_Bg">#735443</SolidColorBrush>
-					<SolidColorBrush x:Key="Form_Selected_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="Form_Selected_Hover_Bg">#5E4334</SolidColorBrush>
-					<SolidColorBrush x:Key="Splitter">Gray</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Bg">#3E342F</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Fg">#E8E0D4</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Border">#524842</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Ok_Bg">#4F8A5B</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Ok_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Ok_Border">#3E6E48</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Cancel_Bg">IndianRed</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Cancel_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Cancel_Border">#B85C5C</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Highlighted_Bg">#B87352</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Highlighted_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="Button_Highlighted_Border">#B87352</SolidColorBrush>
-					<SolidColorBrush x:Key="Panel_Border">#524842</SolidColorBrush>
-					<SolidColorBrush x:Key="Link_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="LinkHover_Fg">#E8DDCF</SolidColorBrush>
-					<SolidColorBrush x:Key="Table_Header_Bg">#3E342F</SolidColorBrush>
-					<SolidColorBrush x:Key="Table_Header_Fg">#E8DDCF</SolidColorBrush>
-					<SolidColorBrush x:Key="Table_Bg">#2A2421</SolidColorBrush>
-					<SolidColorBrush x:Key="Table_Fg">#E8DDCF</SolidColorBrush>
-					<SolidColorBrush x:Key="Table_BorderRowLine">#3E342F</SolidColorBrush>
-					<SolidColorBrush x:Key="Table_RowHover_Bg">#3C2F28</SolidColorBrush>
-					<SolidColorBrush x:Key="Text_Success_Fg">#4ADE80</SolidColorBrush>
-					<SolidColorBrush x:Key="Text_Fail_Fg">#EF4444</SolidColorBrush>
+				</ResourceDictionary>
 
-					<!-- Dark, Main, banners -->
-					<SolidColorBrush x:Key="Main_TabUnderline_Selected">IndianRed</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_TabUnderline_Hover">#ecc3c3</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_Banner_Bg">#38241A</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_Banner_Fg">#E8E0DA</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_BannerButtonsHover_Bg">#4F3528</SolidColorBrush>
-					<SolidColorBrush x:Key="Main_BannerButtonsHover_Fg">#DDE0DA</SolidColorBrush>
+			<!-- ########################################################################### -->
+			<!-- DARK                                                                        -->
+			<!-- ########################################################################### -->
 
-					<!-- Dark, Schematics tab -->
-                    <SolidColorBrush x:Key="Schematics_Name_Bg">Khaki</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Name_Fg">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="Schematics_Name_Border">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Region_PAL_Bg">IndianRed</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Region_PAL_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="Schematics_Region_PAL_Border">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Region_NTSC_Bg">#CBD6E5</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Region_NTSC_Fg">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="Schematics_Region_NTSC_Border">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_ComponentHover_Bg">Khaki</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_ComponentHover_Fg">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="Schematics_ComponentHover_Border">Black</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Panels_Bg">#46403E</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_Panels_Fg">#E8E0DA</SolidColorBrush>
-					<SolidColorBrush x:Key="Schematics_Panels_Border">#524842</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_ComponentLabel_Bg">#222113</SolidColorBrush>
-                    <SolidColorBrush x:Key="Schematics_ComponentLabel_Fg">#ECEEEF</SolidColorBrush>
-					<SolidColorBrush x:Key="Schematics_ComponentLabel_Border">Gray</SolidColorBrush>
-					<SolidColorBrush x:Key="Schematics_Panel_TracesVisible_Trace_Border">#524842</SolidColorBrush>
-					<SolidColorBrush x:Key="Schematics_FirstPin">Orange</SolidColorBrush>
-                    <Color x:Key="Schematics_TracePalette_Color1">#F40000</Color>
-                    <Color x:Key="Schematics_TracePalette_Color2">#1564F4</Color>
-                    <Color x:Key="Schematics_TracePalette_Color3">#0BC419</Color>
-                    <Color x:Key="Schematics_TracePalette_Color4">#E6E600</Color>
+			<ResourceDictionary x:Key="Dark">
 
-					<!-- Dark, Thumbnail -->
-					<SolidColorBrush x:Key="Thumbnail_Border">LightGray</SolidColorBrush>
-					<SolidColorBrush x:Key="Thumbnail_BorderSelected">IndianRed</SolidColorBrush>
-					<SolidColorBrush x:Key="Thumbnail_Bg">#3D302A</SolidColorBrush>
-					<SolidColorBrush x:Key="Thumbnail_Fg">LightGray</SolidColorBrush>
-					<SolidColorBrush x:Key="Thumbnail_Selection_Bg">#4682B4</SolidColorBrush>
-					<SolidColorBrush x:Key="Thumbnail_Selection_Fg">White</SolidColorBrush>
-					
-					<!-- Dark, Component info popup -->
-					<SolidColorBrush x:Key="ComponentPopup_Name_Bg">Khaki</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_Name_Fg">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_Name_Border">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_Pin_Bg">Khaki</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_Pin_Fg">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_Pin_Border">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_OscilloscopeExpected_Bg">#B0D8EC</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_OscilloscopeExpected_Fg">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_OscilloscopeExpected_Border">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_OscilloscopeSyncData_Bg">#735443</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_OscilloscopeSyncData_Fg">#E8DDCF</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_OscilloscopeSyncData_Border">#B87352</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_ImageXofY_Bg">#BB000000</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_ImageXofY_Fg">White</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_ImageXofY_Border">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_KeyboardTyping_Bg">Khaki</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_KeyboardTyping_Fg">DarkOliveGreen</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_KeyboardTyping_Border">Black</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_ImageTransparent_Bg">#A99F99</SolidColorBrush>
-					<SolidColorBrush x:Key="ComponentPopup_BulletList_Fg">Blue</SolidColorBrush>
-					
-                    <!-- Dark, Feedback tab -->
-                    <SolidColorBrush x:Key="Feedback_TrashIcon_Fg">IndianRed</SolidColorBrush>
+				<!-- Dark, Generic colors -->
+				<SolidColorBrush x:Key="Bg">#201C1A</SolidColorBrush>
+				<SolidColorBrush x:Key="Fg">#E8E0DA</SolidColorBrush>
+				<SolidColorBrush x:Key="Border">LightGray</SolidColorBrush>
+				<SolidColorBrush x:Key="Form_Bg">#2A2421</SolidColorBrush>
+				<SolidColorBrush x:Key="Form_Fg">#E8DDCF</SolidColorBrush>
+				<SolidColorBrush x:Key="Form_Border">#524842</SolidColorBrush>
+				<SolidColorBrush x:Key="Form_Selected_Bg">#735443</SolidColorBrush>
+				<SolidColorBrush x:Key="Form_Selected_Fg">White</SolidColorBrush>
+				<SolidColorBrush x:Key="Form_Selected_Hover_Bg">#5E4334</SolidColorBrush>
+				<SolidColorBrush x:Key="Splitter">Gray</SolidColorBrush>
+				<SolidColorBrush x:Key="Button_Bg">#3E342F</SolidColorBrush>
+				<SolidColorBrush x:Key="Button_Fg">#E8E0D4</SolidColorBrush>
+				<SolidColorBrush x:Key="Button_Border">#524842</SolidColorBrush>
+				<SolidColorBrush x:Key="Button_Ok_Bg">#4F8A5B</SolidColorBrush>
+				<SolidColorBrush x:Key="Button_Ok_Fg">White</SolidColorBrush>
+				<SolidColorBrush x:Key="Button_Ok_Border">#3E6E48</SolidColorBrush>
+				<SolidColorBrush x:Key="Button_Cancel_Bg">IndianRed</SolidColorBrush>
+				<SolidColorBrush x:Key="Button_Cancel_Fg">White</SolidColorBrush>
+				<SolidColorBrush x:Key="Button_Cancel_Border">#B85C5C</SolidColorBrush>
+				<SolidColorBrush x:Key="Button_Highlighted_Bg">#B87352</SolidColorBrush>
+				<SolidColorBrush x:Key="Button_Highlighted_Fg">White</SolidColorBrush>
+				<SolidColorBrush x:Key="Button_Highlighted_Border">#B87352</SolidColorBrush>
+				<SolidColorBrush x:Key="Panel_Border">#524842</SolidColorBrush>
+				<SolidColorBrush x:Key="Link_Fg">White</SolidColorBrush>
+				<SolidColorBrush x:Key="LinkHover_Fg">#E8DDCF</SolidColorBrush>
+				<SolidColorBrush x:Key="Table_Header_Bg">#3E342F</SolidColorBrush>
+				<SolidColorBrush x:Key="Table_Header_Fg">#E8DDCF</SolidColorBrush>
+				<SolidColorBrush x:Key="Table_Bg">#2A2421</SolidColorBrush>
+				<SolidColorBrush x:Key="Table_Fg">#E8DDCF</SolidColorBrush>
+				<SolidColorBrush x:Key="Table_BorderRowLine">#3E342F</SolidColorBrush>
+				<SolidColorBrush x:Key="Table_RowHover_Bg">#3C2F28</SolidColorBrush>
+				<SolidColorBrush x:Key="Text_Success_Fg">#4ADE80</SolidColorBrush>
+				<SolidColorBrush x:Key="Text_Fail_Fg">#EF4444</SolidColorBrush>
 
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
-        </ResourceDictionary>
-    </Application.Resources>
+				<!-- Dark, Main, banners -->
+				<SolidColorBrush x:Key="Main_TabUnderline_Selected">IndianRed</SolidColorBrush>
+				<SolidColorBrush x:Key="Main_TabUnderline_Hover">#ecc3c3</SolidColorBrush>
+				<SolidColorBrush x:Key="Main_Banner_Bg">#38241A</SolidColorBrush>
+				<SolidColorBrush x:Key="Main_Banner_Fg">#E8E0DA</SolidColorBrush>
+				<SolidColorBrush x:Key="Main_BannerButtonsHover_Bg">#4F3528</SolidColorBrush>
+				<SolidColorBrush x:Key="Main_BannerButtonsHover_Fg">#DDE0DA</SolidColorBrush>
 
-    <Application.Styles>
+				<!-- Dark, Schematics tab -->
+				<SolidColorBrush x:Key="Schematics_Name_Bg">Khaki</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_Name_Fg">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_Name_Border">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_Region_PAL_Bg">IndianRed</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_Region_PAL_Fg">White</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_Region_PAL_Border">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_Region_NTSC_Bg">#CBD6E5</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_Region_NTSC_Fg">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_Region_NTSC_Border">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_ComponentHover_Bg">Khaki</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_ComponentHover_Fg">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_ComponentHover_Border">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_Panels_Bg">#46403E</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_Panels_Fg">#E8E0DA</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_Panels_Border">#524842</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_ComponentLabel_Bg">#222113</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_ComponentLabel_Fg">#ECEEEF</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_ComponentLabel_Border">Gray</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_Panel_TracesVisible_Trace_Border">#524842</SolidColorBrush>
+				<SolidColorBrush x:Key="Schematics_FirstPin">Orange</SolidColorBrush>
+				<Color x:Key="Schematics_TracePalette_Color1">#F40000</Color>
+				<Color x:Key="Schematics_TracePalette_Color2">#1564F4</Color>
+				<Color x:Key="Schematics_TracePalette_Color3">#0BC419</Color>
+				<Color x:Key="Schematics_TracePalette_Color4">#E6E600</Color>
+
+				<!-- Dark, Thumbnail -->
+				<SolidColorBrush x:Key="Thumbnail_Border">LightGray</SolidColorBrush>
+				<SolidColorBrush x:Key="Thumbnail_BorderSelected">IndianRed</SolidColorBrush>
+				<SolidColorBrush x:Key="Thumbnail_Bg">#3D302A</SolidColorBrush>
+				<SolidColorBrush x:Key="Thumbnail_Fg">LightGray</SolidColorBrush>
+				<SolidColorBrush x:Key="Thumbnail_Selection_Bg">#4682B4</SolidColorBrush>
+				<SolidColorBrush x:Key="Thumbnail_Selection_Fg">White</SolidColorBrush>
+
+				<!-- Dark, Component info popup -->
+				<SolidColorBrush x:Key="ComponentPopup_Name_Bg">Khaki</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_Name_Fg">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_Name_Border">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_Pin_Bg">Khaki</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_Pin_Fg">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_Pin_Border">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_OscilloscopeExpected_Bg">#B0D8EC</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_OscilloscopeExpected_Fg">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_OscilloscopeExpected_Border">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_OscilloscopeSyncData_Bg">#735443</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_OscilloscopeSyncData_Fg">#E8DDCF</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_OscilloscopeSyncData_Border">#B87352</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_ImageXofY_Bg">#BB000000</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_ImageXofY_Fg">White</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_ImageXofY_Border">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_KeyboardTyping_Bg">Khaki</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_KeyboardTyping_Fg">DarkOliveGreen</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_KeyboardTyping_Border">Black</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_ImageTransparent_Bg">#A99F99</SolidColorBrush>
+				<SolidColorBrush x:Key="ComponentPopup_BulletList_Fg">Blue</SolidColorBrush>
+
+				<!-- Dark, Feedback tab -->
+				<SolidColorBrush x:Key="Feedback_TrashIcon_Fg">IndianRed</SolidColorBrush>
+
+			</ResourceDictionary>
+		</ResourceDictionary.ThemeDictionaries>
+	</ResourceDictionary>
+</Application.Resources>
+
+	<Application.Styles>
         <FluentTheme>
             <FluentTheme.Palettes>
                 <!-- Native Avalonia controls themed towards brown/copper -->

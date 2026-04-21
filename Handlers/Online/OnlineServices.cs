@@ -206,11 +206,18 @@ namespace Handlers.OnlineHandling
                 }
 
                 if (validEntries.Count == 1 && label != null)
+                {
                     Logger.Info($"{label} [{validEntries[0].File}] is up to date");
+                    onStatus?.Invoke($"{label} is up to date");
+                }
                 else
+                {
                     Logger.Info($"All local [{validEntries.Count}] valid {label ?? "files"} are up to date");
+                    onStatus?.Invoke(label != null
+                        ? $"All local {label} are up to date"
+                        : "All local files are up to date");
+                }
 
-                onStatus?.Invoke("All local files are up to date");
                 onFile?.Invoke(string.Empty);
                 return 0;
             }
