@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Handlers.DataHandling;
 using System;
 using System.Diagnostics;
@@ -124,7 +125,7 @@ namespace CRT
         // ###########################################################################################
         // Opens the persistent AppData folder that contains the log and settings files.
         // ###########################################################################################
-        private void OnOpenAppDataFolderClick(object? sender, RoutedEventArgs e)
+        private async void OnOpenAppDataFolderClick(object? sender, RoutedEventArgs e)
         {
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             var directory = Path.Combine(appData, AppConfig.AppFolderName);
@@ -133,18 +134,83 @@ namespace CRT
             {
                 Directory.CreateDirectory(directory);
 
-                var psi = new ProcessStartInfo
+                if (TryOpenDirectory(directory, out string failureDetails))
                 {
-                    FileName = directory,
-                    UseShellExecute = true
-                };
+                    return;
+                }
 
-                Process.Start(psi);
+                Logger.Warning(
+                    $"Failed to open AppData folder: [{directory}] - launcher details: [{failureDetails}]");
+
+                await this.ShowOpenAppDataFolderFailedDialogAsync(directory);
             }
             catch (Exception ex)
             {
                 Logger.Warning($"Failed to open AppData folder: [{directory}] - [{ex.Message}]");
+                await this.ShowOpenAppDataFolderFailedDialogAsync(directory);
             }
+        }
+
+        // ###########################################################################################
+        // Shows a dialog with the AppData folder path when automatic opening fails.
+        // ###########################################################################################
+        private async System.Threading.Tasks.Task ShowOpenAppDataFolderFailedDialogAsync(string directory)
+        {
+            if (TopLevel.GetTopLevel(this) is not Window owner)
+            {
+                return;
+            }
+
+            var closeButton = new Button
+            {
+                Content = "OK",
+                MinWidth = 110,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Center
+            };
+
+            var dialog = new Window
+            {
+                Title = "Unable to open folder",
+                Width = 520,
+                MinWidth = 420,
+                CanResize = false,
+                ShowInTaskbar = false,
+                SizeToContent = SizeToContent.Height,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+
+            closeButton.Click += (_, _) => dialog.Close();
+
+            dialog.Content = new Border
+            {
+                Padding = new Thickness(18),
+                Child = new StackPanel
+                {
+                    Spacing = 14,
+                    Children =
+            {
+                new TextBlock
+                {
+                    Text = "The application could not open the data/log/settings folder automatically.",
+                    TextWrapping = TextWrapping.Wrap
+                },
+                new TextBlock
+                {
+                    Text = "You can open it manually using this path:",
+                    TextWrapping = TextWrapping.Wrap
+                },
+                new SelectableTextBlock
+                {
+                    Text = directory,
+                    TextWrapping = TextWrapping.Wrap
+                },
+                closeButton
+            }
+                }
+            };
+
+            await dialog.ShowDialog(owner);
         }
 
         // ###########################################################################################
@@ -169,6 +235,209 @@ namespace CRT
                 this.MultipleInstancesForComponentPopupCheckBox.IsChecked == true;
         }
 
+        // ###########################################################################################
+        // Opens a directory with the platform-specific file manager command and returns failure details.
+        // ###########################################################################################
+        private static bool TryOpenDirectory(string directory, out string failureDetails)
+        {
+            var attempts = new System.Collections.Generic.List<string>();
+
+            if (OperatingSystem.IsWindows())
+            {
+                bool success = TryStartShellTarget("explorer.exe", attempts, directory);
+                failureDetails = string.Join(" | ", attempts);
+                return success;
+            }
+
+            if (OperatingSystem.IsMacOS())
+            {
+                bool success = TryStartCommandWithDiagnostics("open", attempts, directory);
+                failureDetails = string.Join(" | ", attempts);
+                return success;
+            }
+
+            if (OperatingSystem.IsLinux())
+            {
+                if (TryStartCommandWithDiagnostics("xdg-open", attempts, directory))
+                {
+                    failureDetails = string.Join(" | ", attempts);
+                    return true;
+                }
+
+                if (TryStartCommandWithDiagnostics("gio", attempts, "open", directory))
+                {
+                    failureDetails = string.Join(" | ", attempts);
+                    return true;
+                }
+
+                failureDetails = string.Join(" | ", attempts);
+                return false;
+            }
+
+            attempts.Add("Unsupported operating system");
+            failureDetails = string.Join(" | ", attempts);
+            return false;
+        }
+
+        // ###########################################################################################
+        // Starts an external command with arguments and records diagnostic details for each attempt.
+        // ###########################################################################################
+        private static bool TryStartCommandWithDiagnostics(
+            string fileName,
+            System.Collections.Generic.List<string> attempts,
+            params string[] arguments)
+        {
+            string argumentText = arguments.Length == 0 ? "(none)" : string.Join(" ", arguments);
+
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    UseShellExecute = false,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true
+                };
+
+                foreach (var argument in arguments)
+                {
+                    psi.ArgumentList.Add(argument);
+                }
+
+                using var process = Process.Start(psi);
+
+                if (process == null)
+                {
+                    attempts.Add($"Command [{fileName}] args [{argumentText}] did not start a process");
+                    return false;
+                }
+
+                if (process.WaitForExit(2000))
+                {
+                    string standardOutput = process.StandardOutput.ReadToEnd().Trim();
+                    string standardError = process.StandardError.ReadToEnd().Trim();
+
+                    if (process.ExitCode == 0)
+                    {
+                        attempts.Add($"Command [{fileName}] args [{argumentText}] succeeded with exit code [0]");
+                        return true;
+                    }
+
+                    attempts.Add(
+                        $"Command [{fileName}] args [{argumentText}] failed with exit code [{process.ExitCode}] output [{standardOutput}] error [{standardError}]");
+                    return false;
+                }
+
+                attempts.Add($"Command [{fileName}] args [{argumentText}] started and is still running");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                attempts.Add($"Command [{fileName}] args [{argumentText}] threw [{ex.GetType().Name}: {ex.Message}]");
+                return false;
+            }
+        }
+
+        // ###########################################################################################
+        // Starts a shell target and treats successful process creation as success.
+        // This is used for Windows Explorer where exit codes are not reliable for this scenario.
+        // ###########################################################################################
+        private static bool TryStartShellTarget(
+            string fileName,
+            System.Collections.Generic.List<string> attempts,
+            params string[] arguments)
+        {
+            string argumentText = arguments.Length == 0 ? "(none)" : string.Join(" ", arguments);
+
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    UseShellExecute = false
+                };
+
+                foreach (var argument in arguments)
+                {
+                    psi.ArgumentList.Add(argument);
+                }
+
+                using var process = Process.Start(psi);
+
+                if (process == null)
+                {
+                    attempts.Add($"Command [{fileName}] args [{argumentText}] did not start a process");
+                    return false;
+                }
+
+                attempts.Add($"Command [{fileName}] args [{argumentText}] started successfully");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                attempts.Add($"Command [{fileName}] args [{argumentText}] threw [{ex.GetType().Name}: {ex.Message}]");
+                return false;
+            }
+        }
+
+        // ###########################################################################################
+        // Starts an external process with arguments and records diagnostic details for each attempt.
+        // ###########################################################################################
+        private static bool TryStartProcess(
+            string fileName,
+            System.Collections.Generic.List<string> attempts,
+            params string[] arguments)
+        {
+            string argumentText = arguments.Length == 0 ? "(none)" : string.Join(" ", arguments);
+
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    UseShellExecute = false,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true
+                };
+
+                foreach (var argument in arguments)
+                {
+                    psi.ArgumentList.Add(argument);
+                }
+
+                using var process = Process.Start(psi);
+
+                if (process == null)
+                {
+                    attempts.Add($"Command [{fileName}] args [{argumentText}] did not start a process");
+                    return false;
+                }
+
+                if (process.WaitForExit(2000))
+                {
+                    string standardOutput = process.StandardOutput.ReadToEnd().Trim();
+                    string standardError = process.StandardError.ReadToEnd().Trim();
+
+                    if (process.ExitCode == 0)
+                    {
+                        attempts.Add($"Command [{fileName}] args [{argumentText}] succeeded with exit code [0]");
+                        return true;
+                    }
+
+                    attempts.Add(
+                        $"Command [{fileName}] args [{argumentText}] failed with exit code [{process.ExitCode}] output [{standardOutput}] error [{standardError}]");
+                    return false;
+                }
+
+                attempts.Add($"Command [{fileName}] args [{argumentText}] started and is still running");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                attempts.Add($"Command [{fileName}] args [{argumentText}] threw [{ex.GetType().Name}: {ex.Message}]");
+                return false;
+            }
+        }
 
 
 

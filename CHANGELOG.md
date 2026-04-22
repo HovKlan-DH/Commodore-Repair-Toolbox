@@ -1,4 +1,5 @@
-- Added icon for showing status and to refresh online data
+- Fixed some Linux distros could not open folder location of data/log/settings folder #98
+- Added icon for showing "fetch data from online source" status and to refresh instantly
 
 
 
