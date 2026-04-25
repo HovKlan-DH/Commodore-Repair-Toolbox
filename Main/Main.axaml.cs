@@ -48,6 +48,7 @@ namespace CRT
         private DispatcherTimer? _dataSyncStatusIconSpinTimer;
         private int _dataSyncStatusIconSpinRequestCount;
         private double _dataSyncStatusIconSpinAngle;
+        private bool _isHoveringDataSyncStatusIcon;
 
         // Region toggle: local override, does not affect the global setting
         private string _localRegion = UserSettings.Region;
@@ -244,8 +245,8 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Performs the launch-time data update check immediately from the running UI, then starts
-        // the existing background sync pass for any remaining non-Excel files.
+        // Performs the manual UI data update check as a single visible sync flow.
+        // Startup sync behavior remains unchanged and is handled separately during application launch.
         // keepBannerTextStatic: when true, the banner keeps its initial text during the full refresh.
         // ###########################################################################################
         internal async Task CheckForDataUpdatesNowAsync(bool keepBannerTextStatic = false)
@@ -258,7 +259,7 @@ namespace CRT
 
             try
             {
-                bool hasManifest = await DataManager.CheckForDataUpdatesNowAsync(
+                var syncResult = await DataManager.CheckForDataUpdatesNowAsync(
                     status => Dispatcher.UIThread.Post(() =>
                     {
                         if (keepBannerTextStatic)
@@ -274,21 +275,23 @@ namespace CRT
                         this.SyncBannerText.Text = status;
                     }));
 
-                if (!hasManifest)
+                if (syncResult.ChangedCount < 0)
                 {
                     return;
                 }
 
-                this.PopulateHardwareDropDown();
-
-                if (DataManager.HasPendingSync)
+                if (syncResult.MainExcelChanged)
                 {
-                    if (!keepBannerTextStatic)
-                    {
-                        this.SyncBannerText.Text = "Checking remaining files from online source - please wait...";
-                    }
+                    this.RefreshHardwareAndBoardSelectionsAfterMainExcelSync();
+                }
 
-                    this.StartBackgroundSyncAsync(keepBannerTextStatic);
+                if (syncResult.ChangedCount > 0)
+                {
+                    this.SyncBannerText.Text = syncResult.ChangedCount == 1
+                        ? "1 file updated - please refresh board"
+                        : $"{syncResult.ChangedCount} files updated - please refresh board";
+                    this.SyncBannerRefreshButton.IsVisible = true;
+                    this.SyncBanner.IsVisible = true;
                 }
                 else
                 {
@@ -310,24 +313,19 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Shows the sync banner during background sync, then hides it automatically if nothing
-        // changed, or keeps it visible with an update summary and a refresh button.
+        // Syncs any remaining non-Excel files and returns the number of files that changed.
         // keepBannerTextStatic: when true, intermediate status text is suppressed during the run.
         // ###########################################################################################
-        private async void StartBackgroundSyncAsync(bool keepBannerTextStatic = false)
+        private async Task<int> SyncRemainingFilesAsync(bool keepBannerTextStatic = false)
         {
             if (!DataManager.HasPendingSync)
-                return;
-
-            this.SyncBannerText.Text = "Checking data from online source - please wait...";
-            this.SyncBannerRefreshButton.IsVisible = false;
-            this.SyncBanner.IsVisible = true;
-
-            this.StartDataSyncStatusIconSpin();
+            {
+                return 0;
+            }
 
             try
             {
-                int changed = await DataManager.SyncRemainingAsync(status =>
+                return await DataManager.SyncRemainingAsync(status =>
                     Dispatcher.UIThread.Post(() =>
                     {
                         if (keepBannerTextStatic)
@@ -342,6 +340,27 @@ namespace CRT
 
                         this.SyncBannerText.Text = status;
                     }));
+            }
+            catch
+            {
+                throw;
+            }
+        }
+
+        // ###########################################################################################
+        // Starts the remaining background sync without blocking the caller.
+        // ###########################################################################################
+        private async void StartBackgroundSyncAsync(bool keepBannerTextStatic = false)
+        {
+            this.SyncBannerText.Text = "Checking data from online source - please wait...";
+            this.SyncBannerRefreshButton.IsVisible = false;
+            this.SyncBanner.IsVisible = true;
+
+            this.StartDataSyncStatusIconSpin();
+
+            try
+            {
+                int changed = await this.SyncRemainingFilesAsync(keepBannerTextStatic);
 
                 if (changed > 0)
                 {
@@ -350,6 +369,7 @@ namespace CRT
                         : $"{changed} files updated in the background - please refresh board";
 
                     this.SyncBannerRefreshButton.IsVisible = true;
+                    this.SyncBanner.IsVisible = true;
                 }
                 else
                 {
@@ -368,7 +388,8 @@ namespace CRT
         private void OnRefreshBoardClick(object? sender, RoutedEventArgs e)
         {
             this.SyncBanner.IsVisible = false;
-            this.OnBoardSelectionChanged(null, null!);
+            this.SyncBannerRefreshButton.IsVisible = false;
+            this.ReloadCurrentBoardFromDisk(string.Empty);
         }
 
         // ###########################################################################################
@@ -448,6 +469,46 @@ namespace CRT
                 string.Equals(h, lastHardware, StringComparison.OrdinalIgnoreCase));
 
             this.HardwareComboBox.SelectedIndex = savedIndex >= 0 ? savedIndex : 0;
+        }
+
+        // ###########################################################################################
+        // Rebuilds the hardware and board selectors after the main Excel data changed, while trying
+        // to preserve the current selection when those entries still exist.
+        // ###########################################################################################
+        private void RefreshHardwareAndBoardSelectionsAfterMainExcelSync()
+        {
+            string previousHardware = this.HardwareComboBox.SelectedItem as string ?? string.Empty;
+            string previousBoard = this.BoardComboBox.SelectedItem as string ?? string.Empty;
+
+            this.PopulateHardwareDropDown();
+
+            var hardwareNames = this.HardwareComboBox.ItemsSource?
+                .Cast<string>()
+                .ToList() ?? new List<string>();
+
+            if (hardwareNames.Count == 0)
+            {
+                return;
+            }
+
+            int hardwareIndex = hardwareNames.FindIndex(h =>
+                string.Equals(h, previousHardware, StringComparison.OrdinalIgnoreCase));
+
+            this.HardwareComboBox.SelectedIndex = hardwareIndex >= 0 ? hardwareIndex : 0;
+
+            var boardNames = this.BoardComboBox.ItemsSource?
+                .Cast<string>()
+                .ToList() ?? new List<string>();
+
+            if (boardNames.Count == 0)
+            {
+                return;
+            }
+
+            int boardIndex = boardNames.FindIndex(b =>
+                string.Equals(b, previousBoard, StringComparison.OrdinalIgnoreCase));
+
+            this.BoardComboBox.SelectedIndex = boardIndex >= 0 ? boardIndex : 0;
         }
 
         // ###########################################################################################
@@ -859,6 +920,12 @@ namespace CRT
             if (!string.IsNullOrWhiteSpace(boardKey) && !string.IsNullOrWhiteSpace(schematicNameToRestore))
             {
                 UserSettings.SetLastSchematicForBoard(boardKey, schematicNameToRestore);
+            }
+
+            var entry = this.GetCurrentBoardEntry();
+            if (entry != null && !string.IsNullOrWhiteSpace(entry.ExcelDataFile))
+            {
+                BoardDataReader.ClearCache(entry.ExcelDataFile);
             }
 
             this.OnBoardSelectionChanged(null, null!);
@@ -2110,21 +2177,23 @@ namespace CRT
 
         // ###########################################################################################
         // Updates the global launch-time data-sync status icon, clickability and tooltip in the main window.
+        // When launch-time sync is disabled, hovering the icon temporarily shows the manual refresh icon.
         // ###########################################################################################
         private void UpdateDataSyncStatusIcon()
         {
             bool isEnabled = UserSettings.CheckDataOnLaunch;
-            bool isCheckingOnline = isEnabled && this._dataSyncStatusIconSpinRequestCount > 0;
+            bool isCheckingOnline = this._dataSyncStatusIconSpinRequestCount > 0;
+            bool allowManualRefreshWhileDisabled = !isEnabled && this._isHoveringDataSyncStatusIcon;
             bool isClickable = !isCheckingOnline;
 
             this.DataSyncStatusIconTextBlock.IsVisible = !isCheckingOnline;
             this.DataSyncStatusSpinnerCanvas.IsVisible = isCheckingOnline;
 
-            this.DataSyncStatusIconTextBlock.Text = isEnabled
+            this.DataSyncStatusIconTextBlock.Text = isEnabled || allowManualRefreshWhileDisabled
                 ? "\uf021"
                 : "\uf05e";
 
-            if (this.TryFindResource(isEnabled ? "Text_Success_Fg" : "Text_Fail_Fg", out var brushResource) &&
+            if (this.TryFindResource(isEnabled || allowManualRefreshWhileDisabled ? "Text_Success_Fg" : "Text_Fail_Fg", out var brushResource) &&
                 brushResource is IBrush brush)
             {
                 this.DataSyncStatusIconTextBlock.Foreground = brush;
@@ -2132,7 +2201,7 @@ namespace CRT
             }
             else
             {
-                IBrush fallbackBrush = isEnabled
+                IBrush fallbackBrush = isEnabled || allowManualRefreshWhileDisabled
                     ? Brushes.ForestGreen
                     : Brushes.IndianRed;
 
@@ -2151,12 +2220,14 @@ namespace CRT
                     ? "Checking data from online source..."
                     : isEnabled
                         ? "Data update is enabled. Click to refresh data now"
-                        : "Data update is disabled. Click to open \"Configuration\" tab");
+                        : this._isHoveringDataSyncStatusIcon
+                            ? "Data update at launch is disabled. Click to run a manual refresh now"
+                            : "Data update at launch is disabled. Hover to show manual refresh");
         }
 
         // ###########################################################################################
         // Handles clicks on the top-right data-sync status icon.
-        // Enabled opens an immediate refresh; disabled navigates to the Configuration tab.
+        // Clicking always allows a manual refresh unless a sync is already in progress.
         // ###########################################################################################
         private async void OnDataSyncStatusIconPointerPressed(object? sender, PointerPressedEventArgs e)
         {
@@ -2172,13 +2243,25 @@ namespace CRT
 
             e.Handled = true;
 
-            if (!UserSettings.CheckDataOnLaunch)
-            {
-                this.MainTabControl.SelectedItem = this.ConfigurationTabItem;
-                return;
-            }
-
             await this.CheckForDataUpdatesNowAsync(keepBannerTextStatic: true);
+        }
+
+        // ###########################################################################################
+        // Shows the manual refresh icon when hovering the disabled data-sync status icon.
+        // ###########################################################################################
+        private void OnDataSyncStatusIconPointerEntered(object? sender, PointerEventArgs e)
+        {
+            this._isHoveringDataSyncStatusIcon = true;
+            this.UpdateDataSyncStatusIcon();
+        }
+
+        // ###########################################################################################
+        // Restores the normal disabled icon when the pointer leaves the data-sync status icon.
+        // ###########################################################################################
+        private void OnDataSyncStatusIconPointerExited(object? sender, PointerEventArgs e)
+        {
+            this._isHoveringDataSyncStatusIcon = false;
+            this.UpdateDataSyncStatusIcon();
         }
 
         // ###########################################################################################

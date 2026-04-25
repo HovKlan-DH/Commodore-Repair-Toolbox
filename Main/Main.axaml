@@ -423,6 +423,8 @@
 						Height="22"
 						Background="Transparent"
 						ClipToBounds="True"
+						PointerEntered="OnDataSyncStatusIconPointerEntered"
+						PointerExited="OnDataSyncStatusIconPointerExited"
 						PointerPressed="OnDataSyncStatusIconPointerPressed">
 					<Grid Width="22"
 						  Height="22"

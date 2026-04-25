@@ -64,6 +64,16 @@ namespace Handlers.DataHandling
         public static event Action<string>? FileDownloadChanged;
 
         // ###########################################################################################
+        // Result details returned from an immediate manual data sync.
+        // ###########################################################################################
+        public sealed class ManualDataSyncResult
+        {
+            public int ChangedCount { get; init; }
+            public bool MainExcelChanged { get; init; }
+            public bool AnyExcelChanged { get; init; }
+        }
+
+        // ###########################################################################################
         // Resolves the data root, ensures the folder exists, syncs all Excel files against the
         // online manifest, then loads hardware definitions. Images are left for SyncRemainingAsync.
         // ###########################################################################################
@@ -216,11 +226,13 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
-        // Performs the launch-time data update check immediately while the application is already
-        // running. Main and board Excel files are checked right away, and any remaining files stay
-        // queued for the existing background sync flow.
+        // Performs an immediate manual data sync while the application is already running.
+        // Startup behavior remains unchanged elsewhere; this manual path keeps a single UI sync flow,
+        // refreshes the compatible main Excel first so the latest board Excel list is known, then syncs
+        // board Excel files and non-Excel files, and finally clears cached board data if any Excel file changed.
+        // Returns sync details so the UI can decide whether hardware/board selectors must be refreshed.
         // ###########################################################################################
-        public static async Task<bool> CheckForDataUpdatesNowAsync(Action<string>? onStatus = null, Action<string>? onFile = null)
+        public static async Task<ManualDataSyncResult> CheckForDataUpdatesNowAsync(Action<string>? onStatus = null, Action<string>? onFile = null)
         {
             void ReportStatus(string message)
             {
@@ -238,7 +250,12 @@ namespace Handlers.DataHandling
             {
                 Logger.Warning("Immediate data update check skipped - data root is not initialized");
                 ReportStatus("Sync failed - data folder is unavailable");
-                return false;
+                return new ManualDataSyncResult
+                {
+                    ChangedCount = -1,
+                    MainExcelChanged = false,
+                    AnyExcelChanged = false
+                };
             }
 
             bool localDataUpdateRequiresAppUpdate = DataUpdateRequiresAppUpdate;
@@ -248,13 +265,23 @@ namespace Handlers.DataHandling
 
             if (_syncManifest == null)
             {
-                return false;
+                return new ManualDataSyncResult
+                {
+                    ChangedCount = -1,
+                    MainExcelChanged = false,
+                    AnyExcelChanged = false
+                };
             }
 
+            var manifest = _syncManifest;
+            _syncManifest = null;
+
+            int changedCount = 0;
+            bool anyExcelChanged = false;
             var onlineFileNames = new List<string>();
 
             await OnlineServices.SyncFilesAsync(
-                _syncManifest,
+                manifest,
                 string.Empty,
                 f =>
                 {
@@ -268,35 +295,62 @@ namespace Handlers.DataHandling
             DataUpdateRequiresAppUpdate |= localDataUpdateRequiresAppUpdate;
 
             ReportStatus("Checking main data file...");
-            await OnlineServices.SyncFilesAsync(
-                _syncManifest,
+            int mainExcelChangedCount = await OnlineServices.SyncFilesAsync(
+                manifest,
                 _dataRoot,
                 f => string.Equals(f, ResolvedMainExcelFileName, StringComparison.OrdinalIgnoreCase),
                 ReportStatus,
                 ReportFile,
                 label: "Main Excel data file");
 
+            changedCount += mainExcelChangedCount;
+            bool mainExcelChanged = mainExcelChangedCount > 0;
+            anyExcelChanged |= mainExcelChanged;
+
             ReportStatus("Loading hardware definitions...");
             await Task.Run(LoadMainExcel);
 
-            if (HardwareBoards.Count > 0)
-            {
-                var boardExcelFiles = HardwareBoards
-                    .Select(e => e.ExcelDataFile)
-                    .Where(f => !string.IsNullOrWhiteSpace(f))
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var boardExcelFiles = HardwareBoards
+                .Select(e => e.ExcelDataFile)
+                .Where(f => !string.IsNullOrWhiteSpace(f))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-                ReportStatus("Checking board Excel data files...");
-                await OnlineServices.SyncFilesAsync(
-                    _syncManifest,
-                    _dataRoot,
-                    f => boardExcelFiles.Contains(f),
-                    ReportStatus,
-                    ReportFile,
-                    label: "board Excel data files");
+            ReportStatus("Checking remaining data files...");
+            int remainingChangedCount = await OnlineServices.SyncFilesAsync(
+                manifest,
+                _dataRoot,
+                f =>
+                    !string.Equals(f, ResolvedMainExcelFileName, StringComparison.OrdinalIgnoreCase) &&
+                    (
+                        boardExcelFiles.Contains(f) ||
+                        !f.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)
+                    ),
+                ReportStatus,
+                filePath =>
+                {
+                    if (!string.IsNullOrWhiteSpace(filePath) &&
+                        filePath.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+                    {
+                        anyExcelChanged = true;
+                    }
+
+                    ReportFile(filePath);
+                },
+                label: "remaining data files");
+
+            changedCount += remainingChangedCount;
+
+            if (anyExcelChanged)
+            {
+                BoardDataReader.ClearAllCache();
             }
 
-            return true;
+            return new ManualDataSyncResult
+            {
+                ChangedCount = changedCount,
+                MainExcelChanged = mainExcelChanged,
+                AnyExcelChanged = anyExcelChanged
+            };
         }
 
         // ###########################################################################################
