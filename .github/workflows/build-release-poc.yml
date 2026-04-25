@@ -36,23 +36,24 @@ jobs:
       security-events: write # Required to upload results to GitHub
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: 'csharp'
+          build-mode: autobuild
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:csharp"
 
@@ -66,7 +67,7 @@ jobs:
       dotnet_version: ${{ steps.runtime.outputs.dotnet_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set version
         id: ver
@@ -148,7 +149,7 @@ jobs:
             $installer.FullName
 
       - name: Upload Velopack artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: velopack-windows-x64
           path: velopack-output/*
@@ -163,10 +164,10 @@ jobs:
       dotnet_version: ${{ steps.runtime.outputs.dotnet_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -215,7 +216,7 @@ jobs:
             --outputDir velopack-output
 
       - name: Upload Velopack artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: velopack-linux-x64
           path: velopack-output/*
@@ -231,10 +232,10 @@ jobs:
       dotnet_version_x64: ${{ steps.runtime_x64.outputs.dotnet_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -316,7 +317,7 @@ jobs:
             --outputDir velopack-output
 
       - name: Upload Velopack artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: velopack-macos
           path: velopack-output/*
@@ -332,10 +333,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download all Velopack artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: release-assets
           merge-multiple: true
