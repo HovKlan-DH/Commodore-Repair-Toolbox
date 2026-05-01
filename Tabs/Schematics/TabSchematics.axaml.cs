@@ -5978,13 +5978,11 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Loads the KiCad JSON file that resides next to the currently selected board Excel file.
+    // Loads raw KiCad overlay data for the current board from the board-local KiCad folder.
     // Clears all KiCad runtime caches so the next render and hover pass use fresh project data.
     // ###########################################################################################
     public async Task LoadKiCadProjectForCurrentBoardAsync()
     {
-        string jsonPath = this.GetKiCadProjectJsonPathForCurrentBoard();
-
         this.thisKiCadProject = null;
         this.thisKiCadPcbNetRenderCacheByKey.Clear();
         this.thisKiCadPcbHoverHitTestCacheByKey.Clear();
@@ -6003,28 +6001,20 @@ public partial class TabSchematics : UserControl
 
         this.RestoreBoardSettings(this.MainWindow?.GetCurrentBoardKey() ?? string.Empty);
 
-        if (string.IsNullOrWhiteSpace(jsonPath) || !System.IO.File.Exists(jsonPath))
-        {
-            return;
-        }
+        var rawPaths = this.MainWindow?.GetCurrentBoardKiCadRawPaths() ?? new List<string>();
 
-        this.thisKiCadProject = await KiCadProjectLoader.LoadAsync(jsonPath);
-
-        if (this.thisKiCadProject != null)
+        if (rawPaths.Count > 0)
         {
-            Logger.Info($"KiCad overlay data is available for current board: [{jsonPath}]");
+            var boardEntry = this.MainWindow?.GetCurrentBoardEntry();
+
+            this.thisKiCadProject = await KiCadProjectLoader.LoadRawAsync(
+                rawPaths,
+                boardEntry?.HardwareName ?? string.Empty,
+                boardEntry?.BoardName ?? string.Empty);
         }
 
         this.RestoreBoardSettings(this.MainWindow?.GetCurrentBoardKey() ?? string.Empty);
         this.RefreshKiCadOverlay();
-    }
-
-    // ###########################################################################################
-    // Resolves the KiCad JSON path for the currently selected board.
-    // ###########################################################################################
-    private string GetKiCadProjectJsonPathForCurrentBoard()
-    {
-        return this.MainWindow?.GetCurrentBoardKiCadJsonPath() ?? string.Empty;
     }
 
     // ###########################################################################################

@@ -19,7 +19,6 @@ namespace Handlers.DataHandling
         private const string ColHardwareName = "Hardware name in drop-down";
         private const string ColBoardName = "Board name in drop-down";
         private const string ColExcelDataFile = "Excel data file";
-        private const string ColKiCadDataFile = "KiCad data file";
         private const string ColHardwareNotes = "Hardware notes in \"Overview\" tab";
 
         // Column headers for Oscilloscope
@@ -435,7 +434,7 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
-        // Reads hardware and board definitions from the main Excel file.
+        // Reads hardware, board, and oscilloscope definitions from the main Excel file.
         // Column positions are resolved by header name so reordering columns is handled gracefully.
         // Hardware name is carried forward across rows where the cell is empty (merged cell pattern).
         // ###########################################################################################
@@ -487,30 +486,33 @@ namespace Handlers.DataHandling
                     string hardwareName = GetCellText(sheet, row, colMap[ColHardwareName]);
                     string boardName = GetCellText(sheet, row, colMap[ColBoardName]);
                     string excelFile = GetCellText(sheet, row, colMap[ColExcelDataFile]);
-                    string kiCadDataFile = GetCellTextSafe(sheet, row, colMap, ColKiCadDataFile);
                     string notes = GetCellText(sheet, row, colMap[ColHardwareNotes]);
 
-                    // Carry forward hardware name for merged/empty cells in that column
                     if (!string.IsNullOrWhiteSpace(hardwareName))
+                    {
                         lastHwName = hardwareName;
+                    }
                     else
+                    {
                         hardwareName = lastHwName;
+                    }
 
-                    // Skip rows that have neither a board name nor an Excel file reference
                     if (string.IsNullOrWhiteSpace(boardName) && string.IsNullOrWhiteSpace(excelFile))
+                    {
                         continue;
+                    }
 
                     entries.Add(new HardwareBoardEntry
                     {
                         HardwareName = hardwareName,
                         BoardName = boardName,
                         ExcelDataFile = excelFile,
-                        KiCadDataFile = kiCadDataFile,
                         HardwareNotes = notes
                     });
                 }
 
                 HardwareBoards = entries;
+
                 Logger.Info($"Checking [{entries.Count}] board Excel data files, extracted from main Excel data file:");
                 foreach (var boardEntry in entries)
                 {
@@ -543,12 +545,18 @@ namespace Handlers.DataHandling
                             string series = GetCellTextSafe(oscSheet, row, oscColMap, ColSeriesOrModel);
 
                             if (!string.IsNullOrWhiteSpace(brand))
+                            {
                                 lastBrandName = brand;
+                            }
                             else
+                            {
                                 brand = lastBrandName;
+                            }
 
                             if (string.IsNullOrWhiteSpace(series))
+                            {
                                 continue;
+                            }
 
                             oscEntries.Add(new OscilloscopeEntry
                             {
@@ -586,7 +594,7 @@ namespace Handlers.DataHandling
             {
                 Logger.Warning($"Failed to load main Excel data file - [{ex.Message}]");
             }
-        }
+        }                
 
         // ###########################################################################################
         // Lazily loads and caches all sheets from the board-specific Excel file linked to the entry.

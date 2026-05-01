@@ -69,15 +69,49 @@ namespace Handlers.DataHandling
         };
 
         // ###########################################################################################
+        // Reads the Excel Components sheet and returns only the labels that still need new component
+        // rows inserted there, so highlight persistence itself can be handled entirely by JSON.
+        // ###########################################################################################
+        private static List<LabelEditorSaveRow> GetMissingComponentRows(
+            string excelPath,
+            IReadOnlyList<LabelEditorSaveRow> rows,
+            string region)
+        {
+            using var stream = new FileStream(excelPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var package = new ExcelPackage(stream);
+
+            var componentsSheet = package.Workbook.Worksheets[SheetComponents];
+            if (componentsSheet == null)
+            {
+                throw new InvalidOperationException($"Sheet [{SheetComponents}] not found in board Excel file");
+            }
+
+            var componentsColMap = FindHeaderRow(componentsSheet, ComponentsHeaders, out int componentsHeaderRow);
+            if (componentsColMap == null)
+            {
+                throw new InvalidOperationException($"Header row not found in sheet [{SheetComponents}]");
+            }
+
+            return rows
+                .Where(item => !string.IsNullOrWhiteSpace(item.BoardLabel))
+                .GroupBy(item => item.BoardLabel.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .Where(item => !ComponentExistsInSheet(componentsSheet, componentsColMap, componentsHeaderRow, item, region))
+                .OrderBy(item => item.Category?.Trim() ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(item => item.BoardLabel?.Trim() ?? string.Empty, BoardLabelNaturalComparer)
+                .ToList();
+        }
+
+        // ###########################################################################################
         // Saves the current schematic editor state to the workbook by replacing only the edited
         // schematic's highlight rows and appending any newly introduced component rows if needed.
         // Uses a FileInfo-backed EPPlus package so workbook changes are committed directly to disk.
         // ###########################################################################################
         public static async Task<(bool Success, string ErrorMessage)> SaveLabelEditorChangesAsync(
-            string excelPath,
-            string schematicName,
-            IReadOnlyList<LabelEditorSaveRow> rows,
-            string region)
+    string excelPath,
+    string schematicName,
+    IReadOnlyList<LabelEditorSaveRow> rows,
+    string region)
         {
             if (string.IsNullOrWhiteSpace(excelPath) || !File.Exists(excelPath))
             {
@@ -97,65 +131,51 @@ namespace Handlers.DataHandling
 
                 try
                 {
-                    var fileInfo = new FileInfo(excelPath);
+                    var missingComponentRows = GetMissingComponentRows(excelPath, rows, region);
 
-                    Logger.Debug($"BoardDataWriter opening Excel file for write: [{excelPath}]");
+                    Logger.Debug($"BoardDataWriter target Excel file: [{excelPath}]");
+                    Logger.Debug($"BoardDataWriter target JSON file: [{BoardComponentHighlightStorage.GetJsonPath(excelPath)}]");
                     Logger.Debug($"BoardDataWriter target schematic: [{schematicName}]");
                     Logger.Debug($"BoardDataWriter target region: [{region}]");
                     Logger.Debug($"BoardDataWriter received save rows: [{rows.Count}]");
-                    Logger.Debug($"BoardDataWriter file exists: [{fileInfo.Exists}]");
-                    Logger.Debug($"BoardDataWriter file is read-only: [{fileInfo.IsReadOnly}]");
-                    Logger.Debug($"BoardDataWriter file last write time before save: [{fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss.fff}]");
+                    Logger.Debug($"BoardDataWriter missing component rows: [{missingComponentRows.Count}]");
 
-                    using (var package = new ExcelPackage(fileInfo))
+                    if (missingComponentRows.Count > 0)
                     {
-                        var highlightsSheet = package.Workbook.Worksheets[SheetComponentHighlights];
-                        if (highlightsSheet == null)
+                        var fileInfo = new FileInfo(excelPath);
+
+                        using (var package = new ExcelPackage(fileInfo))
                         {
-                            Logger.Warning($"BoardDataWriter could not find sheet [{SheetComponentHighlights}] in [{excelPath}]");
-                            return (false, $"Sheet [{SheetComponentHighlights}] not found in board Excel file");
+                            var componentsSheet = package.Workbook.Worksheets[SheetComponents];
+                            if (componentsSheet == null)
+                            {
+                                Logger.Warning($"BoardDataWriter could not find sheet [{SheetComponents}] in [{excelPath}]");
+                                return (false, $"Sheet [{SheetComponents}] not found in board Excel file");
+                            }
+
+                            var componentsColMap = FindHeaderRow(componentsSheet, ComponentsHeaders, out int componentsHeaderRow);
+                            if (componentsColMap == null)
+                            {
+                                Logger.Warning($"BoardDataWriter could not find header row in sheet [{SheetComponents}]");
+                                return (false, $"Header row not found in sheet [{SheetComponents}]");
+                            }
+
+                            AppendMissingComponents(componentsSheet, componentsColMap, componentsHeaderRow, missingComponentRows, region);
+                            package.Save();
                         }
 
-                        var highlightsColMap = FindHeaderRow(highlightsSheet, ComponentHighlightsHeaders, out int highlightsHeaderRow);
-                        if (highlightsColMap == null)
-                        {
-                            Logger.Warning($"BoardDataWriter could not find header row in sheet [{SheetComponentHighlights}]");
-                            return (false, $"Header row not found in sheet [{SheetComponentHighlights}]");
-                        }
-
-                        Logger.Info($"BoardDataWriter replacing highlight block for schematic [{schematicName}]");
-                        ReplaceHighlightsForSchematic(highlightsSheet, highlightsColMap, highlightsHeaderRow, schematicName, rows);
-
-                        var componentsSheet = package.Workbook.Worksheets[SheetComponents];
-                        if (componentsSheet == null)
-                        {
-                            Logger.Warning($"BoardDataWriter could not find sheet [{SheetComponents}] in [{excelPath}]");
-                            return (false, $"Sheet [{SheetComponents}] not found in board Excel file");
-                        }
-
-                        var componentsColMap = FindHeaderRow(componentsSheet, ComponentsHeaders, out int componentsHeaderRow);
-                        if (componentsColMap == null)
-                        {
-                            Logger.Warning($"BoardDataWriter could not find header row in sheet [{SheetComponents}]");
-                            return (false, $"Header row not found in sheet [{SheetComponents}]");
-                        }
-
-//                        Logger.Info("BoardDataWriter appending any missing component rows");
-                        AppendMissingComponents(componentsSheet, componentsColMap, componentsHeaderRow, rows, region);
-
-//                        Logger.Info($"BoardDataWriter about to save workbook changes for schematic [{schematicName}]");
-                        package.Save();
+                        fileInfo.Refresh();
+                        Logger.Info($"BoardDataWriter completed Excel component save for [{excelPath}]");
                     }
 
-                    fileInfo.Refresh();
-                    Logger.Info($"BoardDataWriter completed workbook save for Excel file [{excelPath}]");
-//                    Logger.Info($"BoardDataWriter file last write time after save: [{fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss.fff}]");
+                    BoardComponentHighlightStorage.SaveComponentHighlights(excelPath, schematicName, rows);
+                    Logger.Info($"BoardDataWriter completed highlight JSON save for schematic [{schematicName}]");
 
                     return (true, string.Empty);
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warning($"Failed to save label editor changes to Excel file [{excelPath}] - [{ex}]");
+                    Logger.Warning($"Failed to save label editor changes for board data file [{excelPath}] - [{ex}]");
                     return (false, BuildSaveFailureMessage(ex, excelPath));
                 }
             });

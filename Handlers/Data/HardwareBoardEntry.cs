@@ -9,9 +9,8 @@
         public string HardwareName { get; init; } = string.Empty;
         public string BoardName { get; init; } = string.Empty;
         public string ExcelDataFile { get; init; } = string.Empty;
-        public string KiCadDataFile { get; init; } = string.Empty;
         public string HardwareNotes { get; init; } = string.Empty;
 
-        public override string ToString() => $"{HardwareName} - {BoardName}";
+        public override string ToString() => $"{this.HardwareName} - {this.BoardName}";
     }
 }

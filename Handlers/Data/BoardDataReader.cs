@@ -141,7 +141,7 @@ namespace Handlers.DataHandling
                         Schematics = MapSchematics(ReadSheetRows(package, SheetBoardSchematics, SchematicsHeaders)),
                         Components = MapComponents(ReadSheetRows(package, SheetComponents, ComponentsHeaders)),
                         ComponentImages = MapComponentImages(ReadSheetRows(package, SheetComponentImages, ComponentImagesHeaders)),
-                        ComponentHighlights = MapComponentHighlights(ReadSheetRows(package, SheetComponentHighlights, ComponentHighlightsHeaders)),
+                        ComponentHighlights = BoardComponentHighlightStorage.LoadComponentHighlights(excelPath),
                         ComponentLocalFiles = MapComponentLocalFiles(ReadSheetRows(package, SheetComponentLocalFiles, ComponentLocalFilesHeaders)),
                         ComponentLinks = MapComponentLinks(ReadSheetRows(package, SheetComponentLinks, ComponentLinksHeaders)),
                         BoardLocalFiles = MapBoardLocalFiles(ReadSheetRows(package, SheetBoardLocalFiles, BoardLocalFilesHeaders)),

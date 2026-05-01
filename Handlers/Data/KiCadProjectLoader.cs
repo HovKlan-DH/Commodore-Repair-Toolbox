@@ -2,65 +2,58 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Handlers.DataHandling
 {
     // ###########################################################################################
-    // Loads and caches one KiCad JSON export, then builds a schematic net-path index so the
-    // Schematics tab can highlight both PCB copper and schematic wire geometry quickly.
+    // Loads and caches raw KiCad files, then builds a schematic net-path index so the Schematics tab
+    // can highlight both PCB copper and schematic wire geometry quickly.
     // ###########################################################################################
     internal static class KiCadProjectLoader
     {
-        private static readonly Dictionary<string, KiCadProjectBundle?> thisCache =
+        private static readonly Dictionary<string, KiCadProjectBundle?> thisRawCache =
             new(StringComparer.OrdinalIgnoreCase);
 
-        private static readonly JsonSerializerOptions thisJsonOptions = new()
+        // ###########################################################################################
+        // Loads modern raw KiCad files directly from disk and converts them into a normalized project bundle.
+        // ###########################################################################################
+        public static async Task<KiCadProjectBundle?> LoadRawAsync(
+            IReadOnlyList<string> rawPaths,
+            string hardwareName = "",
+            string boardName = "")
         {
-            PropertyNameCaseInsensitive = true
-        };
+            var existingPaths = rawPaths
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(Path.GetFullPath)
+                .Where(File.Exists)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-        // ###########################################################################################
-        // Streams and caches the KiCad JSON file from disk. Large files are read through FileStream
-        // instead of File.ReadAllText so memory pressure stays reasonable.
-        // ###########################################################################################
-        public static async Task<KiCadProjectBundle?> LoadAsync(string jsonPath)
-        {
-            if (string.IsNullOrWhiteSpace(jsonPath))
+            if (existingPaths.Count == 0)
             {
                 return null;
             }
 
-            if (KiCadProjectLoader.thisCache.TryGetValue(jsonPath, out var cached))
+            string cacheKey = string.Join(
+                "\u001E",
+                existingPaths.Select(path =>
+                    $"{path}|{File.GetLastWriteTimeUtc(path).Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+
+            if (KiCadProjectLoader.thisRawCache.TryGetValue(cacheKey, out var cached))
             {
                 return cached;
             }
 
-            if (!File.Exists(jsonPath))
-            {
-                KiCadProjectLoader.thisCache[jsonPath] = null;
-                return null;
-            }
-
             try
             {
-                using var stream = new FileStream(
-                    jsonPath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite,
-                    bufferSize: 131072,
-                    useAsync: true);
+                var root = await KiCadRawProjectLoader.LoadAsync(existingPaths, hardwareName, boardName).ConfigureAwait(false);
 
-                var root = await JsonSerializer.DeserializeAsync<KiCadProjectRoot>(
-                    stream,
-                    KiCadProjectLoader.thisJsonOptions).ConfigureAwait(false);
-
-                if (root == null)
+                if (root == null || (root.Pcb.Count == 0 && root.Schematics.Count == 0))
                 {
-                    Logger.Warning($"KiCad JSON could not be deserialized: [{jsonPath}]");
-                    KiCadProjectLoader.thisCache[jsonPath] = null;
+                    Logger.Warning($"Raw KiCad files could not be loaded: [{string.Join("], [", existingPaths)}]");
+                    KiCadProjectLoader.thisRawCache[cacheKey] = null;
                     return null;
                 }
 
@@ -71,24 +64,14 @@ namespace Handlers.DataHandling
                         KiCadProjectLoader.BuildSchematicNetPathIndex(root.Schematics)
                 };
 
-                KiCadProjectLoader.thisCache[jsonPath] = bundle;
-
-                int pcbViewCount = root.Project.Views.Count(view =>
-                    !string.IsNullOrWhiteSpace(view.Type) &&
-                    view.Type.StartsWith("pcb", StringComparison.OrdinalIgnoreCase));
-
-                int schematicViewCount = root.Project.Views.Count(view =>
-                    string.Equals(view.Type, "schematic", StringComparison.OrdinalIgnoreCase));
-
-                Logger.Info(
-                    $"KiCad JSON loaded: [{jsonPath}] - PCB views [{pcbViewCount}], schematic views [{schematicViewCount}]");
+                KiCadProjectLoader.thisRawCache[cacheKey] = bundle;
 
                 return bundle;
             }
             catch (Exception ex)
             {
-                Logger.Warning($"Failed to load KiCad JSON [{jsonPath}] - [{ex.Message}]");
-                KiCadProjectLoader.thisCache[jsonPath] = null;
+                Logger.Warning($"Failed to load raw KiCad files [{string.Join("], [", existingPaths)}] - [{ex}]");
+                KiCadProjectLoader.thisRawCache[cacheKey] = null;
                 return null;
             }
         }

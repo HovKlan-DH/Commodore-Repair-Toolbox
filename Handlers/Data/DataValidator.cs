@@ -304,6 +304,8 @@ namespace Handlers.DataHandling
         // ###########################################################################################
         private static void ValidateOrphanComponents(string excelDataFile, BoardData boardData)
         {
+            string highlightsJsonFile = Path.ChangeExtension(excelDataFile, ".json");
+
             var componentLabels = CreateNormalizedLabelSet(boardData.Components, component => component.BoardLabel);
             var highlightLabels = CreateNormalizedLabelSet(boardData.ComponentHighlights, highlight => highlight.BoardLabel);
 
@@ -315,7 +317,7 @@ namespace Handlers.DataHandling
 
                 if (!highlightLabels.Contains(boardLabel))
                 {
-                    Logger.Warning($"Excel data file [{excelDataFile}] sheet [Components] has an orphan component [{component.BoardLabel.Trim()}] that does not exist in sheet [Component highlights] - please fix!");
+                    Logger.Warning($"Excel data file [{excelDataFile}] sheet [Components] has an orphan component [{component.BoardLabel.Trim()}] that does not exist in JSON file [{highlightsJsonFile}] property [Component highlights] - please fix!");
                 }
             }
 
@@ -327,13 +329,17 @@ namespace Handlers.DataHandling
                 image => $"component image [{image.BoardLabel.Trim()}] pin [{image.Pin.Trim()}]",
                 componentLabels);
 
-            ValidateComponentReferencesInSheet(
-                excelDataFile,
-                "Component highlights",
-                boardData.ComponentHighlights,
-                highlight => highlight.BoardLabel,
-                highlight => $"component highlight [{highlight.BoardLabel.Trim()}] schematic [{highlight.SchematicName.Trim()}]",
-                componentLabels);
+            foreach (var highlight in boardData.ComponentHighlights)
+            {
+                string boardLabel = NormalizeLabel(highlight.BoardLabel);
+                if (string.IsNullOrWhiteSpace(boardLabel))
+                    continue;
+
+                if (!componentLabels.Contains(boardLabel))
+                {
+                    Logger.Warning($"JSON file [{highlightsJsonFile}] property [Component highlights] has an orphan entry component highlight [{highlight.BoardLabel.Trim()}] schematic [{highlight.SchematicName.Trim()}] because component [{boardLabel}] does not exist in sheet [Components] - please fix!");
+                }
+            }
 
             ValidateComponentReferencesInSheet(
                 excelDataFile,

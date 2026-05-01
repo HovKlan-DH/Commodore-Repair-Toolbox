@@ -127,6 +127,7 @@ namespace Handlers.DataHandling
     public sealed class KiCadPcbPad
     {
         [JsonPropertyName("number")]
+        [JsonConverter(typeof(KiCadStringOrNumberJsonConverter))]
         public string? Number { get; init; }
 
         [JsonPropertyName("shape")]
@@ -239,6 +240,7 @@ namespace Handlers.DataHandling
         public string? Reference { get; init; }
 
         [JsonPropertyName("pad_number")]
+        [JsonConverter(typeof(KiCadStringOrNumberJsonConverter))]
         public string? PadNumber { get; init; }
     }
 
@@ -246,6 +248,9 @@ namespace Handlers.DataHandling
     {
         [JsonPropertyName("filename")]
         public string Filename { get; init; } = string.Empty;
+
+        [JsonPropertyName("display_name")]
+        public string DisplayName { get; init; } = string.Empty;
 
         [JsonPropertyName("wires")]
         public List<KiCadSchematicPathItem> Wires { get; init; } = new();

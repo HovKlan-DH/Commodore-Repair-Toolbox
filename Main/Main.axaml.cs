@@ -199,8 +199,8 @@ namespace CRT
             }
             else if (DataManager.DataUpdateRequiresAppUpdate)
             {
-                // Notify if they aren't checking for app updates but missing critical data updates
-                this.UpdateBannerText.Text = "Newer main Excel data file is available, but requires a newer application version. No more data updates will be given for this version";
+                // Notify if they are not checking for app updates but missing critical data updates
+                this.UpdateBannerText.Text = "Newer main Excel data file is available, but requires a newer application version - please update. No more data updates will be given for this version.";
                 this.UpdateBannerInstallButton.IsVisible = false;
                 this.UpdateBannerViewNotesButton.IsVisible = false;
                 this.UpdateBanner.IsVisible = true;
@@ -892,23 +892,55 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Resolves the full path to the currently selected board KiCad JSON file.
-        // Returns empty when the board does not define a KiCad data file.
+        // Resolves full paths to modern raw KiCad files for the currently selected board.
+        // Raw files are auto-discovered from the board-local KiCad folder.
         // ###########################################################################################
-        internal string GetCurrentBoardKiCadJsonPath()
+        internal List<string> GetCurrentBoardKiCadRawPaths()
         {
             var entry = this.GetCurrentBoardEntry();
-            if (entry == null || string.IsNullOrWhiteSpace(entry.KiCadDataFile))
+            if (entry == null)
             {
-                return string.Empty;
+                return new List<string>();
             }
 
-            string relativePath = entry.KiCadDataFile
-                .Trim()
-                .Replace('/', Path.DirectorySeparatorChar)
-                .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var paths = new List<string>();
 
-            return Path.Combine(DataManager.DataRoot, relativePath);
+            string boardExcelPath = this.GetCurrentBoardExcelPath();
+            string boardDirectory = Path.GetDirectoryName(boardExcelPath) ?? string.Empty;
+            string kiCadDirectory = Path.Combine(boardDirectory, "KiCad data");
+
+            if (Directory.Exists(kiCadDirectory))
+            {
+                foreach (string path in Directory.EnumerateFiles(kiCadDirectory, "*.*", SearchOption.TopDirectoryOnly)
+                             .Where(Main.IsSupportedKiCadRawFile))
+                {
+                    paths.Add(path);
+                }
+            }
+
+            var result = paths
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return result;
+        }
+
+        // ###########################################################################################
+        // Returns true when the supplied path points at a supported modern KiCad raw file.
+        // ###########################################################################################
+        private static bool IsSupportedKiCadRawFile(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            string extension = Path.GetExtension(path.Trim());
+
+            return string.Equals(extension, ".kicad_pcb", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(extension, ".kicad_pro", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(extension, ".kicad_sch", StringComparison.OrdinalIgnoreCase);
         }
 
         // ###########################################################################################
