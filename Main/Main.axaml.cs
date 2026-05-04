@@ -37,6 +37,8 @@ namespace CRT
         private ComponentInfoWindow? _singleComponentInfoWindow;
         private readonly Dictionary<string, ComponentInfoWindow> _componentInfoWindowsByKey = new(StringComparer.OrdinalIgnoreCase);
         internal bool isHoveringComponent = false;
+        private bool _isShowingMainExcelRequiresAppUpdateBanner;
+        private int _boardSelectionLoadVersion;
 
         // Blink selected highlights
         private DispatcherTimer? _blinkSelectedTimer;
@@ -193,17 +195,14 @@ namespace CRT
             handledEventsToo: true
         );
 
+            if (DataManager.DataUpdateRequiresAppUpdate)
+            {
+                this.ShowMainExcelRequiresAppUpdateBanner();
+            }
+
             if (UserSettings.CheckVersionOnLaunch)
             {
                 _ = this.CheckForAppUpdateNowAsync();
-            }
-            else if (DataManager.DataUpdateRequiresAppUpdate)
-            {
-                // Notify if they are not checking for app updates but missing critical data updates
-                this.UpdateBannerText.Text = "Newer main Excel data file is available, but requires a newer application version - please update. No more data updates will be given for this version.";
-                this.UpdateBannerInstallButton.IsVisible = false;
-                this.UpdateBannerViewNotesButton.IsVisible = false;
-                this.UpdateBanner.IsVisible = true;
             }
 
             UserSettings.CheckDataOnLaunchChanged += this.OnCheckDataOnLaunchSettingChanged;
@@ -213,8 +212,8 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Checks for an available update and refreshes the banner state immediately.
-        // Can be used both at startup and when the setting is enabled in Configuration.
+        // Checks for an available update and refreshes the application update banner immediately.
+        // This does not interfere with the separate main-Excel compatibility warning banner.
         // ###########################################################################################
         internal async Task CheckForAppUpdateNowAsync()
         {
@@ -222,26 +221,74 @@ namespace CRT
 
             if (available == true)
             {
-                this.UpdateBannerText.Text = $"Version {UpdateService.PendingVersion} is available";
-                this.UpdateBannerInstallButton.IsVisible = true;
-                this.UpdateBannerViewNotesButton.IsVisible = true;
-                this.UpdateBannerInstallButton.IsEnabled = true;
-                this.UpdateBannerViewNotesButton.IsEnabled = true;
-                this.UpdateBannerDismissButton.IsEnabled = true;
-                this.UpdateBanner.IsVisible = true;
+                this.ShowApplicationUpdateAvailableBanner();
+                return;
             }
-            else if (DataManager.DataUpdateRequiresAppUpdate)
-            {
-                this.UpdateBannerText.Text = "Newer main Excel data file is available, but requires a newer application version. No more data updates will be given for this version";
-                this.UpdateBannerInstallButton.IsVisible = false;
-                this.UpdateBannerViewNotesButton.IsVisible = false;
-                this.UpdateBannerDismissButton.IsEnabled = true;
-                this.UpdateBanner.IsVisible = true;
-            }
-            else
-            {
-                this.UpdateBanner.IsVisible = false;
-            }
+
+            this.HideApplicationUpdateBanner();
+        }
+
+        // ###########################################################################################
+        // Shows the dedicated dismissable warning banner explaining that newer main Excel data
+        // exists but requires a newer application version before it can be used.
+        // ###########################################################################################
+        private void ShowMainExcelRequiresAppUpdateBanner()
+        {
+            this._isShowingMainExcelRequiresAppUpdateBanner = true;
+            this.MainExcelRequiresAppUpdateBannerText.Text =
+                "Newer main Excel data file is available, but requires a newer application version, due to breaking changes - please update the application. No more data updates will be given for this application version, and worst-case is data format will break UI or functionality in a future version.";
+            this.MainExcelRequiresAppUpdateBannerDismissButton.IsEnabled = true;
+            this.MainExcelRequiresAppUpdateBanner.IsVisible = true;
+        }
+
+        // ###########################################################################################
+        // Hides the dedicated main-Excel compatibility warning banner and clears its persisted
+        // visible state for the current session.
+        // ###########################################################################################
+        private void HideMainExcelRequiresAppUpdateBanner()
+        {
+            this._isShowingMainExcelRequiresAppUpdateBanner = false;
+            this.MainExcelRequiresAppUpdateBanner.IsVisible = false;
+        }
+
+        // ###########################################################################################
+        // Shows the normal application update banner when GitHub reports that a newer installed
+        // application package is available for download.
+        // ###########################################################################################
+        private void ShowApplicationUpdateAvailableBanner()
+        {
+            this.UpdateBannerText.Text = $"Version {UpdateService.PendingVersion} is available";
+            this.UpdateBannerInstallButton.IsVisible = true;
+            this.UpdateBannerViewNotesButton.IsVisible = true;
+            this.UpdateBannerInstallButton.IsEnabled = true;
+            this.UpdateBannerViewNotesButton.IsEnabled = true;
+            this.UpdateBannerDismissButton.IsEnabled = true;
+            this.UpdateBanner.IsVisible = true;
+        }
+
+        // ###########################################################################################
+        // Hides the normal application update banner without affecting the separate main-Excel
+        // compatibility warning banner.
+        // ###########################################################################################
+        private void HideApplicationUpdateBanner()
+        {
+            this.UpdateBanner.IsVisible = false;
+        }
+
+        // ###########################################################################################
+        // Dismisses the dedicated main-Excel compatibility warning banner.
+        // ###########################################################################################
+        private void OnMainExcelRequiresAppUpdateBannerDismiss(object? sender, RoutedEventArgs e)
+        {
+            this.HideMainExcelRequiresAppUpdateBanner();
+        }
+
+        // ###########################################################################################
+        // Dismisses the normal application update banner without cancelling the update.
+        // ###########################################################################################
+        private void OnUpdateBannerDismiss(object? sender, RoutedEventArgs e)
+        {
+            this.HideApplicationUpdateBanner();
         }
 
         // ###########################################################################################
@@ -298,12 +345,9 @@ namespace CRT
                     this.SyncBanner.IsVisible = false;
                 }
 
-                if (!UserSettings.CheckVersionOnLaunch && DataManager.DataUpdateRequiresAppUpdate)
+                if (DataManager.DataUpdateRequiresAppUpdate)
                 {
-                    this.UpdateBannerText.Text = "Newer main Excel data file is available, but requires a newer application version. No more data updates will be given for this version";
-                    this.UpdateBannerInstallButton.IsVisible = false;
-                    this.UpdateBannerViewNotesButton.IsVisible = false;
-                    this.UpdateBanner.IsVisible = true;
+                    this.ShowMainExcelRequiresAppUpdateBanner();
                 }
             }
             finally
@@ -408,14 +452,6 @@ namespace CRT
         {
             this._isShowingDataSyncDisabledBanner = false;
             this.SyncBanner.IsVisible = false;
-        }
-
-        // ###########################################################################################
-        // Dismisses the update banner without cancelling the update.
-        // ###########################################################################################
-        private void OnUpdateBannerDismiss(object? sender, RoutedEventArgs e)
-        {
-            this.UpdateBanner.IsVisible = false;
         }
 
         // ###########################################################################################
@@ -546,11 +582,13 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Handles board selection changes - loads board data and builds the thumbnail gallery.
+        // Handles board selection changes and loads the visible board UI first, then starts heavier
+        // schematic/KiCad work in the background so the window can remain responsive immediately.
         // ###########################################################################################
         private async void OnBoardSelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
             this._suppressCategoryFilterSave = true;
+            int loadVersion = unchecked(++this._boardSelectionLoadVersion);
 
             bool thisShouldClearComponentSearch = ReferenceEquals(sender, this.BoardComboBox);
 
@@ -564,9 +602,13 @@ namespace CRT
             foreach (var thumb in this.TabSchematicsControl.currentThumbnails)
             {
                 if (!ReferenceEquals(thumb.ImageSource, thumb.BaseThumbnail))
+                {
                     (thumb.ImageSource as IDisposable)?.Dispose();
+                }
+
                 (thumb.BaseThumbnail as IDisposable)?.Dispose();
             }
+
             this.TabSchematicsControl.currentThumbnails.Clear();
             this.TabSchematicsControl.FindControl<ListBox>("SchematicsThumbnailList")!.ItemsSource = null;
             this.CategoryFilterListBox.ItemsSource = null;
@@ -575,29 +617,31 @@ namespace CRT
             this.TabSchematicsControl.highlightIndexBySchematic = new(StringComparer.OrdinalIgnoreCase);
             this.TabSchematicsControl.schematicByName = new(StringComparer.OrdinalIgnoreCase);
             this.TabSchematicsControl.highlightRectsBySchematicAndLabel = new(StringComparer.OrdinalIgnoreCase);
+
             this._currentBoardData = null;
             this.UpdateRegionButtonsState();
-
             this.PopulateBoardInfoSection(null, null);
-
             this.TabSchematicsControl.ResetSchematicsViewer();
 
             var selectedHardware = this.HardwareComboBox.SelectedItem as string;
             var selectedBoard = this.BoardComboBox.SelectedItem as string;
 
             if (string.IsNullOrEmpty(selectedHardware) || string.IsNullOrEmpty(selectedBoard))
+            {
                 return;
+            }
 
             UserSettings.SetLastHardware(selectedHardware);
             UserSettings.SetLastBoardForHardware(selectedHardware, selectedBoard);
 
-            var boardKey = this.GetCurrentBoardKey();
+            string boardKey = this.GetCurrentBoardKey();
             var innerGrid = this.TabSchematicsControl.FindControl<Grid>("SchematicsInnerGrid");
+
             if (innerGrid != null)
             {
                 if (UserSettings.HasSchematicsSplitterRatio(boardKey))
                 {
-                    var ratio = UserSettings.GetSchematicsSplitterRatio(boardKey);
+                    double ratio = UserSettings.GetSchematicsSplitterRatio(boardKey);
                     innerGrid.ColumnDefinitions[0].Width = new GridLength(ratio * 100.0, GridUnitType.Star);
                     innerGrid.ColumnDefinitions[2].Width = new GridLength((1.0 - ratio) * 100.0, GridUnitType.Star);
                 }
@@ -613,21 +657,21 @@ namespace CRT
                 string.Equals(ent.BoardName, selectedBoard, StringComparison.OrdinalIgnoreCase));
 
             if (entry == null || string.IsNullOrWhiteSpace(entry.ExcelDataFile))
+            {
                 return;
+            }
 
             var boardData = await DataManager.LoadBoardDataAsync(entry);
-            if (boardData == null)
+            if (boardData == null || loadVersion != this._boardSelectionLoadVersion)
+            {
                 return;
+            }
 
             this._currentBoardData = boardData;
-            await this.TabSchematicsControl.LoadKiCadProjectForCurrentBoardAsync();
             this.UpdateRegionButtonsState();
-
             this.PopulateBoardInfoSection(boardData.RevisionDate, boardData.Credits);
 
-            // Populate category filter in insertion order
             var categories = BuildDistinctCategories(boardData);
-
             this.CategoryFilterListBox.ItemsSource = categories;
 
             var savedCategories = UserSettings.GetSelectedCategories(boardKey);
@@ -647,17 +691,19 @@ namespace CRT
                 for (int i = 0; i < categories.Count; i++)
                 {
                     if (savedCategories.Contains(categories[i], StringComparer.OrdinalIgnoreCase))
+                    {
                         this.CategoryFilterListBox.Selection.Select(i);
+                    }
                 }
             }
+
             this._suppressCategoryFilterSave = false;
 
-            // Populate component filter for this board
             var activeCategories = new HashSet<string>(
                 this.CategoryFilterListBox.SelectedItems?.Cast<string>() ?? Enumerable.Empty<string>(),
                 StringComparer.OrdinalIgnoreCase);
 
-            var searchTerm = this.ComponentSearchTextBox?.Text ?? string.Empty;
+            string searchTerm = this.ComponentSearchTextBox?.Text ?? string.Empty;
             var componentItems = BuildComponentItems(boardData, UserSettings.Region, activeCategories, searchTerm);
 
             this._suppressComponentHighlightUpdate = true;
@@ -665,98 +711,167 @@ namespace CRT
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
-                try { this.ComponentFilterListBox.SelectAll(); } catch { }
+                try
+                {
+                    this.ComponentFilterListBox.SelectAll();
+                }
+                catch
+                {
+                }
             }
+
             this._suppressComponentHighlightUpdate = false;
 
-            this.TabSchematicsControl.highlightRectsBySchematicAndLabel = await Task.Run(() => TabSchematics.BuildHighlightRects(boardData, UserSettings.Region));
-            this.TabSchematicsControl.schematicByName = boardData.Schematics
-                .Where(s => !string.IsNullOrWhiteSpace(s.SchematicName))
-                .ToDictionary(s => s.SchematicName, s => s, StringComparer.OrdinalIgnoreCase);
-            this.TabSchematicsControl.highlightIndexBySchematic = new(StringComparer.OrdinalIgnoreCase);
-
-            var loaded = await Task.Run(() =>
+            _ = Task.Run(async () =>
             {
-                var result = new List<(string Name, string FullPath, Bitmap? FullBitmap)>();
-
-                foreach (var schematic in boardData.Schematics)
+                try
                 {
-                    if (string.IsNullOrWhiteSpace(schematic.SchematicImageFile))
-                        continue;
+                    var highlightRects = await Task.Run(() =>
+                        TabSchematics.BuildHighlightRects(boardData, UserSettings.Region));
 
-                    var fullPath = Path.Combine(DataManager.DataRoot,
-                        schematic.SchematicImageFile.Replace('/', Path.DirectorySeparatorChar));
+                    var schematicByName = boardData.Schematics
+                        .Where(schematic => !string.IsNullOrWhiteSpace(schematic.SchematicName))
+                        .ToDictionary(
+                            schematic => schematic.SchematicName,
+                            schematic => schematic,
+                            StringComparer.OrdinalIgnoreCase);
 
-                    Bitmap? bitmap = null;
-                    if (File.Exists(fullPath))
+                    var loaded = await Task.Run(() =>
                     {
-                        try { bitmap = new Bitmap(fullPath); }
-                        catch (Exception ex) { Logger.Warning($"Could not load schematic image [{fullPath}] - [{ex.Message}]"); }
+                        var result = new List<(string Name, string FullPath, Bitmap? FullBitmap)>();
+
+                        foreach (var schematic in boardData.Schematics)
+                        {
+                            if (string.IsNullOrWhiteSpace(schematic.SchematicImageFile))
+                            {
+                                continue;
+                            }
+
+                            var fullPath = Path.Combine(
+                                DataManager.DataRoot,
+                                schematic.SchematicImageFile.Replace('/', Path.DirectorySeparatorChar));
+
+                            Bitmap? bitmap = null;
+
+                            if (File.Exists(fullPath))
+                            {
+                                try
+                                {
+                                    bitmap = new Bitmap(fullPath);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.Warning($"Could not load schematic image [{fullPath}] - [{ex.Message}]");
+                                }
+                            }
+
+                            result.Add((schematic.SchematicName, fullPath, bitmap));
+                        }
+
+                        return result;
+                    });
+
+                    var thumbnails = new List<SchematicThumbnail>();
+
+                    foreach (var (name, fullPath, fullBitmap) in loaded)
+                    {
+                        RenderTargetBitmap? baseThumbnail = null;
+                        PixelSize originalPixelSize = default;
+
+                        if (fullBitmap != null)
+                        {
+                            baseThumbnail = TabSchematics.CreateScaledThumbnail(fullBitmap, AppConfig.ThumbnailMaxWidth);
+                            originalPixelSize = fullBitmap.PixelSize;
+                            fullBitmap.Dispose();
+                        }
+
+                        thumbnails.Add(new SchematicThumbnail
+                        {
+                            Name = name,
+                            ImageFilePath = fullPath,
+                            BaseThumbnail = baseThumbnail,
+                            OriginalPixelSize = originalPixelSize,
+                            ImageSource = baseThumbnail,
+                            VisualOpacity = 1.0,
+                            IsMatchForSelection = false
+                        });
                     }
 
-                    result.Add((schematic.SchematicName, fullPath, bitmap));
-                }
+                    List<string> rawPaths = this.GetCurrentBoardKiCadRawPaths();
 
-                return result;
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        if (loadVersion != this._boardSelectionLoadVersion)
+                        {
+                            foreach (var thumbnail in thumbnails)
+                            {
+                                if (!ReferenceEquals(thumbnail.ImageSource, thumbnail.BaseThumbnail))
+                                {
+                                    (thumbnail.ImageSource as IDisposable)?.Dispose();
+                                }
+
+                                (thumbnail.BaseThumbnail as IDisposable)?.Dispose();
+                            }
+
+                            return;
+                        }
+
+                        this.TabSchematicsControl.highlightRectsBySchematicAndLabel = highlightRects;
+                        this.TabSchematicsControl.schematicByName = schematicByName;
+                        this.TabSchematicsControl.highlightIndexBySchematic = new(StringComparer.OrdinalIgnoreCase);
+
+                        this.TabSchematicsControl.LoadSortedThumbnails(boardKey, thumbnails);
+
+                        if (this.TabSchematicsControl.currentThumbnails.Count > 0)
+                        {
+                            string? savedSchematic = UserSettings.GetLastSchematicForBoard(boardKey);
+                            var orderedThumbnails = this.TabSchematicsControl.currentThumbnails.ToList();
+
+                            int savedIndex = string.IsNullOrEmpty(savedSchematic)
+                                ? -1
+                                : orderedThumbnails.FindIndex(thumbnail =>
+                                    string.Equals(thumbnail.Name, savedSchematic, StringComparison.OrdinalIgnoreCase));
+
+                            this.TabSchematicsControl.FindControl<ListBox>("SchematicsThumbnailList")!.SelectedIndex =
+                                savedIndex >= 0 ? savedIndex : 0;
+                        }
+
+                        var localFiles = boardData.BoardLocalFiles.Select(file => new ResourceItem(
+                            file.Category,
+                            file.Name,
+                            string.IsNullOrWhiteSpace(file.File)
+                                ? string.Empty
+                                : Path.Combine(DataManager.DataRoot, file.File.Replace('/', Path.DirectorySeparatorChar))));
+
+                        var webLinks = boardData.BoardLinks.Select(link => new ResourceItem(
+                            link.Category,
+                            link.Name,
+                            link.Url));
+
+                        this.TabResources.LoadData(localFiles, webLinks);
+                        this.TabOverview.LoadData(boardData);
+                        this.TabContribute.LoadData(boardData, this._localRegion);
+                        this.TabOverview.ApplyFilter(this.ComponentSearchTextBox?.Text ?? string.Empty);
+                    }, DispatcherPriority.Background);
+
+                    if (rawPaths.Count > 0)
+                    {
+                        await Dispatcher.UIThread.InvokeAsync(async () =>
+                        {
+                            if (loadVersion != this._boardSelectionLoadVersion)
+                            {
+                                return;
+                            }
+
+                            await this.TabSchematicsControl.LoadKiCadProjectForCurrentBoardAsync();
+                        }, DispatcherPriority.Background);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warning($"Background board load failed - [{ex}]");
+                }
             });
-
-            var thumbnails = new List<SchematicThumbnail>();
-
-            foreach (var (name, fullPath, fullBitmap) in loaded)
-            {
-                RenderTargetBitmap? baseThumbnail = null;
-                PixelSize originalPixelSize = default;
-
-                if (fullBitmap != null)
-                {
-                    baseThumbnail = TabSchematics.CreateScaledThumbnail(fullBitmap, AppConfig.ThumbnailMaxWidth);
-                    originalPixelSize = fullBitmap.PixelSize;
-                    fullBitmap.Dispose();
-                }
-
-                thumbnails.Add(new SchematicThumbnail
-                {
-                    Name = name,
-                    ImageFilePath = fullPath,
-                    BaseThumbnail = baseThumbnail,
-                    OriginalPixelSize = originalPixelSize,
-                    ImageSource = baseThumbnail,
-                    VisualOpacity = 1.0,
-                    IsMatchForSelection = false
-                });
-            }
-
-            this.TabSchematicsControl.LoadSortedThumbnails(boardKey, thumbnails);
-
-            if (this.TabSchematicsControl.currentThumbnails.Count > 0)
-            {
-                var savedSchematic = UserSettings.GetLastSchematicForBoard(boardKey);
-                var orderedThumbnails = this.TabSchematicsControl.currentThumbnails.ToList();
-                var savedIndex = string.IsNullOrEmpty(savedSchematic) ? -1 : orderedThumbnails.FindIndex(t =>
-                    string.Equals(t.Name, savedSchematic, StringComparison.OrdinalIgnoreCase));
-
-                this.TabSchematicsControl.FindControl<ListBox>("SchematicsThumbnailList")!.SelectedIndex = savedIndex >= 0 ? savedIndex : 0;
-            }
-
-            // Populate the Resources tab
-            var localFiles = boardData.BoardLocalFiles.Select(f => new ResourceItem(
-                f.Category,
-                f.Name,
-                string.IsNullOrWhiteSpace(f.File) ? string.Empty : Path.Combine(DataManager.DataRoot, f.File.Replace('/', Path.DirectorySeparatorChar))
-            ));
-
-            var webLinks = boardData.BoardLinks.Select(l => new ResourceItem(
-                l.Category,
-                l.Name,
-                l.Url
-            ));
-
-            this.TabResources.LoadData(localFiles, webLinks);
-            this.TabOverview.LoadData(boardData);
-            this.TabContribute.LoadData(boardData, this._localRegion);
-
-            // Sync any existing search filter right away if applied
-            this.TabOverview.ApplyFilter(this.ComponentSearchTextBox?.Text ?? string.Empty);
         }
 
         // ###########################################################################################

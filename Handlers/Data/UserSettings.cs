@@ -96,6 +96,9 @@ namespace Handlers.DataHandling
         [JsonPropertyName("schematicsMarkPin1OnSelectedComponentByBoard")] public Dictionary<string, bool> SchematicsMarkPin1OnSelectedComponentByBoard { get; set; } = new();
         [JsonPropertyName("schematicsShowTracesOnSelectedComponent")] public bool SchematicsShowTracesOnSelectedComponent { get; set; } = true;
         [JsonPropertyName("schematicsShowTracesOnSelectedComponentByBoard")] public Dictionary<string, bool> SchematicsShowTracesOnSelectedComponentByBoard { get; set; } = new();
+        [JsonPropertyName("schematicsImportantSignalsPanelExpanded")] public bool SchematicsImportantSignalsPanelExpanded { get; set; } = true;
+        [JsonPropertyName("schematicsShowOppositeSideTraces")] public bool SchematicsShowOppositeSideTraces { get; set; } = false;
+        [JsonPropertyName("schematicsShowZones")] public bool SchematicsShowZones { get; set; } = true;
 
     }
 
@@ -201,6 +204,51 @@ namespace Handlers.DataHandling
             { "ComponentPopup_BulletList_Fg", "Red" },
             { "Feedback_TrashIcon_Fg", "IndianRed" }
         };
+
+        // ###########################################################################################
+        // Returns whether opposite-side PCB traces should be rendered while viewing a PCB replica.
+        // ###########################################################################################
+        public static bool SchematicsShowOppositeSideTraces
+        {
+            get => _data.SchematicsShowOppositeSideTraces;
+            set
+            {
+                if (_data.SchematicsShowOppositeSideTraces == value)
+                    return;
+
+                _data.SchematicsShowOppositeSideTraces = value;
+                Logger.Info($"Setting changed: [SchematicsShowOppositeSideTraces] [{value}]");
+                Save();
+            }
+        }
+
+        public static bool SchematicsImportantSignalsPanelExpanded
+        {
+            get => _data.SchematicsImportantSignalsPanelExpanded;
+            set
+            {
+                _data.SchematicsImportantSignalsPanelExpanded = value;
+                Save();
+            }
+        }
+
+        // ###########################################################################################
+        // Returns whether KiCad copper zones are shown in the schematics overlay.
+        // Defaults to true unless explicitly disabled by the user.
+        // ###########################################################################################
+        public static bool SchematicsShowZones
+        {
+            get => _data.SchematicsShowZones;
+            set
+            {
+                if (_data.SchematicsShowZones == value)
+                    return;
+
+                _data.SchematicsShowZones = value;
+                Logger.Info($"Setting changed: [SchematicsShowZones] [{value}]");
+                Save();
+            }
+        }
 
         // ###########################################################################################
         // Returns whether selected-component trace preview is enabled globally.
@@ -763,6 +811,7 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [SchematicsGlobalSettingsPanelExpanded] [{SchematicsGlobalSettingsPanelExpanded}]");
                     Logger.Info($"        [SchematicsShowTracesOnComponentSelect] [{SchematicsShowTracesOnComponentSelect}]");
                     Logger.Info($"        [SchematicsNetConnectionsPanelExpanded] [{SchematicsNetConnectionsPanelExpanded}]");
+                    Logger.Info($"        [SchematicsImportantSignalsPanelExpanded] [{SchematicsImportantSignalsPanelExpanded}]");
                     Logger.Info($"        [SchematicsLabelBoard] [{SchematicsLabelBoard}]");
                     Logger.Info($"        [SchematicsLabelTechnical] [{SchematicsLabelTechnical}]");
                     Logger.Info($"        [SchematicsLabelFriendly] [{SchematicsLabelFriendly}]");

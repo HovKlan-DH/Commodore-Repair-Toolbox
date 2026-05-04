@@ -102,6 +102,12 @@ namespace Handlers.DataHandling
         public string Contact { get; init; } = string.Empty;
     }
 
+    public class KiCadImportantSignalEntry
+    {
+        public string DisplayName { get; init; } = string.Empty;
+        public string KiCadNetName { get; init; } = string.Empty;
+    }
+
     // ###########################################################################################
     // Container for all data loaded from a board-specific Excel file.
     // IsLoaded is true only when the file was read successfully.
@@ -118,6 +124,7 @@ namespace Handlers.DataHandling
         public List<BoardLocalFileEntry> BoardLocalFiles { get; init; } = new();
         public List<BoardLinkEntry> BoardLinks { get; init; } = new();
         public List<CreditEntry> Credits { get; init; } = new();
+        public List<KiCadImportantSignalEntry> KiCadImportantSignals { get; init; } = new();
         public bool IsLoaded { get; init; }
     }
 

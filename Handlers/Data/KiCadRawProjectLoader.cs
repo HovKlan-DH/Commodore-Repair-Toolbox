@@ -100,7 +100,7 @@ namespace Handlers.DataHandling
                 int padCount = pcb.Footprints.Sum(footprint => footprint.Pads.Count);
 
                 Logger.Info(
-                    $"  File [{pcb.Filename}]; nets [{pcb.Nets.List.Count}], footprints [{pcb.Footprints.Count}], pads [{padCount}], segments [{pcb.Routing.Segments.Count}], vias [{pcb.Routing.Vias.Count}], arcs [{pcb.Routing.Arcs.Count}]");
+                    $"  File [{pcb.Filename}]; nets [{pcb.Nets.List.Count}], footprints [{pcb.Footprints.Count}], pads [{padCount}], segments [{pcb.Routing.Segments.Count}], vias [{pcb.Routing.Vias.Count}], arcs [{pcb.Routing.Arcs.Count}], zones [{pcb.Routing.Zones.Count}]");
 
                 foreach (var view in views.Where(view =>
                              string.Equals(view.SourceKind, "pcb", StringComparison.OrdinalIgnoreCase) &&
@@ -324,6 +324,11 @@ namespace Handlers.DataHandling
                 AddOrUpdate(ChildValue(arc, "net"));
             }
 
+            foreach (var zone in Children(pcb, "zone"))
+            {
+                AddOrUpdate(ChildValue(zone, "net"), ChildValue(zone, "net_name"));
+            }
+
             return netsById.Values
                 .OrderBy(net => net.Id, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -410,7 +415,7 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
-        // Extracts PCB tracks, vias, and arcs from a modern KiCad PCB.
+        // Extracts PCB tracks, vias, arcs, and copper zones from a modern KiCad PCB.
         // ###########################################################################################
         private static KiCadPcbRouting ExtractRouting(
             SExpressionNode pcb,
@@ -419,21 +424,27 @@ namespace Handlers.DataHandling
             var segments = new List<KiCadPcbSegment>();
             var vias = new List<KiCadPcbVia>();
             var arcs = new List<KiCadPcbArc>();
+            var zones = new List<KiCadPcbZone>();
 
-            KiCadNetRef? BuildNetRef(string? netId)
+            KiCadNetRef? BuildNetRef(string? netId, string? explicitName = null)
             {
-                if (string.IsNullOrWhiteSpace(netId))
+                if (string.IsNullOrWhiteSpace(netId) && string.IsNullOrWhiteSpace(explicitName))
                 {
                     return null;
                 }
 
-                string name = netMap.TryGetValue(netId, out string? mappedName) && !string.IsNullOrWhiteSpace(mappedName)
-                    ? mappedName
-                    : netId;
+                string? trimmedNetId = string.IsNullOrWhiteSpace(netId) ? null : netId.Trim();
+                string name = !string.IsNullOrWhiteSpace(explicitName)
+                    ? explicitName.Trim()
+                    : !string.IsNullOrWhiteSpace(trimmedNetId) &&
+                      netMap.TryGetValue(trimmedNetId, out string? mappedName) &&
+                      !string.IsNullOrWhiteSpace(mappedName)
+                        ? mappedName
+                        : trimmedNetId ?? string.Empty;
 
                 return new KiCadNetRef
                 {
-                    Id = netId,
+                    Id = trimmedNetId,
                     Name = name,
                     NormalizedName = NormalizeNetName(name)
                 };
@@ -481,11 +492,34 @@ namespace Handlers.DataHandling
                 });
             }
 
+            foreach (var zoneNode in Children(pcb, "zone"))
+            {
+                string? netId = ChildValue(zoneNode, "net");
+                string? netName = ChildValue(zoneNode, "net_name");
+
+                var outlinePolygons = ExtractZonePolygons(zoneNode, "polygon");
+                var filledPolygons = ExtractZonePolygons(zoneNode, "filled_polygon");
+
+                if (outlinePolygons.Count == 0 && filledPolygons.Count == 0)
+                {
+                    continue;
+                }
+
+                zones.Add(new KiCadPcbZone
+                {
+                    Layers = ExtractZoneLayers(zoneNode),
+                    Net = BuildNetRef(netId, netName),
+                    OutlinePolygons = outlinePolygons,
+                    FilledPolygons = filledPolygons
+                });
+            }
+
             return new KiCadPcbRouting
             {
                 Segments = segments,
                 Vias = vias,
-                Arcs = arcs
+                Arcs = arcs,
+                Zones = zones
             };
         }
 
@@ -536,6 +570,15 @@ namespace Handlers.DataHandling
                 }
             }
 
+            for (int i = 0; i < pcb.Routing.Zones.Count; i++)
+            {
+                string? netId = pcb.Routing.Zones[i].Net?.Id;
+                if (!string.IsNullOrWhiteSpace(netId))
+                {
+                    GetBucket(netId).Zones.Add(i);
+                }
+            }
+
             for (int footprintIndex = 0; footprintIndex < pcb.Footprints.Count; footprintIndex++)
             {
                 var footprint = pcb.Footprints[footprintIndex];
@@ -563,6 +606,47 @@ namespace Handlers.DataHandling
             return index
                 .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+        }
+
+        // ###########################################################################################
+        // Extracts the copper layers used by one PCB zone.
+        // Supports both single-layer and multi-layer syntax.
+        // ###########################################################################################
+        private static List<string> ExtractZoneLayers(SExpressionNode zoneNode)
+        {
+            var layers = Args(Child(zoneNode, "layers"))
+                .Where(layer => !string.IsNullOrWhiteSpace(layer))
+                .Select(layer => layer.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (layers.Count > 0)
+            {
+                return layers;
+            }
+
+            string singleLayer = ChildValue(zoneNode, "layer")?.Trim() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(singleLayer))
+            {
+                layers.Add(singleLayer);
+            }
+
+            return layers;
+        }
+
+        // ###########################################################################################
+        // Extracts one group of zone polygons from a zone node.
+        // Uses the filled polygons when present and falls back to outline polygons otherwise.
+        // ###########################################################################################
+        private static List<KiCadPcbZonePolygon> ExtractZonePolygons(SExpressionNode zoneNode, string polygonNodeName)
+        {
+            return Children(zoneNode, polygonNodeName)
+                .Select(polygonNode => new KiCadPcbZonePolygon
+                {
+                    Points = ExtractPts(polygonNode)
+                })
+                .Where(polygon => polygon.Points.Count >= 3)
+                .ToList();
         }
 
         // ###########################################################################################

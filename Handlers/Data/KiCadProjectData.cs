@@ -156,6 +156,30 @@ namespace Handlers.DataHandling
 
         [JsonPropertyName("arcs")]
         public List<KiCadPcbArc> Arcs { get; init; } = new();
+
+        [JsonPropertyName("zones")]
+        public List<KiCadPcbZone> Zones { get; init; } = new();
+    }
+
+    public sealed class KiCadPcbZone
+    {
+        [JsonPropertyName("layers")]
+        public List<string> Layers { get; init; } = new();
+
+        [JsonPropertyName("net")]
+        public KiCadNetRef? Net { get; init; }
+
+        [JsonPropertyName("outline_polygons")]
+        public List<KiCadPcbZonePolygon> OutlinePolygons { get; init; } = new();
+
+        [JsonPropertyName("filled_polygons")]
+        public List<KiCadPcbZonePolygon> FilledPolygons { get; init; } = new();
+    }
+
+    public sealed class KiCadPcbZonePolygon
+    {
+        [JsonPropertyName("points")]
+        public List<KiCadPoint2D> Points { get; init; } = new();
     }
 
     public sealed class KiCadPcbSegment
@@ -226,6 +250,9 @@ namespace Handlers.DataHandling
 
         [JsonPropertyName("pads")]
         public List<KiCadPcbHighlightPadRef> Pads { get; init; } = new();
+
+        [JsonPropertyName("zones")]
+        public List<int> Zones { get; init; } = new();
     }
 
     public sealed class KiCadPcbHighlightPadRef
@@ -726,6 +753,7 @@ namespace Handlers.DataHandling
             List<int> segments = new();
             List<int> vias = new();
             List<int> arcs = new();
+            List<int> zones = new();
             List<KiCadPcbHighlightPadRef> pads = new();
 
             if (rootElement.TryGetProperty("segments", out JsonElement segmentsElement))
@@ -741,6 +769,11 @@ namespace Handlers.DataHandling
             if (rootElement.TryGetProperty("arcs", out JsonElement arcsElement))
             {
                 arcs = KiCadPcbHighlightBucketJsonConverter.ReadIntList(arcsElement);
+            }
+
+            if (rootElement.TryGetProperty("zones", out JsonElement zonesElement))
+            {
+                zones = KiCadPcbHighlightBucketJsonConverter.ReadIntList(zonesElement);
             }
 
             if (rootElement.TryGetProperty("pads", out JsonElement padsElement) &&
@@ -767,7 +800,8 @@ namespace Handlers.DataHandling
                 Segments = segments,
                 Vias = vias,
                 Arcs = arcs,
-                Pads = pads
+                Pads = pads,
+                Zones = zones
             };
         }
 
@@ -792,6 +826,9 @@ namespace Handlers.DataHandling
 
             writer.WritePropertyName("pads");
             JsonSerializer.Serialize(writer, value.Pads, options);
+
+            writer.WritePropertyName("zones");
+            JsonSerializer.Serialize(writer, value.Zones, options);
 
             writer.WriteEndObject();
         }

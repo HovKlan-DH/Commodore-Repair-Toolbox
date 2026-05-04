@@ -260,17 +260,49 @@
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
 					<RowDefinition Height="*" />
 				</Grid.RowDefinitions>
 
+				<!-- Main Excel compatibility warning banner -->
+				<Border x:Name="MainExcelRequiresAppUpdateBanner"
+					Grid.Row="0"
+					IsVisible="False"
+					Background="{DynamicResource Main_Banner_Bg}"
+					CornerRadius="0"
+					Margin="0,0,0,1"
+					Padding="12,6">
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="Auto" />
+						</Grid.ColumnDefinitions>
+
+						<TextBlock x:Name="MainExcelRequiresAppUpdateBannerText"
+								   Grid.Column="0"
+								   VerticalAlignment="Center"
+								   Foreground="{DynamicResource Main_Banner_Fg}"
+								   FontSize="12"
+								   TextWrapping="Wrap" />
+
+						<Button x:Name="MainExcelRequiresAppUpdateBannerDismissButton"
+								Grid.Column="1"
+								Classes="BannerDismissButton"
+								Content="✕"
+								FontSize="11"
+								Padding="6,3"
+								Click="OnMainExcelRequiresAppUpdateBannerDismiss" />
+					</Grid>
+				</Border>
+
 				<!-- Update notification banner -->
 				<Border x:Name="UpdateBanner"
-									Grid.Row="0"
-									IsVisible="False"
-									Background="{DynamicResource Main_Banner_Bg}"
-									CornerRadius="0"
-									Margin="0,8,0,4"
-									Padding="12,6">
+					Grid.Row="1"
+					IsVisible="False"
+					Background="{DynamicResource Main_Banner_Bg}"
+					CornerRadius="0"
+					Margin="0,0,0,4"
+					Padding="12,6">
 					<Grid>
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="*" />
@@ -318,14 +350,14 @@
 
 				<!-- Data sync notification banner -->
 				<Border x:Name="SyncBanner"
-											Grid.Row="1"
-											IsVisible="False"
-											Background="{DynamicResource Main_Banner_Bg}"
-											CornerRadius="0"
-											Margin="0,0,0,4"
-											Padding="12,6"
-											Cursor="Hand"
-											PointerPressed="OnSyncBannerPointerPressed">
+						Grid.Row="2"
+						IsVisible="False"
+						Background="{DynamicResource Main_Banner_Bg}"
+						CornerRadius="0"
+						Margin="0,0,0,4"
+						Padding="12,6"
+						Cursor="Hand"
+						PointerPressed="OnSyncBannerPointerPressed">
 					<Grid>
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="*" />
@@ -334,10 +366,10 @@
 						</Grid.ColumnDefinitions>
 
 						<TextBlock x:Name="SyncBannerText"
-									Grid.Column="0"
-									VerticalAlignment="Center"
-									Foreground="{DynamicResource Main_Banner_Fg}"
-									FontSize="12" />
+								   Grid.Column="0"
+								   VerticalAlignment="Center"
+								   Foreground="{DynamicResource Main_Banner_Fg}"
+								   FontSize="12" />
 
 						<Button x:Name="SyncBannerRefreshButton"
 								Grid.Column="1"
@@ -364,7 +396,7 @@
 
 				<!-- Component label editor mode banner -->
 				<Border x:Name="SchematicsLabelEditorModeBanner"
-						Grid.Row="2"
+						Grid.Row="3"
 						IsVisible="False"
 						Background="{DynamicResource Main_Banner_Bg}"
 						CornerRadius="0"
@@ -377,7 +409,7 @@
 							   TextWrapping="Wrap" />
 				</Border>
 
-				<TabControl x:Name="MainTabControl" Grid.Row="3" Padding="0">
+				<TabControl x:Name="MainTabControl" Grid.Row="4" Padding="0">
 
 					<TabItem x:Name="SchematicsTabItem" Header="Schematics">
 						<local:TabSchematics x:Name="TabSchematicsControl" />
@@ -414,7 +446,7 @@
 				</TabControl>
 
 				<Border x:Name="DataSyncStatusIconBorder"
-						Grid.Row="3"
+						Grid.Row="4"
 						ZIndex="10"
 						HorizontalAlignment="Right"
 						VerticalAlignment="Top"

@@ -19,6 +19,7 @@ namespace Handlers.DataHandling
         private const string SheetBoardLocalFiles = "Board local files";
         private const string SheetBoardLinks = "Board links";
         private const string SheetCredits = "Credits";
+        private const string SheetKiCadImportantSignals = "Important signals";
 
         // Board schematics columns
         private const string ColSchematicName = "Schematic name";
@@ -37,7 +38,7 @@ namespace Handlers.DataHandling
         private const string ColKiCadP2ImageX = "Image 2 Bottom X";
         private const string ColKiCadP2ImageY = "Image 2 Bottom Y";
 
-        // Shared columns (appear in multiple sheets)
+        // Shared columns
         private const string ColUuidV4 = "UUID v4";
         private const string ColBoardLabel = "Board label";
         private const string ColCategory = "Category";
@@ -71,11 +72,10 @@ namespace Handlers.DataHandling
         private const string ColNameOrHandle = "Name or handle";
         private const string ColContact = "Contact (email or web page)";
 
-        // Required header sets per sheet - used for robust, order-independent column mapping
-        // Compliant with .NET6
+        // Important signals columns
+        private const string ColDisplayName = "Display name";
+        private const string ColKiCadNetName = "KiCad net name";
 
-        // Reduce these arrays to only require the strict core columns, so older Excel sheets without newly 
-        // added (optional) columns still load correctly while still parsing the new columns if they exist.
         private static readonly string[] SchematicsHeaders = new[] { ColSchematicName, ColSchematicImageFile };
         private static readonly string[] ComponentsHeaders = new[] { ColBoardLabel, ColFriendlyName, ColTechnicalNameOrValue };
         private static readonly string[] ComponentImagesHeaders = new[] { ColBoardLabel, ColPin, ColName, ColFile };
@@ -85,6 +85,7 @@ namespace Handlers.DataHandling
         private static readonly string[] BoardLocalFilesHeaders = new[] { ColCategory, ColName, ColFile };
         private static readonly string[] BoardLinksHeaders = new[] { ColCategory, ColName, ColUrl };
         private static readonly string[] CreditsHeaders = new[] { ColCategory, ColNameOrHandle };
+        private static readonly string[] KiCadImportantSignalsHeaders = new[] { ColDisplayName, ColKiCadNetName };
 
         private static readonly Dictionary<string, BoardData> _cache = new(StringComparer.OrdinalIgnoreCase);
 
@@ -130,6 +131,7 @@ namespace Handlers.DataHandling
                                     break;
                                 }
                             }
+
                             if (!string.IsNullOrWhiteSpace(revisionDate))
                                 break;
                         }
@@ -147,6 +149,7 @@ namespace Handlers.DataHandling
                         BoardLocalFiles = MapBoardLocalFiles(ReadSheetRows(package, SheetBoardLocalFiles, BoardLocalFilesHeaders)),
                         BoardLinks = MapBoardLinks(ReadSheetRows(package, SheetBoardLinks, BoardLinksHeaders)),
                         Credits = MapCredits(ReadSheetRows(package, SheetCredits, CreditsHeaders)),
+                        KiCadImportantSignals = MapKiCadImportantSignals(ReadSheetRows(package, SheetKiCadImportantSignals, KiCadImportantSignalsHeaders)),
                         IsLoaded = true
                     };
 
@@ -202,7 +205,6 @@ namespace Handlers.DataHandling
             int maxRow = sheet.Dimension?.End.Row ?? 0;
             int maxCol = sheet.Dimension?.End.Column ?? 0;
 
-            // Locate the header row by matching all required headers
             int headerRow = -1;
             var headerColMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
@@ -231,7 +233,6 @@ namespace Handlers.DataHandling
                 return rows;
             }
 
-            // Read data rows
             for (int row = headerRow + 1; row <= maxRow; row++)
             {
                 var rowData = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -371,12 +372,26 @@ namespace Handlers.DataHandling
             }).ToList();
 
         // ###########################################################################################
+        // Maps the grouped important KiCad signal references from the board Excel sheet.
+        // ###########################################################################################
+        private static List<KiCadImportantSignalEntry> MapKiCadImportantSignals(List<Dictionary<string, string>> rows)
+            => rows
+                .Select(r => new KiCadImportantSignalEntry
+                {
+                    DisplayName = Val(r, ColDisplayName),
+                    KiCadNetName = Val(r, ColKiCadNetName)
+                })
+                .Where(entry =>
+                    !string.IsNullOrWhiteSpace(entry.DisplayName) &&
+                    !string.IsNullOrWhiteSpace(entry.KiCadNetName))
+                .ToList();
+
+        // ###########################################################################################
         // Collapses Alt+Enter line breaks in Excel cell headers into a single space, then trims.
         // ###########################################################################################
         private static string NormalizeHeader(string text)
         {
-            //var parts = text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-            var parts = text.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries); // compliant with .NET6
+            var parts = text.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             return string.Join(" ", parts).Trim();
         }
 
