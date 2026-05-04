@@ -97,10 +97,6 @@ namespace CRT
         // Used by: Main.OnSchematicsZoom
         public const double SchematicsZoomFactor = 1.5;
 
-        // Minimum allowed zoom level (1.0 = 100%).
-        // Used by: Main.OnSchematicsZoom
-        public const double SchematicsMinZoom = 0.9;
-
         // Maximum allowed zoom level.
         // Used by: Main.OnSchematicsZoom
         public const double SchematicsMaxZoom = 20.0;

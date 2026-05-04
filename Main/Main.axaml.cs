@@ -37,7 +37,6 @@ namespace CRT
         private ComponentInfoWindow? _singleComponentInfoWindow;
         private readonly Dictionary<string, ComponentInfoWindow> _componentInfoWindowsByKey = new(StringComparer.OrdinalIgnoreCase);
         internal bool isHoveringComponent = false;
-        private bool _isShowingMainExcelRequiresAppUpdateBanner;
         private int _boardSelectionLoadVersion;
 
         // Blink selected highlights
@@ -234,7 +233,6 @@ namespace CRT
         // ###########################################################################################
         private void ShowMainExcelRequiresAppUpdateBanner()
         {
-            this._isShowingMainExcelRequiresAppUpdateBanner = true;
             this.MainExcelRequiresAppUpdateBannerText.Text =
                 "Newer main Excel data file is available, but requires a newer application version, due to breaking changes - please update the application. No more data updates will be given for this application version, and worst-case is data format will break UI or functionality in a future version.";
             this.MainExcelRequiresAppUpdateBannerDismissButton.IsEnabled = true;
@@ -247,7 +245,6 @@ namespace CRT
         // ###########################################################################################
         private void HideMainExcelRequiresAppUpdateBanner()
         {
-            this._isShowingMainExcelRequiresAppUpdateBanner = false;
             this.MainExcelRequiresAppUpdateBanner.IsVisible = false;
         }
 

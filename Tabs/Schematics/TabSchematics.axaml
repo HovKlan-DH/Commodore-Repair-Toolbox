@@ -317,6 +317,30 @@
 											   IsHitTestVisible="False" />
 								</StackPanel>
 
+								<StackPanel x:Name="GlobalShowCalibrationTracesAndPadsRow"
+										IsVisible="False"
+										Orientation="Horizontal"
+										Spacing="6"
+										Background="Transparent"
+										Cursor="Hand"
+										PointerPressed="OnGlobalShowCalibrationTracesAndPadsRowClicked">
+									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+										<CheckBox x:Name="CheckGlobalShowCalibrationTracesAndPads"
+												  MinHeight="0"
+												  Margin="0"
+												  Padding="0"
+												  CornerRadius="2"
+												  IsChecked="True"
+												  IsHitTestVisible="False" />
+									</Viewbox>
+									<TextBlock Text="Show traces and pads"
+											   FontSize="11"
+											   FontWeight="Bold"
+											   Foreground="{DynamicResource Text_Fail_Fg}"
+											   VerticalAlignment="Center"
+											   IsHitTestVisible="False" />
+								</StackPanel>
+								
 								<StackPanel x:Name="GlobalShowZonesRow"
 											IsVisible="False"
 											Orientation="Horizontal"
@@ -507,7 +531,7 @@
 								Margin="0,8,0,0"
 								HorizontalAlignment="Stretch"
 								HorizontalContentAlignment="Center"
-								IsVisible="False"
+								IsVisible="True"
 								IsEnabled="False" />
 						</StackPanel>
 					</Border>
@@ -867,22 +891,6 @@
 						Content="Enable component label editor"
 						HorizontalAlignment="Stretch" />
 
-				<Button x:Name="CopyKiCadWorldPointCandidatesButton"
-					Content="Copy KiCad calibration points"
-					HorizontalAlignment="Stretch" />
-				
-				<Button x:Name="BeginKiCadCalibrationButton"
-									Content="Capture image calibration point"
-									HorizontalAlignment="Stretch" />
-
-				<Button x:Name="CancelKiCadCalibrationButton"
-                        Content="Cancel image calibration capture"
-                        IsVisible="False"
-                        HorizontalAlignment="Stretch"
-                        Foreground="{DynamicResource Button_Cancel_Fg}"
-                        Background="{DynamicResource Button_Cancel_Bg}"
-                        BorderBrush="{DynamicResource Button_Cancel_Border}" />
-
 				<Button x:Name="ApplyLabelEditorChangesButton"
 					Content="Apply all editor changes"
 					IsVisible="False"
@@ -893,6 +901,26 @@
 				
 				<Button x:Name="CancelLabelEditorChangesButton"
 						Content="Discard all editor changes"
+						IsVisible="False"
+						HorizontalAlignment="Stretch"
+						Foreground="{DynamicResource Button_Cancel_Fg}"
+						Background="{DynamicResource Button_Cancel_Bg}"
+						BorderBrush="{DynamicResource Button_Cancel_Border}" />
+
+				<Button x:Name="BeginKiCadTraceCalibrationButton"
+						Content="Calibrate KiCad traces"
+						HorizontalAlignment="Stretch" />
+
+				<Button x:Name="ApplyKiCadTraceCalibrationButton"
+						Content="Apply KiCad calibration"
+						IsVisible="False"
+						HorizontalAlignment="Stretch"
+						Foreground="{DynamicResource Button_Ok_Fg}"
+						Background="{DynamicResource Button_Ok_Bg}"
+						BorderBrush="{DynamicResource Button_Ok_Border}" />
+
+				<Button x:Name="CancelKiCadTraceCalibrationButton"
+						Content="Discard KiCad calibration"
 						IsVisible="False"
 						HorizontalAlignment="Stretch"
 						Foreground="{DynamicResource Button_Cancel_Fg}"

@@ -29,14 +29,6 @@ namespace Handlers.DataHandling
         private const string ColMainHighlightOpacity = "Main highlight opacity";
         private const string ColThumbnailImageHighlightColor = "Thumbnail image highlight color";
         private const string ColThumbnailHighlightOpacity = "Thumbnail highlight opacity";
-        private const string ColKiCadP1WorldX = "CAD 1 Top X";
-        private const string ColKiCadP1WorldY = "CAD 1 Top Y";
-        private const string ColKiCadP1ImageX = "Image 1 Top X";
-        private const string ColKiCadP1ImageY = "Image 1 Top Y";
-        private const string ColKiCadP2WorldX = "CAD 2 Bottom X";
-        private const string ColKiCadP2WorldY = "CAD 2 Bottom Y";
-        private const string ColKiCadP2ImageX = "Image 2 Bottom X";
-        private const string ColKiCadP2ImageY = "Image 2 Bottom Y";
 
         // Shared columns
         private const string ColUuidV4 = "UUID v4";
@@ -140,17 +132,16 @@ namespace Handlers.DataHandling
                     var data = new BoardData
                     {
                         RevisionDate = revisionDate,
-                        Schematics = MapSchematics(ReadSheetRows(package, SheetBoardSchematics, SchematicsHeaders)),
-                        Components = MapComponents(ReadSheetRows(package, SheetComponents, ComponentsHeaders)),
-                        ComponentImages = MapComponentImages(ReadSheetRows(package, SheetComponentImages, ComponentImagesHeaders)),
+                        Schematics = MapSchematics(ReadSheetRows(package, cacheKey, SheetBoardSchematics, SchematicsHeaders)),
+                        Components = MapComponents(ReadSheetRows(package, cacheKey, SheetComponents, ComponentsHeaders)),
+                        ComponentImages = MapComponentImages(ReadSheetRows(package, cacheKey, SheetComponentImages, ComponentImagesHeaders)),
                         ComponentHighlights = BoardComponentHighlightStorage.LoadComponentHighlights(excelPath),
-                        ComponentLocalFiles = MapComponentLocalFiles(ReadSheetRows(package, SheetComponentLocalFiles, ComponentLocalFilesHeaders)),
-                        ComponentLinks = MapComponentLinks(ReadSheetRows(package, SheetComponentLinks, ComponentLinksHeaders)),
-                        BoardLocalFiles = MapBoardLocalFiles(ReadSheetRows(package, SheetBoardLocalFiles, BoardLocalFilesHeaders)),
-                        BoardLinks = MapBoardLinks(ReadSheetRows(package, SheetBoardLinks, BoardLinksHeaders)),
-                        Credits = MapCredits(ReadSheetRows(package, SheetCredits, CreditsHeaders)),
-                        KiCadImportantSignals = MapKiCadImportantSignals(ReadSheetRows(package, SheetKiCadImportantSignals, KiCadImportantSignalsHeaders)),
-                        IsLoaded = true
+                        ComponentLocalFiles = MapComponentLocalFiles(ReadSheetRows(package, cacheKey, SheetComponentLocalFiles, ComponentLocalFilesHeaders)),
+                        ComponentLinks = MapComponentLinks(ReadSheetRows(package, cacheKey, SheetComponentLinks, ComponentLinksHeaders)),
+                        BoardLocalFiles = MapBoardLocalFiles(ReadSheetRows(package, cacheKey, SheetBoardLocalFiles, BoardLocalFilesHeaders)),
+                        BoardLinks = MapBoardLinks(ReadSheetRows(package, cacheKey, SheetBoardLinks, BoardLinksHeaders)),
+                        Credits = MapCredits(ReadSheetRows(package, cacheKey, SheetCredits, CreditsHeaders)),
+                        KiCadImportantSignals = MapKiCadImportantSignals(ReadSheetRows(package, cacheKey, SheetKiCadImportantSignals, KiCadImportantSignalsHeaders)),
                     };
 
                     _cache[cacheKey] = data;
@@ -191,14 +182,18 @@ namespace Handlers.DataHandling
         // all data rows below it. Each row is a case-insensitive dictionary keyed by header name.
         // Multi-line cell headers (Alt+Enter in Excel) are normalized to single-space strings.
         // ###########################################################################################
-        private static List<Dictionary<string, string>> ReadSheetRows(ExcelPackage package, string sheetName, string[] requiredHeaders)
+        private static List<Dictionary<string, string>> ReadSheetRows(
+    ExcelPackage package,
+    string workbookDisplayPath,
+    string sheetName,
+    string[] requiredHeaders)
         {
             var rows = new List<Dictionary<string, string>>();
             var sheet = package.Workbook.Worksheets[sheetName];
 
             if (sheet == null)
             {
-                Logger.Warning($"Sheet [{sheetName}] not found in board Excel file");
+                Logger.Warning($"Sheet [{sheetName}] missing in [{workbookDisplayPath}]");
                 return rows;
             }
 
@@ -216,7 +211,9 @@ namespace Handlers.DataHandling
                 {
                     string text = NormalizeHeader(GetCellText(sheet, row, col));
                     if (!string.IsNullOrWhiteSpace(text))
+                    {
                         colMap[text] = col;
+                    }
                 }
 
                 if (requiredHeaders.All(h => colMap.ContainsKey(h)))
@@ -229,7 +226,7 @@ namespace Handlers.DataHandling
 
             if (headerRow < 1)
             {
-                Logger.Warning($"Header row not found in sheet [{sheetName}] - verify column header names");
+                Logger.Warning($"Header row not found in sheet [{sheetName}] in [{workbookDisplayPath}] - verify column header names");
                 return rows;
             }
 
@@ -243,11 +240,15 @@ namespace Handlers.DataHandling
                     string value = GetCellText(sheet, row, col);
                     rowData[header] = value;
                     if (!string.IsNullOrWhiteSpace(value))
+                    {
                         hasData = true;
+                    }
                 }
 
                 if (hasData)
+                {
                     rows.Add(rowData);
+                }
             }
 
             return rows;
@@ -260,7 +261,8 @@ namespace Handlers.DataHandling
             => row.TryGetValue(key, out var v) ? v : string.Empty;
 
         // ###########################################################################################
-        // Maps board schematic rows including optional KiCad overlay calibration values.
+        // Maps board schematic rows from Excel into the runtime schematic model.
+        // KiCad calibration is no longer read from Excel and is instead loaded from the board JSON file.
         // ###########################################################################################
         private static List<BoardSchematicEntry> MapSchematics(List<Dictionary<string, string>> rows)
             => rows.Select(r => new BoardSchematicEntry
@@ -272,17 +274,7 @@ namespace Handlers.DataHandling
                 MainImageHighlightColor = Val(r, ColMainImageHighlightColor),
                 MainHighlightOpacity = Val(r, ColMainHighlightOpacity),
                 ThumbnailImageHighlightColor = Val(r, ColThumbnailImageHighlightColor),
-                ThumbnailHighlightOpacity = Val(r, ColThumbnailHighlightOpacity),
-
-                KiCadP1WorldX = Val(r, ColKiCadP1WorldX),
-                KiCadP1WorldY = Val(r, ColKiCadP1WorldY),
-                KiCadP1ImageX = Val(r, ColKiCadP1ImageX),
-                KiCadP1ImageY = Val(r, ColKiCadP1ImageY),
-
-                KiCadP2WorldX = Val(r, ColKiCadP2WorldX),
-                KiCadP2WorldY = Val(r, ColKiCadP2WorldY),
-                KiCadP2ImageX = Val(r, ColKiCadP2ImageX),
-                KiCadP2ImageY = Val(r, ColKiCadP2ImageY)
+                ThumbnailHighlightOpacity = Val(r, ColThumbnailHighlightOpacity)
             }).ToList();
 
         private static List<ComponentEntry> MapComponents(List<Dictionary<string, string>> rows)

@@ -27,7 +27,7 @@ public partial class TabSchematics : UserControl
 {
     public Main? MainWindow { get; set; }
 
-    public bool IsLabelEditorActive => this.thisIsLabelEditorMode;
+    public bool IsLabelEditorActive => this.thisIsLabelEditorMode || this.thisIsKiCadTraceCalibrationMode;
 
     // Zoom
     internal Matrix schematicsMatrix = Matrix.Identity;
@@ -38,6 +38,18 @@ public partial class TabSchematics : UserControl
     // Full-res viewer
     internal Bitmap? currentFullResBitmap;
     internal CancellationTokenSource? fullResLoadCts;
+
+    private bool thisIsKiCadTraceCalibrationMode;
+    private double thisKiCadCalibrationImageLeft;
+    private double thisKiCadCalibrationImageTop;
+    private double thisKiCadCalibrationImageRight;
+    private double thisKiCadCalibrationImageBottom;
+    private double thisKiCadCalibrationStartImageLeft;
+    private double thisKiCadCalibrationStartImageTop;
+    private double thisKiCadCalibrationStartImageRight;
+    private double thisKiCadCalibrationStartImageBottom;
+    private LabelEditorDragMode thisKiCadTraceCalibrationDragMode;
+    private Point thisKiCadTraceCalibrationDragStartPixelPoint;
 
     // Panning
     private bool isPanning;
@@ -83,8 +95,6 @@ public partial class TabSchematics : UserControl
 //    private string thisKiCadProjectPath = string.Empty;
     private readonly HashSet<string> thisSelectedKiCadReferences = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> thisSelectedKiCadNormalizedNetNames = new(StringComparer.OrdinalIgnoreCase);
-    private bool thisIsKiCadCalibrationCaptureMode;
-    private readonly List<Point> thisKiCadCalibrationImagePoints = new();
     private string? thisHoveredKiCadNetName;
     private string? thisHoveredKiCadPadNumber;
     private readonly HashSet<string> thisLockedKiCadNetNames = new(StringComparer.OrdinalIgnoreCase);
@@ -127,8 +137,6 @@ public partial class TabSchematics : UserControl
     private long thisLastKiCadHoverHitTestTimestamp;
     private string thisLastKiCadNetConnectionsSignature = string.Empty;
     private string thisLastThumbnailHighlightSignature = string.Empty;
-
-    private Rect thisPanStartViewportRect;
 
     private readonly Dictionary<string, KiCadPcbNetRenderCache> thisKiCadPcbNetRenderCacheByKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, KiCadPcbHoverHitTestCache> thisKiCadPcbHoverHitTestCacheByKey = new(StringComparer.OrdinalIgnoreCase);
@@ -309,14 +317,6 @@ public partial class TabSchematics : UserControl
     {
         public static KiCadViewCalibration Identity { get; } = new();
 
-        public bool HasAffineCalibration { get; init; }
-        public double A { get; init; }
-        public double B { get; init; }
-        public double C { get; init; }
-        public double D { get; init; }
-        public double E { get; init; }
-        public double F { get; init; }
-
         public double ScaleX { get; init; } = 1.0;
         public double ScaleY { get; init; } = 1.0;
         public double OffsetX { get; init; }
@@ -325,28 +325,6 @@ public partial class TabSchematics : UserControl
         public bool MirrorY { get; init; }
     }
 
-    private readonly struct KiCadCalibrationPoint
-    {
-        public KiCadCalibrationPoint(double worldX, double worldY, double imageX, double imageY)
-        {
-            this.WorldX = worldX;
-            this.WorldY = worldY;
-            this.ImageX = imageX;
-            this.ImageY = imageY;
-        }
-
-        public double WorldX { get; }
-        public double WorldY { get; }
-        public double ImageX { get; }
-        public double ImageY { get; }
-    }
-
-    private sealed class KiCadCalibrationWorldPointCandidate
-    {
-        public string Label { get; init; } = string.Empty;
-        public double WorldX { get; init; }
-        public double WorldY { get; init; }
-    }
 
     // ###########################################################################################
     // Triggers a visual overlay refresh when the hovered KiCad net changes.
@@ -402,6 +380,10 @@ public partial class TabSchematics : UserControl
     private Rect thisLabelEditorOriginalSelectionBounds;
     private readonly Dictionary<EditableComponentHighlight, Rect> thisLabelEditorOriginalDragRectangles = new();
 
+    // ###########################################################################################
+    // Initializes the schematics tab control and wires the shared UI actions used by the viewer,
+    // label editor, and KiCad calibration workflows.
+    // ###########################################################################################
     public TabSchematics()
     {
         InitializeComponent();
@@ -411,9 +393,6 @@ public partial class TabSchematics : UserControl
         this.EnableLabelEditorButton.Click += (_, _) => this.BeginLabelEditorMode();
         this.CancelLabelEditorChangesButton.Click += (_, _) => this.CancelLabelEditorChanges();
         this.ApplyLabelEditorChangesButton.Click += (_, _) => this.ApplyLabelEditorChanges();
-     
-        this.BeginKiCadCalibrationButton.Click += (_, _) => this.BeginKiCadCalibrationCapture();
-        this.CancelKiCadCalibrationButton.Click += (_, _) => this.CancelKiCadCalibrationCapture();
 
         this.ConfirmNewLabelEditorBoardLabelButton.Click += (_, _) => this.ConfirmNewLabelEditorPrompt();
         this.CancelNewLabelEditorBoardLabelButton.Click += (_, _) => this.CancelNewLabelEditorPrompt();
@@ -421,9 +400,40 @@ public partial class TabSchematics : UserControl
         this.NewLabelEditorBoardLabelTextBox.KeyDown += this.OnNewLabelEditorPromptKeyDown;
         this.NewLabelEditorCategoryComboBox.KeyDown += this.OnNewLabelEditorPromptKeyDown;
 
-        this.CopyKiCadWorldPointCandidatesButton.Click += (_, _) => this.CopyKiCadWorldPointCandidatesAsync();
-
         this.ClearKiCadTraceSelectionButton.Click += (_, _) => this.ClearAllKiCadTraceSelections();
+
+        this.BeginKiCadTraceCalibrationButton.Click += (_, _) => this.BeginKiCadTraceCalibrationMode();
+        this.ApplyKiCadTraceCalibrationButton.Click += (_, _) => this.ApplyKiCadTraceCalibration();
+        this.CancelKiCadTraceCalibrationButton.Click += (_, _) => this.CancelKiCadTraceCalibrationMode();
+
+        this.CheckGlobalShowCalibrationTracesAndPads.IsChecked = true;
+        this.CheckGlobalShowCalibrationTracesAndPads.IsCheckedChanged += (_, _) =>
+        {
+            if (this.thisIsKiCadTraceCalibrationMode)
+            {
+                this.RefreshKiCadOverlay(forceImmediate: true);
+            }
+        };
+    }
+
+    // ###########################################################################################
+    // Handles row clicks for the temporary KiCad calibration visibility toggle that hides or shows
+    // the rendered traces and pads while keeping the calibration box visible.
+    // ###########################################################################################
+    private void OnGlobalShowCalibrationTracesAndPadsRowClicked(object? sender, PointerPressedEventArgs e)
+    {
+        if (!this.CheckGlobalShowCalibrationTracesAndPads.IsEnabled)
+        {
+            return;
+        }
+
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            this.CheckGlobalShowCalibrationTracesAndPads.IsChecked =
+                this.CheckGlobalShowCalibrationTracesAndPads.IsChecked != true;
+
+            e.Handled = true;
+        }
     }
 
     // ###########################################################################################
@@ -1127,8 +1137,9 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Handles right-click for panning on the schematic view and selection toggling on release.
-    // Left-click selects hovered component, and single-click opens the component info popup.
-    // Also routes pointer presses to the polyline manager if appropriate.
+    // Left-click selects hovered component, single-click opens component info popup, and while the
+    // new KiCad trace calibration mode is active the same pointer pipeline is reused for moving and
+    // resizing the temporary calibration box.
     // ###########################################################################################
     private void OnSchematicsPointerPressed(object? sender, PointerPressedEventArgs e)
     {
@@ -1158,6 +1169,51 @@ public partial class TabSchematics : UserControl
         if (pointer.Properties.IsLeftButtonPressed && this.thisIsShowingLabelEditorMenu)
         {
             this.HideLabelEditorMenu();
+        }
+
+        if (this.thisIsKiCadTraceCalibrationMode)
+        {
+            if (pointer.Properties.IsRightButtonPressed)
+            {
+                this.isPanning = true;
+                this.panStartPoint = point;
+                this.panStartMatrix = this.schematicsMatrix;
+
+                this.HideSchematicsHoverUi();
+                this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.SizeAll);
+
+                e.Pointer.Capture(this.SchematicsContainer);
+                e.Handled = true;
+                return;
+            }
+
+            if (pointer.Properties.IsLeftButtonPressed)
+            {
+                if (!this.TryGetSchematicsImagePixelPoint(point, out var pixelPoint))
+                {
+                    e.Handled = true;
+                    return;
+                }
+
+                if (this.TryGetKiCadTraceCalibrationHandleAtContainerPoint(point, out var resizeMode))
+                {
+                    this.StartKiCadTraceCalibrationDrag(pixelPoint, resizeMode);
+                    this.UpdateKiCadTraceCalibrationCursor(point);
+                    e.Handled = true;
+                    return;
+                }
+
+                if (this.IsPointerInsideCurrentKiCadCalibrationBounds(point))
+                {
+                    this.StartKiCadTraceCalibrationDrag(pixelPoint, LabelEditorDragMode.Move);
+                    this.UpdateKiCadTraceCalibrationCursor(point);
+                    e.Handled = true;
+                    return;
+                }
+
+                e.Handled = true;
+                return;
+            }
         }
 
         if (this.thisIsLabelEditorMode)
@@ -1227,30 +1283,6 @@ public partial class TabSchematics : UserControl
                 this.ClearSelectedLabelEditorHighlights(refresh: false);
                 this.StartDrawingLabelEditorRectangle(pixelPoint);
 
-                e.Handled = true;
-                return;
-            }
-        }
-
-        if (this.thisIsKiCadCalibrationCaptureMode)
-        {
-            if (pointer.Properties.IsRightButtonPressed)
-            {
-                this.isPanning = true;
-                this.panStartPoint = point;
-                this.panStartMatrix = this.schematicsMatrix;
-
-                this.HideSchematicsHoverUi();
-                this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.SizeAll);
-
-                e.Pointer.Capture(this.SchematicsContainer);
-                e.Handled = true;
-                return;
-            }
-
-            if (pointer.Properties.IsLeftButtonPressed)
-            {
-                this.CaptureKiCadCalibrationPointAsync(point);
                 e.Handled = true;
                 return;
             }
@@ -1331,8 +1363,8 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Translates the schematics image while the right mouse button is held down.
-    // Routes movement and shift key state to Polyline Manager and minimizes editor overlay churn
-    // by batching transient hover-state updates instead of mutating overlay properties directly.
+    // Routes movement and shift key state to Polyline Manager, label editor, and the new KiCad
+    // trace calibration box interaction mode.
     // ###########################################################################################
     private void OnSchematicsPointerMoved(object? sender, PointerEventArgs e)
     {
@@ -1343,6 +1375,18 @@ public partial class TabSchematics : UserControl
         if (!this.isPanning && this.IsPointerInsideKiCadNetConnectionsPanel(point))
         {
             this.ClearTransientHoverForKiCadNetConnectionsPanel();
+            return;
+        }
+
+        if (this.thisIsKiCadTraceCalibrationMode && this.thisKiCadTraceCalibrationDragMode != LabelEditorDragMode.None)
+        {
+            if (this.TryGetSchematicsImagePixelPoint(point, out var pixelPoint))
+            {
+                this.UpdateKiCadTraceCalibrationDrag(pixelPoint);
+            }
+
+            this.UpdateKiCadTraceCalibrationCursor(point);
+            e.Handled = true;
             return;
         }
 
@@ -1382,7 +1426,7 @@ public partial class TabSchematics : UserControl
             return;
         }
 
-        if (!this.thisIsLabelEditorMode && TryInvert(this.schematicsMatrix, out var inv))
+        if (!this.thisIsLabelEditorMode && !this.thisIsKiCadTraceCalibrationMode && TryInvert(this.schematicsMatrix, out var inv))
         {
             var localPoint = new Point(
                 (point.X * inv.M11) + (point.Y * inv.M21) + inv.M31,
@@ -1404,7 +1448,24 @@ public partial class TabSchematics : UserControl
             return;
         }
 
-        if (!this.thisIsLabelEditorMode && !this.thisIsKiCadCalibrationCaptureMode)
+        if (this.thisIsKiCadTraceCalibrationMode)
+        {
+            this.UpdateKiCadTraceCalibrationCursor(point);
+            this.SchematicsHoverLabelBorder.IsVisible = false;
+            this.SchematicsHoverLabelText.Text = string.Empty;
+            this.SchematicsHoverPadBorder.IsVisible = false;
+            this.SchematicsHoverPadText.Text = string.Empty;
+
+            if (this.MainWindow != null)
+            {
+                this.MainWindow.isHoveringComponent = false;
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        if (!this.thisIsLabelEditorMode)
         {
             if (this.ShouldProcessKiCadHoverHitTest(point))
             {
@@ -1450,9 +1511,10 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Exits pan mode when the right mouse button is released, or finalized polyline logic.
-    // Also evaluates if the release qualifies as a stationary right-click to toggle selection
-    // or show the label-editor action menu on empty space.
+    // Exits pan mode when the right mouse button is released, finalizes label-editor operations,
+    // and handles the new KiCad trace calibration move/resize workflow including empty-space
+    // right-click access to Apply or Discard actions.
+    // Keeps keyboard focus on the schematics control while KiCad trace calibration mode is active.
     // ###########################################################################################
     private void OnSchematicsPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
@@ -1463,6 +1525,16 @@ public partial class TabSchematics : UserControl
         if (!this.isPanning && this.IsPointerInsideKiCadNetConnectionsPanel(point))
         {
             this.ClearTransientHoverForKiCadNetConnectionsPanel();
+            return;
+        }
+
+        if (this.thisIsKiCadTraceCalibrationMode && this.thisKiCadTraceCalibrationDragMode != LabelEditorDragMode.None)
+        {
+            this.CompleteKiCadTraceCalibrationDrag();
+            this.UpdateKiCadTraceCalibrationCursor(point);
+            this.SchematicsContainer.Focus();
+            this.Focus();
+            e.Handled = true;
             return;
         }
 
@@ -1492,7 +1564,7 @@ public partial class TabSchematics : UserControl
             return;
         }
 
-        if (!this.thisIsLabelEditorMode && TryInvert(this.schematicsMatrix, out var inv))
+        if (!this.thisIsLabelEditorMode && !this.thisIsKiCadTraceCalibrationMode && TryInvert(this.schematicsMatrix, out var inv))
         {
             var localPoint = new Point(
                 (point.X * inv.M11) + (point.Y * inv.M21) + inv.M31,
@@ -1506,7 +1578,16 @@ public partial class TabSchematics : UserControl
         }
 
         if (!this.isPanning)
+        {
+            if (this.thisIsKiCadTraceCalibrationMode)
+            {
+                this.UpdateKiCadTraceCalibrationCursor(point);
+                this.SchematicsContainer.Focus();
+                this.Focus();
+            }
+
             return;
+        }
 
         this.isPanning = false;
         e.Pointer.Capture(null);
@@ -1516,7 +1597,7 @@ public partial class TabSchematics : UserControl
 
         if (isStationaryRightClick)
         {
-            if (this.thisIsKiCadCalibrationCaptureMode)
+            if (this.thisIsKiCadTraceCalibrationMode)
             {
                 this.ShowLabelEditorMenu(point);
             }
@@ -1542,15 +1623,13 @@ public partial class TabSchematics : UserControl
                 }
                 else if (!string.IsNullOrWhiteSpace(activeHoveredKiCadNetName) && this.thisLockedKiCadNetNames.Contains(activeHoveredKiCadNetName))
                 {
-                    // Deselects the currently hovered item with a right click
                     this.thisLockedKiCadNetNames.Remove(activeHoveredKiCadNetName);
-                    this.thisHoveredKiCadNetName = null; // Clear hover state immediately
+                    this.thisHoveredKiCadNetName = null;
                     this.RefreshKiCadOverlay();
                     this.RefreshBlinkStateFromCurrentSelection();
                 }
                 else if (this.thisLockedKiCadNetNames.Count > 0)
                 {
-                    // Right clicking anywhere else on an empty un-hovered space clears all locked KiCad traces 
                     this.thisLockedKiCadNetNames.Clear();
                     this.RefreshKiCadOverlay();
                     this.RefreshBlinkStateFromCurrentSelection();
@@ -1560,6 +1639,12 @@ public partial class TabSchematics : UserControl
                     this.ShowLabelEditorMenu(point);
                 }
             }
+        }
+
+        if (this.thisIsKiCadTraceCalibrationMode)
+        {
+            this.SchematicsContainer.Focus();
+            this.Focus();
         }
 
         this.UpdateSchematicsHoverUi(e.GetPosition(this.SchematicsContainer));
@@ -1759,6 +1844,8 @@ public partial class TabSchematics : UserControl
         this.thisKiCadOverlayRefreshRequestVersion = 0;
         this.thisKiCadOverlayLastRenderedVersion = 0;
         this.thisKiCadSchematicHoverHitTestCacheByKey.Clear();
+        this.thisKiCadProject = null;
+        this.thisCurrentKiCadRuntimeCacheScopeKey = string.Empty;
 
         lock (this.thisKiCadPcbNetRenderCacheSync)
         {
@@ -1794,8 +1881,16 @@ public partial class TabSchematics : UserControl
         this.thisSchematicsOnlySelectedBoardLabels.Clear();
         this.thisLockedKiCadNetNames.Clear();
 
-        this.thisIsKiCadCalibrationCaptureMode = false;
-        this.thisKiCadCalibrationImagePoints.Clear();
+        this.thisIsKiCadTraceCalibrationMode = false;
+        this.thisKiCadTraceCalibrationDragMode = LabelEditorDragMode.None;
+        this.thisKiCadCalibrationImageLeft = 0.0;
+        this.thisKiCadCalibrationImageTop = 0.0;
+        this.thisKiCadCalibrationImageRight = 0.0;
+        this.thisKiCadCalibrationImageBottom = 0.0;
+        this.thisKiCadCalibrationStartImageLeft = 0.0;
+        this.thisKiCadCalibrationStartImageTop = 0.0;
+        this.thisKiCadCalibrationStartImageRight = 0.0;
+        this.thisKiCadCalibrationStartImageBottom = 0.0;
 
         this.thisIsDraggingThumbnail = false;
         this.thisDraggedThumbnail = null;
@@ -2804,24 +2899,30 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Updates hover label/cursor from current pointer position.
+    // Updates hover label and cursor from current pointer position.
+    // The new KiCad trace calibration mode takes over hover UI so alignment work stays visually
+    // clean and only the calibration box interaction feedback is shown.
     // ###########################################################################################
     private void UpdateSchematicsHoverUi(Point pointerInContainer)
     {
-        if (this.thisIsKiCadCalibrationCaptureMode)
+        if (this.thisIsKiCadTraceCalibrationMode)
         {
             this.SetHoveredComponentBoardLabel(null);
-            this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.Cross);
+            this.SetHoveredKiCadNet(null);
+            this.thisHoveredKiCadPadNumber = null;
+
             this.SchematicsHoverLabelText.Text =
-                "Calibration capture - Left-click point, Right-click pan, Esc cancel";
+                "KiCad calibration mode - drag inside box to move, drag edges to resize, drag across to flip";
             this.SchematicsHoverLabelBorder.IsVisible = true;
             this.SchematicsHoverPadBorder.IsVisible = false;
+            this.SchematicsHoverPadText.Text = string.Empty;
 
             if (this.MainWindow != null)
             {
                 this.MainWindow.isHoveringComponent = false;
             }
 
+            this.UpdateKiCadTraceCalibrationCursor(pointerInContainer);
             return;
         }
 
@@ -2855,12 +2956,21 @@ public partial class TabSchematics : UserControl
             this.SetHoveredComponentBoardLabel(hoveredBoardLabel);
             this.SchematicsHoverLabelText.Text = displayText;
             this.SchematicsHoverLabelBorder.IsVisible = true;
-            if (this.MainWindow != null) this.MainWindow.isHoveringComponent = true;
+
+            if (this.MainWindow != null)
+            {
+                this.MainWindow.isHoveringComponent = true;
+            }
         }
         else
         {
             this.SetHoveredComponentBoardLabel(null);
-            if (this.MainWindow != null) this.MainWindow.isHoveringComponent = false;
+
+            if (this.MainWindow != null)
+            {
+                this.MainWindow.isHoveringComponent = false;
+            }
+
             this.SchematicsHoverLabelBorder.IsVisible = false;
             this.SchematicsHoverLabelText.Text = string.Empty;
         }
@@ -3718,17 +3828,20 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Returns true when the schematics actions menu is allowed to be shown.
-    // Contributor mode enables menu entry from empty-space right click.
+    // Contributor mode enables menu entry from empty-space right click, and active editor or KiCad
+    // calibration workflows keep the same shared floating menu available.
     // ###########################################################################################
     private bool CanShowSchematicsActionsMenu()
     {
         return this.IsBoardContributorModeEnabled() ||
                this.thisIsLabelEditorMode ||
-               this.thisIsKiCadCalibrationCaptureMode;
+               this.thisIsKiCadTraceCalibrationMode;
     }
 
     // ###########################################################################################
     // Shows the floating schematic action menu at the requested schematic container location.
+    // The menu adapts its height to contributor mode, label editor mode, and the new KiCad trace
+    // calibration workflow.
     // ###########################################################################################
     private void ShowLabelEditorMenu(Point containerPoint)
     {
@@ -3740,13 +3853,21 @@ public partial class TabSchematics : UserControl
         this.thisLastLabelEditorMenuPoint = containerPoint;
         this.UpdateLabelEditorMenuButtons();
 
-        double estimatedWidth = 240.0;
-        double estimatedHeight = this.thisIsLabelEditorMode
-            ? 110.0
-            : this.thisIsKiCadCalibrationCaptureMode ? 90.0 : 155.0;
+        double estimatedWidth = 250.0;
+        double estimatedHeight =
+            this.thisIsLabelEditorMode ? 110.0 :
+            this.thisIsKiCadTraceCalibrationMode ? 105.0 :
+            195.0;
 
-        double x = Math.Clamp(containerPoint.X, 6.0, Math.Max(6.0, this.SchematicsContainer.Bounds.Width - estimatedWidth));
-        double y = Math.Clamp(containerPoint.Y, 6.0, Math.Max(6.0, this.SchematicsContainer.Bounds.Height - estimatedHeight));
+        double x = Math.Clamp(
+            containerPoint.X,
+            6.0,
+            Math.Max(6.0, this.SchematicsContainer.Bounds.Width - estimatedWidth));
+
+        double y = Math.Clamp(
+            containerPoint.Y,
+            6.0,
+            Math.Max(6.0, this.SchematicsContainer.Bounds.Height - estimatedHeight));
 
         this.SchematicsLabelEditorMenuBorder.Margin = new Thickness(x, y, 0, 0);
         this.SchematicsLabelEditorMenuBorder.IsVisible = true;
@@ -3763,23 +3884,32 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Updates the menu text and button visibility according to the current editor and calibration state.
+    // Updates the menu text and button visibility according to the current editor and calibration
+    // state, including the new KiCad trace calibration start/apply/discard workflow.
     // ###########################################################################################
     private void UpdateLabelEditorMenuButtons()
     {
-        this.SchematicsLabelEditorMenuStateTextBlock.Text = this.thisIsLabelEditorMode
-            ? "Component label editor mode"
-            : this.thisIsKiCadCalibrationCaptureMode
-                ? "Image calibration capture"
-                : "Contributor mode actions";
+        this.SchematicsLabelEditorMenuStateTextBlock.Text =
+            this.thisIsLabelEditorMode
+                ? "Component label editor mode"
+                : this.thisIsKiCadTraceCalibrationMode
+                    ? "KiCad trace calibration"
+                    : "Contributor mode actions";
 
-        this.EnableLabelEditorButton.IsVisible = !this.thisIsLabelEditorMode && !this.thisIsKiCadCalibrationCaptureMode;
-        this.BeginKiCadCalibrationButton.IsVisible = !this.thisIsLabelEditorMode && !this.thisIsKiCadCalibrationCaptureMode;
-        this.CopyKiCadWorldPointCandidatesButton.IsVisible = !this.thisIsLabelEditorMode && !this.thisIsKiCadCalibrationCaptureMode;
-        this.CancelKiCadCalibrationButton.IsVisible = this.thisIsKiCadCalibrationCaptureMode;
+        this.EnableLabelEditorButton.IsVisible =
+            !this.thisIsLabelEditorMode &&
+            !this.thisIsKiCadTraceCalibrationMode;
 
-        this.CancelLabelEditorChangesButton.IsVisible = this.thisIsLabelEditorMode;
+        this.BeginKiCadTraceCalibrationButton.IsVisible =
+            !this.thisIsLabelEditorMode &&
+            !this.thisIsKiCadTraceCalibrationMode &&
+            this.HasCurrentSchematicKiCadTraces();
+
         this.ApplyLabelEditorChangesButton.IsVisible = this.thisIsLabelEditorMode;
+        this.CancelLabelEditorChangesButton.IsVisible = this.thisIsLabelEditorMode;
+
+        this.ApplyKiCadTraceCalibrationButton.IsVisible = this.thisIsKiCadTraceCalibrationMode;
+        this.CancelKiCadTraceCalibrationButton.IsVisible = this.thisIsKiCadTraceCalibrationMode;
     }
 
     // ###########################################################################################
@@ -5638,6 +5768,145 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
+    // Applies keyboard move, expand, or shrink operations to the KiCad trace calibration box.
+    // Arrow keys move by 1 px, Shift expands in the pressed direction, and Alt shrinks from
+    // the opposite side of the pressed direction, matching the component label editor behavior.
+    // ###########################################################################################
+    private bool ApplyKiCadTraceCalibrationKeyboardStep(Key key, KeyModifiers modifiers)
+    {
+        if (!this.thisIsKiCadTraceCalibrationMode ||
+            this.currentFullResBitmap == null ||
+            this.thisKiCadTraceCalibrationDragMode != LabelEditorDragMode.None ||
+            this.SchematicsLabelEditorMenuBorder.IsVisible)
+        {
+            return false;
+        }
+
+        if (modifiers.HasFlag(KeyModifiers.Shift) && modifiers.HasFlag(KeyModifiers.Alt))
+        {
+            return false;
+        }
+
+        bool thisIsShift = modifiers.HasFlag(KeyModifiers.Shift);
+        bool thisIsAlt = modifiers.HasFlag(KeyModifiers.Alt);
+        const double thisStep = 1.0;
+        bool thisChanged = false;
+
+        bool thisMirrorX = this.thisKiCadCalibrationImageLeft > this.thisKiCadCalibrationImageRight;
+        bool thisMirrorY = this.thisKiCadCalibrationImageTop > this.thisKiCadCalibrationImageBottom;
+
+        double thisLeft = Math.Min(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+        double thisRight = Math.Max(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+        double thisTop = Math.Min(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+        double thisBottom = Math.Max(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+
+        if (!thisIsShift && !thisIsAlt)
+        {
+            switch (key)
+            {
+                case Key.Left:
+                    thisLeft -= thisStep;
+                    thisRight -= thisStep;
+                    thisChanged = true;
+                    break;
+
+                case Key.Right:
+                    thisLeft += thisStep;
+                    thisRight += thisStep;
+                    thisChanged = true;
+                    break;
+
+                case Key.Up:
+                    thisTop -= thisStep;
+                    thisBottom -= thisStep;
+                    thisChanged = true;
+                    break;
+
+                case Key.Down:
+                    thisTop += thisStep;
+                    thisBottom += thisStep;
+                    thisChanged = true;
+                    break;
+            }
+        }
+        else if (thisIsShift)
+        {
+            switch (key)
+            {
+                case Key.Left:
+                    thisLeft -= thisStep;
+                    thisChanged = true;
+                    break;
+
+                case Key.Right:
+                    thisRight += thisStep;
+                    thisChanged = true;
+                    break;
+
+                case Key.Up:
+                    thisTop -= thisStep;
+                    thisChanged = true;
+                    break;
+
+                case Key.Down:
+                    thisBottom += thisStep;
+                    thisChanged = true;
+                    break;
+            }
+        }
+        else if (thisIsAlt)
+        {
+            switch (key)
+            {
+                case Key.Left:
+                    if ((thisRight - thisLeft) > thisStep)
+                    {
+                        thisRight -= thisStep;
+                        thisChanged = true;
+                    }
+                    break;
+
+                case Key.Right:
+                    if ((thisRight - thisLeft) > thisStep)
+                    {
+                        thisLeft += thisStep;
+                        thisChanged = true;
+                    }
+                    break;
+
+                case Key.Up:
+                    if ((thisBottom - thisTop) > thisStep)
+                    {
+                        thisBottom -= thisStep;
+                        thisChanged = true;
+                    }
+                    break;
+
+                case Key.Down:
+                    if ((thisBottom - thisTop) > thisStep)
+                    {
+                        thisTop += thisStep;
+                        thisChanged = true;
+                    }
+                    break;
+            }
+        }
+
+        if (!thisChanged)
+        {
+            return false;
+        }
+
+        this.thisKiCadCalibrationImageLeft = thisMirrorX ? thisRight : thisLeft;
+        this.thisKiCadCalibrationImageRight = thisMirrorX ? thisLeft : thisRight;
+        this.thisKiCadCalibrationImageTop = thisMirrorY ? thisBottom : thisTop;
+        this.thisKiCadCalibrationImageBottom = thisMirrorY ? thisTop : thisBottom;
+
+        this.RefreshKiCadOverlay(forceImmediate: true);
+        return true;
+    }
+
+    // ###########################################################################################
     // Applies keyboard move, expand, or shrink operations to the selected editor rectangle.
     // Arrow keys move by 1 px, Shift expands in the pressed direction, and Alt shrinks from
     // the opposite side of the pressed direction. Each committed step is undoable.
@@ -5837,7 +6106,7 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Handles keyboard interaction for label-editor and KiCad calibration capture workflows.
+    // Handles keyboard interaction for label-editor and KiCad calibration workflows.
     // Ctrl+Z undoes label-editor changes and Ctrl+Y redoes them within the current editor session.
     // Pressing D duplicates the currently selected editor rectangle and opens the new-label prompt.
     // ###########################################################################################
@@ -5845,10 +6114,20 @@ public partial class TabSchematics : UserControl
     {
         this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
 
-        if (this.thisIsKiCadCalibrationCaptureMode && e.Key == Key.Escape)
+        if (this.thisIsKiCadTraceCalibrationMode)
         {
-            this.CancelKiCadCalibrationCapture();
-            e.Handled = true;
+            if (e.Key == Key.Escape)
+            {
+                this.CancelKiCadTraceCalibrationMode();
+                e.Handled = true;
+                return;
+            }
+
+            if (this.ApplyKiCadTraceCalibrationKeyboardStep(e.Key, e.KeyModifiers))
+            {
+                e.Handled = true;
+            }
+
             return;
         }
 
@@ -5862,9 +6141,9 @@ public partial class TabSchematics : UserControl
             return;
         }
 
-        bool isCtrlDown = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        bool thisIsCtrlDown = e.KeyModifiers.HasFlag(KeyModifiers.Control);
 
-        if (isCtrlDown && e.Key == Key.Z)
+        if (thisIsCtrlDown && e.Key == Key.Z)
         {
             if (this.TryUndoLabelEditorChange())
             {
@@ -5874,7 +6153,7 @@ public partial class TabSchematics : UserControl
             return;
         }
 
-        if (isCtrlDown && e.Key == Key.Y)
+        if (thisIsCtrlDown && e.Key == Key.Y)
         {
             if (this.TryRedoLabelEditorChange())
             {
@@ -5884,7 +6163,7 @@ public partial class TabSchematics : UserControl
             return;
         }
 
-        if (!isCtrlDown &&
+        if (!thisIsCtrlDown &&
             !e.KeyModifiers.HasFlag(KeyModifiers.Alt) &&
             e.Key == Key.D)
         {
@@ -6873,27 +7152,56 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Returns the calibration object for the current schematic.
-    // Models rigid 2-point orthogonal coordinate tracking for non-rotated exported replica images.
+    // Returns the active KiCad calibration for the current schematic.
+    // Uses the temporary interactive box calibration while calibration mode is active; otherwise
+    // loads the persisted box calibration from the board JSON file.
     // ###########################################################################################
     private KiCadViewCalibration GetKiCadViewCalibration(string schematicName)
     {
-        if (string.IsNullOrWhiteSpace(schematicName) ||
-            !this.schematicByName.TryGetValue(schematicName, out var schematicEntry))
+        if (this.thisIsKiCadTraceCalibrationMode &&
+            string.Equals(this.GetCurrentSchematicName(), schematicName, StringComparison.OrdinalIgnoreCase) &&
+            this.currentFullResBitmap != null &&
+            this.currentFullResBitmap.PixelSize.Width > 0 &&
+            this.currentFullResBitmap.PixelSize.Height > 0)
         {
-            return KiCadViewCalibration.Identity;
+            double left = Math.Min(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+            double right = Math.Max(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+            double top = Math.Min(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+            double bottom = Math.Max(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+
+            return new KiCadViewCalibration
+            {
+                ScaleX = (right - left) / this.currentFullResBitmap.PixelSize.Width,
+                ScaleY = (bottom - top) / this.currentFullResBitmap.PixelSize.Height,
+                OffsetX = left,
+                OffsetY = top,
+                MirrorX = this.thisKiCadCalibrationImageLeft > this.thisKiCadCalibrationImageRight,
+                MirrorY = this.thisKiCadCalibrationImageTop > this.thisKiCadCalibrationImageBottom
+            };
         }
 
-        bool hasP1 = TabSchematics.TryParseCalibrationPoint(
-            schematicEntry.KiCadP1WorldX, schematicEntry.KiCadP1WorldY, schematicEntry.KiCadP1ImageX, schematicEntry.KiCadP1ImageY, out var p1);
+        string excelPath = this.MainWindow?.GetCurrentBoardExcelPath() ?? string.Empty;
 
-        bool hasP2 = TabSchematics.TryParseCalibrationPoint(
-            schematicEntry.KiCadP2WorldX, schematicEntry.KiCadP2WorldY, schematicEntry.KiCadP2ImageX, schematicEntry.KiCadP2ImageY, out var p2);
-
-        if (hasP1 && hasP2 &&
-            TabSchematics.TryBuildOrthogonalCalibration(p1, p2, out var orthogonalCalibration))
+        if (BoardComponentHighlightStorage.TryLoadKiCadCalibration(
+                excelPath,
+                schematicName,
+                out _,
+                out double offsetX,
+                out double offsetY,
+                out double scaleX,
+                out double scaleY,
+                out bool mirrorX,
+                out bool mirrorY))
         {
-            return orthogonalCalibration;
+            return new KiCadViewCalibration
+            {
+                ScaleX = scaleX,
+                ScaleY = scaleY,
+                OffsetX = offsetX,
+                OffsetY = offsetY,
+                MirrorX = mirrorX,
+                MirrorY = mirrorY
+            };
         }
 
         return KiCadViewCalibration.Identity;
@@ -6901,8 +7209,7 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Maps one KiCad world-space point into the local image coordinate system currently used by
-    // the schematics image and overlays.
-    // Prefers affine calibration when present and falls back to the older normalized mapping.
+    // the schematics image and overlays using the active box-based calibration model.
     // ###########################################################################################
     private Point MapKiCadWorldToLocal(
         double worldX,
@@ -6911,20 +7218,6 @@ public partial class TabSchematics : UserControl
         Rect contentRect,
         KiCadViewCalibration calibration)
     {
-        if (calibration.HasAffineCalibration &&
-            this.currentFullResBitmap != null &&
-            this.currentFullResBitmap.PixelSize.Width > 0 &&
-            this.currentFullResBitmap.PixelSize.Height > 0)
-        {
-            double bitmapX = (calibration.A * worldX) + (calibration.B * worldY) + calibration.C;
-            double bitmapY = (calibration.D * worldX) + (calibration.E * worldY) + calibration.F;
-
-            double localX = contentRect.X + ((bitmapX / this.currentFullResBitmap.PixelSize.Width) * contentRect.Width);
-            double localY = contentRect.Y + ((bitmapY / this.currentFullResBitmap.PixelSize.Height) * contentRect.Height);
-
-            return new Point(localX, localY);
-        }
-
         if (worldBounds.Width <= 0 || worldBounds.Height <= 0)
         {
             return new Point(contentRect.X, contentRect.Y);
@@ -6946,33 +7239,33 @@ public partial class TabSchematics : UserControl
         nx *= calibration.ScaleX;
         ny *= calibration.ScaleY;
 
-        double localXFallback = contentRect.X + (nx * contentRect.Width);
-        double localYFallback = contentRect.Y + (ny * contentRect.Height);
+        double localX = contentRect.X + (nx * contentRect.Width);
+        double localY = contentRect.Y + (ny * contentRect.Height);
 
         if (this.currentFullResBitmap != null)
         {
             if (this.currentFullResBitmap.PixelSize.Width > 0)
             {
-                localXFallback += calibration.OffsetX * (contentRect.Width / this.currentFullResBitmap.PixelSize.Width);
+                localX += calibration.OffsetX * (contentRect.Width / this.currentFullResBitmap.PixelSize.Width);
             }
 
             if (this.currentFullResBitmap.PixelSize.Height > 0)
             {
-                localYFallback += calibration.OffsetY * (contentRect.Height / this.currentFullResBitmap.PixelSize.Height);
+                localY += calibration.OffsetY * (contentRect.Height / this.currentFullResBitmap.PixelSize.Height);
             }
         }
         else
         {
-            localXFallback += calibration.OffsetX;
-            localYFallback += calibration.OffsetY;
+            localX += calibration.OffsetX;
+            localY += calibration.OffsetY;
         }
 
-        return new Point(localXFallback, localYFallback);
+        return new Point(localX, localY);
     }
 
     // ###########################################################################################
-    // Converts one KiCad world-space length into the current local overlay coordinate space.
-    // Uses affine basis-vector scaling when affine calibration exists.
+    // Converts one KiCad world-space length into the current local overlay coordinate space using
+    // the active box-based calibration model.
     // ###########################################################################################
     private double MapKiCadWorldLengthToLocal(
         double worldLength,
@@ -6980,33 +7273,13 @@ public partial class TabSchematics : UserControl
         Rect contentRect,
         KiCadViewCalibration calibration)
     {
-        if (calibration.HasAffineCalibration &&
-            this.currentFullResBitmap != null &&
-            this.currentFullResBitmap.PixelSize.Width > 0 &&
-            this.currentFullResBitmap.PixelSize.Height > 0)
-        {
-            double bitmapToLocalX = contentRect.Width / this.currentFullResBitmap.PixelSize.Width;
-            double bitmapToLocalY = contentRect.Height / this.currentFullResBitmap.PixelSize.Height;
+        double thisScaleX = contentRect.Width / Math.Max(0.0001, worldBounds.Width);
+        double thisScaleY = contentRect.Height / Math.Max(0.0001, worldBounds.Height);
 
-            double localUnitX = Math.Sqrt(
-                Math.Pow(calibration.A * bitmapToLocalX, 2.0) +
-                Math.Pow(calibration.D * bitmapToLocalY, 2.0));
+        thisScaleX *= Math.Abs(calibration.ScaleX);
+        thisScaleY *= Math.Abs(calibration.ScaleY);
 
-            double localUnitY = Math.Sqrt(
-                Math.Pow(calibration.B * bitmapToLocalX, 2.0) +
-                Math.Pow(calibration.E * bitmapToLocalY, 2.0));
-
-            double averageScale = (localUnitX + localUnitY) / 2.0;
-            return worldLength * averageScale;
-        }
-
-        double sx = contentRect.Width / Math.Max(0.0001, worldBounds.Width);
-        double sy = contentRect.Height / Math.Max(0.0001, worldBounds.Height);
-
-        sx *= Math.Abs(calibration.ScaleX);
-        sy *= Math.Abs(calibration.ScaleY);
-
-        return worldLength * ((sx + sy) / 2.0);
+        return worldLength * ((thisScaleX + thisScaleY) / 2.0);
     }
 
     // ###########################################################################################
@@ -7192,30 +7465,6 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Parses one 3-point calibration row from Excel text values.
-    // ###########################################################################################
-    private static bool TryParseCalibrationPoint(
-        string worldXText,
-        string worldYText,
-        string imageXText,
-        string imageYText,
-        out KiCadCalibrationPoint point)
-    {
-        point = default;
-
-        if (!TabSchematics.TryParseDouble(worldXText, out double worldX) ||
-            !TabSchematics.TryParseDouble(worldYText, out double worldY) ||
-            !TabSchematics.TryParseDouble(imageXText, out double imageX) ||
-            !TabSchematics.TryParseDouble(imageYText, out double imageY))
-        {
-            return false;
-        }
-
-        point = new KiCadCalibrationPoint(worldX, worldY, imageX, imageY);
-        return true;
-    }
-
-    // ###########################################################################################
     // Converts a schematic container pointer position into bitmap pixel coordinates for the
     // currently displayed schematic image.
     // ###########################################################################################
@@ -7251,550 +7500,6 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Enables image calibration capture for the current schematic.
-    // ###########################################################################################
-    private void BeginKiCadCalibrationCapture()
-    {
-        this.thisIsKiCadCalibrationCaptureMode = true;
-        this.thisKiCadCalibrationImagePoints.Clear();
-
-        this.HideLabelEditorMenu();
-        this.SchematicsContainer.Focus();
-        this.UpdateSchematicsHoverUi(new Point(0, 0));
-
-        Logger.Info($"Image calibration capture started for schematic [{this.GetCurrentSchematicName()}]");
-    }
-
-    // ###########################################################################################
-    // Cancels the current image calibration capture workflow.
-    // ###########################################################################################
-    private void CancelKiCadCalibrationCapture()
-    {
-        this.thisIsKiCadCalibrationCaptureMode = false;
-        this.thisKiCadCalibrationImagePoints.Clear();
-
-        this.HideSchematicsHoverUi();
-        this.HideLabelEditorMenu();
-        this.SchematicsContainer.Focus();
-
-        Logger.Info("Image calibration capture canceled");
-    }
-
-    // ###########################################################################################
-    // Captures one image-space calibration point and copies the X and Y coordinates to the clipboard.
-    // ###########################################################################################
-    private async void CaptureKiCadCalibrationPointAsync(Point pointerInContainer)
-    {
-        if (!this.thisIsKiCadCalibrationCaptureMode)
-        {
-            return;
-        }
-
-        if (!this.TryGetSchematicsImagePixelPoint(pointerInContainer, out var pixelPoint))
-        {
-            return;
-        }
-
-        this.thisKiCadCalibrationImagePoints.Clear();
-        this.thisKiCadCalibrationImagePoints.Add(pixelPoint);
-
-        Logger.Info(
-            $"Image calibration point captured for schematic [{this.GetCurrentSchematicName()}] -> ImageX=[{pixelPoint.X.ToString("0.##", CultureInfo.InvariantCulture)}] ImageY=[{pixelPoint.Y.ToString("0.##", CultureInfo.InvariantCulture)}]");
-
-        string xText = pixelPoint.X.ToString("0.######", CultureInfo.InvariantCulture);
-        string yText = pixelPoint.Y.ToString("0.######", CultureInfo.InvariantCulture);
-        string clipboardText = $"'{xText}\t'{yText}";
-
-        if (TopLevel.GetTopLevel(this) is TopLevel topLevel && topLevel.Clipboard != null)
-        {
-            await ClipboardExtensions.SetTextAsync(topLevel.Clipboard, clipboardText);
-        }
-
-        this.thisIsKiCadCalibrationCaptureMode = false;
-        this.SchematicsContainer.Cursor = Cursor.Default;
-        this.SchematicsHoverLabelText.Text = "Calibration values copied to clipboard";
-        this.SchematicsHoverLabelBorder.IsVisible = true;
-
-        Logger.Info($"Image calibration capture completed for schematic [{this.GetCurrentSchematicName()}]");
-    }
-
-    // ###########################################################################################
-    // Adds one KiCad calibration world-point candidate if the label/coordinate combination was
-    // not already added to the current candidate list.
-    // ###########################################################################################
-    private static void AddKiCadCalibrationWorldPointCandidate(
-        List<KiCadCalibrationWorldPointCandidate> candidates,
-        HashSet<string> seen,
-        string label,
-        double worldX,
-        double worldY)
-    {
-        string normalizedLabel = label?.Trim() ?? string.Empty;
-        string key =
-            $"{Math.Round(worldX, 6).ToString(CultureInfo.InvariantCulture)}|" +
-            $"{Math.Round(worldY, 6).ToString(CultureInfo.InvariantCulture)}|" +
-            normalizedLabel;
-
-        if (!seen.Add(key))
-        {
-            return;
-        }
-
-        candidates.Add(new KiCadCalibrationWorldPointCandidate
-        {
-            Label = normalizedLabel,
-            WorldX = worldX,
-            WorldY = worldY
-        });
-    }
-
-    // ###########################################################################################
-    // Builds candidate KiCad world points for the currently selected schematic or PCB view.
-    // PCB candidates are filtered to selected references when a component selection exists.
-    // ###########################################################################################
-    private List<KiCadCalibrationWorldPointCandidate> BuildCurrentKiCadCalibrationWorldPointCandidates()
-    {
-        var bundle = this.thisKiCadProject;
-        var currentView = this.ResolveKiCadViewForCurrentSchematic();
-
-        if (bundle == null || currentView == null)
-        {
-            return new List<KiCadCalibrationWorldPointCandidate>();
-        }
-
-        if (string.Equals(currentView.Type, "pcb_top", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(currentView.Type, "pcb_bottom", StringComparison.OrdinalIgnoreCase))
-        {
-            if (currentView.SourceIndex < 0 || currentView.SourceIndex >= bundle.Root.Pcb.Count)
-            {
-                return new List<KiCadCalibrationWorldPointCandidate>();
-            }
-
-            string requiredLayer = string.Equals(currentView.Type, "pcb_bottom", StringComparison.OrdinalIgnoreCase)
-                ? "B.Cu"
-                : "F.Cu";
-
-            return this.BuildPcbCalibrationWorldPointCandidates(bundle.Root.Pcb[currentView.SourceIndex], requiredLayer);
-        }
-
-        if (string.Equals(currentView.Type, "schematic", StringComparison.OrdinalIgnoreCase))
-        {
-            return this.BuildSchematicCalibrationWorldPointCandidates(bundle, currentView);
-        }
-
-        return new List<KiCadCalibrationWorldPointCandidate>();
-    }
-
-    // ###########################################################################################
-    // Builds candidate KiCad world points for one PCB view using exact pad centers, via centers,
-    // segment endpoints, arc control points, and board-corner landmarks.
-    // Always includes pads for all visible footprints on the current PCB side.
-    // ###########################################################################################
-    private List<KiCadCalibrationWorldPointCandidate> BuildPcbCalibrationWorldPointCandidates(KiCadPcb pcb, string requiredLayer)
-    {
-        var candidates = new List<KiCadCalibrationWorldPointCandidate>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var seenCoordinates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        bool hasReferenceFilter = this.thisSelectedKiCadReferences.Count > 0;
-
-        void AddExactCandidate(string label, double worldX, double worldY)
-        {
-            string coordinateKey =
-                $"{Math.Round(worldX, 4).ToString(CultureInfo.InvariantCulture)}|" +
-                $"{Math.Round(worldY, 4).ToString(CultureInfo.InvariantCulture)}";
-
-            if (!seenCoordinates.Add(coordinateKey))
-            {
-                return;
-            }
-
-            TabSchematics.AddKiCadCalibrationWorldPointCandidate(
-                candidates,
-                seen,
-                label,
-                worldX,
-                worldY);
-        }
-
-        bool IsMatchingSelectedNet(KiCadNetRef? net)
-        {
-            if (!hasReferenceFilter)
-            {
-                return true;
-            }
-
-            string normalizedName = net?.NormalizedName?.Trim() ?? string.Empty;
-            return !string.IsNullOrWhiteSpace(normalizedName) &&
-                   this.thisSelectedKiCadNormalizedNetNames.Contains(normalizedName);
-        }
-
-        string BuildNetSuffix(KiCadNetRef? net)
-        {
-            string normalizedName = net?.NormalizedName?.Trim() ?? string.Empty;
-            return string.IsNullOrWhiteSpace(normalizedName)
-                ? string.Empty
-                : $" [{normalizedName}]";
-        }
-
-        foreach (var footprint in pcb.Footprints
-                     .OrderBy(footprint => footprint.Reference?.Trim() ?? string.Empty, StringComparer.OrdinalIgnoreCase))
-        {
-            string reference = footprint.Reference?.Trim() ?? string.Empty;
-
-            var visiblePads = footprint.Pads
-                .Where(pad => pad.AbsoluteCenter != null)
-                .Where(pad => TabSchematics.IsKiCadPcbPointVisibleOnSide(pad.Layers, requiredLayer))
-                .OrderBy(pad => pad.Number?.Trim() ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            foreach (var pad in visiblePads)
-            {
-                string padNumber = pad.Number?.Trim() ?? "?";
-                string label = string.IsNullOrWhiteSpace(reference)
-                    ? $"Pad {padNumber}"
-                    : $"{reference} pad {padNumber}";
-
-                AddExactCandidate(label, pad.AbsoluteCenter!.X, pad.AbsoluteCenter.Y);
-            }
-        }
-
-        for (int i = 0; i < pcb.Routing.Vias.Count; i++)
-        {
-            var via = pcb.Routing.Vias[i];
-            if (via.At == null)
-            {
-                continue;
-            }
-
-            if (!TabSchematics.IsKiCadPcbPointVisibleOnSide(via.Layers, requiredLayer))
-            {
-                continue;
-            }
-
-            if (!IsMatchingSelectedNet(via.Net))
-            {
-                continue;
-            }
-
-            AddExactCandidate(
-                $"Via {i + 1:000}{BuildNetSuffix(via.Net)}",
-                via.At.X,
-                via.At.Y);
-        }
-
-        for (int i = 0; i < pcb.Routing.Segments.Count; i++)
-        {
-            var segment = pcb.Routing.Segments[i];
-            if (segment.Start == null || segment.End == null)
-            {
-                continue;
-            }
-
-            if (!string.Equals(segment.Layer?.Trim(), requiredLayer, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (!IsMatchingSelectedNet(segment.Net))
-            {
-                continue;
-            }
-
-            string suffix = BuildNetSuffix(segment.Net);
-
-            AddExactCandidate($"Segment {i + 1:000} start{suffix}", segment.Start.X, segment.Start.Y);
-            AddExactCandidate($"Segment {i + 1:000} end{suffix}", segment.End.X, segment.End.Y);
-        }
-
-        for (int i = 0; i < pcb.Routing.Arcs.Count; i++)
-        {
-            var arc = pcb.Routing.Arcs[i];
-            if (arc.Start == null || arc.Mid == null || arc.End == null)
-            {
-                continue;
-            }
-
-            if (!string.Equals(arc.Layer?.Trim(), requiredLayer, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (!IsMatchingSelectedNet(arc.Net))
-            {
-                continue;
-            }
-
-            string suffix = BuildNetSuffix(arc.Net);
-
-            AddExactCandidate($"Arc {i + 1:000} start{suffix}", arc.Start.X, arc.Start.Y);
-            AddExactCandidate($"Arc {i + 1:000} mid{suffix}", arc.Mid.X, arc.Mid.Y);
-            AddExactCandidate($"Arc {i + 1:000} end{suffix}", arc.End.X, arc.End.Y);
-        }
-
-        if (!hasReferenceFilter)
-        {
-            Rect bounds = this.GetKiCadPcbWorldBounds(pcb);
-            if (bounds.Width > 0 && bounds.Height > 0)
-            {
-                AddExactCandidate("PCB bounds top-left", bounds.Left, bounds.Top);
-                AddExactCandidate("PCB bounds top-right", bounds.Right, bounds.Top);
-                AddExactCandidate("PCB bounds bottom-left", bounds.Left, bounds.Bottom);
-                AddExactCandidate("PCB bounds bottom-right", bounds.Right, bounds.Bottom);
-            }
-        }
-
-        return candidates
-            .OrderBy(candidate => candidate.Label, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(candidate => candidate.WorldX)
-            .ThenBy(candidate => candidate.WorldY)
-            .ToList();
-    }
-
-    // ###########################################################################################
-    // Builds candidate KiCad world points for the currently selected schematic or PCB view.
-    // PCB views always include component pads for all visible footprints.
-    // ###########################################################################################
-    private List<KiCadCalibrationWorldPointCandidate> BuildSchematicCalibrationWorldPointCandidates(
-        KiCadProjectBundle bundle,
-        KiCadProjectView view)
-    {
-        var candidates = new List<KiCadCalibrationWorldPointCandidate>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        if (view.SourceIndex < 0 || view.SourceIndex >= bundle.Root.Schematics.Count)
-        {
-            return candidates;
-        }
-
-        var schematic = bundle.Root.Schematics[view.SourceIndex];
-
-        foreach (var symbol in schematic.Symbols)
-        {
-            string reference = symbol.Reference?.Trim() ?? string.Empty;
-            string value = symbol.Value?.Trim() ?? string.Empty;
-
-            if (string.IsNullOrWhiteSpace(reference) || TabSchematics.IsInternalKiCadSymbolReference(reference))
-            {
-                continue;
-            }
-
-            foreach (var property in symbol.PropertiesDetailed.Where(property =>
-                         property.At != null &&
-                         string.Equals(property.Name?.Trim(), "Reference", StringComparison.OrdinalIgnoreCase) &&
-                         property.Effects?.Hide != true))
-            {
-                string anchorDescription = TabSchematics.DescribeKiCadTextAnchor(property.Effects);
-
-                TabSchematics.AddKiCadCalibrationWorldPointCandidate(
-                    candidates,
-                    seen,
-                    $"Component {reference} reference text ({anchorDescription})",
-                    property.At!.X,
-                    property.At.Y);
-            }
-
-            if (symbol.At != null)
-            {
-                TabSchematics.AddKiCadCalibrationWorldPointCandidate(
-                    candidates,
-                    seen,
-                    $"Component {reference} symbol anchor",
-                    symbol.At.X,
-                    symbol.At.Y);
-            }
-        }
-
-        foreach (var label in schematic.Labels.Local.Where(label => label.At != null))
-        {
-            string text = label.Text?.Trim() ?? "(local label)";
-            TabSchematics.AddKiCadCalibrationWorldPointCandidate(
-                candidates,
-                seen,
-                $"Local label {text}",
-                label.At!.X,
-                label.At.Y);
-        }
-
-        foreach (var label in schematic.Labels.Global.Where(label => label.At != null))
-        {
-            string text = label.Text?.Trim() ?? "(global label)";
-            TabSchematics.AddKiCadCalibrationWorldPointCandidate(
-                candidates,
-                seen,
-                $"Global label {text}",
-                label.At!.X,
-                label.At.Y);
-        }
-
-        foreach (var label in schematic.Labels.Hierarchical.Where(label => label.At != null))
-        {
-            string text = label.Text?.Trim() ?? "(hierarchical label)";
-            TabSchematics.AddKiCadCalibrationWorldPointCandidate(
-                candidates,
-                seen,
-                $"Hierarchical label {text}",
-                label.At!.X,
-                label.At.Y);
-        }
-
-        if (bundle.SchematicNetPathIndexBySchematicIndex.TryGetValue(view.SourceIndex, out var indexByNet))
-        {
-            IEnumerable<KeyValuePair<string, List<KiCadResolvedPath>>> pathsToUse =
-                this.thisSelectedKiCadNormalizedNetNames.Count > 0
-                    ? indexByNet
-                        .Where(kvp => this.thisSelectedKiCadNormalizedNetNames.Contains(kvp.Key))
-                        .OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
-                    : indexByNet
-                        .OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
-                        .Take(20);
-
-            foreach (var kvp in pathsToUse)
-            {
-                int pathOrdinal = 1;
-
-                foreach (var path in kvp.Value)
-                {
-                    if (path.Points.Count == 0)
-                    {
-                        pathOrdinal++;
-                        continue;
-                    }
-
-                    var start = path.Points[0];
-                    var end = path.Points[path.Points.Count - 1];
-
-                    TabSchematics.AddKiCadCalibrationWorldPointCandidate(
-                        candidates,
-                        seen,
-                        $"{kvp.Key} path {pathOrdinal} start",
-                        start.X,
-                        start.Y);
-
-                    TabSchematics.AddKiCadCalibrationWorldPointCandidate(
-                        candidates,
-                        seen,
-                        $"{kvp.Key} path {pathOrdinal} end",
-                        end.X,
-                        end.Y);
-
-                    pathOrdinal++;
-                }
-            }
-        }
-
-        Rect bounds = this.GetKiCadSchematicWorldBounds(schematic);
-        if (bounds.Width > 0 && bounds.Height > 0)
-        {
-            TabSchematics.AddKiCadCalibrationWorldPointCandidate(candidates, seen, "Schematic bounds top-left", bounds.Left, bounds.Top);
-            TabSchematics.AddKiCadCalibrationWorldPointCandidate(candidates, seen, "Schematic bounds top-right", bounds.Right, bounds.Top);
-            TabSchematics.AddKiCadCalibrationWorldPointCandidate(candidates, seen, "Schematic bounds bottom-left", bounds.Left, bounds.Bottom);
-            TabSchematics.AddKiCadCalibrationWorldPointCandidate(candidates, seen, "Schematic bounds bottom-right", bounds.Right, bounds.Bottom);
-            TabSchematics.AddKiCadCalibrationWorldPointCandidate(candidates, seen, "Schematic bounds center", bounds.Center.X, bounds.Center.Y);
-        }
-
-        return candidates
-            .OrderBy(candidate =>
-            {
-                if (candidate.Label.Contains("reference text", StringComparison.OrdinalIgnoreCase)) return 0;
-                if (candidate.Label.Contains("symbol anchor", StringComparison.OrdinalIgnoreCase)) return 1;
-                return 2;
-            })
-            .ThenBy(candidate => candidate.Label, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
-    // ###########################################################################################
-    // Returns true when a KiCad calibration candidate is allowed in clipboard export.
-    // Only pad entries and component reference-text entries are copied.
-    // ###########################################################################################
-    private static bool IsClipboardEligibleKiCadCalibrationWorldPointCandidate(KiCadCalibrationWorldPointCandidate candidate)
-    {
-        string label = candidate.Label?.Trim() ?? string.Empty;
-
-        return label.StartsWith("Pad ", StringComparison.OrdinalIgnoreCase) ||
-               label.Contains(" pad ", StringComparison.OrdinalIgnoreCase) ||
-               label.Contains(" reference text ", StringComparison.OrdinalIgnoreCase);
-    }
-
-    // ###########################################################################################
-    // Builds tab-separated clipboard text for KiCad world-point candidates so they can be pasted
-    // into Excel or inspected in a text editor.
-    // ###########################################################################################
-    private string BuildKiCadWorldPointCandidatesClipboardText(IReadOnlyList<KiCadCalibrationWorldPointCandidate> candidates)
-    {
-        var lines = new List<string>(candidates.Count + 1)
-        {
-            "Label\tWorld X\tWorld Y"
-        };
-
-        foreach (var candidate in candidates)
-        {
-            lines.Add(
-                $"{candidate.Label}\t" +
-                $"{candidate.WorldX.ToString("0.######", CultureInfo.InvariantCulture)}\t" +
-                $"{candidate.WorldY.ToString("0.######", CultureInfo.InvariantCulture)}");
-        }
-
-        return string.Join(Environment.NewLine, lines);
-    }
-
-    // ###########################################################################################
-    // Copies candidate KiCad world points for the current view to the clipboard.
-    // Only pad entries and component reference-text entries are exported.
-    // ###########################################################################################
-    private async void CopyKiCadWorldPointCandidatesAsync()
-    {
-        var allCandidates = this.BuildCurrentKiCadCalibrationWorldPointCandidates();
-        var clipboardCandidates = allCandidates
-            .Where(TabSchematics.IsClipboardEligibleKiCadCalibrationWorldPointCandidate)
-            .ToList();
-
-        string schematicName = this.GetCurrentSchematicName();
-
-        if (clipboardCandidates.Count == 0)
-        {
-            this.SchematicsHoverLabelText.Text = allCandidates.Count == 0
-                ? $"No KiCad match found for '{schematicName}'. Names must match."
-                : $"No pad or reference text entries found for '{schematicName}'.";
-            this.SchematicsHoverLabelBorder.IsVisible = true;
-            this.HideLabelEditorMenu();
-            this.SchematicsContainer.Focus();
-
-            if (TopLevel.GetTopLevel(this) is TopLevel topLevelClear && topLevelClear.Clipboard != null)
-            {
-                await topLevelClear.Clipboard.ClearAsync();
-            }
-
-            if (allCandidates.Count == 0)
-            {
-                Logger.Warning($"KiCad calibration copy failed. Excel name '{schematicName}' not found in traces JSON.");
-            }
-            else
-            {
-                Logger.Warning($"KiCad calibration copy found no pad/reference-text entries for schematic [{schematicName}].");
-            }
-
-            return;
-        }
-
-        string clipboardText = this.BuildKiCadWorldPointCandidatesClipboardText(clipboardCandidates);
-
-        if (TopLevel.GetTopLevel(this) is TopLevel topLevel && topLevel.Clipboard != null)
-        {
-            //            await topLevel.Clipboard.SetTextAsync(clipboardText);
-            await ClipboardExtensions.SetTextAsync(topLevel.Clipboard, clipboardText);
-        }
-
-        this.SchematicsHoverLabelText.Text = $"Copied {clipboardCandidates.Count} KiCad calibration points";
-        this.SchematicsHoverLabelBorder.IsVisible = true;
-        this.HideLabelEditorMenu();
-        this.SchematicsContainer.Focus();
-
-        Logger.Info($"Copied [{clipboardCandidates.Count}] KiCad calibration points for schematic [{schematicName}]");
-    }
-
-    // ###########################################################################################
     // Returns true when a KiCad copper point is visible on the inspected PCB side.
     // Treats "*.Cu" as visible on both sides so through-hole pads and vias are included.
     // ###########################################################################################
@@ -7815,102 +7520,71 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
-    // Builds a strict orthogonal transform bypassing affine shear by utilizing exactly two points.
-    // Ideal for non-rotated exported replica images to ensure perfectly parallel geometry tracking.
+    // Projects one schematic-local point back into KiCad world coordinates using the active
+    // box-based calibration model.
     // ###########################################################################################
-    private static bool TryBuildOrthogonalCalibration(
-        KiCadCalibrationPoint p1,
-        KiCadCalibrationPoint p2,
-        out KiCadViewCalibration calibration)
+    private bool TryMapLocalToKiCadWorld(
+        Point localPoint,
+        Rect worldBounds,
+        Rect contentRect,
+        KiCadViewCalibration calibration,
+        out Point worldPoint)
     {
-        calibration = KiCadViewCalibration.Identity;
+        worldPoint = default;
 
-        double dWorldX = p2.WorldX - p1.WorldX;
-        double dWorldY = p2.WorldY - p1.WorldY;
-
-        if (Math.Abs(dWorldX) < 0.0001 || Math.Abs(dWorldY) < 0.0001)
+        if (worldBounds.Width <= 0 || worldBounds.Height <= 0)
         {
             return false;
         }
 
-        double scaleX = (p2.ImageX - p1.ImageX) / dWorldX;
-        double scaleY = (p2.ImageY - p1.ImageY) / dWorldY;
-
-        double offsetX = p1.ImageX - (p1.WorldX * scaleX);
-        double offsetY = p1.ImageY - (p1.WorldY * scaleY);
-
-        calibration = new KiCadViewCalibration
-        {
-            HasAffineCalibration = true,
-            A = scaleX,
-            B = 0,
-            C = offsetX,
-            D = 0,
-            E = scaleY,
-            F = offsetY
-        };
-
-        return true;
-    }
-
-    // ###########################################################################################
-    // Projects mouse pixel coordinates back onto KiCad PCB world coordinates for high-perf hovering.
-    // ###########################################################################################
-    private bool TryMapLocalToKiCadWorld(Point localPoint, Rect worldBounds, Rect contentRect, KiCadViewCalibration calibration, out Point worldPoint)
-    {
-        worldPoint = default;
-
-        if (calibration.HasAffineCalibration && this.currentFullResBitmap != null &&
-            this.currentFullResBitmap.PixelSize.Width > 0 && this.currentFullResBitmap.PixelSize.Height > 0)
-        {
-            double scaleX = contentRect.Width / this.currentFullResBitmap.PixelSize.Width;
-            double scaleY = contentRect.Height / this.currentFullResBitmap.PixelSize.Height;
-
-            double bitmapX = (localPoint.X - contentRect.X) / scaleX;
-            double bitmapY = (localPoint.Y - contentRect.Y) / scaleY;
-
-            double bx = bitmapX - calibration.C;
-            double by = bitmapY - calibration.F;
-
-            double det = (calibration.A * calibration.E) - (calibration.B * calibration.D);
-            if (Math.Abs(det) < 1e-10) return false;
-
-            double invDet = 1.0 / det;
-            double wx = (calibration.E * bx - calibration.B * by) * invDet;
-            double wy = (calibration.A * by - calibration.D * bx) * invDet;
-
-            worldPoint = new Point(wx, wy);
-            return true;
-        }
-
-        if (worldBounds.Width <= 0 || worldBounds.Height <= 0) return false;
-
-        double localXFallback = localPoint.X;
-        double localYFallback = localPoint.Y;
+        double thisLocalX = localPoint.X;
+        double thisLocalY = localPoint.Y;
 
         if (this.currentFullResBitmap != null)
         {
             if (this.currentFullResBitmap.PixelSize.Width > 0)
-                localXFallback -= calibration.OffsetX * (contentRect.Width / this.currentFullResBitmap.PixelSize.Width);
+            {
+                thisLocalX -= calibration.OffsetX * (contentRect.Width / this.currentFullResBitmap.PixelSize.Width);
+            }
+
             if (this.currentFullResBitmap.PixelSize.Height > 0)
-                localYFallback -= calibration.OffsetY * (contentRect.Height / this.currentFullResBitmap.PixelSize.Height);
+            {
+                thisLocalY -= calibration.OffsetY * (contentRect.Height / this.currentFullResBitmap.PixelSize.Height);
+            }
         }
         else
         {
-            localXFallback -= calibration.OffsetX;
-            localYFallback -= calibration.OffsetY;
+            thisLocalX -= calibration.OffsetX;
+            thisLocalY -= calibration.OffsetY;
         }
 
-        double nx = (localXFallback - contentRect.X) / contentRect.Width;
-        double ny = (localYFallback - contentRect.Y) / contentRect.Height;
+        double thisNormalizedX = (thisLocalX - contentRect.X) / contentRect.Width;
+        double thisNormalizedY = (thisLocalY - contentRect.Y) / contentRect.Height;
 
-        if (Math.Abs(calibration.ScaleX) > 1e-10) nx /= calibration.ScaleX;
-        if (Math.Abs(calibration.ScaleY) > 1e-10) ny /= calibration.ScaleY;
+        if (Math.Abs(calibration.ScaleX) > 1e-10)
+        {
+            thisNormalizedX /= calibration.ScaleX;
+        }
 
-        if (calibration.MirrorX) nx = 1.0 - nx;
-        if (calibration.MirrorY) ny = 1.0 - ny;
+        if (Math.Abs(calibration.ScaleY) > 1e-10)
+        {
+            thisNormalizedY /= calibration.ScaleY;
+        }
 
-        worldPoint = new Point((nx * worldBounds.Width) + worldBounds.X, (ny * worldBounds.Height) + worldBounds.Y);
+        if (calibration.MirrorX)
+        {
+            thisNormalizedX = 1.0 - thisNormalizedX;
+        }
+
+        if (calibration.MirrorY)
+        {
+            thisNormalizedY = 1.0 - thisNormalizedY;
+        }
+
+        worldPoint = new Point(
+            (thisNormalizedX * worldBounds.Width) + worldBounds.X,
+            (thisNormalizedY * worldBounds.Height) + worldBounds.Y);
+
         return true;
     }
 
@@ -8373,8 +8047,8 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Rebuilds the currently visible KiCad overlay for the selected image view immediately.
-    // PCB views render copper geometry, while schematic views render resolved wire paths.
-    // Also allows a pin-1-only render path for hovered components even when no traces are active.
+    // While trace calibration mode is active, the temporary calibration transform is used and the
+    // temporary traces-and-pads checkbox can suppress all overlay geometry except the box itself.
     // ###########################################################################################
     private void RefreshKiCadOverlayNow()
     {
@@ -8395,6 +8069,56 @@ public partial class TabSchematics : UserControl
         var currentView = this.ResolveKiCadViewForCurrentSchematic();
         if (currentView == null)
         {
+            return;
+        }
+
+        if (this.thisIsKiCadTraceCalibrationMode)
+        {
+            bool thisShouldShowCalibrationTracesAndPads =
+                this.CheckGlobalShowCalibrationTracesAndPads.IsChecked != false;
+
+            if (thisShouldShowCalibrationTracesAndPads)
+            {
+                if (string.Equals(currentView.Type, "pcb_top", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(currentView.Type, "pcb_bottom", StringComparison.OrdinalIgnoreCase))
+                {
+                    var calibrationNetNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                    var pcb = this.thisKiCadProject.Root.Pcb.ElementAtOrDefault(currentView.SourceIndex);
+                    if (pcb != null)
+                    {
+                        foreach (var net in pcb.Nets.List)
+                        {
+                            string normalizedName = net.NormalizedName?.Trim() ?? string.Empty;
+                            if (!string.IsNullOrWhiteSpace(normalizedName))
+                            {
+                                calibrationNetNames.Add(normalizedName);
+                            }
+                        }
+                    }
+
+                    this.RenderKiCadPcbGeometry(
+                        currentView,
+                        new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                        calibrationNetNames);
+                }
+                else if (string.Equals(currentView.Type, "schematic", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (this.thisKiCadProject.SchematicNetPathIndexBySchematicIndex.TryGetValue(currentView.SourceIndex, out var indexByNet))
+                    {
+                        var calibrationNetNames = new HashSet<string>(
+                            indexByNet.Keys.Where(key => !string.IsNullOrWhiteSpace(key)),
+                            StringComparer.OrdinalIgnoreCase);
+
+                        this.RenderKiCadSchematicGeometry(currentView, calibrationNetNames);
+                    }
+                }
+            }
+
+            var primitives = this.SchematicsKiCadOverlayCanvas.Primitives.ToList();
+            primitives.Add(this.BuildKiCadCalibrationBoxPrimitive());
+            this.SchematicsKiCadOverlayCanvas.SetGeometry(primitives);
+
             return;
         }
 
@@ -8872,6 +8596,8 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Updates schematics settings visibility for global and board-specific CAD trace options.
+    // Also exposes the temporary calibration-only traces-and-pads toggle while KiCad calibration
+    // mode is active so alignment can be checked against the underlying image.
     // ###########################################################################################
     private void UpdateInteractiveCadTraceHoverModeUi()
     {
@@ -8886,6 +8612,10 @@ public partial class TabSchematics : UserControl
             currentView != null &&
             (string.Equals(currentView.Type, "pcb_top", StringComparison.OrdinalIgnoreCase) ||
              string.Equals(currentView.Type, "pcb_bottom", StringComparison.OrdinalIgnoreCase));
+
+        bool isCalibrationTraceToggleVisible =
+            hasKiCadTraces &&
+            this.thisIsKiCadTraceCalibrationMode;
 
         this.BoardMarkPin1OnSelectedComponentRow.IsVisible = hasBoard && hasKiCadPcbPadData;
         this.CheckBoardMarkPin1OnSelectedComponent.IsEnabled = hasBoard && hasKiCadPcbPadData;
@@ -8908,6 +8638,14 @@ public partial class TabSchematics : UserControl
             ? new Cursor(StandardCursorType.Hand)
             : Cursor.Default;
         this.CheckGlobalShowOppositeSideTraces.IsEnabled = isCurrentViewPcb;
+
+        this.GlobalShowCalibrationTracesAndPadsRow.IsVisible = isCalibrationTraceToggleVisible;
+        this.GlobalShowCalibrationTracesAndPadsRow.IsEnabled = isCalibrationTraceToggleVisible;
+        this.GlobalShowCalibrationTracesAndPadsRow.Opacity = isCalibrationTraceToggleVisible ? 1.0 : 0.55;
+        this.GlobalShowCalibrationTracesAndPadsRow.Cursor = isCalibrationTraceToggleVisible
+            ? new Cursor(StandardCursorType.Hand)
+            : Cursor.Default;
+        this.CheckGlobalShowCalibrationTracesAndPads.IsEnabled = isCalibrationTraceToggleVisible;
 
         this.GlobalShowZonesRow.IsVisible = isCurrentViewPcb;
         this.GlobalShowZonesRow.IsEnabled = isCurrentViewPcb;
@@ -13239,13 +12977,13 @@ public partial class TabSchematics : UserControl
 
     // ###########################################################################################
     // Updates the visibility and enabled state of the Important signals clear button.
-    // The button is only visible when one or more important signals are currently selected.
+    // The button stays visible whenever the panel has content, but is disabled when nothing is selected.
     // ###########################################################################################
     private void UpdateImportantSignalsClearButtonState(bool hasVisibleImportantSignalsContent)
     {
         bool hasAnythingToClear = this.thisSelectedImportantSignalDisplayNames.Count > 0;
 
-        this.ClearImportantSignalsButton.IsVisible = hasAnythingToClear;
+        this.ClearImportantSignalsButton.IsVisible = hasVisibleImportantSignalsContent;
         this.ClearImportantSignalsButton.IsEnabled = hasAnythingToClear;
     }
 
@@ -13296,5 +13034,692 @@ public partial class TabSchematics : UserControl
             this.SchematicsHoverPadText.Text = string.Empty;
         }
     }
+
+    // ###########################################################################################
+    // Enters interactive KiCad trace calibration mode and seeds the resize box from the currently
+    // active calibration if one exists, otherwise from the default full-image KiCad bounds.
+    // The temporary traces-and-pads visibility toggle always defaults to checked on entry.
+    // ###########################################################################################
+    private void BeginKiCadTraceCalibrationMode()
+    {
+        if (this.currentFullResBitmap == null || this.thisKiCadProject == null)
+        {
+            return;
+        }
+
+        var view = this.ResolveKiCadViewForCurrentSchematic();
+        if (view == null)
+        {
+            return;
+        }
+
+        Rect imageBounds = this.BuildKiCadCalibrationImageBounds(view);
+
+        this.thisKiCadCalibrationImageLeft = imageBounds.Left;
+        this.thisKiCadCalibrationImageTop = imageBounds.Top;
+        this.thisKiCadCalibrationImageRight = imageBounds.Right;
+        this.thisKiCadCalibrationImageBottom = imageBounds.Bottom;
+
+        this.thisKiCadCalibrationStartImageLeft = this.thisKiCadCalibrationImageLeft;
+        this.thisKiCadCalibrationStartImageTop = this.thisKiCadCalibrationImageTop;
+        this.thisKiCadCalibrationStartImageRight = this.thisKiCadCalibrationImageRight;
+        this.thisKiCadCalibrationStartImageBottom = this.thisKiCadCalibrationImageBottom;
+
+        this.thisKiCadTraceCalibrationDragMode = LabelEditorDragMode.None;
+        this.thisIsKiCadTraceCalibrationMode = true;
+
+        this.CheckGlobalShowCalibrationTracesAndPads.IsChecked = true;
+
+        this.HideLabelEditorMenu();
+        this.UpdateInteractiveCadTraceHoverModeUi();
+        this.SchematicsContainer.Focus();
+        this.Focus();
+        this.RefreshKiCadOverlay(forceImmediate: true);
+        this.UpdateSchematicsHoverUi(new Point(0, 0));
+
+        Logger.Info($"KiCad trace calibration mode enabled for schematic [{this.GetCurrentSchematicName()}]");
+    }
+
+    // ###########################################################################################
+    // Cancels the current interactive KiCad trace calibration session and restores the persisted
+    // calibration without writing anything to disk.
+    // ###########################################################################################
+    private void CancelKiCadTraceCalibrationMode()
+    {
+        this.thisIsKiCadTraceCalibrationMode = false;
+        this.thisKiCadTraceCalibrationDragMode = LabelEditorDragMode.None;
+        this.thisKiCadCalibrationImageLeft = 0.0;
+        this.thisKiCadCalibrationImageTop = 0.0;
+        this.thisKiCadCalibrationImageRight = 0.0;
+        this.thisKiCadCalibrationImageBottom = 0.0;
+        this.thisKiCadCalibrationStartImageLeft = 0.0;
+        this.thisKiCadCalibrationStartImageTop = 0.0;
+        this.thisKiCadCalibrationStartImageRight = 0.0;
+        this.thisKiCadCalibrationStartImageBottom = 0.0;
+
+        this.CheckGlobalShowCalibrationTracesAndPads.IsChecked = true;
+
+        this.HideLabelEditorMenu();
+        this.UpdateInteractiveCadTraceHoverModeUi();
+        this.RefreshKiCadOverlay(forceImmediate: true);
+        this.SchematicsContainer.Focus();
+
+        Logger.Info("KiCad trace calibration mode canceled");
+    }
+
+    // ###########################################################################################
+    // Saves the current interactive KiCad trace calibration box into the board JSON file and then
+    // exits calibration mode so the persisted transform becomes the active transform immediately.
+    // ###########################################################################################
+    private void ApplyKiCadTraceCalibration()
+    {
+        if (!this.thisIsKiCadTraceCalibrationMode || this.currentFullResBitmap == null)
+        {
+            return;
+        }
+
+        string schematicName = this.GetCurrentSchematicName();
+        string excelPath = this.MainWindow?.GetCurrentBoardExcelPath() ?? string.Empty;
+        string cadName = this.schematicByName.TryGetValue(schematicName, out var entry)
+            ? entry.CadName?.Trim() ?? string.Empty
+            : string.Empty;
+
+        if (string.IsNullOrWhiteSpace(excelPath) || string.IsNullOrWhiteSpace(schematicName))
+        {
+            return;
+        }
+
+        double left = Math.Min(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+        double right = Math.Max(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+        double top = Math.Min(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+        double bottom = Math.Max(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+
+        bool mirrorX = this.thisKiCadCalibrationImageLeft > this.thisKiCadCalibrationImageRight;
+        bool mirrorY = this.thisKiCadCalibrationImageTop > this.thisKiCadCalibrationImageBottom;
+
+        double scaleX = (right - left) / this.currentFullResBitmap.PixelSize.Width;
+        double scaleY = (bottom - top) / this.currentFullResBitmap.PixelSize.Height;
+        double offsetX = left;
+        double offsetY = top;
+
+        BoardComponentHighlightStorage.SaveKiCadCalibration(
+            excelPath,
+            schematicName,
+            cadName,
+            offsetX,
+            offsetY,
+            scaleX,
+            scaleY,
+            mirrorX,
+            mirrorY);
+
+        this.thisIsKiCadTraceCalibrationMode = false;
+        this.thisKiCadTraceCalibrationDragMode = LabelEditorDragMode.None;
+        this.CheckGlobalShowCalibrationTracesAndPads.IsChecked = true;
+
+        this.HideLabelEditorMenu();
+        this.UpdateInteractiveCadTraceHoverModeUi();
+        this.RefreshKiCadOverlay(forceImmediate: true);
+        this.SchematicsContainer.Focus();
+
+        Logger.Info(
+            $"KiCad trace calibration saved for schematic [{schematicName}] " +
+            $"OffsetX=[{offsetX.ToString("0.######", CultureInfo.InvariantCulture)}] " +
+            $"OffsetY=[{offsetY.ToString("0.######", CultureInfo.InvariantCulture)}] " +
+            $"ScaleX=[{scaleX.ToString("0.######", CultureInfo.InvariantCulture)}] " +
+            $"ScaleY=[{scaleY.ToString("0.######", CultureInfo.InvariantCulture)}] " +
+            $"MirrorX=[{mirrorX}] MirrorY=[{mirrorY}]");
+    }
+
+    // ###########################################################################################
+    // Builds the current KiCad calibration box in image-pixel coordinates by mapping the active
+    // KiCad view bounds through the currently active calibration.
+    // ###########################################################################################
+    private Rect BuildKiCadCalibrationImageBounds(KiCadProjectView view)
+    {
+        if (this.currentFullResBitmap == null)
+        {
+            return default;
+        }
+
+        Rect worldBounds;
+        string currentSchematicName = this.GetCurrentSchematicName();
+
+        if (string.Equals(view.Type, "pcb_top", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(view.Type, "pcb_bottom", StringComparison.OrdinalIgnoreCase))
+        {
+            if (view.SourceIndex < 0 || view.SourceIndex >= this.thisKiCadProject!.Root.Pcb.Count)
+            {
+                return new Rect(0, 0, this.currentFullResBitmap.PixelSize.Width, this.currentFullResBitmap.PixelSize.Height);
+            }
+
+            worldBounds = this.GetKiCadPcbWorldBounds(this.thisKiCadProject.Root.Pcb[view.SourceIndex]);
+        }
+        else
+        {
+            if (view.SourceIndex < 0 || view.SourceIndex >= this.thisKiCadProject!.Root.Schematics.Count)
+            {
+                return new Rect(0, 0, this.currentFullResBitmap.PixelSize.Width, this.currentFullResBitmap.PixelSize.Height);
+            }
+
+            worldBounds = this.GetKiCadSchematicWorldBounds(this.thisKiCadProject.Root.Schematics[view.SourceIndex]);
+        }
+
+        if (worldBounds.Width <= 0 || worldBounds.Height <= 0)
+        {
+            return new Rect(0, 0, this.currentFullResBitmap.PixelSize.Width, this.currentFullResBitmap.PixelSize.Height);
+        }
+
+        var calibration = KiCadViewCalibration.Identity;
+
+        string excelPath = this.MainWindow?.GetCurrentBoardExcelPath() ?? string.Empty;
+        if (BoardComponentHighlightStorage.TryLoadKiCadCalibration(
+                excelPath,
+                currentSchematicName,
+                out _,
+                out double offsetX,
+                out double offsetY,
+                out double scaleX,
+                out double scaleY,
+                out bool mirrorX,
+                out bool mirrorY))
+        {
+            calibration = new KiCadViewCalibration
+            {
+                OffsetX = offsetX,
+                OffsetY = offsetY,
+                ScaleX = scaleX,
+                ScaleY = scaleY,
+                MirrorX = mirrorX,
+                MirrorY = mirrorY
+            };
+        }
+
+        Point topLeft = this.MapKiCadWorldToImagePixel(worldBounds.Left, worldBounds.Top, worldBounds, calibration);
+        Point topRight = this.MapKiCadWorldToImagePixel(worldBounds.Right, worldBounds.Top, worldBounds, calibration);
+        Point bottomLeft = this.MapKiCadWorldToImagePixel(worldBounds.Left, worldBounds.Bottom, worldBounds, calibration);
+        Point bottomRight = this.MapKiCadWorldToImagePixel(worldBounds.Right, worldBounds.Bottom, worldBounds, calibration);
+
+        double left = new[] { topLeft.X, topRight.X, bottomLeft.X, bottomRight.X }.Min();
+        double right = new[] { topLeft.X, topRight.X, bottomLeft.X, bottomRight.X }.Max();
+        double top = new[] { topLeft.Y, topRight.Y, bottomLeft.Y, bottomRight.Y }.Min();
+        double bottom = new[] { topLeft.Y, topRight.Y, bottomLeft.Y, bottomRight.Y }.Max();
+
+        return new Rect(left, top, Math.Max(1.0, right - left), Math.Max(1.0, bottom - top));
+    }
+
+    // ###########################################################################################
+    // Maps one KiCad world coordinate directly into image-pixel coordinates using the current
+    // non-affine box calibration model.
+    // ###########################################################################################
+    private Point MapKiCadWorldToImagePixel(
+        double worldX,
+        double worldY,
+        Rect worldBounds,
+        KiCadViewCalibration calibration)
+    {
+        if (this.currentFullResBitmap == null || worldBounds.Width <= 0 || worldBounds.Height <= 0)
+        {
+            return default;
+        }
+
+        double nx = (worldX - worldBounds.X) / worldBounds.Width;
+        double ny = (worldY - worldBounds.Y) / worldBounds.Height;
+
+        if (calibration.MirrorX)
+        {
+            nx = 1.0 - nx;
+        }
+
+        if (calibration.MirrorY)
+        {
+            ny = 1.0 - ny;
+        }
+
+        double imageX = calibration.OffsetX + (nx * calibration.ScaleX * this.currentFullResBitmap.PixelSize.Width);
+        double imageY = calibration.OffsetY + (ny * calibration.ScaleY * this.currentFullResBitmap.PixelSize.Height);
+
+        return new Point(imageX, imageY);
+    }
+
+    // ###########################################################################################
+    // Converts an image-pixel rectangle into schematic-local coordinates so the calibration border
+    // can be drawn on top of the current image using the same mapping as other overlays.
+    // ###########################################################################################
+    private Rect ConvertImagePixelRectToLocalRect(Rect imagePixelRect)
+    {
+        if (this.currentFullResBitmap == null ||
+            this.currentFullResBitmap.PixelSize.Width <= 0 ||
+            this.currentFullResBitmap.PixelSize.Height <= 0)
+        {
+            return default;
+        }
+
+        var contentRect = this.GetImageContentRect();
+
+        double x = contentRect.X + ((imagePixelRect.X / this.currentFullResBitmap.PixelSize.Width) * contentRect.Width);
+        double y = contentRect.Y + ((imagePixelRect.Y / this.currentFullResBitmap.PixelSize.Height) * contentRect.Height);
+        double width = (imagePixelRect.Width / this.currentFullResBitmap.PixelSize.Width) * contentRect.Width;
+        double height = (imagePixelRect.Height / this.currentFullResBitmap.PixelSize.Height) * contentRect.Height;
+
+        return new Rect(x, y, width, height);
+    }
+
+    // ###########################################################################################
+    // Builds the visible KiCad calibration border box and explicit corner/side handle markers so the
+    // user can see where resize interaction is available while aligning the temporary KiCad overlay.
+    // The border is drawn slightly outside the actual KiCad data bounds to avoid covering details.
+    // ###########################################################################################
+    private KiCadOverlayPrimitive BuildKiCadCalibrationBoxPrimitive()
+    {
+        Rect thisBorderImageRect = this.GetKiCadCalibrationBorderImageRect();
+        Rect thisLocalRect = this.ConvertImagePixelRectToLocalRect(thisBorderImageRect);
+
+        double thisScale = Math.Max(0.0001, this.schematicsMatrix.M11);
+        double thisHandleSize = Math.Clamp(10.0 / thisScale, 5.0, 12.0);
+        double thisHalfHandleSize = thisHandleSize / 2.0;
+
+        var thisHandleBrush = new SolidColorBrush(Colors.LimeGreen, 1.0);
+        var thisHandlePen = new Pen(thisHandleBrush, 1.0);
+        var thisBorderPen = new Pen(thisHandleBrush, 1.0);
+
+        var thisPrimitives = new List<KiCadOverlayPrimitive>
+    {
+        new KiCadOverlayPrimitive
+        {
+            Kind = KiCadOverlayPrimitiveKind.Rectangle,
+            Rect = thisLocalRect,
+            Pen = thisBorderPen,
+            Fill = null
+        }
+    };
+
+        var thisHandleCenters = new[]
+        {
+        new Point(thisLocalRect.Left, thisLocalRect.Top),
+        new Point(thisLocalRect.Center.X, thisLocalRect.Top),
+        new Point(thisLocalRect.Right, thisLocalRect.Top),
+        new Point(thisLocalRect.Right, thisLocalRect.Center.Y),
+        new Point(thisLocalRect.Right, thisLocalRect.Bottom),
+        new Point(thisLocalRect.Center.X, thisLocalRect.Bottom),
+        new Point(thisLocalRect.Left, thisLocalRect.Bottom),
+        new Point(thisLocalRect.Left, thisLocalRect.Center.Y)
+    };
+
+        foreach (var thisHandleCenter in thisHandleCenters)
+        {
+            thisPrimitives.Add(new KiCadOverlayPrimitive
+            {
+                Kind = KiCadOverlayPrimitiveKind.Rectangle,
+                Rect = new Rect(
+                    thisHandleCenter.X - thisHalfHandleSize,
+                    thisHandleCenter.Y - thisHalfHandleSize,
+                    thisHandleSize,
+                    thisHandleSize),
+                Pen = thisHandlePen,
+                Fill = thisHandleBrush
+            });
+        }
+
+        var thisGeometry = new StreamGeometry();
+
+        using (var thisGeometryContext = thisGeometry.Open())
+        {
+            foreach (var thisPrimitive in thisPrimitives)
+            {
+                if (thisPrimitive.Kind != KiCadOverlayPrimitiveKind.Rectangle)
+                {
+                    continue;
+                }
+
+                thisGeometryContext.BeginFigure(thisPrimitive.Rect.TopLeft, isFilled: thisPrimitive.Fill != null);
+                thisGeometryContext.LineTo(thisPrimitive.Rect.TopRight);
+                thisGeometryContext.LineTo(thisPrimitive.Rect.BottomRight);
+                thisGeometryContext.LineTo(thisPrimitive.Rect.BottomLeft);
+                thisGeometryContext.EndFigure(isClosed: true);
+            }
+        }
+
+        return new KiCadOverlayPrimitive
+        {
+            Kind = KiCadOverlayPrimitiveKind.Geometry,
+            Geometry = thisGeometry,
+            Pen = thisBorderPen,
+            Fill = null
+        };
+    }
+
+    // ###########################################################################################
+    // Returns the current interactive calibration rectangle in image-pixel coordinates.
+    // Left can be greater than right and top can be greater than bottom so flip state is preserved.
+    // ###########################################################################################
+    private Rect GetCurrentKiCadCalibrationImageRect()
+    {
+        double left = Math.Min(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+        double right = Math.Max(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+        double top = Math.Min(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+        double bottom = Math.Max(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+
+        return new Rect(left, top, Math.Max(1.0, right - left), Math.Max(1.0, bottom - top));
+    }
+
+    // ###########################################################################################
+    // Returns true when the pointer is inside the currently visible KiCad calibration rectangle.
+    // This is used for move-drag behavior while calibration mode is active.
+    // ###########################################################################################
+    private bool IsPointerInsideCurrentKiCadCalibrationBounds(Point pointerInContainer)
+    {
+        if (!this.thisIsKiCadTraceCalibrationMode)
+        {
+            return false;
+        }
+
+        if (!this.TryGetSchematicsImagePixelPoint(pointerInContainer, out var pixelPoint))
+        {
+            return false;
+        }
+
+        double left = Math.Min(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+        double right = Math.Max(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+        double top = Math.Min(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+        double bottom = Math.Max(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+
+        return pixelPoint.X >= left &&
+               pixelPoint.X <= right &&
+               pixelPoint.Y >= top &&
+               pixelPoint.Y <= bottom;
+    }
+
+    // ###########################################################################################
+    // Builds the visual calibration-border rectangle in image-pixel space.
+    // The border is intentionally expanded slightly outside the actual KiCad data bounds so the
+    // visible box and handles do not sit directly on top of traces and pads.
+    // ###########################################################################################
+    private Rect GetKiCadCalibrationBorderImageRect()
+    {
+        const double thisBorderPaddingPixels = 10.0;
+
+        double thisLeft = Math.Min(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+        double thisRight = Math.Max(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+        double thisTop = Math.Min(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+        double thisBottom = Math.Max(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+
+        double thisExpandedLeft = thisLeft - thisBorderPaddingPixels;
+        double thisExpandedTop = thisTop - thisBorderPaddingPixels;
+        double thisExpandedRight = thisRight + thisBorderPaddingPixels;
+        double thisExpandedBottom = thisBottom + thisBorderPaddingPixels;
+
+        if (this.currentFullResBitmap != null)
+        {
+            thisExpandedLeft = Math.Clamp(thisExpandedLeft, 0.0, this.currentFullResBitmap.PixelSize.Width);
+            thisExpandedTop = Math.Clamp(thisExpandedTop, 0.0, this.currentFullResBitmap.PixelSize.Height);
+            thisExpandedRight = Math.Clamp(thisExpandedRight, 0.0, this.currentFullResBitmap.PixelSize.Width);
+            thisExpandedBottom = Math.Clamp(thisExpandedBottom, 0.0, this.currentFullResBitmap.PixelSize.Height);
+        }
+
+        return new Rect(
+            thisExpandedLeft,
+            thisExpandedTop,
+            Math.Max(1.0, thisExpandedRight - thisExpandedLeft),
+            Math.Max(1.0, thisExpandedBottom - thisExpandedTop));
+    }
+
+    // ###########################################################################################
+    // Tries to resolve which KiCad calibration resize handle is under the pointer so the box can
+    // be resized from edges or corners and flipped naturally by dragging across opposite sides.
+    // Hit-testing uses the expanded visual border rectangle so the handles match what is drawn.
+    // ###########################################################################################
+    private bool TryGetKiCadTraceCalibrationHandleAtContainerPoint(
+        Point pointerInContainer,
+        out LabelEditorDragMode dragMode)
+    {
+        dragMode = LabelEditorDragMode.None;
+
+        if (!this.thisIsKiCadTraceCalibrationMode ||
+            this.currentFullResBitmap == null)
+        {
+            return false;
+        }
+
+        if (!TryInvert(this.schematicsMatrix, out var thisInverseMatrix))
+        {
+            return false;
+        }
+
+        var thisLocalPoint = new Point(
+            (pointerInContainer.X * thisInverseMatrix.M11) + (pointerInContainer.Y * thisInverseMatrix.M21) + thisInverseMatrix.M31,
+            (pointerInContainer.X * thisInverseMatrix.M12) + (pointerInContainer.Y * thisInverseMatrix.M22) + thisInverseMatrix.M32);
+
+        var thisContentRect = this.GetImageContentRect();
+        if (thisContentRect.Width <= 0 || thisContentRect.Height <= 0 || !thisContentRect.Contains(thisLocalPoint))
+        {
+            return false;
+        }
+
+        Rect thisBorderImageRect = this.GetKiCadCalibrationBorderImageRect();
+        Rect thisLocalRect = this.ConvertImagePixelRectToLocalRect(thisBorderImageRect);
+        double thisScale = Math.Max(0.0001, this.schematicsMatrix.M11);
+
+        foreach (var thisHitTarget in BuildLabelEditorHandleHitRects(thisLocalRect, thisScale))
+        {
+            if (!thisHitTarget.HitRect.Contains(thisLocalPoint))
+            {
+                continue;
+            }
+
+            dragMode = thisHitTarget.DragMode;
+            return true;
+        }
+
+        return false;
+    }
+
+    // ###########################################################################################
+    // Remaps a visually hit KiCad calibration handle to the underlying stored edge/corner definition.
+    // This keeps resize behavior correct after horizontal and/or vertical flips, because the visible
+    // top-left corner may no longer correspond to the stored left/top values.
+    // ###########################################################################################
+    private LabelEditorDragMode RemapKiCadTraceCalibrationDragModeForCurrentFlip(LabelEditorDragMode dragMode)
+    {
+        bool thisIsMirroredX = this.thisKiCadCalibrationImageLeft > this.thisKiCadCalibrationImageRight;
+        bool thisIsMirroredY = this.thisKiCadCalibrationImageTop > this.thisKiCadCalibrationImageBottom;
+
+        if (!thisIsMirroredX && !thisIsMirroredY)
+        {
+            return dragMode;
+        }
+
+        return dragMode switch
+        {
+            LabelEditorDragMode.ResizeTopLeft => thisIsMirroredX
+                ? thisIsMirroredY
+                    ? LabelEditorDragMode.ResizeBottomRight
+                    : LabelEditorDragMode.ResizeTopRight
+                : thisIsMirroredY
+                    ? LabelEditorDragMode.ResizeBottomLeft
+                    : LabelEditorDragMode.ResizeTopLeft,
+
+            LabelEditorDragMode.ResizeTop => thisIsMirroredY
+                ? LabelEditorDragMode.ResizeBottom
+                : LabelEditorDragMode.ResizeTop,
+
+            LabelEditorDragMode.ResizeTopRight => thisIsMirroredX
+                ? thisIsMirroredY
+                    ? LabelEditorDragMode.ResizeBottomLeft
+                    : LabelEditorDragMode.ResizeTopLeft
+                : thisIsMirroredY
+                    ? LabelEditorDragMode.ResizeBottomRight
+                    : LabelEditorDragMode.ResizeTopRight,
+
+            LabelEditorDragMode.ResizeRight => thisIsMirroredX
+                ? LabelEditorDragMode.ResizeLeft
+                : LabelEditorDragMode.ResizeRight,
+
+            LabelEditorDragMode.ResizeBottomRight => thisIsMirroredX
+                ? thisIsMirroredY
+                    ? LabelEditorDragMode.ResizeTopLeft
+                    : LabelEditorDragMode.ResizeBottomLeft
+                : thisIsMirroredY
+                    ? LabelEditorDragMode.ResizeTopRight
+                    : LabelEditorDragMode.ResizeBottomRight,
+
+            LabelEditorDragMode.ResizeBottom => thisIsMirroredY
+                ? LabelEditorDragMode.ResizeTop
+                : LabelEditorDragMode.ResizeBottom,
+
+            LabelEditorDragMode.ResizeBottomLeft => thisIsMirroredX
+                ? thisIsMirroredY
+                    ? LabelEditorDragMode.ResizeTopRight
+                    : LabelEditorDragMode.ResizeBottomRight
+                : thisIsMirroredY
+                    ? LabelEditorDragMode.ResizeTopLeft
+                    : LabelEditorDragMode.ResizeBottomLeft,
+
+            LabelEditorDragMode.ResizeLeft => thisIsMirroredX
+                ? LabelEditorDragMode.ResizeRight
+                : LabelEditorDragMode.ResizeLeft,
+
+            _ => dragMode
+        };
+    }
+
+    // ###########################################################################################
+    // Starts a KiCad calibration move or resize drag by capturing both the pointer start pixel and
+    // the current box edges so drag updates remain stable and do not accumulate rounding drift.
+    // Visual resize handles are remapped to the stored flipped edge/corner definition first.
+    // ###########################################################################################
+    private void StartKiCadTraceCalibrationDrag(Point startPixelPoint, LabelEditorDragMode dragMode)
+    {
+        this.thisKiCadTraceCalibrationDragMode =
+            dragMode == LabelEditorDragMode.Move
+                ? LabelEditorDragMode.Move
+                : this.RemapKiCadTraceCalibrationDragModeForCurrentFlip(dragMode);
+
+        this.thisKiCadTraceCalibrationDragStartPixelPoint = startPixelPoint;
+        this.thisKiCadCalibrationStartImageLeft = this.thisKiCadCalibrationImageLeft;
+        this.thisKiCadCalibrationStartImageTop = this.thisKiCadCalibrationImageTop;
+        this.thisKiCadCalibrationStartImageRight = this.thisKiCadCalibrationImageRight;
+        this.thisKiCadCalibrationStartImageBottom = this.thisKiCadCalibrationImageBottom;
+    }
+
+    // ###########################################################################################
+    // Updates the temporary KiCad calibration box during drag. Moving preserves the box size while
+    // resize modes allow edge crossing so horizontal and vertical flipping happen automatically.
+    // ###########################################################################################
+    private void UpdateKiCadTraceCalibrationDrag(Point currentPixelPoint)
+    {
+        if (!this.thisIsKiCadTraceCalibrationMode ||
+            this.thisKiCadTraceCalibrationDragMode == LabelEditorDragMode.None)
+        {
+            return;
+        }
+
+        double dx = currentPixelPoint.X - this.thisKiCadTraceCalibrationDragStartPixelPoint.X;
+        double dy = currentPixelPoint.Y - this.thisKiCadTraceCalibrationDragStartPixelPoint.Y;
+
+        double left = this.thisKiCadCalibrationStartImageLeft;
+        double top = this.thisKiCadCalibrationStartImageTop;
+        double right = this.thisKiCadCalibrationStartImageRight;
+        double bottom = this.thisKiCadCalibrationStartImageBottom;
+
+        switch (this.thisKiCadTraceCalibrationDragMode)
+        {
+            case LabelEditorDragMode.Move:
+                left += dx;
+                right += dx;
+                top += dy;
+                bottom += dy;
+                break;
+
+            case LabelEditorDragMode.ResizeTopLeft:
+                left += dx;
+                top += dy;
+                break;
+
+            case LabelEditorDragMode.ResizeTop:
+                top += dy;
+                break;
+
+            case LabelEditorDragMode.ResizeTopRight:
+                right += dx;
+                top += dy;
+                break;
+
+            case LabelEditorDragMode.ResizeRight:
+                right += dx;
+                break;
+
+            case LabelEditorDragMode.ResizeBottomRight:
+                right += dx;
+                bottom += dy;
+                break;
+
+            case LabelEditorDragMode.ResizeBottom:
+                bottom += dy;
+                break;
+
+            case LabelEditorDragMode.ResizeBottomLeft:
+                left += dx;
+                bottom += dy;
+                break;
+
+            case LabelEditorDragMode.ResizeLeft:
+                left += dx;
+                break;
+        }
+
+        this.thisKiCadCalibrationImageLeft = left;
+        this.thisKiCadCalibrationImageTop = top;
+        this.thisKiCadCalibrationImageRight = right;
+        this.thisKiCadCalibrationImageBottom = bottom;
+
+        this.RefreshKiCadOverlay(forceImmediate: true);
+    }
+
+    // ###########################################################################################
+    // Completes the active KiCad calibration drag and clears the transient drag mode so the overlay
+    // returns to idle calibration interaction state.
+    // ###########################################################################################
+    private void CompleteKiCadTraceCalibrationDrag()
+    {
+        this.thisKiCadTraceCalibrationDragMode = LabelEditorDragMode.None;
+    }
+
+    // ###########################################################################################
+    // Updates the cursor while KiCad trace calibration mode is active so resize handles and move
+    // areas feel consistent with the component label editor interactions.
+    // ###########################################################################################
+    private void UpdateKiCadTraceCalibrationCursor(Point pointerInContainer)
+    {
+        if (!this.thisIsKiCadTraceCalibrationMode)
+        {
+            return;
+        }
+
+        if (this.thisKiCadTraceCalibrationDragMode != LabelEditorDragMode.None)
+        {
+            this.SchematicsContainer.Cursor = this.thisKiCadTraceCalibrationDragMode == LabelEditorDragMode.Move
+                ? new Cursor(StandardCursorType.SizeAll)
+                : new Cursor(StandardCursorType.Hand);
+            return;
+        }
+
+        if (this.TryGetKiCadTraceCalibrationHandleAtContainerPoint(pointerInContainer, out _))
+        {
+            this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.Hand);
+            return;
+        }
+
+        if (this.IsPointerInsideCurrentKiCadCalibrationBounds(pointerInContainer))
+        {
+            this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.SizeAll);
+            return;
+        }
+
+        this.SchematicsContainer.Cursor = Cursor.Default;
+    }
+
+
+
 
 }

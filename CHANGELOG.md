@@ -1,14 +1,18 @@
-
-- Fixed selected component did not blink in thumbnails
 - Fixed component labels was shown on top of panels
+- Fixed selected component did not blink in thumbnails
 - Fixed it did zoom schematic image when inside a panel (VAR DET ET PROBLEM FØR????????)
 - Fixed "Netlist names" panel should not show in schematic images without KiCad data (TEST.. IS THIS TRUE?????????????)
+- Added `Important signals` panel in "Schematics" tab
 - Added KiCad zones also to visualize
-- Added highlighting of KiCad traces in schematic images (not only in PCB)
+- Added highlighting of KiCad traces also in schematic images
+  - Previously it only did highlight in the PCB images
 - Changed data format for KiCad files
   - Now using original raw KiCad data files instead of a JSON file with converted data
 - Changed data format for highlighted component bounds
   - Moved from board Excel sheet to JSON file
+- Changed data format for KiCad calibration points
+  - Moved from board Excel sheet to JSON file
 - Changed "Clear All" button is now always visible in "Netlist name" panels, if it has selected traces
 - Changed update banner notification when main Excel data file has newer version
 - Changed it is possible to pan, so panels in "Schematics" tab does not hide the schematic below it
+- Changed KiCad calibration mapping to use interactive trace-map instead of manual calibration points

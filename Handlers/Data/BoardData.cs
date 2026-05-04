@@ -12,16 +12,6 @@ namespace Handlers.DataHandling
         public string MainHighlightOpacity { get; init; } = string.Empty;
         public string ThumbnailImageHighlightColor { get; init; } = string.Empty;
         public string ThumbnailHighlightOpacity { get; init; } = string.Empty;
-
-        public string KiCadP1WorldX { get; init; } = string.Empty;
-        public string KiCadP1WorldY { get; init; } = string.Empty;
-        public string KiCadP1ImageX { get; init; } = string.Empty;
-        public string KiCadP1ImageY { get; init; } = string.Empty;
-
-        public string KiCadP2WorldX { get; init; } = string.Empty;
-        public string KiCadP2WorldY { get; init; } = string.Empty;
-        public string KiCadP2ImageX { get; init; } = string.Empty;
-        public string KiCadP2ImageY { get; init; } = string.Empty;
     }
 
     public class ComponentEntry
@@ -125,7 +115,6 @@ namespace Handlers.DataHandling
         public List<BoardLinkEntry> BoardLinks { get; init; } = new();
         public List<CreditEntry> Credits { get; init; } = new();
         public List<KiCadImportantSignalEntry> KiCadImportantSignals { get; init; } = new();
-        public bool IsLoaded { get; init; }
     }
 
     public class OscilloscopeEntry
@@ -133,24 +122,77 @@ namespace Handlers.DataHandling
         public string Brand { get; init; } = string.Empty;
         public string SeriesOrModel { get; init; } = string.Empty;
         public string Port { get; init; } = string.Empty;
+
         public string Identify { get; init; } = string.Empty;
         public string DrainErrorQueue { get; init; } = string.Empty;
         public string OperationComplete { get; init; } = string.Empty;
         public string ClearStatistics { get; init; } = string.Empty;
         public string QueryActiveTrigger { get; init; } = string.Empty;
+
         public string Stop { get; init; } = string.Empty;
         public string Single { get; init; } = string.Empty;
         public string Run { get; init; } = string.Empty;
+
         public string QueryTriggerMode { get; init; } = string.Empty;
+        public string QueryTriggerSource { get; init; } = string.Empty;
+        public string SetTriggerSource { get; init; } = string.Empty;
+        public string QueryTriggerSlope { get; init; } = string.Empty;
+        public string SetTriggerSlope { get; init; } = string.Empty;
         public string QueryTriggerLevel { get; init; } = string.Empty;
         public string SetTriggerLevel { get; init; } = string.Empty;
+
+        public string QueryAvgCount { get; init; } = string.Empty;
+        public string SetAvgCount { get; init; } = string.Empty;
+        public string QueryMemoryDepth { get; init; } = string.Empty;
+        public string SetMemoryDepth { get; init; } = string.Empty;
+        public string QuerySampleRate { get; init; } = string.Empty;
+
+        public string QueryProbeAttenuation { get; init; } = string.Empty;
+        public string SetProbeAttenuation { get; init; } = string.Empty;
+        public string QueryChannelScale { get; init; } = string.Empty;
+        public string SetChannelScale { get; init; } = string.Empty;
+        public string QueryChannelOffset { get; init; } = string.Empty;
+        public string SetChannelOffset { get; init; } = string.Empty;
+
+        public string QueryTimeScale { get; init; } = string.Empty;
+        public string SetTimeScale { get; init; } = string.Empty;
+        public string QueryTimeOffset { get; init; } = string.Empty;
+        public string SetTimeOffset { get; init; } = string.Empty;
+
         public string QueryTimeDiv { get; init; } = string.Empty;
         public string SetTimeDiv { get; init; } = string.Empty;
         public string QueryVoltsDiv { get; init; } = string.Empty;
         public string SetVoltsDiv { get; init; } = string.Empty;
+
+        public string QueryMeasureFrequency { get; init; } = string.Empty;
+        public string QueryMeasurePeriod { get; init; } = string.Empty;
+        public string QueryMeasureDutyCycle { get; init; } = string.Empty;
+        public string QueryMeasureRiseTime { get; init; } = string.Empty;
+        public string QueryMeasureFallTime { get; init; } = string.Empty;
+        public string QueryMeasureOvershoot { get; init; } = string.Empty;
+        public string QueryMeasurePreshoot { get; init; } = string.Empty;
+        public string QueryMeasureAmplitude { get; init; } = string.Empty;
+        public string QueryMeasurePkToPk { get; init; } = string.Empty;
+        public string QueryMeasureMaximum { get; init; } = string.Empty;
+        public string QueryMeasureMinimum { get; init; } = string.Empty;
+        public string QueryMeasureMean { get; init; } = string.Empty;
+        public string QueryMeasureRms { get; init; } = string.Empty;
+
+        public string QueryCursorHorizontal { get; init; } = string.Empty;
+        public string SetCursorHorizontal { get; init; } = string.Empty;
+        public string QueryCursorVertical { get; init; } = string.Empty;
+        public string SetCursorVertical { get; init; } = string.Empty;
+
+        public string ReadWaveformPreamble { get; init; } = string.Empty;
+        public string ReadWaveformData { get; init; } = string.Empty;
         public string DumpImage { get; init; } = string.Empty;
+        public string ScreenshotCommand { get; init; } = string.Empty;
+
         public string TimeDivList { get; init; } = string.Empty;
         public string VoltsDivList { get; init; } = string.Empty;
         public string DebounceTime { get; init; } = string.Empty;
+
+        public string DefaultFileExtension { get; init; } = string.Empty;
+        public string Notes { get; init; } = string.Empty;
     }
 }
