@@ -128,6 +128,8 @@ public partial class TabSchematics : UserControl
     private string thisLastKiCadNetConnectionsSignature = string.Empty;
     private string thisLastThumbnailHighlightSignature = string.Empty;
 
+    private Rect thisPanStartViewportRect;
+
     private readonly Dictionary<string, KiCadPcbNetRenderCache> thisKiCadPcbNetRenderCacheByKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, KiCadPcbHoverHitTestCache> thisKiCadPcbHoverHitTestCacheByKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, KiCadSchematicHoverHitTestCache> thisKiCadSchematicHoverHitTestCacheByKey =
