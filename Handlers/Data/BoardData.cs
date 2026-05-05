@@ -8,9 +8,10 @@ namespace Handlers.DataHandling
         public string SchematicName { get; init; } = string.Empty;
         public string CadName { get; init; } = string.Empty;
         public string SchematicImageFile { get; init; } = string.Empty;
-        public string MainImageHighlightColor { get; init; } = string.Empty;
-        public string MainHighlightOpacity { get; init; } = string.Empty;
-        public string ThumbnailImageHighlightColor { get; init; } = string.Empty;
+        public string SchematicHighlightColor { get; init; } = string.Empty;
+        public string SchematicHighlightOpacity { get; init; } = string.Empty;
+        public string OppositeTraceHighlightColor { get; init; } = string.Empty;
+        public string ThumbnailHighlightColor { get; init; } = string.Empty;
         public string ThumbnailHighlightOpacity { get; init; } = string.Empty;
     }
 

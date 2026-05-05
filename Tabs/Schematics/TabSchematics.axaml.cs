@@ -1776,8 +1776,8 @@ public partial class TabSchematics : UserControl
                 this.schematicByName.TryGetValue(selected.Name, out var schematic))
             {
                 this.SchematicsHighlightsOverlay.HighlightIndex = index;
-                this.SchematicsHighlightsOverlay.HighlightColor = ParseColorOrDefault(schematic.MainImageHighlightColor, Colors.IndianRed);
-                this.SchematicsHighlightsOverlay.HighlightOpacity = ParseOpacityOrDefault(schematic.MainHighlightOpacity, 0.20);
+                this.SchematicsHighlightsOverlay.HighlightColor = ParseColorOrDefault(schematic.SchematicHighlightColor, Colors.IndianRed);
+                this.SchematicsHighlightsOverlay.HighlightOpacity = ParseOpacityOrDefault(schematic.SchematicHighlightOpacity, 0.20);
             }
         }
         else
@@ -2474,7 +2474,7 @@ public partial class TabSchematics : UserControl
             HighlightIndex = index,
             BitmapPixelSize = originalPixelSize,
             ViewMatrix = Matrix.Identity,
-            HighlightColor = ParseColorOrDefault(schematic.ThumbnailImageHighlightColor, Colors.IndianRed),
+            HighlightColor = ParseColorOrDefault(schematic.ThumbnailHighlightColor, Colors.IndianRed),
             HighlightOpacity = ParseOpacityOrDefault(schematic.ThumbnailHighlightOpacity, 0.20) * Math.Clamp(opacityMultiplier, 0.0, 1.0),
             IsHitTestVisible = false
         };
@@ -2603,9 +2603,9 @@ public partial class TabSchematics : UserControl
         {
             this.SchematicsHighlightsOverlay.HighlightIndex = mainIndex;
             this.SchematicsHighlightsOverlay.BitmapPixelSize = this.currentFullResBitmap?.PixelSize ?? new PixelSize(0, 0);
-            this.SchematicsHighlightsOverlay.HighlightColor = ParseColorOrDefault(mainSchematic.MainImageHighlightColor, Colors.IndianRed);
+            this.SchematicsHighlightsOverlay.HighlightColor = ParseColorOrDefault(mainSchematic.SchematicHighlightColor, Colors.IndianRed);
             this.SchematicsHighlightsOverlay.HighlightOpacity =
-                ParseOpacityOrDefault(mainSchematic.MainHighlightOpacity, 0.20) * this.thisCurrentHighlightBlinkFactor;
+                ParseOpacityOrDefault(mainSchematic.SchematicHighlightOpacity, 0.20) * this.thisCurrentHighlightBlinkFactor;
         }
         else
         {
@@ -2693,7 +2693,6 @@ public partial class TabSchematics : UserControl
                 }
 
                 bool hasMatch = hasComponentMatch || hasKiCadMatch;
-//                bool hasMatch = hasComponentMatch;
                 bool isRelevantForDimming = !hasAnyThumbnailSelection || hasMatch;
 
                 thumb.VisualOpacity = isRelevantForDimming ? 1.0 : 0.35;
@@ -3257,9 +3256,30 @@ public partial class TabSchematics : UserControl
 
     public static double ParseOpacityOrDefault(string text, double fallback)
     {
-        if (!TryParseDouble(text, out var v)) return fallback;
-        if (v > 1.0) v /= 100.0;
-        return Math.Clamp(v, 0.0, 1.0);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return fallback;
+        }
+
+        string normalized = text.Trim();
+
+        bool isPercent = normalized.EndsWith("%", StringComparison.Ordinal);
+        if (isPercent)
+        {
+            normalized = normalized[..^1].Trim();
+        }
+
+        if (!double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+        {
+            return fallback;
+        }
+
+        if (isPercent || value > 1.0)
+        {
+            value /= 100.0;
+        }
+
+        return Math.Clamp(value, 0.0, 1.0);
     }
 
     // ###########################################################################################
@@ -4165,8 +4185,8 @@ public partial class TabSchematics : UserControl
         if (!string.IsNullOrWhiteSpace(schematicName) &&
             this.schematicByName.TryGetValue(schematicName, out var schematic))
         {
-            highlightColor = ParseColorOrDefault(schematic.MainImageHighlightColor, Colors.IndianRed);
-            highlightOpacity = ParseOpacityOrDefault(schematic.MainHighlightOpacity, 0.20);
+            highlightColor = ParseColorOrDefault(schematic.SchematicHighlightColor, Colors.IndianRed);
+            highlightOpacity = ParseOpacityOrDefault(schematic.SchematicHighlightOpacity, 0.20);
         }
 
         this.SchematicsLabelEditorOverlay.ApplyState(
@@ -7126,21 +7146,7 @@ public partial class TabSchematics : UserControl
         public int ViaIndex { get; set; } = -1;
         public int ArcIndex { get; set; } = -1;
         public KiCadPcbHighlightPadRef? PadRef { get; set; }
-    }
-
-    // ###########################################################################################
-    // Renders PCB copper geometry for the currently selected normalized net names.
-    // Straight PCB segments are grouped into connected chains and rendered as rounded polylines
-    // so the overlay keeps the original visual style while still using the fast single-control
-    // render path instead of creating thousands of child controls.
-    // ###########################################################################################
-    private void RenderKiCadPcbGeometry(KiCadProjectView view)
-    {
-        this.RenderKiCadPcbGeometry(
-            view,
-            this.BuildActiveKiCadTracePreviewReferences(),
-            this.BuildActiveKiCadTracePreviewNetNames());
-    }
+    }    
 
     // ###########################################################################################
     // Renders resolved schematic wire paths for the currently selected normalized net names.
@@ -8304,8 +8310,8 @@ public partial class TabSchematics : UserControl
 
         if (this.schematicByName.TryGetValue(schematicName, out var schematic))
         {
-            highlightColor = ParseColorOrDefault(schematic.MainImageHighlightColor, Colors.IndianRed);
-            highlightOpacity = ParseOpacityOrDefault(schematic.MainHighlightOpacity, 0.20);
+            highlightColor = ParseColorOrDefault(schematic.SchematicHighlightColor, Colors.IndianRed);
+            highlightOpacity = ParseOpacityOrDefault(schematic.SchematicHighlightOpacity, 0.20);
         }
 
         this.SchematicsHoverHighlightsOverlay.HighlightColor = highlightColor;
@@ -11313,6 +11319,8 @@ public partial class TabSchematics : UserControl
     // Renders PCB copper geometry for a precomputed set of active references and net names.
     // Missing KiCad net caches are built in the background so the UI can render immediately and
     // refresh itself when the heavy continuity graph becomes available.
+    // Opposite-side traces now share the same opacity behavior as the primary side, so only the
+    // opposite-side color remains configurable from board data.
     // ###########################################################################################
     private void RenderKiCadPcbGeometry(
         KiCadProjectView view,
@@ -11344,10 +11352,13 @@ public partial class TabSchematics : UserControl
 
         Color overlayColor = Colors.DeepSkyBlue;
         double baseOpacity = 0.20;
+        Color oppositeTraceHighlightColor = Colors.DodgerBlue;
+
         if (this.schematicByName.TryGetValue(currentSchematicName, out var schematicEntry))
         {
-            overlayColor = ParseColorOrDefault(schematicEntry.MainImageHighlightColor, Colors.DeepSkyBlue);
-            baseOpacity = ParseOpacityOrDefault(schematicEntry.MainHighlightOpacity, 0.20);
+            overlayColor = ParseColorOrDefault(schematicEntry.SchematicHighlightColor, Colors.DeepSkyBlue);
+            baseOpacity = ParseOpacityOrDefault(schematicEntry.SchematicHighlightOpacity, 0.20);
+            oppositeTraceHighlightColor = ParseColorOrDefault(schematicEntry.OppositeTraceHighlightColor, Colors.DodgerBlue);
         }
 
         double translatedOpacity = Math.Clamp(baseOpacity + 0.25, 0.0, 1.0);
@@ -11557,8 +11568,8 @@ public partial class TabSchematics : UserControl
                 : new SolidColorBrush(overlayColor, effectiveOpacity);
 
             IBrush oppositeBrush = isHoveredNet && !shouldBlinkThisNet
-                ? new SolidColorBrush(Colors.DodgerBlue, 0.95)
-                : new SolidColorBrush(Colors.DodgerBlue, Math.Clamp(0.55 * blinkFactor, 0.0, 0.95));
+                ? new SolidColorBrush(oppositeTraceHighlightColor, 1.0)
+                : new SolidColorBrush(oppositeTraceHighlightColor, effectiveOpacity);
 
             if (showOppositeSideTraces)
             {
@@ -11597,14 +11608,14 @@ public partial class TabSchematics : UserControl
                             }
 
                             double oppositeZoneFillOpacity = isHoveredNet && !shouldBlinkThisNet
-                                ? 0.24
-                                : Math.Clamp(0.22 * blinkFactor, 0.06, 0.24);
+                                ? Math.Min(1.0, Math.Clamp(translatedOpacity * 0.65, 0.10, 0.38) + 0.12)
+                                : Math.Clamp(effectiveOpacity * 0.65, 0.10, 0.38);
 
                             primitives.Add(new KiCadOverlayPrimitive
                             {
                                 Kind = KiCadOverlayPrimitiveKind.Geometry,
                                 Geometry = zoneGeometry,
-                                Fill = new SolidColorBrush(Colors.DodgerBlue, oppositeZoneFillOpacity),
+                                Fill = new SolidColorBrush(oppositeTraceHighlightColor, oppositeZoneFillOpacity),
                                 Pen = new Pen(oppositeBrush, 1.0)
                             });
                         }
@@ -11793,8 +11804,8 @@ public partial class TabSchematics : UserControl
         double baseOpacity = 0.20;
         if (this.schematicByName.TryGetValue(currentSchematicName, out var schematicEntry))
         {
-            overlayColor = ParseColorOrDefault(schematicEntry.MainImageHighlightColor, Colors.Orange);
-            baseOpacity = ParseOpacityOrDefault(schematicEntry.MainHighlightOpacity, 0.20);
+            overlayColor = ParseColorOrDefault(schematicEntry.SchematicHighlightColor, Colors.Orange);
+            baseOpacity = ParseOpacityOrDefault(schematicEntry.SchematicHighlightOpacity, 0.20);
         }
 
         double translatedOpacity = Math.Clamp(baseOpacity + 0.25, 0.0, 1.0);

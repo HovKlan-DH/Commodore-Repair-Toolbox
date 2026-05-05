@@ -366,10 +366,13 @@
 						</Grid.ColumnDefinitions>
 
 						<TextBlock x:Name="SyncBannerText"
-								   Grid.Column="0"
-								   VerticalAlignment="Center"
-								   Foreground="{DynamicResource Main_Banner_Fg}"
-								   FontSize="12" />
+							   Grid.Column="0"
+							   VerticalAlignment="Center"
+							   Foreground="{DynamicResource Main_Banner_Fg}"
+							   FontSize="12"
+							   TextWrapping="Wrap"
+							   TextTrimming="CharacterEllipsis"
+							   MaxLines="2" />
 
 						<Button x:Name="SyncBannerRefreshButton"
 								Grid.Column="1"

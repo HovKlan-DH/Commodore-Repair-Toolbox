@@ -97,7 +97,7 @@ namespace Handlers.DataHandling
         [JsonPropertyName("schematicsShowTracesOnSelectedComponent")] public bool SchematicsShowTracesOnSelectedComponent { get; set; } = true;
         [JsonPropertyName("schematicsShowTracesOnSelectedComponentByBoard")] public Dictionary<string, bool> SchematicsShowTracesOnSelectedComponentByBoard { get; set; } = new();
         [JsonPropertyName("schematicsImportantSignalsPanelExpanded")] public bool SchematicsImportantSignalsPanelExpanded { get; set; } = true;
-        [JsonPropertyName("schematicsShowOppositeSideTraces")] public bool SchematicsShowOppositeSideTraces { get; set; } = false;
+        [JsonPropertyName("schematicsShowOppositeSideTraces")] public bool SchematicsShowOppositeSideTraces { get; set; } = true;
         [JsonPropertyName("schematicsShowZones")] public bool SchematicsShowZones { get; set; } = true;
 
     }

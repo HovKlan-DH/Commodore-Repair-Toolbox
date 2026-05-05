@@ -254,7 +254,7 @@ namespace CRT
         // ###########################################################################################
         private void ShowApplicationUpdateAvailableBanner()
         {
-            this.UpdateBannerText.Text = $"Version {UpdateService.PendingVersion} is available";
+            this.UpdateBannerText.Text = $"Version [{UpdateService.PendingVersion}] is available";
             this.UpdateBannerInstallButton.IsVisible = true;
             this.UpdateBannerViewNotesButton.IsVisible = true;
             this.UpdateBannerInstallButton.IsEnabled = true;
@@ -311,7 +311,8 @@ namespace CRT
                             return;
                         }
 
-                        if (status.Contains("up to date", StringComparison.OrdinalIgnoreCase))
+                        if (status.Contains("up to date", StringComparison.OrdinalIgnoreCase) ||
+                            status.StartsWith("Update complete", StringComparison.OrdinalIgnoreCase))
                         {
                             return;
                         }
@@ -331,10 +332,18 @@ namespace CRT
 
                 if (syncResult.ChangedCount > 0)
                 {
-                    this.SyncBannerText.Text = syncResult.ChangedCount == 1
-                        ? "1 file updated - please refresh board"
-                        : $"{syncResult.ChangedCount} files updated - please refresh board";
+                    string bannerText = syncResult.ChangedCount == 1
+                        ? "[1] file updated - please refresh board"
+                        : $"[{syncResult.ChangedCount}] files updated - please refresh board";
+
+                    this.SyncBannerText.Text = BuildSyncBannerText(bannerText, syncResult.ProtectedFilesCount);
                     this.SyncBannerRefreshButton.IsVisible = true;
+                    this.SyncBanner.IsVisible = true;
+                }
+                else if (syncResult.ProtectedFilesCount > 0)
+                {
+                    this.SyncBannerText.Text = BuildSyncBannerText("All data files are up to date", syncResult.ProtectedFilesCount);
+                    this.SyncBannerRefreshButton.IsVisible = false;
                     this.SyncBanner.IsVisible = true;
                 }
                 else
@@ -374,7 +383,8 @@ namespace CRT
                             return;
                         }
 
-                        if (status.Contains("up to date", StringComparison.OrdinalIgnoreCase))
+                        if (status.Contains("up to date", StringComparison.OrdinalIgnoreCase) ||
+                            status.StartsWith("Sync complete", StringComparison.OrdinalIgnoreCase))
                         {
                             return;
                         }
@@ -393,6 +403,17 @@ namespace CRT
         // ###########################################################################################
         private async void StartBackgroundSyncAsync(bool keepBannerTextStatic = false)
         {
+            if (!UserSettings.CheckDataOnLaunch || !DataManager.HasPendingSync)
+            {
+                if (!this._isShowingDataSyncDisabledBanner)
+                {
+                    this.SyncBanner.IsVisible = false;
+                    this.SyncBannerRefreshButton.IsVisible = false;
+                }
+
+                return;
+            }
+
             this.SyncBannerText.Text = "Checking data from online source - please wait...";
             this.SyncBannerRefreshButton.IsVisible = false;
             this.SyncBanner.IsVisible = true;
@@ -403,13 +424,23 @@ namespace CRT
             {
                 int changed = await this.SyncRemainingFilesAsync(keepBannerTextStatic);
 
+                DataManager.LoadProtectedContributionStateForCurrentData();
+                int protectedFilesCount = DataManager.ProtectedContributionFileCount;
+
                 if (changed > 0)
                 {
-                    this.SyncBannerText.Text = changed == 1
-                        ? "1 file updated in the background - please refresh board"
-                        : $"{changed} files updated in the background - please refresh board";
+                    string bannerText = changed == 1
+                        ? "[1] file updated in background - please refresh board"
+                        : $"[{changed}] files updated in background - please refresh board";
 
+                    this.SyncBannerText.Text = BuildSyncBannerText(bannerText, protectedFilesCount);
                     this.SyncBannerRefreshButton.IsVisible = true;
+                    this.SyncBanner.IsVisible = true;
+                }
+                else if (protectedFilesCount > 0)
+                {
+                    this.SyncBannerText.Text = BuildSyncBannerText("All data files are up to date", protectedFilesCount);
+                    this.SyncBannerRefreshButton.IsVisible = false;
                     this.SyncBanner.IsVisible = true;
                 }
                 else
@@ -2465,6 +2496,18 @@ namespace CRT
 
             this.UpdateDataSyncStatusIcon();
         }
+
+        // ###########################################################################################
+        // Appends protected-file count information to a sync banner message when applicable.
+        // ###########################################################################################
+        private static string BuildSyncBannerText(string message, int protectedFilesCount)
+        {
+            return protectedFilesCount > 0
+                ? $"{message}; protected contribution related files are [{protectedFilesCount}]"
+                : message;
+        }
+
+
 
         // ###########################################################################################
     }

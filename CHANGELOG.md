@@ -2,6 +2,7 @@
 - Fixed selected component did not blink in thumbnails
 - Fixed it did zoom schematic image when inside a panel (VAR DET ET PROBLEM FØR????????)
 - Fixed "Netlist names" panel should not show in schematic images without KiCad data (TEST.. IS THIS TRUE?????????????)
+- Fixed thumbnail opacity can be 100% (pure solid)
 - Added `Important signals` panel in "Schematics" tab
 - Added KiCad zones also to visualize
 - Added highlighting of KiCad traces also in schematic images

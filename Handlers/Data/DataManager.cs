@@ -62,6 +62,10 @@ namespace Handlers.DataHandling
         // Raised with the relative file path of whichever file is currently being processed
         public static event Action<string>? FileDownloadChanged;
 
+        private static readonly HashSet<string> _protectedContributionFiles = new(StringComparer.OrdinalIgnoreCase);
+
+        public static int ProtectedContributionFileCount => _protectedContributionFiles.Count;
+
         // ###########################################################################################
         // Result details returned from an immediate manual data sync.
         // ###########################################################################################
@@ -70,6 +74,7 @@ namespace Handlers.DataHandling
             public int ChangedCount { get; init; }
             public bool MainExcelChanged { get; init; }
             public bool AnyExcelChanged { get; init; }
+            public int ProtectedFilesCount { get; init; }
         }
 
         // ###########################################################################################
@@ -84,12 +89,10 @@ namespace Handlers.DataHandling
             _dataRoot = ResolveDataRoot(args);
             Logger.Info($"Data root is [{_dataRoot}]");
 
-            // Create the data root folder, if this is either first-run or using a custom --data-root
             bool isNewRoot = !Directory.Exists(_dataRoot);
             Directory.CreateDirectory(_dataRoot);
             if (isNewRoot)
             {
-                // Check if this is a first-run with the default "AppData" path
                 var bundledData = Path.Combine(AppContext.BaseDirectory, "Data");
                 if (Directory.Exists(bundledData))
                 {
@@ -108,7 +111,6 @@ namespace Handlers.DataHandling
                 Logger.Info("Checking online source for new or updated files");
             }
 
-            // Determine from local files initially (fallback if offline)
             var localFiles = Directory.EnumerateFiles(_dataRoot)
                 .Select(Path.GetFileName)
                 .Where(f => !string.IsNullOrEmpty(f))
@@ -116,9 +118,7 @@ namespace Handlers.DataHandling
 
             DetermineResolvedMainExcel(localFiles);
 
-            // Preserve the local "newer version exists" state.
-            // The online manifest may refine which file should be synced,
-            // but it must not clear a newer version already detected locally.
+            string localResolvedMainExcelFileName = ResolvedMainExcelFileName;
             bool localDataUpdateRequiresAppUpdate = DataUpdateRequiresAppUpdate;
 
 #if DEBUG
@@ -136,18 +136,19 @@ namespace Handlers.DataHandling
 
                     if (_syncManifest != null)
                     {
-                        // Use a dummy filter run to harvest the file names natively through the delegate 
-                        // (ensures we get the exact string field the Sync tool operates on without guessing properties)
                         var onlineFileNames = new List<string>();
                         await OnlineServices.SyncFilesAsync(_syncManifest, string.Empty, f => { onlineFileNames.Add(f); return false; }, null, null);
 
                         DetermineResolvedMainExcel(onlineFileNames);
 
-                        // Keep the local warning state even if the online manifest does not list
-                        // the same newer main Excel file already present on disk.
+                        if (!string.IsNullOrWhiteSpace(localResolvedMainExcelFileName) &&
+                            !string.Equals(localResolvedMainExcelFileName, AppConfig.MainExcelFileName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            ResolvedMainExcelFileName = localResolvedMainExcelFileName;
+                        }
+
                         DataUpdateRequiresAppUpdate |= localDataUpdateRequiresAppUpdate;
 
-                        // Sync only the resolved versioned main Excel file first — one exact match
                         RaiseStatus("Checking main data file...");
                         await OnlineServices.SyncFilesAsync(
                             _syncManifest, _dataRoot,
@@ -172,7 +173,6 @@ namespace Handlers.DataHandling
 
             Logger.Info($"Resolved main Excel data file to be used: [{ResolvedMainExcelFileName}]");
 
-            // Load main Excel now — HardwareBoards is populated from this point on
             RaiseStatus("Loading hardware definitions...");
             await Task.Run(LoadMainExcel);
 
@@ -182,17 +182,20 @@ namespace Handlers.DataHandling
 #endif
                 if (_syncManifest != null && HardwareBoards.Count > 0)
                 {
-                    // Build an exact set of board Excel paths from the loaded hardware list —
-                    // this is a handful of files, not a broad extension scan of the full manifest
                     var boardExcelFiles = HardwareBoards
-                        .Select(e => e.ExcelDataFile)
-                        .Where(f => !string.IsNullOrWhiteSpace(f))
+                        .Select(entry => thisNormalizeRelativePath(entry.ExcelDataFile))
+                        .Where(path => !string.IsNullOrWhiteSpace(path))
                         .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
                     RaiseStatus("Checking board Excel data files...");
                     await OnlineServices.SyncFilesAsync(
                         _syncManifest, _dataRoot,
-                        f => boardExcelFiles.Contains(f),
+                        file =>
+                        {
+                            string normalizedFile = thisNormalizeRelativePath(file);
+                            return boardExcelFiles.Contains(normalizedFile) &&
+                                   !thisIsProtectedContributionFile(normalizedFile);
+                        },
                         RaiseStatus, RaiseFileDownload,
                         label: "board Excel data files");
                 }
@@ -220,7 +223,12 @@ namespace Handlers.DataHandling
 
             return await OnlineServices.SyncFilesAsync(
                 manifest, _dataRoot,
-                f => !f.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase),
+                file =>
+                {
+                    string normalizedFile = thisNormalizeRelativePath(file);
+                    return !file.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) &&
+                           !thisIsProtectedContributionFile(normalizedFile);
+                },
                 onStatus);
         }
 
@@ -253,10 +261,12 @@ namespace Handlers.DataHandling
                 {
                     ChangedCount = -1,
                     MainExcelChanged = false,
-                    AnyExcelChanged = false
+                    AnyExcelChanged = false,
+                    ProtectedFilesCount = _protectedContributionFiles.Count
                 };
             }
 
+            string localResolvedMainExcelFileName = ResolvedMainExcelFileName;
             bool localDataUpdateRequiresAppUpdate = DataUpdateRequiresAppUpdate;
 
             ReportStatus("Fetching online file manifest...");
@@ -268,7 +278,8 @@ namespace Handlers.DataHandling
                 {
                     ChangedCount = -1,
                     MainExcelChanged = false,
-                    AnyExcelChanged = false
+                    AnyExcelChanged = false,
+                    ProtectedFilesCount = _protectedContributionFiles.Count
                 };
             }
 
@@ -282,22 +293,29 @@ namespace Handlers.DataHandling
             await OnlineServices.SyncFilesAsync(
                 manifest,
                 string.Empty,
-                f =>
+                file =>
                 {
-                    onlineFileNames.Add(f);
+                    onlineFileNames.Add(file);
                     return false;
                 },
                 null,
                 null);
 
             DetermineResolvedMainExcel(onlineFileNames);
+
+            if (!string.IsNullOrWhiteSpace(localResolvedMainExcelFileName) &&
+                !string.Equals(localResolvedMainExcelFileName, AppConfig.MainExcelFileName, StringComparison.OrdinalIgnoreCase))
+            {
+                ResolvedMainExcelFileName = localResolvedMainExcelFileName;
+            }
+
             DataUpdateRequiresAppUpdate |= localDataUpdateRequiresAppUpdate;
 
             ReportStatus("Checking main data file...");
             int mainExcelChangedCount = await OnlineServices.SyncFilesAsync(
                 manifest,
                 _dataRoot,
-                f => string.Equals(f, ResolvedMainExcelFileName, StringComparison.OrdinalIgnoreCase),
+                file => string.Equals(file, ResolvedMainExcelFileName, StringComparison.OrdinalIgnoreCase),
                 ReportStatus,
                 ReportFile,
                 label: "Main Excel data file");
@@ -310,20 +328,25 @@ namespace Handlers.DataHandling
             await Task.Run(LoadMainExcel);
 
             var boardExcelFiles = HardwareBoards
-                .Select(e => e.ExcelDataFile)
-                .Where(f => !string.IsNullOrWhiteSpace(f))
+                .Select(entry => thisNormalizeRelativePath(entry.ExcelDataFile))
+                .Where(path => !string.IsNullOrWhiteSpace(path))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             ReportStatus("Checking remaining data files...");
             int remainingChangedCount = await OnlineServices.SyncFilesAsync(
                 manifest,
                 _dataRoot,
-                f =>
-                    !string.Equals(f, ResolvedMainExcelFileName, StringComparison.OrdinalIgnoreCase) &&
-                    (
-                        boardExcelFiles.Contains(f) ||
-                        !f.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)
-                    ),
+                file =>
+                {
+                    string normalizedFile = thisNormalizeRelativePath(file);
+
+                    return !string.Equals(file, ResolvedMainExcelFileName, StringComparison.OrdinalIgnoreCase) &&
+                           !thisIsProtectedContributionFile(normalizedFile) &&
+                           (
+                               boardExcelFiles.Contains(normalizedFile) ||
+                               !file.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)
+                           );
+                },
                 ReportStatus,
                 filePath =>
                 {
@@ -348,7 +371,8 @@ namespace Handlers.DataHandling
             {
                 ChangedCount = changedCount,
                 MainExcelChanged = mainExcelChanged,
-                AnyExcelChanged = anyExcelChanged
+                AnyExcelChanged = anyExcelChanged,
+                ProtectedFilesCount = _protectedContributionFiles.Count
             };
         }
 
@@ -418,6 +442,102 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
+        // Rebuilds the protected user-contribution file set for the currently resolved data files
+        // without changing the already loaded runtime lists used by the UI.
+        // ###########################################################################################
+        public static void LoadProtectedContributionStateForCurrentData()
+        {
+            if (string.IsNullOrWhiteSpace(_dataRoot) || string.IsNullOrWhiteSpace(ResolvedMainExcelFileName))
+            {
+                _protectedContributionFiles.Clear();
+                return;
+            }
+
+            string mainExcelPath = Path.Combine(_dataRoot, ResolvedMainExcelFileName);
+            if (!File.Exists(mainExcelPath))
+            {
+                _protectedContributionFiles.Clear();
+                return;
+            }
+
+            string userContributionRelativePath = thisGetUserContributionMainExcelRelativePath();
+            if (string.IsNullOrWhiteSpace(userContributionRelativePath))
+            {
+                _protectedContributionFiles.Clear();
+                return;
+            }
+
+            string userContributionFullPath = Path.Combine(_dataRoot, userContributionRelativePath.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(userContributionFullPath))
+            {
+                _protectedContributionFiles.Clear();
+                return;
+            }
+
+            var protectedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            protectedFiles.Add(thisNormalizeRelativePath(userContributionRelativePath));
+
+            var contributionEntries = thisReadHardwareBoardEntriesFromWorkbook(userContributionFullPath);
+
+            foreach (var contributionEntry in contributionEntries)
+            {
+                string normalizedBoardExcelFile = thisNormalizeRelativePath(contributionEntry.ExcelDataFile);
+                if (string.IsNullOrWhiteSpace(normalizedBoardExcelFile))
+                {
+                    continue;
+                }
+
+                protectedFiles.Add(normalizedBoardExcelFile);
+
+                string boardExcelFullPath = Path.Combine(_dataRoot, normalizedBoardExcelFile.Replace('/', Path.DirectorySeparatorChar));
+                string boardJsonRelativePath = thisNormalizeRelativePath(Path.ChangeExtension(normalizedBoardExcelFile, ".json") ?? string.Empty);
+
+                if (!string.IsNullOrWhiteSpace(boardJsonRelativePath))
+                {
+                    protectedFiles.Add(boardJsonRelativePath);
+                }
+
+                if (!File.Exists(boardExcelFullPath))
+                {
+                    continue;
+                }
+
+                foreach (string referencedFile in BoardDataReader.CollectReferencedLocalFiles(boardExcelFullPath))
+                {
+                    string normalizedReferencedFile = thisNormalizeRelativePath(referencedFile);
+                    if (!string.IsNullOrWhiteSpace(normalizedReferencedFile))
+                    {
+                        protectedFiles.Add(normalizedReferencedFile);
+                    }
+                }
+
+                string boardDirectory = Path.GetDirectoryName(boardExcelFullPath) ?? string.Empty;
+                string kiCadDirectory = Path.Combine(boardDirectory, "KiCad data");
+
+                if (Directory.Exists(kiCadDirectory))
+                {
+                    foreach (string kiCadFile in Directory.EnumerateFiles(kiCadDirectory, "*", SearchOption.AllDirectories))
+                    {
+                        string relativeKiCadFile = Path.GetRelativePath(_dataRoot, kiCadFile);
+                        string normalizedKiCadFile = thisNormalizeRelativePath(relativeKiCadFile);
+
+                        if (!string.IsNullOrWhiteSpace(normalizedKiCadFile))
+                        {
+                            protectedFiles.Add(normalizedKiCadFile);
+                        }
+                    }
+                }
+            }
+
+            _protectedContributionFiles.Clear();
+
+            foreach (string protectedFile in protectedFiles)
+            {
+                _protectedContributionFiles.Add(protectedFile);
+            }
+        }
+
+        // ###########################################################################################
         // Parses --data-root from args, or falls back to a persistent AppData folder that survives
         // Velopack updates (which replace the install directory but leave AppData untouched).
         // ###########################################################################################
@@ -437,9 +557,14 @@ namespace Handlers.DataHandling
         // Reads hardware, board, and oscilloscope definitions from the main Excel file.
         // Column positions are resolved by header name so reordering columns is handled gracefully.
         // Hardware name is carried forward across rows where the cell is empty (merged cell pattern).
+        // Also loads an optional "_UserContribution" sidecar workbook and protects its files from sync.
         // ###########################################################################################
         private static void LoadMainExcel()
         {
+            HardwareBoards = new List<HardwareBoardEntry>();
+            Oscilloscopes = new List<OscilloscopeEntry>();
+            _protectedContributionFiles.Clear();
+
             if (string.IsNullOrEmpty(ResolvedMainExcelFileName))
             {
                 Logger.Warning("No compatible main Excel data file matched the current application version");
@@ -509,6 +634,91 @@ namespace Handlers.DataHandling
                         ExcelDataFile = excelFile,
                         HardwareNotes = notes
                     });
+                }
+
+                string userContributionRelativePath = thisGetUserContributionMainExcelRelativePath();
+                if (!string.IsNullOrWhiteSpace(userContributionRelativePath))
+                {
+                    string userContributionFullPath = Path.Combine(_dataRoot, userContributionRelativePath.Replace('/', Path.DirectorySeparatorChar));
+
+                    if (File.Exists(userContributionFullPath))
+                    {
+                        var contributionEntries = thisReadHardwareBoardEntriesFromWorkbook(userContributionFullPath);
+
+                        if (contributionEntries.Count > 0)
+                        {
+                            var existingKeys = new HashSet<string>(
+                                entries.Select(entry => $"{entry.HardwareName}|{entry.BoardName}"),
+                                StringComparer.OrdinalIgnoreCase);
+
+                            foreach (var contributionEntry in contributionEntries)
+                            {
+                                string identity = $"{contributionEntry.HardwareName}|{contributionEntry.BoardName}";
+                                if (existingKeys.Add(identity))
+                                {
+                                    entries.Add(contributionEntry);
+                                }
+                                else
+                                {
+                                    Logger.Warning($"Duplicate hardware/board entry skipped from user contribution file: [{contributionEntry.HardwareName}] / [{contributionEntry.BoardName}]");
+                                }
+                            }
+
+                            _protectedContributionFiles.Add(thisNormalizeRelativePath(userContributionRelativePath));
+
+                            foreach (var contributionEntry in contributionEntries)
+                            {
+                                string normalizedBoardExcelFile = thisNormalizeRelativePath(contributionEntry.ExcelDataFile);
+                                if (string.IsNullOrWhiteSpace(normalizedBoardExcelFile))
+                                {
+                                    continue;
+                                }
+
+                                _protectedContributionFiles.Add(normalizedBoardExcelFile);
+
+                                string boardExcelFullPath = Path.Combine(_dataRoot, normalizedBoardExcelFile.Replace('/', Path.DirectorySeparatorChar));
+                                string boardJsonRelativePath = thisNormalizeRelativePath(Path.ChangeExtension(normalizedBoardExcelFile, ".json") ?? string.Empty);
+                                if (!string.IsNullOrWhiteSpace(boardJsonRelativePath))
+                                {
+                                    _protectedContributionFiles.Add(boardJsonRelativePath);
+                                }
+
+                                if (!File.Exists(boardExcelFullPath))
+                                {
+                                    Logger.Warning($"User contribution board Excel file not found while building protection list: [{boardExcelFullPath}]");
+                                    continue;
+                                }
+
+                                foreach (string referencedFile in BoardDataReader.CollectReferencedLocalFiles(boardExcelFullPath))
+                                {
+                                    string normalizedReferencedFile = thisNormalizeRelativePath(referencedFile);
+                                    if (!string.IsNullOrWhiteSpace(normalizedReferencedFile))
+                                    {
+                                        _protectedContributionFiles.Add(normalizedReferencedFile);
+                                    }
+                                }
+
+                                string boardDirectory = Path.GetDirectoryName(boardExcelFullPath) ?? string.Empty;
+                                string kiCadDirectory = Path.Combine(boardDirectory, "KiCad data");
+
+                                if (Directory.Exists(kiCadDirectory))
+                                {
+                                    foreach (string kiCadFile in Directory.EnumerateFiles(kiCadDirectory, "*", SearchOption.AllDirectories))
+                                    {
+                                        string relativeKiCadFile = Path.GetRelativePath(_dataRoot, kiCadFile);
+                                        string normalizedKiCadFile = thisNormalizeRelativePath(relativeKiCadFile);
+                                        if (!string.IsNullOrWhiteSpace(normalizedKiCadFile))
+                                        {
+                                            _protectedContributionFiles.Add(normalizedKiCadFile);
+                                        }
+                                    }
+                                }
+                            }
+
+                            Logger.Info($"Loaded [{contributionEntries.Count}] hardware/board entries from user contribution file [{userContributionRelativePath}]");
+                            Logger.Info($"Protected contribution files=[{_protectedContributionFiles.Count}]");
+                        }
+                    }
                 }
 
                 HardwareBoards = entries;
@@ -594,7 +804,7 @@ namespace Handlers.DataHandling
             {
                 Logger.Warning($"Failed to load main Excel data file - [{ex.Message}]");
             }
-        }                
+        }
 
         // ###########################################################################################
         // Lazily loads and caches all sheets from the board-specific Excel file linked to the entry.
@@ -675,5 +885,121 @@ namespace Handlers.DataHandling
         // Fires the FileDownloadChanged event with the given file path.
         // ###########################################################################################
         private static void RaiseFileDownload(string filePath) => FileDownloadChanged?.Invoke(filePath);
+
+        // ###########################################################################################
+        // Resolves the optional user contribution sidecar main Excel file for the active main workbook.
+        // ###########################################################################################
+        private static string thisGetUserContributionMainExcelRelativePath()
+        {
+            if (string.IsNullOrWhiteSpace(ResolvedMainExcelFileName))
+            {
+                return string.Empty;
+            }
+
+            string directory = Path.GetDirectoryName(ResolvedMainExcelFileName) ?? string.Empty;
+            string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(ResolvedMainExcelFileName);
+            string extension = Path.GetExtension(ResolvedMainExcelFileName);
+
+            string contributionFileName = $"{fileNameWithoutExtension}_UserContribution{extension}";
+            string relativePath = string.IsNullOrWhiteSpace(directory)
+                ? contributionFileName
+                : Path.Combine(directory, contributionFileName);
+
+            return thisNormalizeRelativePath(relativePath);
+        }
+
+        // ###########################################################################################
+        // Reads hardware and board entries from a main-format Excel workbook.
+        // ###########################################################################################
+        private static List<HardwareBoardEntry> thisReadHardwareBoardEntriesFromWorkbook(string excelPath)
+        {
+            var entries = new List<HardwareBoardEntry>();
+
+            ExcelPackage.License.SetNonCommercialPersonal("Dennis Helligsø");
+
+            try
+            {
+                using var stream = new FileStream(excelPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var package = new ExcelPackage(stream);
+                var sheet = package.Workbook.Worksheets[SheetHardwareBoard];
+
+                if (sheet == null)
+                {
+                    Logger.Warning($"Sheet [{SheetHardwareBoard}] not found in user contribution main Excel file");
+                    return entries;
+                }
+
+                var hardwareRequiredCols = new[] { ColHardwareName, ColBoardName, ColExcelDataFile, ColHardwareNotes };
+                var colMap = FindHeaderRow(sheet, hardwareRequiredCols, out int headerRow);
+
+                if (colMap == null)
+                {
+                    Logger.Warning($"Header row not found in user contribution [{SheetHardwareBoard}] sheet");
+                    return entries;
+                }
+
+                int maxRow = sheet.Dimension?.End.Row ?? 0;
+                string lastHwName = string.Empty;
+
+                for (int row = headerRow + 1; row <= maxRow; row++)
+                {
+                    string hardwareName = GetCellText(sheet, row, colMap[ColHardwareName]);
+                    string boardName = GetCellText(sheet, row, colMap[ColBoardName]);
+                    string excelFile = GetCellText(sheet, row, colMap[ColExcelDataFile]);
+                    string notes = GetCellText(sheet, row, colMap[ColHardwareNotes]);
+
+                    if (!string.IsNullOrWhiteSpace(hardwareName))
+                    {
+                        lastHwName = hardwareName;
+                    }
+                    else
+                    {
+                        hardwareName = lastHwName;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(boardName) && string.IsNullOrWhiteSpace(excelFile))
+                    {
+                        continue;
+                    }
+
+                    entries.Add(new HardwareBoardEntry
+                    {
+                        HardwareName = hardwareName,
+                        BoardName = boardName,
+                        ExcelDataFile = excelFile,
+                        HardwareNotes = notes
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to read user contribution main Excel file [{excelPath}] - [{ex.Message}]");
+            }
+
+            return entries;
+        }
+
+        // ###########################################################################################
+        // Normalizes a relative manifest or workbook path for comparison.
+        // ###########################################################################################
+        private static string thisNormalizeRelativePath(string path)
+        {
+            return string.IsNullOrWhiteSpace(path)
+                ? string.Empty
+                : path.Trim().Replace('\\', '/').TrimStart('/');
+        }
+
+        // ###########################################################################################
+        // Returns whether a relative file path belongs to protected user contribution data.
+        // ###########################################################################################
+        private static bool thisIsProtectedContributionFile(string relativePath)
+        {
+            return !string.IsNullOrWhiteSpace(relativePath) &&
+                   _protectedContributionFiles.Contains(thisNormalizeRelativePath(relativePath));
+        }
+
+
+
+
     }
 }

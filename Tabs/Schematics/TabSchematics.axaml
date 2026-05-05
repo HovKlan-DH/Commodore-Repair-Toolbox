@@ -303,12 +303,12 @@
 											PointerPressed="OnGlobalShowOppositeSideTracesRowClicked">
 									<Viewbox Width="20" Height="20" IsHitTestVisible="False">
 										<CheckBox x:Name="CheckGlobalShowOppositeSideTraces"
-												  MinHeight="0"
-												  Margin="0"
-												  Padding="0"
-												  CornerRadius="2"
-												  IsChecked="False"
-												  IsHitTestVisible="False" />
+											  MinHeight="0"
+											  Margin="0"
+											  Padding="0"
+											  CornerRadius="2"
+											  IsChecked="True"
+											  IsHitTestVisible="False" />
 									</Viewbox>
 									<TextBlock Text="Show traces from opposite side"
 											   FontSize="11"

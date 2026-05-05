@@ -25,9 +25,10 @@ namespace Handlers.DataHandling
         private const string ColSchematicName = "Schematic name";
         private const string ColCadName = "CAD name";
         private const string ColSchematicImageFile = "Schematic image file";
-        private const string ColMainImageHighlightColor = "Main image highlight color";
-        private const string ColMainHighlightOpacity = "Main highlight opacity";
-        private const string ColThumbnailImageHighlightColor = "Thumbnail image highlight color";
+        private const string ColSchematicHighlightColor = "Schematic highlight color";
+        private const string ColSchematicHighlightOpacity = "Schematic highlight opacity";
+        private const string ColOppositeTraceHighlightColor = "Opposite trace highlight color";
+        private const string ColThumbnailHighlightColor = "Thumbnail highlight color";
         private const string ColThumbnailHighlightOpacity = "Thumbnail highlight opacity";
 
         // Shared columns
@@ -263,6 +264,8 @@ namespace Handlers.DataHandling
         // ###########################################################################################
         // Maps board schematic rows from Excel into the runtime schematic model.
         // KiCad calibration is no longer read from Excel and is instead loaded from the board JSON file.
+        // Opposite trace highlight opacity is no longer loaded from Excel and now follows the main
+        // schematic highlight opacity behavior in the renderer.
         // ###########################################################################################
         private static List<BoardSchematicEntry> MapSchematics(List<Dictionary<string, string>> rows)
             => rows.Select(r => new BoardSchematicEntry
@@ -271,9 +274,10 @@ namespace Handlers.DataHandling
                 SchematicName = Val(r, ColSchematicName),
                 CadName = Val(r, ColCadName),
                 SchematicImageFile = Val(r, ColSchematicImageFile),
-                MainImageHighlightColor = Val(r, ColMainImageHighlightColor),
-                MainHighlightOpacity = Val(r, ColMainHighlightOpacity),
-                ThumbnailImageHighlightColor = Val(r, ColThumbnailImageHighlightColor),
+                SchematicHighlightColor = Val(r, ColSchematicHighlightColor),
+                SchematicHighlightOpacity = Val(r, ColSchematicHighlightOpacity),
+                OppositeTraceHighlightColor = Val(r, ColOppositeTraceHighlightColor),
+                ThumbnailHighlightColor = Val(r, ColThumbnailHighlightColor),
                 ThumbnailHighlightOpacity = Val(r, ColThumbnailHighlightOpacity)
             }).ToList();
 
@@ -392,5 +396,113 @@ namespace Handlers.DataHandling
         // ###########################################################################################
         private static string GetCellText(ExcelWorksheet sheet, int row, int col)
             => sheet.Cells[row, col].Text?.Trim() ?? string.Empty;
+    
+
+        // ###########################################################################################
+        // Collects all relative local file paths referenced by the board workbook so contributed
+        // board assets can be protected from online overwrite.
+        // ###########################################################################################
+        public static HashSet<string> CollectReferencedLocalFiles(string excelPath)
+        {
+            var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (string.IsNullOrWhiteSpace(excelPath) || !File.Exists(excelPath))
+            {
+                return files;
+            }
+
+            ExcelPackage.License.SetNonCommercialPersonal("Dennis Helligsø");
+
+            try
+            {
+                using var stream = new FileStream(excelPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var package = new ExcelPackage(stream);
+
+                foreach (var row in ReadSheetRows(package, excelPath, SheetBoardSchematics, SchematicsHeaders))
+                {
+                    string file = thisNormalizeRelativePath(Val(row, ColSchematicImageFile));
+                    if (!string.IsNullOrWhiteSpace(file))
+                    {
+                        files.Add(file);
+                    }
+                }
+
+                foreach (var row in ReadSheetRows(package, excelPath, SheetComponentImages, ComponentImagesHeaders))
+                {
+                    string file = thisNormalizeRelativePath(Val(row, ColFile));
+                    if (!string.IsNullOrWhiteSpace(file))
+                    {
+                        files.Add(file);
+                    }
+                }
+
+                foreach (var row in ReadSheetRows(package, excelPath, SheetComponentLocalFiles, ComponentLocalFilesHeaders))
+                {
+                    string file = thisNormalizeRelativePath(Val(row, ColFile));
+                    if (!string.IsNullOrWhiteSpace(file))
+                    {
+                        files.Add(file);
+                    }
+                }
+
+                foreach (var row in ReadSheetRows(package, excelPath, SheetBoardLocalFiles, BoardLocalFilesHeaders))
+                {
+                    string file = thisNormalizeRelativePath(Val(row, ColFile));
+                    if (!string.IsNullOrWhiteSpace(file))
+                    {
+                        files.Add(file);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to collect referenced local files from board Excel file [{excelPath}] - [{ex.Message}]");
+            }
+
+            return files;
+        }
+
+        // ###########################################################################################
+        // Adds normalized relative local file paths from one worksheet row collection into the target set.
+        // ###########################################################################################
+        private static void AddReferencedLocalFiles(
+            HashSet<string> files,
+            List<Dictionary<string, string>> rows,
+            string fileColumnName)
+        {
+            foreach (var row in rows)
+            {
+                string normalized = NormalizeRelativeFilePath(Val(row, fileColumnName));
+                if (!string.IsNullOrWhiteSpace(normalized))
+                {
+                    files.Add(normalized);
+                }
+            }
+        }
+
+        // ###########################################################################################
+        // Normalizes a relative file path for case-insensitive manifest comparison.
+        // ###########################################################################################
+        private static string NormalizeRelativeFilePath(string path)
+        {
+            return string.IsNullOrWhiteSpace(path)
+                ? string.Empty
+                : path.Trim().Replace('\\', '/').TrimStart('/');
+        }
+
+        // ###########################################################################################
+        // Normalizes a relative file path for comparison with manifest entries.
+        // ###########################################################################################
+        private static string thisNormalizeRelativePath(string path)
+        {
+            return string.IsNullOrWhiteSpace(path)
+                ? string.Empty
+                : path.Trim().Replace('\\', '/').TrimStart('/');
+        }
+
+
+
+
+
     }
 }
