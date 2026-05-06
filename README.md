@@ -35,7 +35,7 @@ It is (for now) primarily dedicated to Commodore, and have several built-in prof
 
 ## Installation and usage
 
-Download the newest normal (non-NETA) _CRT_ version from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), and install it afterwards. The installation folder cannot be set by the user, and is decided by installation system (Avalonia), but in the `Configuration` tab you can open the folder and view where it has its configuration and data files located.
+Download the newest normal (non-BETA) _CRT_ version from [Releases](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/releases), and install it afterwards. The installation folder cannot be chosen by the user and is determined by the installation process. In the `Configuration` tab you can open the folder and see where the configuration and data files are stored.
 
 If needed then the `data-root` folder can be changed via a commandline parameter, view [Commandline parameters](#commandline-parameters).
 
@@ -212,7 +212,7 @@ One possibility to contribute data is by submitting it directly to the GitHub re
 - Commit changes to your forked repo and the new branch you have created
 - Create a `Pull Request`
   - Important - **make sure to validate your data before submitting this pull request, as bad data will be declined**
-- Await review
+- Wait for review
 
 There are of course more details to this, but please let me know if this does _not_ work for you.
 
