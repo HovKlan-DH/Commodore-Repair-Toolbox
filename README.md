@@ -35,7 +35,7 @@ It is (for now) primarily dedicated to Commodore, and have several built-in prof
 
 ## Installation and usage
 
-Download the newest normal (non-NETA) _CRT_ version from [Releases](https://github.com/HovKlan-DH/Commodore-Repair-Toolbox/releases), and install it afterwards. The installation folder cannot be set by the user, and is decided by installation system (Avalonia), but in the `Configuration` tab you can open the folder and view where it has its configuration and data files located.
+Download the newest normal (non-BETA) _CRT_ version from [Releases](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/releases), and install it afterwards. The installation folder cannot be set by the user, and is decided by installation system (Avalonia), but in the `Configuration` tab you can open the folder and view where it has its configuration and data files located.
 
 If needed then the `data-root` folder can be changed via a commandline parameter, view [Commandline parameters](#commandline-parameters).
 
