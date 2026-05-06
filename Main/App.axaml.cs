@@ -68,6 +68,7 @@ namespace CRT
         // URL to the JSON manifest listing all data files and their SHA-256 checksums.
         // Used by: OnlineServices.FetchManifestAsync
         public const string ChecksumsUrl = "https://classic-repair-toolbox.dk/app-data/dataChecksums.json";
+        public const string ChecksumsUrl_test = "https://classic-repair-toolbox.dk/app-data-TEST/dataChecksums.json";
 
         // URL for the phone-home version check endpoint.
         // Used by: OnlineServices.CheckInVersionAsync
@@ -115,6 +116,10 @@ namespace CRT
         // ###########################################################################################
         public static readonly string AppVersionString = GetAppVersion();
 
+        // ###########################################################################################
+        // Builds the application version string from the executing assembly metadata.
+        // Includes the revision component only when it is explicitly greater than zero.
+        // ###########################################################################################
         private static string GetAppVersion()
         {
             var version = Assembly.GetExecutingAssembly().GetName().Version;
@@ -131,10 +136,44 @@ namespace CRT
                 : $"{version.Major}.{version.Minor}.{version.Build}";
         }
 
+        // ###########################################################################################
+        // Returns true when the application was compiled as a DEBUG build.
+        // RELEASE builds always report false here.
+        // ###########################################################################################
+        public static bool IsDebugBuild
+        {
+            get
+            {
+#if DEBUG
+                return true;
+#else
+                return false;
+#endif
+            }
+        }
+
+        // ###########################################################################################
+        // Returns the effective checksum manifest URL for the current build and user setting.
+        // RELEASE builds always use the production source, while DEBUG builds may opt into TEST.
+        // ###########################################################################################
+        public static string GetChecksumsUrl()
+        {
+#if DEBUG
+            return UserSettings.DownloadDataFromTestSource
+                ? ChecksumsUrl_test
+                : ChecksumsUrl;
+#else
+            return ChecksumsUrl;
+#endif
+        }
+
     }
 
     public partial class App : Application
     {
+        // ###########################################################################################
+        // Loads the Avalonia XAML resources for the application instance.
+        // ###########################################################################################
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);

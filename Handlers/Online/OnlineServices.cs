@@ -92,17 +92,30 @@ namespace Handlers.OnlineHandling
             using var http = new HttpClient { Timeout = AppConfig.ApiTimeout };
             http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", OnlineServices.UserAgent);
 
+            Uri trustedManifestUri;
+            try
+            {
+                trustedManifestUri = new Uri(AppConfig.GetChecksumsUrl(), UriKind.Absolute);
+            }
+            catch (Exception ex)
+            {
+                Logger.Critical($"Configured manifest URL is invalid: {ex.Message}");
+                onStatus?.Invoke("Sync failed - see log");
+                return null;
+            }
+
             string json;
             try
             {
-                if (!string.Equals(OnlineServices.TrustedManifestUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(trustedManifestUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
                 {
-                    Logger.Critical($"Manifest URL must use HTTPS: [{OnlineServices.TrustedManifestUri}]");
+                    Logger.Critical($"Manifest URL must use HTTPS: [{trustedManifestUri}]");
                     onStatus?.Invoke("Sync failed - see log");
                     return null;
                 }
 
-                json = await http.GetStringAsync(OnlineServices.TrustedManifestUri);
+                Logger.Info($"Fetching checksum manifest from [{trustedManifestUri}]");
+                json = await http.GetStringAsync(trustedManifestUri);
             }
             catch (Exception ex)
             {
@@ -122,7 +135,7 @@ namespace Handlers.OnlineHandling
                     return null;
                 }
 
-                Logger.Info($"Online source checksum manifest fetched:");
+                Logger.Info($"Online source checksum manifest fetched from [{trustedManifestUri}]:");
                 Logger.Info($"    [{entries.Count}] files available online");
                 return entries;
             }
@@ -415,7 +428,18 @@ namespace Handlers.OnlineHandling
                 return false;
             }
 
-            if (!string.Equals(candidateUri.Authority, OnlineServices.TrustedDownloadAuthority, StringComparison.OrdinalIgnoreCase))
+            string trustedDownloadAuthority;
+            try
+            {
+                trustedDownloadAuthority = new Uri(AppConfig.GetChecksumsUrl(), UriKind.Absolute).Authority;
+            }
+            catch (Exception ex)
+            {
+                failureReason = $"configured manifest URL is invalid: {ex.Message}";
+                return false;
+            }
+
+            if (!string.Equals(candidateUri.Authority, trustedDownloadAuthority, StringComparison.OrdinalIgnoreCase))
             {
                 failureReason = $"download URL authority is not trusted: [{candidateUri.Authority}]";
                 return false;

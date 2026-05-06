@@ -99,6 +99,9 @@ namespace Handlers.DataHandling
         [JsonPropertyName("schematicsImportantSignalsPanelExpanded")] public bool SchematicsImportantSignalsPanelExpanded { get; set; } = true;
         [JsonPropertyName("schematicsShowOppositeSideTraces")] public bool SchematicsShowOppositeSideTraces { get; set; } = true;
         [JsonPropertyName("schematicsShowZones")] public bool SchematicsShowZones { get; set; } = true;
+        [JsonPropertyName("downloadDataFromTestSource")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? DownloadDataFromTestSource { get; set; }
 
     }
 
@@ -204,6 +207,21 @@ namespace Handlers.DataHandling
             { "ComponentPopup_BulletList_Fg", "Red" },
             { "Feedback_TrashIcon_Fg", "IndianRed" }
         };
+
+        public static bool DownloadDataFromTestSource
+        {
+            get => _data.DownloadDataFromTestSource ?? false;
+            set
+            {
+                bool currentValue = _data.DownloadDataFromTestSource ?? false;
+                if (currentValue == value)
+                    return;
+
+                _data.DownloadDataFromTestSource = value;
+                Logger.Info($"Setting changed: [DownloadDataFromTestSource] [{value}]");
+                Save();
+            }
+        }
 
         // ###########################################################################################
         // Returns whether opposite-side PCB traces should be rendered while viewing a PCB replica.
@@ -792,6 +810,7 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [Theme] [{ThemeVariant}]");
                     Logger.Info($"        [OpenMultiplePopups] [{MultipleInstancesForComponentPopup}]");
                     Logger.Info($"        [CheckDataOnLaunch] [{CheckDataOnLaunch}]");
+                    Logger.Info($"        [DownloadDataFromTestSource] [{(AppConfig.IsDebugBuild ? DownloadDataFromTestSource.ToString() : "Release build - forced off")}]");
                     Logger.Info($"        [CheckVersionOnLaunch] [{CheckVersionOnLaunch}]");
                     Logger.Info($"        [AllowBetaNotification] [{ShowDevelopmentVersionNotification}]");
                     Logger.Info($"        [ValidateDataOnLaunch] [{ValidateDataOnLaunch}]");
@@ -1260,19 +1279,23 @@ namespace Handlers.DataHandling
         // Returns whether selected-component trace preview is enabled globally.
         // The board key is ignored and only kept for backward call-site compatibility.
         // ###########################################################################################
+/*
         public static bool GetSchematicsShowTracesOnSelectedComponentForBoard(string boardKey)
         {
             return SchematicsShowTracesOnSelectedComponent;
         }
+*/
 
         // ###########################################################################################
         // Persists whether selected-component trace preview is enabled globally.
         // The board key is ignored and only kept for backward call-site compatibility.
         // ###########################################################################################
+/*
         public static void SetSchematicsShowTracesOnSelectedComponentForBoard(string boardKey, bool enabled)
         {
             SchematicsShowTracesOnSelectedComponent = enabled;
         }
+*/
 
     }
 }

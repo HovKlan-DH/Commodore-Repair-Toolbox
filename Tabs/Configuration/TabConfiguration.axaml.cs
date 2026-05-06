@@ -31,9 +31,15 @@ namespace CRT
             this.ShowDevelopmentVersionNotificationCheckBox.IsChecked = UserSettings.ShowDevelopmentVersionNotification;
             this.MultipleInstancesForComponentPopupCheckBox.IsChecked = UserSettings.MultipleInstancesForComponentPopup;
 
+            this.DownloadDataFromTestSourceCheckBox.IsVisible = AppConfig.IsDebugBuild;
+            this.DownloadDataFromTestSourceCheckBox.IsEnabled = AppConfig.IsDebugBuild;
+            this.DownloadDataFromTestSourceCheckBox.IsChecked =
+                AppConfig.IsDebugBuild && UserSettings.DownloadDataFromTestSource;
+
             this.ThemeVariantComboBox.SelectionChanged += this.OnThemeVariantSelectionChanged;
             this.CheckVersionOnLaunchCheckBox.IsCheckedChanged += this.OnCheckVersionOnLaunchChanged;
             this.CheckDataOnLaunchCheckBox.IsCheckedChanged += this.OnCheckDataOnLaunchChanged;
+            this.DownloadDataFromTestSourceCheckBox.IsCheckedChanged += this.OnDownloadDataFromTestSourceChanged;
             this.ShowDevelopmentVersionNotificationCheckBox.IsCheckedChanged += this.OnShowDevelopmentVersionNotificationChanged;
             this.MultipleInstancesForComponentPopupCheckBox.IsCheckedChanged += this.OnMultipleInstancesForComponentPopupChanged;
         }
@@ -383,6 +389,7 @@ namespace CRT
         // ###########################################################################################
         // Starts an external process with arguments and records diagnostic details for each attempt.
         // ###########################################################################################
+/*
         private static bool TryStartProcess(
             string fileName,
             System.Collections.Generic.List<string> attempts,
@@ -438,7 +445,36 @@ namespace CRT
                 return false;
             }
         }
+*/
 
+        // ###########################################################################################
+        // Persists whether DEBUG builds should fetch data from the TEST manifest source instead of
+        // the production source. When launch-time data sync is enabled, switching source also
+        // performs an immediate refresh so the selected source takes effect right away.
+        // ###########################################################################################
+        private async void OnDownloadDataFromTestSourceChanged(object? sender, RoutedEventArgs e)
+        {
+            if (!AppConfig.IsDebugBuild)
+            {
+                this.DownloadDataFromTestSourceCheckBox.IsChecked = false;
+                this.DownloadDataFromTestSourceCheckBox.IsVisible = false;
+                this.DownloadDataFromTestSourceCheckBox.IsEnabled = false;
+                return;
+            }
+
+            bool isEnabled = this.DownloadDataFromTestSourceCheckBox.IsChecked == true;
+            UserSettings.DownloadDataFromTestSource = isEnabled;
+
+            if (!UserSettings.CheckDataOnLaunch)
+            {
+                return;
+            }
+
+            if (TopLevel.GetTopLevel(this) is Main mainWindow)
+            {
+                await mainWindow.CheckForDataUpdatesNowAsync();
+            }
+        }
 
 
 

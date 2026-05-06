@@ -234,7 +234,7 @@ namespace CRT
         private void ShowMainExcelRequiresAppUpdateBanner()
         {
             this.MainExcelRequiresAppUpdateBannerText.Text =
-                "Newer main Excel data file is available, but requires a newer application version, due to breaking changes - please update the application. No more data updates will be given for this application version, and worst-case is data format will break UI or functionality in a future version.";
+                "Newer main Excel data file is available, but requires a newer application version, due to breaking changes - please update the application. No more data updates will be given for this application version, and worst-case is that future data update will break UI or functionality. Consider yourself informed 😁";
             this.MainExcelRequiresAppUpdateBannerDismissButton.IsEnabled = true;
             this.MainExcelRequiresAppUpdateBanner.IsVisible = true;
         }

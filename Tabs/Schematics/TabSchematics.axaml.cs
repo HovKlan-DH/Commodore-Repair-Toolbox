@@ -7152,10 +7152,12 @@ public partial class TabSchematics : UserControl
     // Renders resolved schematic wire paths for the currently selected normalized net names.
     // Uses a render-only overlay control instead of creating one Polyline control per path.
     // ###########################################################################################
+/*
     private void RenderKiCadSchematicGeometry(KiCadProjectView view)
     {
         this.RenderKiCadSchematicGeometry(view, this.BuildActiveKiCadTracePreviewNetNames());
     }
+*/
 
     // ###########################################################################################
     // Returns the active KiCad calibration for the current schematic.
@@ -13404,15 +13406,17 @@ public partial class TabSchematics : UserControl
     // Returns the current interactive calibration rectangle in image-pixel coordinates.
     // Left can be greater than right and top can be greater than bottom so flip state is preserved.
     // ###########################################################################################
-    private Rect GetCurrentKiCadCalibrationImageRect()
-    {
-        double left = Math.Min(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
-        double right = Math.Max(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
-        double top = Math.Min(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
-        double bottom = Math.Max(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+/*
+        private Rect GetCurrentKiCadCalibrationImageRect()
+        {
+            double left = Math.Min(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+            double right = Math.Max(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
+            double top = Math.Min(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
+            double bottom = Math.Max(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
 
-        return new Rect(left, top, Math.Max(1.0, right - left), Math.Max(1.0, bottom - top));
-    }
+            return new Rect(left, top, Math.Max(1.0, right - left), Math.Max(1.0, bottom - top));
+        }
+*/
 
     // ###########################################################################################
     // Returns true when the pointer is inside the currently visible KiCad calibration rectangle.
