@@ -261,7 +261,7 @@ After a year with _CRT_ and due to several questions about "_is it Windows only_
 ## Screenshots
 
 Main schematics (with a component showing its direct connected traces):
-<img width="900" height="539" alt="image" src="https://github.com/user-attachments/assets/51bcb53c-976f-47c2-a07d-472c40804890" />
+<img width="900" height="539" alt="image" src="https://github.com/user-attachments/assets/c9e7a8e2-e17c-47da-aad7-dddfdb8a1775" />
 
 Overview where a lot of component information is garthered:
 <img width="900" height="539" alt="image" src="https://github.com/user-attachments/assets/4328b95c-b4ec-44e7-ae8c-4824b4023ae0" />
