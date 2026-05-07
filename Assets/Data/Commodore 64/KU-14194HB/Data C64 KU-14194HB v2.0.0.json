@@ -4560,5 +4560,34 @@
         }
       ]
     }
+  },
+  "KiCad calibration points": {
+    "Top (replica)": {
+      "CadName": "KU-14194HB-REV-B-KiCad - PCB Top",
+      "OffsetX": 75.58788497532751,
+      "OffsetY": 448.22970903522156,
+      "ScaleX": 0.977072315807385,
+      "ScaleY": 0.8377939411727116,
+      "MirrorX": false,
+      "MirrorY": false
+    },
+    "Bottom (replica)": {
+      "CadName": "KU-14194HB-REV-B-KiCad - PCB Bottom",
+      "OffsetX": 60.95729113493158,
+      "OffsetY": 447.933979921729,
+      "ScaleX": 0.977270376042199,
+      "ScaleY": 0.8340529050666874,
+      "MirrorX": true,
+      "MirrorY": false
+    },
+    "Schematics (replica)": {
+      "CadName": "Sheet1",
+      "OffsetX": 622.4465997390961,
+      "OffsetY": 516.1600022687314,
+      "ScaleX": 0.8586031228843782,
+      "ScaleY": 0.8451201451907093,
+      "MirrorX": false,
+      "MirrorY": false
+    }
   }
 }

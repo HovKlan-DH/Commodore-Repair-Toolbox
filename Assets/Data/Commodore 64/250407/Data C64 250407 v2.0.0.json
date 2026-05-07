@@ -7062,5 +7062,43 @@
         }
       ]
     }
+  },
+  "KiCad calibration points": {
+    "Top (replica)": {
+      "CadName": "250407_ - PCB Top",
+      "OffsetX": 50.87193460490473,
+      "OffsetY": 451.9972752043597,
+      "ScaleX": 0.9769080633767282,
+      "ScaleY": 0.812766517468314,
+      "MirrorX": false,
+      "MirrorY": false
+    },
+    "Bottom (replica)": {
+      "CadName": "250407_ - PCB Bottom",
+      "OffsetX": 64.74144716924127,
+      "OffsetY": 449.7266121707535,
+      "ScaleX": 0.9767832677364009,
+      "ScaleY": 0.8107714402071144,
+      "MirrorX": true,
+      "MirrorY": false
+    },
+    "Schematics #1 of 2": {
+      "CadName": "250407_",
+      "OffsetX": 441.74793524942163,
+      "OffsetY": 513.3131813676908,
+      "ScaleX": 0.8691138703930692,
+      "ScaleY": 0.8541457959446066,
+      "MirrorX": false,
+      "MirrorY": false
+    },
+    "Schematics #2 of 2": {
+      "CadName": "250407_sheet2",
+      "OffsetX": 250.04228609184025,
+      "OffsetY": 557.6288954960908,
+      "ScaleX": 0.9138416075183713,
+      "ScaleY": 0.7856855831223194,
+      "MirrorX": false,
+      "MirrorY": false
+    }
   }
 }

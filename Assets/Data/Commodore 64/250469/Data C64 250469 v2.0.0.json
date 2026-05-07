@@ -4336,5 +4336,34 @@
         }
       ]
     }
+  },
+  "KiCad calibration points": {
+    "KiCAD replica; Top": {
+      "CadName": "C64-250469-KiCad - PCB Top",
+      "OffsetX": 51.893081761006385,
+      "OffsetY": 447.9056603773586,
+      "ScaleX": 0.9772445220902244,
+      "ScaleY": 0.766022549917533,
+      "MirrorX": false,
+      "MirrorY": false
+    },
+    "KiCAD replica; Bottom": {
+      "CadName": "C64-250469-KiCad - PCB Bottom",
+      "OffsetX": 61.823899371069274,
+      "OffsetY": 451.1823899371068,
+      "ScaleX": 0.9775993514150945,
+      "ScaleY": 0.7670552231071739,
+      "MirrorX": true,
+      "MirrorY": false
+    },
+    "KiCAD schematics": {
+      "CadName": "C64-250469-KiCad",
+      "OffsetX": 326.82739343116714,
+      "OffsetY": 457.842068483578,
+      "ScaleX": 0.9041682972280455,
+      "ScaleY": 0.857343978327068,
+      "MirrorX": false,
+      "MirrorY": false
+    }
   }
 }
