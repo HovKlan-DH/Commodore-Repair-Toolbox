@@ -49,7 +49,6 @@ namespace Handlers.DataHandling
         private static List<DataFileEntry>? _syncManifest;
 
         public static string DataRoot => _dataRoot;
-        //        public static List<HardwareBoardEntry> HardwareBoards { get; private set; } = [];
         public static List<HardwareBoardEntry> HardwareBoards { get; private set; } = new(); // compliant with .NET6
         public static List<OscilloscopeEntry> Oscilloscopes { get; private set; } = new();
 
