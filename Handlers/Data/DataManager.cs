@@ -77,6 +77,178 @@ namespace Handlers.DataHandling
             public int ProtectedFilesCount { get; init; }
         }
 
+        private sealed class MainExcelResolution
+        {
+            public string FileName { get; init; } = string.Empty;
+            public bool RequiresAppUpdate { get; init; }
+            public string SourceDescription { get; init; } = string.Empty;
+        }
+
+        // ###########################################################################################
+        // Resolves the best main Excel file from a file list, preferring the newest compatible
+        // versioned file and optionally falling back to the legacy unversioned file name.
+        // ###########################################################################################
+        private static MainExcelResolution ResolveMainExcelCandidate(
+            IEnumerable<string> availableFiles,
+            bool allowSyntheticLegacyFallback,
+            string sourceDescription)
+        {
+            Version appVersion = Version.TryParse(AppConfig.AppVersionString, out var parsedVersion)
+                ? parsedVersion
+                : new Version(0, 0, 0, 0);
+
+            Version? bestCompatibleVersion = null;
+            string bestCompatibleFile = string.Empty;
+            string legacyFile = string.Empty;
+            bool newerExists = false;
+
+            foreach (string rawPath in availableFiles ?? Enumerable.Empty<string>())
+            {
+                if (string.IsNullOrWhiteSpace(rawPath))
+                {
+                    continue;
+                }
+
+                string normalizedPath = thisNormalizeRelativePath(rawPath);
+                string fileName = Path.GetFileName(normalizedPath);
+
+                if (string.Equals(fileName, AppConfig.MainExcelFileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    legacyFile = normalizedPath;
+                }
+
+                if (!fileName.StartsWith(AppConfig.MainExcelFileNamePrefix, StringComparison.OrdinalIgnoreCase) ||
+                    !fileName.EndsWith(AppConfig.MainExcelFileSuffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string versionPart = fileName.Substring(
+                    AppConfig.MainExcelFileNamePrefix.Length,
+                    fileName.Length - AppConfig.MainExcelFileNamePrefix.Length - AppConfig.MainExcelFileSuffix.Length);
+
+                if (!Version.TryParse(versionPart, out Version? fileVersion))
+                {
+                    continue;
+                }
+
+                if (fileVersion <= appVersion)
+                {
+                    if (bestCompatibleVersion == null || fileVersion > bestCompatibleVersion)
+                    {
+                        bestCompatibleVersion = fileVersion;
+                        bestCompatibleFile = normalizedPath;
+                    }
+                }
+                else
+                {
+                    newerExists = true;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(bestCompatibleFile))
+            {
+                return new MainExcelResolution
+                {
+                    FileName = bestCompatibleFile,
+                    RequiresAppUpdate = newerExists,
+                    SourceDescription = sourceDescription
+                };
+            }
+
+            if (!string.IsNullOrWhiteSpace(legacyFile))
+            {
+                return new MainExcelResolution
+                {
+                    FileName = legacyFile,
+                    RequiresAppUpdate = newerExists,
+                    SourceDescription = sourceDescription
+                };
+            }
+
+            if (allowSyntheticLegacyFallback)
+            {
+                return new MainExcelResolution
+                {
+                    FileName = AppConfig.MainExcelFileName,
+                    RequiresAppUpdate = newerExists,
+                    SourceDescription = sourceDescription
+                };
+            }
+
+            return new MainExcelResolution
+            {
+                FileName = string.Empty,
+                RequiresAppUpdate = newerExists,
+                SourceDescription = sourceDescription
+            };
+        }
+
+        // ###########################################################################################
+        // Applies the selected main Excel resolution to runtime state and emits a detailed log line.
+        // ###########################################################################################
+        private static void ApplyMainExcelResolution(MainExcelResolution resolution, string context)
+        {
+            ResolvedMainExcelFileName = resolution.FileName;
+            DataUpdateRequiresAppUpdate = resolution.RequiresAppUpdate;
+
+            Logger.Info(
+                $"Main Excel resolution [{context}] source=[{resolution.SourceDescription}] file=[{(string.IsNullOrWhiteSpace(resolution.FileName) ? "none" : resolution.FileName)}] requires_app_update=[{resolution.RequiresAppUpdate}]");
+        }
+
+        // ###########################################################################################
+        // Returns whether the given relative data file currently exists inside the data root.
+        // ###########################################################################################
+        private static bool DoesRelativeDataFileExist(string relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(_dataRoot) || string.IsNullOrWhiteSpace(relativePath))
+            {
+                return false;
+            }
+
+            string fullPath = Path.Combine(_dataRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            return File.Exists(fullPath);
+        }
+
+        // ###########################################################################################
+        // Ensures the selected main Excel exists locally after sync and falls back to the local
+        // cached candidate only when the preferred online candidate could not be obtained.
+        // ###########################################################################################
+        private static MainExcelResolution EnsureUsableMainExcelAfterSync(
+            MainExcelResolution preferredResolution,
+            MainExcelResolution localFallbackResolution,
+            string context,
+            Action<string>? onStatus = null)
+        {
+            if (!string.IsNullOrWhiteSpace(preferredResolution.FileName) &&
+                DoesRelativeDataFileExist(preferredResolution.FileName))
+            {
+                return preferredResolution;
+            }
+
+            if (!string.IsNullOrWhiteSpace(localFallbackResolution.FileName) &&
+                DoesRelativeDataFileExist(localFallbackResolution.FileName) &&
+                !string.Equals(localFallbackResolution.FileName, preferredResolution.FileName, StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.Warning(
+                    $"Resolved main Excel file [{preferredResolution.FileName}] was not available after sync - falling back to local cached [{localFallbackResolution.FileName}] in [{context}]");
+
+                onStatus?.Invoke("Latest main data file could not be downloaded - using local cached data");
+
+                return new MainExcelResolution
+                {
+                    FileName = localFallbackResolution.FileName,
+                    RequiresAppUpdate = preferredResolution.RequiresAppUpdate || localFallbackResolution.RequiresAppUpdate,
+                    SourceDescription = $"local fallback after failed online sync ({context})"
+                };
+            }
+
+            Logger.Warning(
+                $"Resolved main Excel file [{preferredResolution.FileName}] was not available after sync and no usable local fallback existed in [{context}]");
+
+            return preferredResolution;
+        }
+
         // ###########################################################################################
         // Resolves the data root, ensures the folder exists, syncs all Excel files against the
         // online manifest, then loads hardware definitions. Images are left for SyncRemainingAsync.
@@ -86,11 +258,13 @@ namespace Handlers.DataHandling
             Logger.Info(args.Length > 0
                 ? $"Commandline parameters: [{string.Join(" ", args)}]"
                 : "No commandline parameters given");
+
             _dataRoot = ResolveDataRoot(args);
             Logger.Info($"Data root is [{_dataRoot}]");
 
             bool isNewRoot = !Directory.Exists(_dataRoot);
             Directory.CreateDirectory(_dataRoot);
+
             if (isNewRoot)
             {
                 var bundledData = Path.Combine(AppContext.BaseDirectory, "Data");
@@ -113,13 +287,16 @@ namespace Handlers.DataHandling
 
             var localFiles = Directory.EnumerateFiles(_dataRoot)
                 .Select(Path.GetFileName)
-                .Where(f => !string.IsNullOrEmpty(f))
-                .Cast<string>();
+                .Where(file => !string.IsNullOrWhiteSpace(file))
+                .Cast<string>()
+                .ToList();
 
-            DetermineResolvedMainExcel(localFiles);
+            MainExcelResolution localResolution = ResolveMainExcelCandidate(
+                localFiles,
+                allowSyntheticLegacyFallback: true,
+                sourceDescription: "local cache");
 
-            string localResolvedMainExcelFileName = ResolvedMainExcelFileName;
-            bool localDataUpdateRequiresAppUpdate = DataUpdateRequiresAppUpdate;
+            ApplyMainExcelResolution(localResolution, "startup local scan");
 
 #if DEBUG
             if (!AppConfig.DebugSimulateSync)
@@ -136,25 +313,47 @@ namespace Handlers.DataHandling
 
                     if (_syncManifest != null)
                     {
-                        var onlineFileNames = new List<string>();
-                        await OnlineServices.SyncFilesAsync(_syncManifest, string.Empty, f => { onlineFileNames.Add(f); return false; }, null, null);
+                        MainExcelResolution onlineResolution = ResolveMainExcelCandidate(
+                            _syncManifest.Select(entry => entry.File),
+                            allowSyntheticLegacyFallback: false,
+                            sourceDescription: "online manifest");
 
-                        DetermineResolvedMainExcel(onlineFileNames);
+                        Logger.Info(
+                            $"Main Excel candidates at startup: local=[{localResolution.FileName}] online=[{onlineResolution.FileName}]");
 
-                        if (!string.IsNullOrWhiteSpace(localResolvedMainExcelFileName) &&
-                            !string.Equals(localResolvedMainExcelFileName, AppConfig.MainExcelFileName, StringComparison.OrdinalIgnoreCase))
+                        MainExcelResolution selectedResolution = !string.IsNullOrWhiteSpace(onlineResolution.FileName)
+                            ? new MainExcelResolution
+                            {
+                                FileName = onlineResolution.FileName,
+                                RequiresAppUpdate = onlineResolution.RequiresAppUpdate || localResolution.RequiresAppUpdate,
+                                SourceDescription = "online manifest preferred"
+                            }
+                            : localResolution;
+
+                        ApplyMainExcelResolution(selectedResolution, "startup selected candidate");
+
+                        if (!string.IsNullOrWhiteSpace(ResolvedMainExcelFileName))
                         {
-                            ResolvedMainExcelFileName = localResolvedMainExcelFileName;
+                            RaiseStatus("Checking main data file...");
+                            await OnlineServices.SyncFilesAsync(
+                                _syncManifest,
+                                _dataRoot,
+                                file => string.Equals(
+                                    thisNormalizeRelativePath(file),
+                                    thisNormalizeRelativePath(ResolvedMainExcelFileName),
+                                    StringComparison.OrdinalIgnoreCase),
+                                RaiseStatus,
+                                RaiseFileDownload,
+                                label: "Main Excel data file");
                         }
 
-                        DataUpdateRequiresAppUpdate |= localDataUpdateRequiresAppUpdate;
+                        selectedResolution = EnsureUsableMainExcelAfterSync(
+                            selectedResolution,
+                            localResolution,
+                            "startup",
+                            RaiseStatus);
 
-                        RaiseStatus("Checking main data file...");
-                        await OnlineServices.SyncFilesAsync(
-                            _syncManifest, _dataRoot,
-                            f => string.Equals(f, ResolvedMainExcelFileName, StringComparison.OrdinalIgnoreCase),
-                            RaiseStatus, RaiseFileDownload,
-                            label: "Main Excel data file");
+                        ApplyMainExcelResolution(selectedResolution, "startup final");
                     }
                 }
                 else
@@ -189,14 +388,16 @@ namespace Handlers.DataHandling
 
                     RaiseStatus("Checking board Excel data files...");
                     await OnlineServices.SyncFilesAsync(
-                        _syncManifest, _dataRoot,
+                        _syncManifest,
+                        _dataRoot,
                         file =>
                         {
                             string normalizedFile = thisNormalizeRelativePath(file);
                             return boardExcelFiles.Contains(normalizedFile) &&
                                    !thisIsProtectedContributionFile(normalizedFile);
                         },
-                        RaiseStatus, RaiseFileDownload,
+                        RaiseStatus,
+                        RaiseFileDownload,
                         label: "board Excel data files");
                 }
 #if DEBUG
@@ -257,6 +458,7 @@ namespace Handlers.DataHandling
             {
                 Logger.Warning("Immediate data update check skipped - data root is not initialized");
                 ReportStatus("Sync failed - data folder is unavailable");
+
                 return new ManualDataSyncResult
                 {
                     ChangedCount = -1,
@@ -266,8 +468,16 @@ namespace Handlers.DataHandling
                 };
             }
 
-            string localResolvedMainExcelFileName = ResolvedMainExcelFileName;
-            bool localDataUpdateRequiresAppUpdate = DataUpdateRequiresAppUpdate;
+            var localFiles = Directory.EnumerateFiles(_dataRoot)
+                .Select(Path.GetFileName)
+                .Where(file => !string.IsNullOrWhiteSpace(file))
+                .Cast<string>()
+                .ToList();
+
+            MainExcelResolution localResolution = ResolveMainExcelCandidate(
+                localFiles,
+                allowSyntheticLegacyFallback: true,
+                sourceDescription: "local cache");
 
             ReportStatus("Fetching online file manifest...");
             _syncManifest = await OnlineServices.FetchManifestAsync(ReportStatus);
@@ -286,43 +496,54 @@ namespace Handlers.DataHandling
             var manifest = _syncManifest;
             _syncManifest = null;
 
+            MainExcelResolution onlineResolution = ResolveMainExcelCandidate(
+                manifest.Select(entry => entry.File),
+                allowSyntheticLegacyFallback: false,
+                sourceDescription: "online manifest");
+
+            Logger.Info(
+                $"Main Excel candidates during manual sync: local=[{localResolution.FileName}] online=[{onlineResolution.FileName}]");
+
+            MainExcelResolution selectedResolution = !string.IsNullOrWhiteSpace(onlineResolution.FileName)
+                ? new MainExcelResolution
+                {
+                    FileName = onlineResolution.FileName,
+                    RequiresAppUpdate = onlineResolution.RequiresAppUpdate || localResolution.RequiresAppUpdate,
+                    SourceDescription = "online manifest preferred"
+                }
+                : localResolution;
+
+            ApplyMainExcelResolution(selectedResolution, "manual sync selected candidate");
+
             int changedCount = 0;
             bool anyExcelChanged = false;
-            var onlineFileNames = new List<string>();
 
-            await OnlineServices.SyncFilesAsync(
-                manifest,
-                string.Empty,
-                file =>
-                {
-                    onlineFileNames.Add(file);
-                    return false;
-                },
-                null,
-                null);
-
-            DetermineResolvedMainExcel(onlineFileNames);
-
-            if (!string.IsNullOrWhiteSpace(localResolvedMainExcelFileName) &&
-                !string.Equals(localResolvedMainExcelFileName, AppConfig.MainExcelFileName, StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(ResolvedMainExcelFileName))
             {
-                ResolvedMainExcelFileName = localResolvedMainExcelFileName;
+                ReportStatus("Checking main data file...");
+                int mainExcelChangedCount = await OnlineServices.SyncFilesAsync(
+                    manifest,
+                    _dataRoot,
+                    file => string.Equals(
+                        thisNormalizeRelativePath(file),
+                        thisNormalizeRelativePath(ResolvedMainExcelFileName),
+                        StringComparison.OrdinalIgnoreCase),
+                    ReportStatus,
+                    ReportFile,
+                    label: "Main Excel data file");
+
+                changedCount += mainExcelChangedCount;
+                bool mainExcelChanged = mainExcelChangedCount > 0;
+                anyExcelChanged |= mainExcelChanged;
             }
 
-            DataUpdateRequiresAppUpdate |= localDataUpdateRequiresAppUpdate;
+            selectedResolution = EnsureUsableMainExcelAfterSync(
+                selectedResolution,
+                localResolution,
+                "manual sync",
+                ReportStatus);
 
-            ReportStatus("Checking main data file...");
-            int mainExcelChangedCount = await OnlineServices.SyncFilesAsync(
-                manifest,
-                _dataRoot,
-                file => string.Equals(file, ResolvedMainExcelFileName, StringComparison.OrdinalIgnoreCase),
-                ReportStatus,
-                ReportFile,
-                label: "Main Excel data file");
-
-            changedCount += mainExcelChangedCount;
-            bool mainExcelChanged = mainExcelChangedCount > 0;
-            anyExcelChanged |= mainExcelChanged;
+            ApplyMainExcelResolution(selectedResolution, "manual sync final");
 
             ReportStatus("Loading hardware definitions...");
             await Task.Run(LoadMainExcel);
@@ -340,7 +561,10 @@ namespace Handlers.DataHandling
                 {
                     string normalizedFile = thisNormalizeRelativePath(file);
 
-                    return !string.Equals(file, ResolvedMainExcelFileName, StringComparison.OrdinalIgnoreCase) &&
+                    return !string.Equals(
+                               normalizedFile,
+                               thisNormalizeRelativePath(ResolvedMainExcelFileName),
+                               StringComparison.OrdinalIgnoreCase) &&
                            !thisIsProtectedContributionFile(normalizedFile) &&
                            (
                                boardExcelFiles.Contains(normalizedFile) ||
@@ -367,64 +591,20 @@ namespace Handlers.DataHandling
                 BoardDataReader.ClearAllCache();
             }
 
+            bool finalMainExcelChanged = false;
+            if (!string.IsNullOrWhiteSpace(ResolvedMainExcelFileName))
+            {
+                finalMainExcelChanged = changedCount > 0 &&
+                    DoesRelativeDataFileExist(ResolvedMainExcelFileName);
+            }
+
             return new ManualDataSyncResult
             {
                 ChangedCount = changedCount,
-                MainExcelChanged = mainExcelChanged,
+                MainExcelChanged = finalMainExcelChanged,
                 AnyExcelChanged = anyExcelChanged,
                 ProtectedFilesCount = _protectedContributionFiles.Count
             };
-        }
-
-        // ###########################################################################################
-        // Parses available file lists to find the highest compatible version of the main Excel file.
-        // ###########################################################################################
-        private static void DetermineResolvedMainExcel(IEnumerable<string> availableFiles)
-        {
-            Version appVer = Version.TryParse(AppConfig.AppVersionString, out var v) ? v : new Version(0, 0, 0, 0);
-
-            Version? bestVer = null;
-            string bestFile = string.Empty;
-            bool newerExists = false;
-
-            foreach (var fullPath in availableFiles)
-            {
-                // Ensure any directory prefixes from manifest strings are ignored
-                string file = Path.GetFileName(fullPath);
-
-                if (file.StartsWith(AppConfig.MainExcelFileNamePrefix, StringComparison.OrdinalIgnoreCase) &&
-                    file.EndsWith(AppConfig.MainExcelFileSuffix, StringComparison.OrdinalIgnoreCase))
-                {
-                    string versionPart = file.Substring(
-                        AppConfig.MainExcelFileNamePrefix.Length,
-                        file.Length - AppConfig.MainExcelFileNamePrefix.Length - AppConfig.MainExcelFileSuffix.Length);
-
-                    if (Version.TryParse(versionPart, out var fileVer))
-                    {
-                        if (fileVer <= appVer)
-                        {
-                            if (bestVer == null || fileVer > bestVer)
-                            {
-                                bestVer = fileVer;
-                                bestFile = fullPath; // Preserve the original path for sync
-                            }
-                        }
-                        else
-                        {
-                            newerExists = true;
-                        }
-                    }
-                }
-            }
-
-            if (string.IsNullOrEmpty(bestFile))
-            {
-                // Fallback looking for legacy unversioned file if no versioned ones exist
-                bestFile = AppConfig.MainExcelFileName;
-            }
-
-            ResolvedMainExcelFileName = bestFile;
-            DataUpdateRequiresAppUpdate = newerExists;
         }
 
         // ###########################################################################################
