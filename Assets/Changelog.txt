@@ -1,3 +1,8 @@
+# 2.0.1, 2026-May-7
+-------------------
+- Fixed online data update could incorrectly use an older local main Excel data file instead of the newer one from online source
+
+
 # 2.0.0, 2026-May-7
 -------------------
 - Fixed component labels was shown on top of panels
