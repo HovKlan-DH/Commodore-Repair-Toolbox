@@ -103,6 +103,10 @@ namespace Handlers.DataHandling
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? DownloadDataFromTestSource { get; set; }
 
+        [JsonPropertyName("allowDeletionOfOrphanAndNonUsedFiles")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? AllowDeletionOfOrphanAndNonUsedFiles { get; set; }
+
     }
 
     // ###########################################################################################
@@ -207,6 +211,21 @@ namespace Handlers.DataHandling
             { "ComponentPopup_BulletList_Fg", "Red" },
             { "Feedback_TrashIcon_Fg", "IndianRed" }
         };
+
+        public static bool AllowDeletionOfOrphanAndNonUsedFiles
+        {
+            get => _data.AllowDeletionOfOrphanAndNonUsedFiles ?? false;
+            set
+            {
+                bool currentValue = _data.AllowDeletionOfOrphanAndNonUsedFiles ?? false;
+                if (currentValue == value)
+                    return;
+
+                _data.AllowDeletionOfOrphanAndNonUsedFiles = value;
+                Logger.Info($"Setting changed: [AllowDeletionOfOrphanAndNonUsedFiles] [{value}]");
+                Save();
+            }
+        }
 
         public static bool DownloadDataFromTestSource
         {
@@ -811,6 +830,7 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [OpenMultiplePopups] [{MultipleInstancesForComponentPopup}]");
                     Logger.Info($"        [CheckDataOnLaunch] [{CheckDataOnLaunch}]");
                     Logger.Info($"        [DownloadDataFromTestSource] [{(AppConfig.IsDebugBuild ? DownloadDataFromTestSource.ToString() : "Release build - forced off")}]");
+                    Logger.Info($"        [AllowDeletionOfOrphanAndNonUsedFiles] [{AllowDeletionOfOrphanAndNonUsedFiles}]");
                     Logger.Info($"        [CheckVersionOnLaunch] [{CheckVersionOnLaunch}]");
                     Logger.Info($"        [AllowBetaNotification] [{ShowDevelopmentVersionNotification}]");
                     Logger.Info($"        [ValidateDataOnLaunch] [{ValidateDataOnLaunch}]");

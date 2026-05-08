@@ -47,6 +47,8 @@ namespace Handlers.DataHandling
 
         private static string _dataRoot = string.Empty;
         private static List<DataFileEntry>? _syncManifest;
+        private static List<DataFileEntry>? _lastFetchedManifest;
+        private static readonly System.Threading.SemaphoreSlim OrphanAndUnusedFileCleanupSemaphore = new(1, 1);
 
         public static string DataRoot => _dataRoot;
         public static List<HardwareBoardEntry> HardwareBoards { get; private set; } = new(); // compliant with .NET6
@@ -309,6 +311,7 @@ namespace Handlers.DataHandling
                 {
                     RaiseStatus("Fetching online file manifest...");
                     _syncManifest = await OnlineServices.FetchManifestAsync(RaiseStatus);
+                    _lastFetchedManifest = _syncManifest?.ToList();
 
                     if (_syncManifest != null)
                     {
@@ -480,6 +483,7 @@ namespace Handlers.DataHandling
 
             ReportStatus("Fetching online file manifest...");
             _syncManifest = await OnlineServices.FetchManifestAsync(ReportStatus);
+            _lastFetchedManifest = _syncManifest?.ToList();
 
             if (_syncManifest == null)
             {
@@ -1176,6 +1180,390 @@ namespace Handlers.DataHandling
             return !string.IsNullOrWhiteSpace(relativePath) &&
                    _protectedContributionFiles.Contains(thisNormalizeRelativePath(relativePath));
         }
+
+        // ###########################################################################################
+        // Deletes orphan and non-used files from the data root after building a complete referenced-file
+        // map from the online manifest, all main Excel files, optional user-contribution main Excel
+        // files, board Excel files, board JSON sidecars, and KiCad files. Deletions are strictly
+        // contained inside the data root and only run while launch-time data sync is enabled.
+        // Empty directories left behind are removed afterwards, still strictly within the data root.
+        // ###########################################################################################
+        public static async Task<int> DeleteOrphanAndUnusedFilesAsync()
+        {
+            if (!UserSettings.CheckDataOnLaunch)
+            {
+                Logger.Info("Orphan/non-used file cleanup skipped - launch-time data sync is disabled");
+                return 0;
+            }
+
+            if (!UserSettings.AllowDeletionOfOrphanAndNonUsedFiles)
+            {
+                Logger.Info("Orphan/non-used file cleanup skipped - setting is disabled");
+                return 0;
+            }
+
+            if (string.IsNullOrWhiteSpace(_dataRoot) || !Directory.Exists(_dataRoot))
+            {
+                Logger.Warning("Orphan/non-used file cleanup skipped - data root is not available");
+                return 0;
+            }
+
+            await OrphanAndUnusedFileCleanupSemaphore.WaitAsync();
+
+            try
+            {
+                return await Task.Run(() =>
+                {
+                    string dataRootFullPath = thisEnsureTrailingDirectorySeparator(Path.GetFullPath(_dataRoot));
+                    var mappedFiles = CollectAllReferencedDataFiles(dataRootFullPath);
+
+                    Logger.Info(
+                        $"Starting orphan/non-used file cleanup inside data root [{dataRootFullPath}] with [{mappedFiles.Count}] mapped files");
+
+                    int deletedFileCount = 0;
+
+                    foreach (string filePath in Directory.EnumerateFiles(dataRootFullPath, "*", SearchOption.AllDirectories))
+                    {
+                        string fullFilePath = Path.GetFullPath(filePath);
+
+                        if (!thisIsPathWithinDataRoot(dataRootFullPath, fullFilePath))
+                        {
+                            Logger.Warning($"Skipped file outside data root during orphan cleanup: [{fullFilePath}]");
+                            continue;
+                        }
+
+                        string relativePath = thisNormalizeRelativePath(Path.GetRelativePath(dataRootFullPath, fullFilePath));
+
+                        if (string.IsNullOrWhiteSpace(relativePath) || mappedFiles.Contains(relativePath))
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            File.Delete(fullFilePath);
+                            deletedFileCount++;
+                            Logger.Info($"Deleted orphan/non-used data file: [{relativePath}]");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Warning($"Failed to delete orphan/non-used data file [{relativePath}] - [{ex.Message}]");
+                        }
+                    }
+
+                    int deletedDirectoryCount = thisDeleteEmptyDirectoriesInsideDataRoot(dataRootFullPath);
+
+                    Logger.Info(
+                        $"Background orphan/non-used file cleanup complete - deleted [{deletedFileCount}] files and [{deletedDirectoryCount}] empty directories");
+
+                    return deletedFileCount;
+                });
+            }
+            finally
+            {
+                OrphanAndUnusedFileCleanupSemaphore.Release();
+            }
+        }
+
+        // ###########################################################################################
+        // Builds the full referenced-file map used by orphan cleanup across the online manifest,
+        // all main workbooks, and all referenced board workbooks.
+        // ###########################################################################################
+        private static HashSet<string> CollectAllReferencedDataFiles(string dataRootFullPath)
+        {
+            var mappedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            thisAddMappedFilesFromManifestSnapshot(mappedFiles, dataRootFullPath);
+
+            var mainExcelRelativePaths = thisGetAllMainExcelRelativePaths(dataRootFullPath);
+
+            foreach (string mainExcelRelativePath in mainExcelRelativePaths)
+            {
+                thisAddMappedFilesFromMainExcel(mappedFiles, dataRootFullPath, mainExcelRelativePath);
+            }
+
+            Logger.Info(
+                $"Mapped [{mappedFiles.Count}] referenced files from manifest and [{mainExcelRelativePaths.Count}] main Excel data files for orphan cleanup");
+
+            return mappedFiles;
+        }
+
+        // ###########################################################################################
+        // Adds all files from the latest fetched online manifest to the orphan-cleanup mapped-file set
+        // so auxiliary reference files such as README files are never deleted just because they are not
+        // directly referenced by Excel data.
+        // ###########################################################################################
+        private static void thisAddMappedFilesFromManifestSnapshot(
+            HashSet<string> mappedFiles,
+            string dataRootFullPath)
+        {
+            if (_lastFetchedManifest == null || _lastFetchedManifest.Count == 0)
+            {
+                Logger.Warning("No online manifest snapshot was available for orphan cleanup mapping");
+                return;
+            }
+
+            int originalCount = mappedFiles.Count;
+
+            foreach (DataFileEntry entry in _lastFetchedManifest)
+            {
+                thisTryAddMappedRelativePath(mappedFiles, dataRootFullPath, entry.File, "online manifest");
+            }
+
+            Logger.Info(
+                $"Mapped [{mappedFiles.Count - originalCount}] files from the online manifest snapshot for orphan cleanup");
+        }
+
+        // ###########################################################################################
+        // Returns all main Excel data files currently present inside the data root.
+        // ###########################################################################################
+        private static List<string> thisGetAllMainExcelRelativePaths(string dataRootFullPath)
+        {
+            return Directory.EnumerateFiles(dataRootFullPath, "*", SearchOption.AllDirectories)
+                .Select(path => thisNormalizeRelativePath(Path.GetRelativePath(dataRootFullPath, path)))
+                .Where(path =>
+                {
+                    string fileName = Path.GetFileName(path);
+
+                    return string.Equals(fileName, AppConfig.MainExcelFileName, StringComparison.OrdinalIgnoreCase) ||
+                           (
+                               fileName.StartsWith(AppConfig.MainExcelFileNamePrefix, StringComparison.OrdinalIgnoreCase) &&
+                               fileName.EndsWith(AppConfig.MainExcelFileSuffix, StringComparison.OrdinalIgnoreCase)
+                           );
+                })
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        // ###########################################################################################
+        // Adds all referenced files from one main Excel workbook and its optional user-contribution
+        // sidecar workbook into the orphan-cleanup mapped-file set.
+        // ###########################################################################################
+        private static void thisAddMappedFilesFromMainExcel(
+            HashSet<string> mappedFiles,
+            string dataRootFullPath,
+            string mainExcelRelativePath)
+        {
+            thisTryAddMappedRelativePath(mappedFiles, dataRootFullPath, mainExcelRelativePath, "main Excel data file");
+
+            string mainExcelFullPath = Path.GetFullPath(Path.Combine(
+                dataRootFullPath,
+                mainExcelRelativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+            if (!File.Exists(mainExcelFullPath))
+            {
+                Logger.Warning($"Main Excel data file missing during orphan cleanup mapping: [{mainExcelRelativePath}]");
+                return;
+            }
+
+            foreach (HardwareBoardEntry entry in thisReadHardwareBoardEntriesFromWorkbook(mainExcelFullPath))
+            {
+                thisAddMappedFilesFromBoardExcel(mappedFiles, dataRootFullPath, entry.ExcelDataFile);
+            }
+
+            string userContributionRelativePath = thisGetUserContributionMainExcelRelativePathFor(mainExcelRelativePath);
+            string userContributionFullPath = Path.GetFullPath(Path.Combine(
+                dataRootFullPath,
+                userContributionRelativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+            if (!File.Exists(userContributionFullPath))
+            {
+                return;
+            }
+
+            thisTryAddMappedRelativePath(
+                mappedFiles,
+                dataRootFullPath,
+                userContributionRelativePath,
+                "user contribution main Excel data file");
+
+            foreach (HardwareBoardEntry entry in thisReadHardwareBoardEntriesFromWorkbook(userContributionFullPath))
+            {
+                thisAddMappedFilesFromBoardExcel(mappedFiles, dataRootFullPath, entry.ExcelDataFile);
+            }
+        }
+
+        // ###########################################################################################
+        // Adds one board Excel file and all files it uses to the orphan-cleanup mapped-file set.
+        // ###########################################################################################
+        private static void thisAddMappedFilesFromBoardExcel(
+            HashSet<string> mappedFiles,
+            string dataRootFullPath,
+            string boardExcelRelativePath)
+        {
+            string normalizedBoardExcelRelativePath = thisNormalizeRelativePath(boardExcelRelativePath);
+            if (string.IsNullOrWhiteSpace(normalizedBoardExcelRelativePath))
+            {
+                return;
+            }
+
+            thisTryAddMappedRelativePath(
+                mappedFiles,
+                dataRootFullPath,
+                normalizedBoardExcelRelativePath,
+                "board Excel data file");
+
+            string boardJsonRelativePath =
+                thisNormalizeRelativePath(Path.ChangeExtension(normalizedBoardExcelRelativePath, ".json") ?? string.Empty);
+
+            if (!string.IsNullOrWhiteSpace(boardJsonRelativePath))
+            {
+                thisTryAddMappedRelativePath(mappedFiles, dataRootFullPath, boardJsonRelativePath, "board JSON sidecar");
+            }
+
+            string boardExcelFullPath = Path.GetFullPath(Path.Combine(
+                dataRootFullPath,
+                normalizedBoardExcelRelativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+            if (!File.Exists(boardExcelFullPath))
+            {
+                return;
+            }
+
+            foreach (string referencedFile in BoardDataReader.CollectReferencedLocalFiles(boardExcelFullPath))
+            {
+                thisTryAddMappedRelativePath(mappedFiles, dataRootFullPath, referencedFile, "board Excel referenced file");
+            }
+
+            string boardDirectory = Path.GetDirectoryName(boardExcelFullPath) ?? string.Empty;
+            string kiCadDirectory = Path.Combine(boardDirectory, "KiCad data");
+
+            if (!Directory.Exists(kiCadDirectory))
+            {
+                return;
+            }
+
+            foreach (string kiCadFile in Directory.EnumerateFiles(kiCadDirectory, "*", SearchOption.AllDirectories))
+            {
+                string relativeKiCadFile = thisNormalizeRelativePath(Path.GetRelativePath(dataRootFullPath, kiCadFile));
+                thisTryAddMappedRelativePath(mappedFiles, dataRootFullPath, relativeKiCadFile, "KiCad data file");
+            }
+        }
+
+        // ###########################################################################################
+        // Adds a relative path to the orphan-cleanup mapped-file set only when it resolves inside the
+        // current data root after full path normalization.
+        // ###########################################################################################
+        private static void thisTryAddMappedRelativePath(
+            HashSet<string> mappedFiles,
+            string dataRootFullPath,
+            string relativePath,
+            string sourceDescription)
+        {
+            string normalizedRelativePath = thisNormalizeRelativePath(relativePath);
+            if (string.IsNullOrWhiteSpace(normalizedRelativePath))
+            {
+                return;
+            }
+
+            string fullPath = Path.GetFullPath(Path.Combine(
+                dataRootFullPath,
+                normalizedRelativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+            if (!thisIsPathWithinDataRoot(dataRootFullPath, fullPath))
+            {
+                Logger.Warning(
+                    $"Skipped mapped file outside data root from [{sourceDescription}]: [{relativePath}]");
+                return;
+            }
+
+            string safeRelativePath = thisNormalizeRelativePath(Path.GetRelativePath(dataRootFullPath, fullPath));
+            mappedFiles.Add(safeRelativePath);
+        }
+
+        // ###########################################################################################
+        // Resolves the optional user-contribution sidecar workbook path for an arbitrary main workbook.
+        // ###########################################################################################
+        private static string thisGetUserContributionMainExcelRelativePathFor(string mainExcelRelativePath)
+        {
+            if (string.IsNullOrWhiteSpace(mainExcelRelativePath))
+            {
+                return string.Empty;
+            }
+
+            string directory = Path.GetDirectoryName(mainExcelRelativePath) ?? string.Empty;
+            string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(mainExcelRelativePath);
+            string extension = Path.GetExtension(mainExcelRelativePath);
+
+            string contributionFileName = $"{fileNameWithoutExtension}_UserContribution{extension}";
+            string relativePath = string.IsNullOrWhiteSpace(directory)
+                ? contributionFileName
+                : Path.Combine(directory, contributionFileName);
+
+            return thisNormalizeRelativePath(relativePath);
+        }
+
+        // ###########################################################################################
+        // Returns whether a fully normalized path is located inside the current data root.
+        // ###########################################################################################
+        private static bool thisIsPathWithinDataRoot(string dataRootFullPath, string candidateFullPath)
+        {
+            StringComparison comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
+
+            return candidateFullPath.StartsWith(dataRootFullPath, comparison);
+        }
+
+        // ###########################################################################################
+        // Ensures a directory path ends with a single trailing directory separator for safe prefix tests.
+        // ###########################################################################################
+        private static string thisEnsureTrailingDirectorySeparator(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return string.Empty;
+            }
+
+            return path.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal)
+                ? path
+                : path + Path.DirectorySeparatorChar;
+        }
+
+        // ###########################################################################################
+        // Deletes empty directories inside the data root after orphan file cleanup.
+        // Traversal is deepest-first so child folders are removed before their parents.
+        // ###########################################################################################
+        private static int thisDeleteEmptyDirectoriesInsideDataRoot(string dataRootFullPath)
+        {
+            int deletedDirectoryCount = 0;
+
+            var directories = Directory.EnumerateDirectories(dataRootFullPath, "*", SearchOption.AllDirectories)
+                .Select(Path.GetFullPath)
+                .Where(path => thisIsPathWithinDataRoot(dataRootFullPath, path))
+                .OrderByDescending(path => path.Length)
+                .ToList();
+
+            foreach (string directoryPath in directories)
+            {
+                try
+                {
+                    if (!Directory.Exists(directoryPath))
+                    {
+                        continue;
+                    }
+
+                    if (Directory.EnumerateFileSystemEntries(directoryPath).Any())
+                    {
+                        continue;
+                    }
+
+                    string relativePath = thisNormalizeRelativePath(Path.GetRelativePath(dataRootFullPath, directoryPath));
+                    Directory.Delete(directoryPath, recursive: false);
+                    deletedDirectoryCount++;
+                    Logger.Info($"Deleted empty data directory: [{relativePath}]");
+                }
+                catch (Exception ex)
+                {
+                    string relativePath = thisNormalizeRelativePath(Path.GetRelativePath(dataRootFullPath, directoryPath));
+                    Logger.Warning($"Failed to delete empty data directory [{relativePath}] - [{ex.Message}]");
+                }
+            }
+
+            return deletedDirectoryCount;
+        }
+
 
 
 

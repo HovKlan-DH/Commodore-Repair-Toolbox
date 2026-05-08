@@ -28,8 +28,12 @@ namespace CRT
             // to avoid triggering redundant saves during startup
             this.CheckVersionOnLaunchCheckBox.IsChecked = UserSettings.CheckVersionOnLaunch;
             this.CheckDataOnLaunchCheckBox.IsChecked = UserSettings.CheckDataOnLaunch;
+            this.AllowDeletionOfOrphanAndNonUsedFilesCheckBox.IsChecked =
+                UserSettings.AllowDeletionOfOrphanAndNonUsedFiles;
             this.ShowDevelopmentVersionNotificationCheckBox.IsChecked = UserSettings.ShowDevelopmentVersionNotification;
             this.MultipleInstancesForComponentPopupCheckBox.IsChecked = UserSettings.MultipleInstancesForComponentPopup;
+
+            this.UpdateAllowDeletionOfOrphanAndNonUsedFilesCheckBoxState();
 
             this.DownloadDataFromTestSourceCheckBox.IsVisible = AppConfig.IsDebugBuild;
             this.DownloadDataFromTestSourceCheckBox.IsEnabled = AppConfig.IsDebugBuild;
@@ -39,9 +43,40 @@ namespace CRT
             this.ThemeVariantComboBox.SelectionChanged += this.OnThemeVariantSelectionChanged;
             this.CheckVersionOnLaunchCheckBox.IsCheckedChanged += this.OnCheckVersionOnLaunchChanged;
             this.CheckDataOnLaunchCheckBox.IsCheckedChanged += this.OnCheckDataOnLaunchChanged;
+            this.AllowDeletionOfOrphanAndNonUsedFilesCheckBox.IsCheckedChanged += this.OnAllowDeletionOfOrphanAndNonUsedFilesChanged;
             this.DownloadDataFromTestSourceCheckBox.IsCheckedChanged += this.OnDownloadDataFromTestSourceChanged;
             this.ShowDevelopmentVersionNotificationCheckBox.IsCheckedChanged += this.OnShowDevelopmentVersionNotificationChanged;
             this.MultipleInstancesForComponentPopupCheckBox.IsCheckedChanged += this.OnMultipleInstancesForComponentPopupChanged;
+        }
+
+        // ###########################################################################################
+        // Persists whether orphan and non-used files may be deleted from the data root.
+        // The cleanup can only run when launch-time data synchronization is enabled.
+        // ###########################################################################################
+        private void OnAllowDeletionOfOrphanAndNonUsedFilesChanged(object? sender, RoutedEventArgs e)
+        {
+            bool isEnabled = this.AllowDeletionOfOrphanAndNonUsedFilesCheckBox.IsChecked == true;
+            UserSettings.AllowDeletionOfOrphanAndNonUsedFiles = isEnabled;
+
+            if (!isEnabled || !UserSettings.CheckDataOnLaunch)
+            {
+                return;
+            }
+
+            if (TopLevel.GetTopLevel(this) is Main mainWindow)
+            {
+                mainWindow.ScheduleOrphanAndUnusedFileCleanupIfEnabled();
+            }
+        }
+
+        // ###########################################################################################
+        // Keeps the orphan/non-used file deletion checkbox enabled only while launch-time data sync
+        // is enabled, without changing the stored deletion preference.
+        // ###########################################################################################
+        private void UpdateAllowDeletionOfOrphanAndNonUsedFilesCheckBoxState()
+        {
+            bool isCheckDataOnLaunchEnabled = this.CheckDataOnLaunchCheckBox.IsChecked == true;
+            this.AllowDeletionOfOrphanAndNonUsedFilesCheckBox.IsEnabled = isCheckDataOnLaunchEnabled;
         }
 
         // ###########################################################################################
@@ -97,6 +132,7 @@ namespace CRT
 
             bool isEnabled = this.CheckDataOnLaunchCheckBox.IsChecked == true;
             UserSettings.CheckDataOnLaunch = isEnabled;
+            this.UpdateAllowDeletionOfOrphanAndNonUsedFilesCheckBoxState();
 
             if (!isEnabled)
             {
@@ -106,6 +142,7 @@ namespace CRT
             if (TopLevel.GetTopLevel(this) is Main mainWindow)
             {
                 await mainWindow.CheckForDataUpdatesNowAsync();
+                mainWindow.ScheduleOrphanAndUnusedFileCleanupIfEnabled();
             }
         }
 
@@ -117,6 +154,7 @@ namespace CRT
         {
             this.thisSuppressCheckDataOnLaunchChanged = true;
             this.CheckDataOnLaunchCheckBox.IsChecked = isChecked;
+            this.UpdateAllowDeletionOfOrphanAndNonUsedFilesCheckBoxState();
             this.thisSuppressCheckDataOnLaunchChanged = false;
         }
 

@@ -80,12 +80,16 @@
                        Margin="0,16,0,4" />
 
 			<CheckBox x:Name="CheckDataOnLaunchCheckBox"
-                      Content="Check for new or updated data at application launch" />
+          Content="Check for new or updated data at application launch" />
+
+			<CheckBox x:Name="AllowDeletionOfOrphanAndNonUsedFilesCheckBox"
+					  Content="Allow deletion of orphan and non-used files"
+					  IsEnabled="False" />
 
 			<CheckBox x:Name="DownloadDataFromTestSourceCheckBox"
-                      Content="Download data from TEST source (do not use - for development only)"
+					  Content="Download data from TEST source (do not use - for development only)"
 					  Foreground="{DynamicResource Text_Fail_Fg}"
-                      IsVisible="False" />
+					  IsVisible="False" />
 
 			<CheckBox x:Name="CheckVersionOnLaunchCheckBox"
                       Content="Check for new version at application launch" />

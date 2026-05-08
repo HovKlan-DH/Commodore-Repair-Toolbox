@@ -67,6 +67,13 @@ namespace CRT
         // Exposes the Oscilloscope tab control so other UI windows can route scope actions through it.
         public TabOscilloscope TabOscilloscopeControl => this.TabOscilloscope;
 
+        private readonly TaskCompletionSource<bool> thisWindowOpenedCompletionSource =
+    new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> thisBackgroundStartupSyncCompletionSource =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private Task? thisBackgroundDataValidationTask;
+        private bool thisHasScheduledOrphanAndUnusedFileCleanup;
+
         public Main()
         {
             InitializeComponent();
@@ -403,25 +410,25 @@ namespace CRT
         // ###########################################################################################
         private async void StartBackgroundSyncAsync(bool keepBannerTextStatic = false)
         {
-            if (!UserSettings.CheckDataOnLaunch || !DataManager.HasPendingSync)
-            {
-                if (!this._isShowingDataSyncDisabledBanner)
-                {
-                    this.SyncBanner.IsVisible = false;
-                    this.SyncBannerRefreshButton.IsVisible = false;
-                }
-
-                return;
-            }
-
-            this.SyncBannerText.Text = "Checking data from online source - please wait...";
-            this.SyncBannerRefreshButton.IsVisible = false;
-            this.SyncBanner.IsVisible = true;
-
-            this.StartDataSyncStatusIconSpin();
-
             try
             {
+                if (!UserSettings.CheckDataOnLaunch || !DataManager.HasPendingSync)
+                {
+                    if (!this._isShowingDataSyncDisabledBanner)
+                    {
+                        this.SyncBanner.IsVisible = false;
+                        this.SyncBannerRefreshButton.IsVisible = false;
+                    }
+
+                    return;
+                }
+
+                this.SyncBannerText.Text = "Checking data from online source - please wait...";
+                this.SyncBannerRefreshButton.IsVisible = false;
+                this.SyncBanner.IsVisible = true;
+
+                this.StartDataSyncStatusIconSpin();
+
                 int changed = await this.SyncRemainingFilesAsync(keepBannerTextStatic);
 
                 DataManager.LoadProtectedContributionStateForCurrentData();
@@ -448,8 +455,13 @@ namespace CRT
                     this.SyncBanner.IsVisible = false;
                 }
             }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Background data sync failed - [{ex.Message}]");
+            }
             finally
             {
+                this.thisBackgroundStartupSyncCompletionSource.TrySetResult(true);
                 this.StopDataSyncStatusIconSpin();
             }
         }
@@ -1159,8 +1171,11 @@ namespace CRT
 
             if (UserSettings.ValidateDataOnLaunch)
             {
-                _ = Task.Run(DataValidator.ValidateAllDataAsync);
+                this.thisBackgroundDataValidationTask = this.StartBackgroundDataValidationAsync();
             }
+
+            this.thisWindowOpenedCompletionSource.TrySetResult(true);
+            this.ScheduleOrphanAndUnusedFileCleanupIfEnabled();
 
             Dispatcher.UIThread.Post(() => this._windowPlacementReady = true, DispatcherPriority.Background);
 
@@ -2507,6 +2522,74 @@ namespace CRT
                 : message;
         }
 
+        // ###########################################################################################
+        // Starts the background data validation task and converts failures into log entries only.
+        // ###########################################################################################
+        private Task StartBackgroundDataValidationAsync()
+        {
+            return Task.Run(async () =>
+            {
+                try
+                {
+                    await DataValidator.ValidateAllDataAsync();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warning($"Background data validation failed - [{ex.Message}]");
+                }
+            });
+        }
+
+        // ###########################################################################################
+        // Schedules orphan/non-used file cleanup once per application session when both launch-time
+        // sync and orphan cleanup are enabled.
+        // ###########################################################################################
+        internal void ScheduleOrphanAndUnusedFileCleanupIfEnabled()
+        {
+            if (!UserSettings.CheckDataOnLaunch ||
+                !UserSettings.AllowDeletionOfOrphanAndNonUsedFiles ||
+                this.thisHasScheduledOrphanAndUnusedFileCleanup)
+            {
+                return;
+            }
+
+            this.thisHasScheduledOrphanAndUnusedFileCleanup = true;
+            _ = this.RunOrphanAndUnusedFileCleanupAfterStartupAsync();
+        }
+
+        // ###########################################################################################
+        // Waits until startup UI work, background sync, and background validation are all settled before
+        // running the orphan/non-used file cleanup as a low-priority background task.
+        // ###########################################################################################
+        private async Task RunOrphanAndUnusedFileCleanupAfterStartupAsync()
+        {
+            try
+            {
+                await this.thisWindowOpenedCompletionSource.Task;
+                await this.thisBackgroundStartupSyncCompletionSource.Task;
+
+                if (this.thisBackgroundDataValidationTask != null)
+                {
+                    await this.thisBackgroundDataValidationTask;
+                }
+
+                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+
+                await Task.Delay(TimeSpan.FromSeconds(15));
+
+                if (!UserSettings.AllowDeletionOfOrphanAndNonUsedFiles)
+                {
+                    return;
+                }
+
+                await DataManager.DeleteOrphanAndUnusedFilesAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Background orphan/non-used file cleanup failed - [{ex.Message}]");
+            }
+        }
 
 
         // ###########################################################################################
