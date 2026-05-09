@@ -1,1 +1,2 @@
-- Fixed online data update could incorrectly use an older local main Excel data file instead of the newer one from online source
+- Fixed an exception error in Linux, preventing application from running
+- Added option for `Delete orphan and non-used files` in "Configuration" tab

@@ -83,7 +83,7 @@
           Content="Check for new or updated data at application launch" />
 
 			<CheckBox x:Name="AllowDeletionOfOrphanAndNonUsedFilesCheckBox"
-					  Content="Allow deletion of orphan and non-used files"
+					  Content="Delete orphan and non-used files"
 					  IsEnabled="False" />
 
 			<CheckBox x:Name="DownloadDataFromTestSourceCheckBox"
