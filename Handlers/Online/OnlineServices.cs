@@ -245,7 +245,7 @@ namespace Handlers.OnlineHandling
             foreach (var (entry, localPath, downloadUri, expectedChecksum, isNew) in toDownload)
             {
                 downloadIndex++;
-                onStatus?.Invoke($"Downloading file [{downloadIndex}] of [{toDownload.Count}] from online source");
+                onStatus?.Invoke($"Downloading file [{downloadIndex}] of [{toDownload.Count}] from online source:");
                 onFile?.Invoke(entry.File);
 
                 if (await OnlineServices.DownloadFileAsync(http, entry, localPath, downloadUri, expectedChecksum, isNew))

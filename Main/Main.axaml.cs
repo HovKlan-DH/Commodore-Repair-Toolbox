@@ -51,6 +51,8 @@ namespace CRT
         private double _dataSyncStatusIconSpinAngle;
         private bool _isHoveringDataSyncStatusIcon;
 
+        private string _currentSyncFileRelativePath = string.Empty;
+
         // Region toggle: local override, does not affect the global setting
         private string _localRegion = UserSettings.Region;
 
@@ -302,7 +304,9 @@ namespace CRT
         // ###########################################################################################
         internal async Task CheckForDataUpdatesNowAsync(bool keepBannerTextStatic = false)
         {
-            this.SyncBannerText.Text = "Checking data from online source - please wait...";
+            this._currentSyncFileRelativePath = string.Empty;
+
+            this.SetSyncBannerText("Checking data from online source - please wait...");
             this.SyncBannerRefreshButton.IsVisible = false;
             this.SyncBanner.IsVisible = true;
 
@@ -324,7 +328,25 @@ namespace CRT
                             return;
                         }
 
-                        this.SyncBannerText.Text = status;
+                        // IMPORTANT: status only on line 1 (file path is line 2, managed separately)
+                        this.SetSyncBannerText(status);
+                    }),
+                    filePath => Dispatcher.UIThread.Post(() =>
+                    {
+                        // IMPORTANT: file path only on line 2
+                        this._currentSyncFileRelativePath = filePath ?? string.Empty;
+
+                        if (keepBannerTextStatic)
+                        {
+                            return;
+                        }
+
+                        // Keep whatever line 1 currently says; only refresh line 2.
+                        string currentLine1 = this.SyncBannerText.Text?
+                            .Split('\n')[0]
+                            .Trim() ?? string.Empty;
+
+                        this.SetSyncBannerText(currentLine1);
                     }));
 
                 if (syncResult.ChangedCount < 0)
@@ -337,19 +359,22 @@ namespace CRT
                     this.RefreshHardwareAndBoardSelectionsAfterMainExcelSync();
                 }
 
+                // Clear file line once we switch to the final summary.
+                this._currentSyncFileRelativePath = string.Empty;
+
                 if (syncResult.ChangedCount > 0)
                 {
                     string bannerText = syncResult.ChangedCount == 1
                         ? "[1] file updated - please refresh board"
                         : $"[{syncResult.ChangedCount}] files updated - please refresh board";
 
-                    this.SyncBannerText.Text = BuildSyncBannerText(bannerText, syncResult.ProtectedFilesCount);
+                    this.SetSyncBannerText(BuildSyncBannerText(bannerText, syncResult.ProtectedFilesCount));
                     this.SyncBannerRefreshButton.IsVisible = true;
                     this.SyncBanner.IsVisible = true;
                 }
                 else if (syncResult.ProtectedFilesCount > 0)
                 {
-                    this.SyncBannerText.Text = BuildSyncBannerText("All data files are up to date", syncResult.ProtectedFilesCount);
+                    this.SetSyncBannerText(BuildSyncBannerText("All data files are up to date", syncResult.ProtectedFilesCount));
                     this.SyncBannerRefreshButton.IsVisible = false;
                     this.SyncBanner.IsVisible = true;
                 }
@@ -365,6 +390,7 @@ namespace CRT
             }
             finally
             {
+                this._currentSyncFileRelativePath = string.Empty;
                 this.StopDataSyncStatusIconSpin();
             }
         }
@@ -382,8 +408,8 @@ namespace CRT
 
             try
             {
-                return await DataManager.SyncRemainingAsync(status =>
-                    Dispatcher.UIThread.Post(() =>
+                return await DataManager.SyncRemainingAsync(
+                    status => Dispatcher.UIThread.Post(() =>
                     {
                         if (keepBannerTextStatic)
                         {
@@ -396,7 +422,24 @@ namespace CRT
                             return;
                         }
 
-                        this.SyncBannerText.Text = status;
+                        // status only on line 1
+                        this.SetSyncBannerText(status);
+                    }),
+                    filePath => Dispatcher.UIThread.Post(() =>
+                    {
+                        // file only on line 2
+                        this._currentSyncFileRelativePath = filePath ?? string.Empty;
+
+                        if (keepBannerTextStatic)
+                        {
+                            return;
+                        }
+
+                        string currentLine1 = this.SyncBannerText.Text?
+                            .Split('\n')[0]
+                            .Trim() ?? string.Empty;
+
+                        this.SetSyncBannerText(currentLine1);
                     }));
             }
             catch
@@ -2433,7 +2476,8 @@ namespace CRT
 
             e.Handled = true;
 
-            await this.CheckForDataUpdatesNowAsync(keepBannerTextStatic: true);
+            // Allow the banner to update with progress + current file (2-line banner).
+            await this.CheckForDataUpdatesNowAsync(keepBannerTextStatic: false);
         }
 
         // ###########################################################################################
@@ -2591,6 +2635,27 @@ namespace CRT
             }
         }
 
+        // ###########################################################################################
+        // Rebuilds the sync banner text as two lines:
+        // Line 1: status/progress only
+        // Line 2: current relative path being transferred (single-line, optional)
+        // ###########################################################################################
+        private void SetSyncBannerText(string statusLine)
+        {
+            string cleanStatus = (statusLine ?? string.Empty)
+                .Replace("\r", string.Empty, StringComparison.Ordinal)
+                .Replace("\n", " ", StringComparison.Ordinal)
+                .Trim();
+
+            string cleanFile = (this._currentSyncFileRelativePath ?? string.Empty)
+                .Replace("\r", string.Empty, StringComparison.Ordinal)
+                .Replace("\n", string.Empty, StringComparison.Ordinal)
+                .Trim();
+
+            this.SyncBannerText.Text = string.IsNullOrWhiteSpace(cleanFile)
+                ? cleanStatus
+                : $"{cleanStatus}\n{cleanFile}";
+        }
 
         // ###########################################################################################
     }

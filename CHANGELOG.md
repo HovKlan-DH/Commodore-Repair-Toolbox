@@ -1,2 +1,1 @@
-- Fixed an exception error in Linux, preventing application from running
-- Added option for `Delete orphan and non-used files` in "Configuration" tab
+- Changed banner for updating data from online source to show specific files being updated

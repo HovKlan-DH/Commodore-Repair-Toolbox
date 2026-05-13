@@ -414,9 +414,10 @@ namespace Handlers.DataHandling
         // Syncs all non-Excel files (images etc.) using the manifest already fetched at startup.
         // Intended to run silently in the background after the UI has opened.
         // onStatus: optional callback for general progress messages, fired on the caller's thread.
+        // onFile:   optional callback fired with the relative file path currently being downloaded.
         // Returns the number of files that were successfully new or updated.
         // ###########################################################################################
-        public static async Task<int> SyncRemainingAsync(Action<string>? onStatus = null)
+        public static async Task<int> SyncRemainingAsync(Action<string>? onStatus = null, Action<string>? onFile = null)
         {
             if (_syncManifest == null)
                 return 0;
@@ -425,14 +426,17 @@ namespace Handlers.DataHandling
             _syncManifest = null;
 
             return await OnlineServices.SyncFilesAsync(
-                manifest, _dataRoot,
+                manifest,
+                _dataRoot,
                 file =>
                 {
                     string normalizedFile = thisNormalizeRelativePath(file);
                     return !file.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) &&
                            !thisIsProtectedContributionFile(normalizedFile);
                 },
-                onStatus);
+                onStatus,
+                onFile,
+                label: "remaining data files");
         }
 
         // ###########################################################################################
@@ -556,7 +560,7 @@ namespace Handlers.DataHandling
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            ReportStatus("Checking remaining data files...");
+            ReportStatus("Checking data from online source - please wait...");
             int remainingChangedCount = await OnlineServices.SyncFilesAsync(
                 manifest,
                 _dataRoot,
