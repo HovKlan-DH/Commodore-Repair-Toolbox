@@ -5788,6 +5788,25 @@ public partial class TabSchematics : UserControl
     }
 
     // ###########################################################################################
+    // Applies saved KiCad mirror flags onto the calibration-box coordinates by swapping edges.
+    // Calibration mode encodes mirroring by having Left>Right and/or Top>Bottom.
+    // ###########################################################################################
+    private void ApplyKiCadCalibrationMirrorFlagsToBox(bool mirrorX, bool mirrorY)
+    {
+        if (mirrorX)
+        {
+            (this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight) =
+                (this.thisKiCadCalibrationImageRight, this.thisKiCadCalibrationImageLeft);
+        }
+
+        if (mirrorY)
+        {
+            (this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom) =
+                (this.thisKiCadCalibrationImageBottom, this.thisKiCadCalibrationImageTop);
+        }
+    }
+    
+    // ###########################################################################################
     // Applies keyboard move, expand, or shrink operations to the KiCad trace calibration box.
     // Arrow keys move by 1 px, Shift expands in the pressed direction, and Alt shrinks from
     // the opposite side of the pressed direction, matching the component label editor behavior.
@@ -13072,6 +13091,23 @@ public partial class TabSchematics : UserControl
         this.thisKiCadCalibrationImageTop = imageBounds.Top;
         this.thisKiCadCalibrationImageRight = imageBounds.Right;
         this.thisKiCadCalibrationImageBottom = imageBounds.Bottom;
+
+        // Load persisted mirror flags and re-apply them onto the calibration box.
+        string excelPath = this.MainWindow?.GetCurrentBoardExcelPath() ?? string.Empty;
+        string schematicName = this.GetCurrentSchematicName();
+        if (BoardComponentHighlightStorage.TryLoadKiCadCalibration(
+                excelPath,
+                schematicName,
+                out _,
+                out _,
+                out _,
+                out _,
+                out _,
+                out bool mirrorX,
+                out bool mirrorY))
+        {
+            this.ApplyKiCadCalibrationMirrorFlagsToBox(mirrorX, mirrorY);
+        }
 
         this.thisKiCadCalibrationStartImageLeft = this.thisKiCadCalibrationImageLeft;
         this.thisKiCadCalibrationStartImageTop = this.thisKiCadCalibrationImageTop;

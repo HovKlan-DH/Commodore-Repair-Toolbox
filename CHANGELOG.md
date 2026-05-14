@@ -1,1 +1,2 @@
+- Fixed KiCad calibration points would be reset after using component label editor
 - Changed banner for updating data from online source to show specific files being updated

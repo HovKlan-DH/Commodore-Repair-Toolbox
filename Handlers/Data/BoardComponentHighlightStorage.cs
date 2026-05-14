@@ -134,17 +134,24 @@ namespace Handlers.DataHandling
                 throw new InvalidOperationException("Could not resolve board highlight JSON path.");
             }
 
-            BoardComponentHighlightJsonRoot root = thisLoadRoot(jsonPath);
-
-            if (root.ComponentHighlights == null)
-            {
-                root.ComponentHighlights = new Dictionary<string, Dictionary<string, List<BoardComponentHighlightJsonRect>>>(StringComparer.OrdinalIgnoreCase);
-            }
-
             string normalizedSchematicName = schematicName?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(normalizedSchematicName))
             {
                 throw new InvalidOperationException("No schematic name was provided for highlight JSON save.");
+            }
+
+            // Load full JSON so we do not destroy other roots (e.g. "KiCad calibration points").
+            JsonObject rootObject = LoadJsonRootObject(jsonPath);
+
+            JsonObject highlightsRoot;
+            if (rootObject["Component highlights"] is JsonObject existingHighlightsRoot)
+            {
+                highlightsRoot = existingHighlightsRoot;
+            }
+            else
+            {
+                highlightsRoot = new JsonObject();
+                rootObject["Component highlights"] = highlightsRoot;
             }
 
             var schematicRows = rows
@@ -152,29 +159,39 @@ namespace Handlers.DataHandling
                 .Where(item => !string.IsNullOrWhiteSpace(item.BoardLabel))
                 .GroupBy(item => item.BoardLabel.Trim(), StringComparer.OrdinalIgnoreCase)
                 .OrderBy(group => group.Key, BoardLabelNaturalComparer)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group
-                        .OrderBy(item => item.Y)
-                        .ThenBy(item => item.X)
-                        .Select(item => new BoardComponentHighlightJsonRect
-                        {
-                            X = RoundToInt(item.X),
-                            Y = RoundToInt(item.Y),
-                            Width = RoundToInt(item.Width),
-                            Height = RoundToInt(item.Height)
-                        })
-                        .ToList(),
-                    StringComparer.OrdinalIgnoreCase);
+                .ToList();
 
-            root.ComponentHighlights[normalizedSchematicName] = schematicRows;
+            var schematicObject = new JsonObject();
 
-            root.ComponentHighlights = root.ComponentHighlights
-                .OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(
-                    item => item.Key,
-                    item => item.Value,
-                    StringComparer.OrdinalIgnoreCase);
+            foreach (var group in schematicRows)
+            {
+                var rectArray = new JsonArray();
+
+                foreach (var item in group
+                             .OrderBy(r => r.Y)
+                             .ThenBy(r => r.X))
+                {
+                    rectArray.Add(new JsonObject
+                    {
+                        ["X"] = RoundToInt(item.X),
+                        ["Y"] = RoundToInt(item.Y),
+                        ["Width"] = RoundToInt(item.Width),
+                        ["Height"] = RoundToInt(item.Height)
+                    });
+                }
+
+                schematicObject[group.Key] = rectArray;
+            }
+
+            highlightsRoot[normalizedSchematicName] = schematicObject;
+
+            // Keep stable ordering at the root level (matches KiCad calibration save behavior).
+            JsonObject orderedRootObject = new();
+
+            foreach (var property in rootObject.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                orderedRootObject[property.Key] = property.Value?.DeepClone();
+            }
 
             string directory = Path.GetDirectoryName(jsonPath) ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(directory))
@@ -182,7 +199,11 @@ namespace Handlers.DataHandling
                 Directory.CreateDirectory(directory);
             }
 
-            string json = JsonSerializer.Serialize(root, JsonSerializerOptions);
+            string json = orderedRootObject.ToJsonString(new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
             File.WriteAllText(jsonPath, json);
         }
 
