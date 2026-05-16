@@ -74,17 +74,22 @@ When a new version is released it will be shown to you in the application, and y
   - **310378** (C128 and C128D, plastic cabinet)
     - Covers _all_ components
     - Oscilloscope baseline measurements for PAL and NTSC
+    - Interactive (KiCad) traces and netlists
   - **250477** (C128DCR, metal cabinet)
     - Covers _all_ components
     - Would appreciate help with:
       - Oscilloscope baseline for NTSC
+- **ZX Spectrum 16K/48K**
+  - **Issue 4**
+    - Interactive (KiCad) traces and netlists
+    - Would appreciate help with:
+      - Oscilloscope baseline for PAL and NTSC (not sure if they have differences for these regions?)
 
 
 ### Data contributions being worked on currently
 
 - **@Rabs** is doing an oscilloscope baseline for **Amstrad CPC 664**
 - I will do the **PAL** oscilloscope baseline for **C128 DCR** - just need some time
-- I will add the **ZX Spectrum 16K/48K Issue 4** board (with KiCad data)
 - Please let me know if you want to contribute with something, so it can be visualized here to avoid duplicate work.
 
 
