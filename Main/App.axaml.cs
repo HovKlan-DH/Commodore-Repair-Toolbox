@@ -154,17 +154,12 @@ namespace CRT
 
         // ###########################################################################################
         // Returns the effective checksum manifest URL for the current build and user setting.
-        // RELEASE builds always use the production source, while DEBUG builds may opt into TEST.
         // ###########################################################################################
         public static string GetChecksumsUrl()
         {
-#if DEBUG
             return UserSettings.DownloadDataFromTestSource
                 ? ChecksumsUrl_test
                 : ChecksumsUrl;
-#else
-            return ChecksumsUrl;
-#endif
         }
 
     }

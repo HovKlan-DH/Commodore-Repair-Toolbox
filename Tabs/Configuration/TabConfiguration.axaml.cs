@@ -437,8 +437,8 @@ namespace CRT
 
         // ###########################################################################################
         // Persists whether data should be fetched from the BETA manifest source instead of
-        // the production source. When launch-time data sync is enabled, switching source also
-        // performs an immediate refresh so the selected source takes effect right away.
+        // the production source. Enabling it performs an immediate refresh so the selected source
+        // takes effect right away, while disabling it applies on next application launch.
         // ###########################################################################################
         private async void OnDownloadDataFromTestSourceChanged(object? sender, RoutedEventArgs e)
         {
@@ -448,6 +448,11 @@ namespace CRT
             if (!UserSettings.CheckDataOnLaunch)
             {
                 this.UpdateDownloadDataFromTestSourceCheckBoxState();
+                return;
+            }
+
+            if (!isEnabled)
+            {
                 return;
             }
 
