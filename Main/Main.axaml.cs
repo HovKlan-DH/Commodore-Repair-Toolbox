@@ -387,6 +387,11 @@ namespace CRT
                 {
                     this.ShowMainExcelRequiresAppUpdateBanner();
                 }
+
+                if (UserSettings.AllowDeletionOfOrphanAndNonUsedFiles)
+                {
+                    _ = DataManager.DeleteOrphanAndUnusedFilesAsync();
+                }
             }
             finally
             {
@@ -496,6 +501,11 @@ namespace CRT
                 else
                 {
                     this.SyncBanner.IsVisible = false;
+                }
+
+                if (UserSettings.AllowDeletionOfOrphanAndNonUsedFiles)
+                {
+                    _ = DataManager.DeleteOrphanAndUnusedFilesAsync();
                 }
             }
             catch (Exception ex)
