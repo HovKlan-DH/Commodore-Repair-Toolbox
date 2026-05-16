@@ -68,7 +68,7 @@ namespace CRT
         // URL to the JSON manifest listing all data files and their SHA-256 checksums.
         // Used by: OnlineServices.FetchManifestAsync
         public const string ChecksumsUrl = "https://classic-repair-toolbox.dk/app-data/dataChecksums.json";
-        public const string ChecksumsUrl_test = "https://classic-repair-toolbox.dk/app-data-TEST/dataChecksums.json";
+        public const string ChecksumsUrl_test = "https://classic-repair-toolbox.dk/app-data-BETA/dataChecksums.json";
 
         // URL for the phone-home version check endpoint.
         // Used by: OnlineServices.CheckInVersionAsync
