@@ -1275,11 +1275,17 @@ namespace Handlers.DataHandling
         // ###########################################################################################
         private static HashSet<string> CollectAllReferencedDataFiles(string dataRootFullPath)
         {
-            var mappedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var mappedFiles = new HashSet<string>(
+                OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+                    ? StringComparer.OrdinalIgnoreCase
+                    : StringComparer.Ordinal);
 
             thisAddMappedFilesFromManifestSnapshot(mappedFiles, dataRootFullPath);
 
             var mainExcelRelativePaths = thisGetAllMainExcelRelativePaths(dataRootFullPath);
+
+            Logger.Info(
+                $"Orphan cleanup discovered [{mainExcelRelativePaths.Count}] main Excel data files: [{string.Join(" | ", mainExcelRelativePaths)}]");
 
             foreach (string mainExcelRelativePath in mainExcelRelativePaths)
             {

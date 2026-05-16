@@ -684,6 +684,7 @@ public partial class TabSchematics : UserControl
         {
             bool willBeExpanded = !this.ImportantSignalsListPanel.IsVisible;
             this.UpdateImportantSignalsPanelExpandedState(willBeExpanded);
+            this.UpdateImportantSignalsClearButtonState(this.ImportantSignalsPanel.IsVisible);
             UserSettings.SchematicsImportantSignalsPanelExpanded = willBeExpanded;
         };
 
@@ -13010,12 +13011,16 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     // Updates the visibility and enabled state of the Important signals clear button.
     // The button stays visible whenever the panel has content, but is disabled when nothing is selected.
+    // When the panel is collapsed and nothing is selected, the button is hidden to save space.
     // ###########################################################################################
     private void UpdateImportantSignalsClearButtonState(bool hasVisibleImportantSignalsContent)
     {
         bool hasAnythingToClear = this.thisSelectedImportantSignalDisplayNames.Count > 0;
+        bool isExpanded = this.ImportantSignalsListPanel.IsVisible;
 
-        this.ClearImportantSignalsButton.IsVisible = hasVisibleImportantSignalsContent;
+        bool shouldShowButton = hasVisibleImportantSignalsContent && (isExpanded || hasAnythingToClear);
+
+        this.ClearImportantSignalsButton.IsVisible = shouldShowButton;
         this.ClearImportantSignalsButton.IsEnabled = hasAnythingToClear;
     }
 
