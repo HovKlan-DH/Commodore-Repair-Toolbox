@@ -1287,9 +1287,24 @@ namespace Handlers.DataHandling
             Logger.Info(
                 $"Orphan cleanup discovered [{mainExcelRelativePaths.Count}] main Excel data files: [{string.Join(" | ", mainExcelRelativePaths)}]");
 
-            foreach (string mainExcelRelativePath in mainExcelRelativePaths)
+            string resolvedMainExcelRelativePath = thisNormalizeRelativePath(ResolvedMainExcelFileName);
+
+            if (!string.IsNullOrWhiteSpace(resolvedMainExcelRelativePath))
             {
-                thisAddMappedFilesFromMainExcel(mappedFiles, dataRootFullPath, mainExcelRelativePath);
+                Logger.Info(
+                    $"Orphan cleanup will map only resolved main Excel data file: [{resolvedMainExcelRelativePath}]");
+
+                thisAddMappedFilesFromMainExcel(mappedFiles, dataRootFullPath, resolvedMainExcelRelativePath);
+            }
+            else
+            {
+                Logger.Warning(
+                    "Orphan cleanup did not have a resolved main Excel data file name; mapping all discovered main Excel files");
+
+                foreach (string mainExcelRelativePath in mainExcelRelativePaths)
+                {
+                    thisAddMappedFilesFromMainExcel(mappedFiles, dataRootFullPath, mainExcelRelativePath);
+                }
             }
 
             Logger.Info(
