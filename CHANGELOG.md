@@ -1,3 +1,9 @@
-- Fixed KiCad calibration points would be reset after using component label editor
-- Changed banner for updating data from online source to show specific files being updated
-- Changed "Clear All" button will not be shown in collapsed "Important signals" when no selected signals
+- **New**
+  - Added option to download data from BETA source
+    - Should only be used in agreement with developer, as data can be incomplete or even broken for some parts
+    - Used to test new functionalities, and should not be used as a normal data source!
+- **Changed**
+  - Banner for updating data from online source to show specific files being updated
+  - "Clear All" button will not be shown in collapsed "Important signals" when no selected signals
+- **Fixed**
+  - KiCad calibration points would be reset after using component label editor

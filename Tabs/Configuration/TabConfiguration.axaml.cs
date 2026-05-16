@@ -35,10 +35,9 @@ namespace CRT
 
             this.UpdateAllowDeletionOfOrphanAndNonUsedFilesCheckBoxState();
 
-            this.DownloadDataFromTestSourceCheckBox.IsVisible = AppConfig.IsDebugBuild;
-            this.DownloadDataFromTestSourceCheckBox.IsEnabled = AppConfig.IsDebugBuild;
-            this.DownloadDataFromTestSourceCheckBox.IsChecked =
-                AppConfig.IsDebugBuild && UserSettings.DownloadDataFromTestSource;
+            this.DownloadDataFromTestSourceCheckBox.IsVisible = true;
+            this.DownloadDataFromTestSourceCheckBox.IsChecked = UserSettings.DownloadDataFromTestSource;
+            this.UpdateDownloadDataFromTestSourceCheckBoxState();
 
             this.ThemeVariantComboBox.SelectionChanged += this.OnThemeVariantSelectionChanged;
             this.CheckVersionOnLaunchCheckBox.IsCheckedChanged += this.OnCheckVersionOnLaunchChanged;
@@ -47,6 +46,16 @@ namespace CRT
             this.DownloadDataFromTestSourceCheckBox.IsCheckedChanged += this.OnDownloadDataFromTestSourceChanged;
             this.ShowDevelopmentVersionNotificationCheckBox.IsCheckedChanged += this.OnShowDevelopmentVersionNotificationChanged;
             this.MultipleInstancesForComponentPopupCheckBox.IsCheckedChanged += this.OnMultipleInstancesForComponentPopupChanged;
+        }
+
+        // ###########################################################################################
+        // Keeps the "Download data from BETA source" checkbox enabled only while launch-time data sync
+        // is enabled, without changing the stored source preference.
+        // ###########################################################################################
+        private void UpdateDownloadDataFromTestSourceCheckBoxState()
+        {
+            bool isCheckDataOnLaunchEnabled = this.CheckDataOnLaunchCheckBox.IsChecked == true;
+            this.DownloadDataFromTestSourceCheckBox.IsEnabled = isCheckDataOnLaunchEnabled;
         }
 
         // ###########################################################################################
@@ -133,6 +142,7 @@ namespace CRT
             bool isEnabled = this.CheckDataOnLaunchCheckBox.IsChecked == true;
             UserSettings.CheckDataOnLaunch = isEnabled;
             this.UpdateAllowDeletionOfOrphanAndNonUsedFilesCheckBoxState();
+            this.UpdateDownloadDataFromTestSourceCheckBoxState();
 
             if (!isEnabled)
             {
@@ -155,6 +165,7 @@ namespace CRT
             this.thisSuppressCheckDataOnLaunchChanged = true;
             this.CheckDataOnLaunchCheckBox.IsChecked = isChecked;
             this.UpdateAllowDeletionOfOrphanAndNonUsedFilesCheckBoxState();
+            this.UpdateDownloadDataFromTestSourceCheckBoxState();
             this.thisSuppressCheckDataOnLaunchChanged = false;
         }
 
@@ -425,86 +436,18 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Starts an external process with arguments and records diagnostic details for each attempt.
-        // ###########################################################################################
-/*
-        private static bool TryStartProcess(
-            string fileName,
-            System.Collections.Generic.List<string> attempts,
-            params string[] arguments)
-        {
-            string argumentText = arguments.Length == 0 ? "(none)" : string.Join(" ", arguments);
-
-            try
-            {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = fileName,
-                    UseShellExecute = false,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true
-                };
-
-                foreach (var argument in arguments)
-                {
-                    psi.ArgumentList.Add(argument);
-                }
-
-                using var process = Process.Start(psi);
-
-                if (process == null)
-                {
-                    attempts.Add($"Command [{fileName}] args [{argumentText}] did not start a process");
-                    return false;
-                }
-
-                if (process.WaitForExit(2000))
-                {
-                    string standardOutput = process.StandardOutput.ReadToEnd().Trim();
-                    string standardError = process.StandardError.ReadToEnd().Trim();
-
-                    if (process.ExitCode == 0)
-                    {
-                        attempts.Add($"Command [{fileName}] args [{argumentText}] succeeded with exit code [0]");
-                        return true;
-                    }
-
-                    attempts.Add(
-                        $"Command [{fileName}] args [{argumentText}] failed with exit code [{process.ExitCode}] output [{standardOutput}] error [{standardError}]");
-                    return false;
-                }
-
-                attempts.Add($"Command [{fileName}] args [{argumentText}] started and is still running");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                attempts.Add($"Command [{fileName}] args [{argumentText}] threw [{ex.GetType().Name}: {ex.Message}]");
-                return false;
-            }
-        }
-*/
-
-        // ###########################################################################################
-        // Persists whether DEBUG builds should fetch data from the TEST manifest source instead of
+        // Persists whether data should be fetched from the BETA manifest source instead of
         // the production source. When launch-time data sync is enabled, switching source also
         // performs an immediate refresh so the selected source takes effect right away.
         // ###########################################################################################
         private async void OnDownloadDataFromTestSourceChanged(object? sender, RoutedEventArgs e)
         {
-            if (!AppConfig.IsDebugBuild)
-            {
-                this.DownloadDataFromTestSourceCheckBox.IsChecked = false;
-                this.DownloadDataFromTestSourceCheckBox.IsVisible = false;
-                this.DownloadDataFromTestSourceCheckBox.IsEnabled = false;
-                return;
-            }
-
             bool isEnabled = this.DownloadDataFromTestSourceCheckBox.IsChecked == true;
             UserSettings.DownloadDataFromTestSource = isEnabled;
 
             if (!UserSettings.CheckDataOnLaunch)
             {
+                this.UpdateDownloadDataFromTestSourceCheckBoxState();
                 return;
             }
 
