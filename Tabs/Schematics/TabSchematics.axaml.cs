@@ -12555,7 +12555,7 @@ public partial class TabSchematics : UserControl
             this.thisLockedKiCadNetNames.Count > 0 ||
             this.thisSelectedImportantSignalDisplayNames.Count > 0;
 
-        this.ClearKiCadTraceSelectionButton.IsVisible = hasVisibleNetlistContent;
+        this.ClearKiCadTraceSelectionButton.IsVisible = hasAnythingToClear;
         this.ClearKiCadTraceSelectionButton.IsEnabled = hasAnythingToClear;
     }
 

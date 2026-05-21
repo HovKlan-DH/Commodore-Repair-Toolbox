@@ -7,7 +7,7 @@
 		<Authors>Dennis Helligsø</Authors>
 		<Copyright>©2025-2026</Copyright>
 		<AssemblyName>Classic-Repair-Toolbox</AssemblyName>
-		<AssemblyVersion>2.1.1003</AssemblyVersion>
+		<AssemblyVersion>2.2.0</AssemblyVersion>
         <OutputType>WinExe</OutputType>
 		<TargetFrameworks>net10.0</TargetFrameworks>
 		<RollForward>LatestMajor</RollForward>
@@ -15,7 +15,7 @@
         <ApplicationManifest>Main\app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-        <RuntimeIdentifiers>win-x86;win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
+        <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
         <PackageProjectUrl>https://github.com/HovKlan-DH/Classic-Repair-Toolbox</PackageProjectUrl>
         <PackageIcon>CRT_icon.png</PackageIcon>
         <ApplicationIcon>Assets\CRT_icon.ico</ApplicationIcon>
@@ -25,11 +25,11 @@
 </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="12.0.2" />
-    <PackageReference Include="Avalonia.Desktop" Version="12.0.2" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.2" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.2" />
-	<PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.0.2" />
+    <PackageReference Include="Avalonia" Version="12.0.3" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.0.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.3" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.3" />
+	<PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.0.3" />
     <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.1" />
     <PackageReference Include="EPPlus" Version="8.5.4" />
     <PackageReference Include="Velopack" Version="0.0.1298" />
