@@ -6,7 +6,7 @@
       - Should only be used in agreement with developer, as data can be incomplete or even broken for some parts
       - Used to test new functionalities, and should not be used as a normal data source!
   - **Changed**
-    - Banner will show filenames when updating data from online source to show specific files being updated
+    - Banner will show filenames when updating data from online source
     - "Clear All" button will not be shown in collapsed "Important signals" when no selected signals
     - "Clear All" button will not be shown in "Netlist names" when no selected signals
   - **Fixed**
