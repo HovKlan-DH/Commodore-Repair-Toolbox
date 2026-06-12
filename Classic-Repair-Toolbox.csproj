@@ -80,10 +80,15 @@
 	<PropertyGroup>
 		<MiniproRid>$(RuntimeIdentifier)</MiniproRid>
 		<MiniproRid Condition="'$(MiniproRid)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">win-x64</MiniproRid>
+		<!--
 		<MiniproRid Condition="'$(MiniproRid)' == '' And $([MSBuild]::IsOSPlatform('Linux'))">linux-x64</MiniproRid>
 		<MiniproRid Condition="'$(MiniproRid)' == '' And $([MSBuild]::IsOSPlatform('OSX'))">osx-x64</MiniproRid>
+		-->
 	</PropertyGroup>
+	<!--
 	<ItemGroup Condition="'$(MiniproRid)' != '' And Exists('Assets/MiniPro/$(MiniproRid)')">
+	-->
+	<ItemGroup Condition="'$(MiniproRid)' != '' And Exists('Assets/MiniPro/$(MiniproRid)') And !$(MiniproRid.StartsWith('linux'))">
 		<Content Include="Assets/MiniPro/$(MiniproRid)/**/*">
 			<Link>%(Filename)%(Extension)</Link>
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
