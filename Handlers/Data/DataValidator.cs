@@ -80,6 +80,7 @@ namespace Handlers.DataHandling
 
                 ValidateBoardUuids(contextName, boardData, seenUuids);
                 ValidateOrphanComponents(contextName, boardData);
+                ValidatePartNumberConsistency(contextName, boardData);
             }
 
             Logger.Info("Background data validation complete");
@@ -356,6 +357,39 @@ namespace Handlers.DataHandling
                 link => link.BoardLabel,
                 link => $"component link [{link.BoardLabel.Trim()}] name [{link.Name.Trim()}]",
                 componentLabels);
+        }
+
+        // ###########################################################################################
+        // Flags likely Part-number copy-paste errors: a Commodore part number identifies ONE chip,
+        // so the same Part-number attached to IC components with different Technical names is almost
+        // certainly wrong (e.g. on the C64 250407 the PLA U17 carries the 4066's part-number). The IC
+        // test deliberately matches on Technical name, not Part-number, for exactly this reason.
+        // ###########################################################################################
+        private static void ValidatePartNumberConsistency(string excelDataFile, BoardData boardData)
+        {
+            var byPartNumber = new Dictionary<string, (HashSet<string> Names, List<string> Labels)>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in boardData.Components)
+            {
+//                if (!string.Equals(c.Category?.Trim(), "IC", StringComparison.OrdinalIgnoreCase))
+//                    continue;
+                string partNumber = (c.PartNumber ?? string.Empty).Trim();
+                string technicalName = (c.TechnicalNameOrValue ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(partNumber) || string.IsNullOrWhiteSpace(technicalName))
+                    continue;
+                if (!byPartNumber.TryGetValue(partNumber, out var agg))
+                {
+                    agg = (new HashSet<string>(StringComparer.OrdinalIgnoreCase), new List<string>());
+                    byPartNumber[partNumber] = agg;
+                }
+                agg.Names.Add(technicalName);
+                agg.Labels.Add(c.BoardLabel.Trim());
+            }
+
+            foreach (var (partNumber, agg) in byPartNumber)
+            {
+                if (agg.Names.Count > 1)
+                    Logger.Warning($"Excel data file [{excelDataFile}] sheet [Components] has part-number [{partNumber}] used by components with different technical names [{string.Join(", ", agg.Names)}] for board labels ({string.Join(", ", agg.Labels)}) - please fix!");
+            }
         }
 
         // ###########################################################################################

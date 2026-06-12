@@ -1,0 +1,9 @@
+minipro — open-source command-line programmer for TL866/T48-class devices.
+
+This bundled minipro.exe is cross-compiled (native WinUSB backend, no libusb DLL,
+no Zadig) from  https://github.com/KevinWelton/minipro-win  (a Windows fork of
+https://gitlab.com/DavidGriffith/minipro ) with two small patches — see
+tools/build-minipro.sh. It is used only for the logic/PLA vector tests (which feed
+their vectors via --logicic, so no device DB is bundled). minipro is licensed
+GPL-3.0; Classic Repair Toolbox is also GPL-3.0, and minipro runs as a separate
+subprocess (mere aggregation).

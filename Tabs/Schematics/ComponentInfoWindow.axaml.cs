@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Handlers.DataHandling;
+using Handlers.IcTesting;
 using Handlers.Oscilloscope;
 using System;
 using System.Collections.Generic;
@@ -1354,7 +1355,52 @@ namespace CRT
             bool hasDescription = !string.IsNullOrWhiteSpace(description);
             this.OneLinerSection.IsVisible = hasDescription;
             this.InfoDescription.Text = hasDescription ? description.Trim() : string.Empty;
+
+            this.UpdateTestAffordance(entry);
         }
+
+        private IcTestEntry? _activeTestEntry;
+
+// ###########################################################################################
+// Shows the "Test this IC" affordance only for IC components that have a test-catalogue
+// entry (matched on Technical name/value, not the unreliable Part-number). Functional-only
+// parts show a disabled button with an honest label.
+// ###########################################################################################
+private void UpdateTestAffordance(ComponentEntry? entry)
+{
+    this._activeTestEntry = null;
+    bool isIc = string.Equals(entry?.Category?.Trim(), "IC", StringComparison.OrdinalIgnoreCase);
+    var cat = isIc ? IcTestCatalogue.Lookup(entry!.TechnicalNameOrValue) : null;
+    if (cat is null)
+    {
+        this.TestSection.IsVisible = false;
+        return;
+    }
+    this._activeTestEntry = cat;
+    Logger.Info($"IC test affordance shown for [{this._boardLabel}] [{entry!.TechnicalNameOrValue}] (kind={cat.Kind}, support={cat.Support})");
+    this.TestSection.IsVisible = true;
+    this.TestButton.IsEnabled = cat.IsTestable;
+    this.TestButton.Content = cat.IsTestable ? "Test this IC" : "Test (functional-only)";
+    this.TestCaptionText.Text = cat.IsTestable
+        ? DescribeCoverage(cat) + " - chip out of the board, in the T48."
+        : "Sequential part: a vector test is a functional check, not exhaustive.";
+}
+
+private static string DescribeCoverage(IcTestEntry e) => e.Kind switch
+{
+    "pla" => $"Exhaustive PLA test ({e.VectorCount} vectors)",
+    "rom" => "ROM verify (hash compare)",
+    "logic-combinational" => $"Exhaustive logic test ({e.Vectors?.Count ?? 0} vectors)",
+    _ => "Test",
+};
+
+private void OnTestClick(object? sender, RoutedEventArgs e)
+{
+    if (this._activeTestEntry is null) return;
+    Logger.Info($"Opening IC test window for [{this._boardLabel}] [{this._activeTestEntry.Id}]");
+    if (this.Owner is Main mainOwner)
+        mainOwner.OpenIcTestWindow(this._activeTestEntry, this._boardLabel);
+}
 
         // ###########################################################################################
         // Queues oscilloscope auto-sync for the currently selected image.

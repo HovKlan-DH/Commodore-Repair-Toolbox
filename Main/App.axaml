@@ -252,7 +252,7 @@
         </FluentTheme>
 
 		<!-- ### -->
-		
+
 		<!-- Tab, Hover -->
 		<Style Selector="TabItem:pointerover /template/ Border#PART_SelectedPipe">
 			<Setter Property="Background" Value="{DynamicResource Main_TabUnderline_Hover}" />

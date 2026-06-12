@@ -420,6 +420,12 @@
 										 Foreground="{DynamicResource Fg}"
 										 IsVisible="False" />
 
+					<!-- IC test (shown only for ICs with a test-catalogue entry) -->
+					<StackPanel x:Name="TestSection" IsVisible="False" Spacing="4" Margin="0,8,0,0">
+						<Button x:Name="TestButton" Content="Test this IC" HorizontalAlignment="Left" Click="OnTestClick" />
+						<TextBlock x:Name="TestCaptionText" FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource Fg}" />
+					</StackPanel>
+					
 					<!-- 3. Component one-liner (hidden when empty) -->
 					<StackPanel x:Name="OneLinerSection"
 								IsVisible="False"

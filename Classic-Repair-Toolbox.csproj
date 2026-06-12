@@ -7,7 +7,7 @@
 		<Authors>Dennis Helligsø</Authors>
 		<Copyright>©2025-2026</Copyright>
 		<AssemblyName>Classic-Repair-Toolbox</AssemblyName>
-		<AssemblyVersion>2.2.0</AssemblyVersion>
+		<AssemblyVersion>2.2.999</AssemblyVersion>
         <OutputType>WinExe</OutputType>
 		<TargetFrameworks>net10.0</TargetFrameworks>
 		<RollForward>LatestMajor</RollForward>
@@ -36,24 +36,24 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="Tabs\Feedback\TabFeedback.axaml.cs">
+    <Compile Update="Tabs/Feedback/TabFeedback.axaml.cs">
       <DependentUpon>TabFeedback.axaml</DependentUpon>
     </Compile>
-    <Compile Update="Main\Main.axaml.cs">
+    <Compile Update="Main/Main.axaml.cs">
       <DependentUpon>Main.axaml</DependentUpon>
     </Compile>
-    <Compile Update="Tabs\Oscilloscope\TabOscilloscope.axaml.cs">
+    <Compile Update="Tabs/Oscilloscope/TabOscilloscope.axaml.cs">
       <DependentUpon>TabOscilloscope.axaml</DependentUpon>
     </Compile>
-    <Compile Update="Tabs\Overview\TabOverview.axaml.cs">
+    <Compile Update="Tabs/Overview/TabOverview.axaml.cs">
       <DependentUpon>TabOverview.axaml</DependentUpon>
     </Compile>
-    <Compile Update="Properties\Resources.Designer.cs">
+    <Compile Update="Properties/Resources.Designer.cs">
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <Compile Update="Main\Splash.axaml.cs">
+    <Compile Update="Main/Splash.axaml.cs">
       <DependentUpon>Splash.axaml</DependentUpon>
     </Compile>
   </ItemGroup>
@@ -64,31 +64,50 @@
  </ItemGroup>
  -->
 	<ItemGroup>
-		<AvaloniaResource Include="Assets\CRT_icon.png" />
-		<AvaloniaResource Include="Assets\Fonts\*.otf" />
+		<AvaloniaResource Include="Assets/CRT_icon.png" />
+		<AvaloniaResource Include="Assets/Fonts/*.otf" />
 	</ItemGroup>
 
   <ItemGroup>
-    <Content Include="Assets\CRT_icon.ico" />
+    <Content Include="Assets/CRT_icon.ico" />
   </ItemGroup>
 
+	<!--
+	Bundled MiniPro, per-RID, flattened next to the EXE (so "MiniproProcessRunner.ResolveBinary" finds 
+	it via "AppContext.BaseDirectory"). A RID-targeted publish uses the RID as-is; a plain dev build 
+	(no RID) falls back to the host OS's natural RID so the committed "minipro.exe" is staged automatically. 
+	-->
+	<PropertyGroup>
+		<MiniproRid>$(RuntimeIdentifier)</MiniproRid>
+		<MiniproRid Condition="'$(MiniproRid)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">win-x64</MiniproRid>
+		<MiniproRid Condition="'$(MiniproRid)' == '' And $([MSBuild]::IsOSPlatform('Linux'))">linux-x64</MiniproRid>
+		<MiniproRid Condition="'$(MiniproRid)' == '' And $([MSBuild]::IsOSPlatform('OSX'))">osx-x64</MiniproRid>
+	</PropertyGroup>
+	<ItemGroup Condition="'$(MiniproRid)' != '' And Exists('Assets/MiniPro/$(MiniproRid)')">
+		<Content Include="Assets/MiniPro/$(MiniproRid)/**/*">
+			<Link>%(Filename)%(Extension)</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Pack>false</Pack>
+		</Content>
+	</ItemGroup>
+
     <ItemGroup>
-        <AvaloniaResource Include="Assets\Changelog.txt" />
+        <AvaloniaResource Include="Assets/Changelog.txt" />
     </ItemGroup>
 
   <ItemGroup>
-    <None Include=".github\copilot-instructions.md" />
+    <None Include=".github/copilot-instructions.md" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Update="Properties\Resources.resx">
+    <EmbeddedResource Update="Properties/Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
 
     <ItemGroup>
-	    <AvaloniaResource Update="Assets\CRT_icon.png">
+	    <AvaloniaResource Update="Assets/CRT_icon.png">
 		    <Pack>True</Pack>
 		    <PackagePath>\</PackagePath>
 	    </AvaloniaResource>
