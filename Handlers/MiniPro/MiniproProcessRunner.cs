@@ -25,11 +25,12 @@ public sealed class MiniproProcessRunner : IMiniproRunner
     {
         if (!string.IsNullOrWhiteSpace(_explicitPath) && File.Exists(_explicitPath))
             return _explicitPath;
-        // Bundled next to the executable (per-RID), resolved via AppContext.BaseDirectory.
-        var bundled = Path.Combine(AppContext.BaseDirectory, BinaryName);
-        if (File.Exists(bundled))
-            return bundled;
-        // Otherwise let the OS resolve it on PATH.
+        if (OperatingSystem.IsWindows())
+        {
+            var bundled = Path.Combine(AppContext.BaseDirectory, BinaryName);
+            if (File.Exists(bundled))
+                return bundled;
+        }
         return BinaryName;
     }
 
