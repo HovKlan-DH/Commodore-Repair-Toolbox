@@ -30,7 +30,7 @@ public static class IcTestCatalogue
 //        Path.Combine(AppContext.BaseDirectory, "Assets", "MiniPro", "IC-Tests", "catalogue");
 
     /// <summary>Directory holding external vector files (e.g. the PLA's gzipped XML).</summary>
-    public static string VectorsDir => _vectorsDir ?? Path.Combine(DataManager.DataRoot, "Generic shared files", "MiniPro", "IC tests", "Catalogue");
+    public static string VectorsDir => _vectorsDir ?? Path.Combine(DataManager.DataRoot, "Generic shared files", "MiniPro", "IC tests", "Vectors");
 //    public static string VectorsDir => _vectorsDir ?? Path.Combine(AppContext.BaseDirectory, "Assets", "MiniPro", "IC-Tests", "vectors");
 
     public static IReadOnlyList<IcTestEntry> Entries
