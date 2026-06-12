@@ -76,7 +76,7 @@ public static class IcTestCatalogue
             _entries = entries;
             _byMatch = index;
             // Vectors sit beside the catalogue dir when an explicit dir is given (tests).
-            _vectorsDir = dir is null ? null : Path.Combine(Path.GetDirectoryName(dir)!, "vectors");
+            _vectorsDir = dir is null ? null : Path.Combine(Path.GetDirectoryName(dir)!, "Vectors");
         }
     }
 
