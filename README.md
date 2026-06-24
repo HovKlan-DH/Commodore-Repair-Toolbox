@@ -49,7 +49,11 @@ When a new version is released it will be shown to you in the application, and y
 - **Amstrad CPC 664**
   - **MC0005A**
 - **Commodore VIC-20**
+  - **324003**
+    - Covers _all_ components
+    - Oscilloscope baseline measurements for PAL and NTSC
   - **250403** (CR)
+    - Covers _all_ components
     - Oscilloscope baseline measurements for PAL and NTSC
 - **Commodore 64**
   - **KU-14194HB**
