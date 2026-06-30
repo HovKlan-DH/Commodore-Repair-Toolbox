@@ -163,7 +163,7 @@ You can help specifically with these topics:
 
 There are several ways to get in contact with the developer:
 
-- Direct communication via [Retro Hardware Discord](https://discord.com/channels/@me/1474742006701101179/1518951677091250339) channel (accept invite on page)
+- Direct communication via [Retro Hardware Discord](https://discord.gg/kVTtdvZtzE) channel (accept invite on page)
 - CRT "Feedback" tab
 - GitHub [Issues](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/issues)
 
