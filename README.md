@@ -48,6 +48,9 @@ When a new version is released it will be shown to you in the application, and y
 
 - **Amstrad CPC 664**
   - **MC0005A**
+- **Commodore Plus/4**
+  - **310163**
+    - Oscilloscope baseline measurements for PAL and NTSC
 - **Commodore VIC-20**
   - **324003**
     - Covers _all_ components
@@ -83,9 +86,6 @@ When a new version is released it will be shown to you in the application, and y
     - Covers _all_ components
     - Would appreciate help with:
       - Oscilloscope baseline for NTSC
-- **Commodore Plus/4**
-  - **310163**
-    - Oscilloscope baseline measurements for PAL and NTSC
 - **ZX Spectrum 16K/48K**
   - **Issue 4**
     - Interactive (KiCad) traces and netlists
