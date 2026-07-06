@@ -83,6 +83,9 @@ When a new version is released it will be shown to you in the application, and y
     - Covers _all_ components
     - Would appreciate help with:
       - Oscilloscope baseline for NTSC
+- **Commodore Plus/4**
+  - **310163**
+    - Oscilloscope baseline measurements for PAL and NTSC
 - **ZX Spectrum 16K/48K**
   - **Issue 4**
     - Interactive (KiCad) traces and netlists
@@ -93,7 +96,6 @@ When a new version is released it will be shown to you in the application, and y
 ### Data contributions being worked on currently
 
 - **@Rabs** is doing an oscilloscope baseline for **Amstrad CPC 664**
-- **SX64man** is doing a new system for **Commodore Plus/4**
 - I will do the **PAL** oscilloscope baseline for **C128 DCR** - just need some time
 - Please let me know if you want to contribute with something, so it can be visualized here to avoid duplicate work.
 
