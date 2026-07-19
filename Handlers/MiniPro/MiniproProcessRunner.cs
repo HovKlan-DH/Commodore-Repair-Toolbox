@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,10 +32,52 @@ public sealed class MiniproProcessRunner : IMiniproRunner
             if (File.Exists(bundled))
                 return bundled;
         }
+        else if (TryFindOnCommonUnixPaths(BinaryName, out var found))
+        {
+            return found;
+        }
         return BinaryName;
     }
 
     private static string BinaryName => OperatingSystem.IsWindows() ? "minipro.exe" : "minipro";
+
+    // GUI apps on macOS are launched by launchd, which never sources ~/.profile or
+    // ~/.zprofile (those only run for interactive/login shells), so a minipro directory
+    // the user added there is invisible to Process.Start's inherited PATH even though it
+    // works fine from Terminal. Probe the common non-Windows install locations directly
+    // as a fallback so the app can find it regardless of how it was launched.
+    private static bool TryFindOnCommonUnixPaths(string binaryName, out string? found)
+    {
+        var candidates = new List<string>();
+        var path = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        candidates.AddRange(path.Split(Path.PathSeparator));
+
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        candidates.AddRange(new[]
+        {
+            "/usr/local/bin",
+            "/opt/homebrew/bin",
+            "/opt/homebrew/sbin",
+            "/usr/local/sbin",
+            Path.Combine(home, ".local", "bin"),
+        });
+
+        foreach (var dir in candidates.Distinct())
+        {
+            try
+            {
+                var candidate = Path.Combine(dir, binaryName);
+                if (File.Exists(candidate))
+                {
+                    found = candidate;
+                    return true;
+                }
+            }
+            catch { /* skip bad entry */ }
+        }
+        found = null;
+        return false;
+    }
 
     public async Task<MiniproRunResult> RunAsync(
         IReadOnlyList<string> args, IProgress<string>? output, CancellationToken ct)
@@ -42,6 +85,7 @@ public sealed class MiniproProcessRunner : IMiniproRunner
         var psi = new ProcessStartInfo
         {
             FileName = ResolveBinary(),
+            WorkingDirectory = AppContext.BaseDirectory,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

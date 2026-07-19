@@ -87,20 +87,10 @@ namespace CRT
             {
                 var bin = new MiniproProcessRunner().ResolveBinary();
                 if (string.IsNullOrEmpty(bin)) return false;
-                if (System.IO.File.Exists(bin)) return true;   // bundled next to the exe
-                // Bare name -> search PATH (minipro installed system-wide, e.g. /usr/local/bin).
-                var path = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-                foreach (var dir in path.Split(System.IO.Path.PathSeparator))
-                {
-                    try
-                    {
-                        if (System.IO.File.Exists(System.IO.Path.Combine(dir, bin)) ||
-                            System.IO.File.Exists(System.IO.Path.Combine(dir, bin + ".exe")))
-                            return true;
-                    }
-                    catch { /* skip bad PATH entry */ }
-                }
-                return false;
+                // ResolveBinary() now returns an absolute path whenever it found the binary
+                // (bundled, or via the PATH/common-install-dir probe); a bare name back here
+                // means it wasn't found anywhere reasonable.
+                return System.IO.Path.IsPathRooted(bin) && System.IO.File.Exists(bin);
             }
             catch
             {

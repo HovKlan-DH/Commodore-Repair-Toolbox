@@ -32,6 +32,7 @@ namespace CRT
                 UserSettings.AllowDeletionOfOrphanAndNonUsedFiles;
             this.ShowDevelopmentVersionNotificationCheckBox.IsChecked = UserSettings.ShowDevelopmentVersionNotification;
             this.MultipleInstancesForComponentPopupCheckBox.IsChecked = UserSettings.MultipleInstancesForComponentPopup;
+            this.EnableMiniproExperimentalModeCheckBox.IsChecked = UserSettings.EnableMiniproExperimentalMode;
 
             this.UpdateAllowDeletionOfOrphanAndNonUsedFilesCheckBoxState();
 
@@ -46,6 +47,7 @@ namespace CRT
             this.DownloadDataFromTestSourceCheckBox.IsCheckedChanged += this.OnDownloadDataFromTestSourceChanged;
             this.ShowDevelopmentVersionNotificationCheckBox.IsCheckedChanged += this.OnShowDevelopmentVersionNotificationChanged;
             this.MultipleInstancesForComponentPopupCheckBox.IsCheckedChanged += this.OnMultipleInstancesForComponentPopupChanged;
+            this.EnableMiniproExperimentalModeCheckBox.IsCheckedChanged += this.OnEnableMiniproExperimentalModeChanged;
         }
 
         // ###########################################################################################
@@ -175,6 +177,14 @@ namespace CRT
         private void OnShowDevelopmentVersionNotificationChanged(object? sender, RoutedEventArgs e)
         {
             UserSettings.ShowDevelopmentVersionNotification = this.ShowDevelopmentVersionNotificationCheckBox.IsChecked == true;
+        }
+
+        // ###########################################################################################
+        // Persists the "Enable experimental mode for Minipro" preference when the checkbox is toggled.
+        // ###########################################################################################
+        private void OnEnableMiniproExperimentalModeChanged(object? sender, RoutedEventArgs e)
+        {
+            UserSettings.EnableMiniproExperimentalMode = this.EnableMiniproExperimentalModeCheckBox.IsChecked == true;
         }
 
         // ###########################################################################################

@@ -538,6 +538,20 @@ namespace CRT
         }
 
         // ###########################################################################################
+        // Scales the per-notch zoom factor by the actual reported wheel delta magnitude, instead of
+        // only its sign. Avalonia's Linux/GTK/libinput backends can report smaller or larger deltas
+        // per PointerWheelChanged event than the Windows backend's normalized 1.0-per-notch value, so
+        // treating every event as a full step caused very coarse, aggressive zooming on Linux.
+        // A delta magnitude of 1.0 (a normal Windows notch) reduces this to exactly baseFactor.
+        // ###########################################################################################
+        private static double ComputeWheelZoomFactor(double deltaY, double baseFactor)
+        {
+            double magnitude = Math.Clamp(Math.Abs(deltaY), 0.1, 3.0);
+            double factor = Math.Pow(baseFactor, magnitude);
+            return deltaY > 0 ? factor : 1.0 / factor;
+        }
+
+        // ###########################################################################################
         // Intercepts scroll wheel events at the tunnel phase on the left panel and maps them to
         // thumbnail navigation. Scroll up → next (right), scroll down → previous (left).
         // ###########################################################################################
@@ -552,7 +566,7 @@ namespace CRT
             {
                 // We base our scaling layout transforms natively on the inner image dimensions accurately.
                 var pos = e.GetPosition(this.MainImageContainer);
-                double delta = e.Delta.Y > 0 ? 1.2 : 0.8333333333333334;
+                double delta = ComputeWheelZoomFactor(e.Delta.Y, 1.2);
 
                 double newScale = this._imageMatrix.M11 * delta;
 
@@ -1369,6 +1383,11 @@ namespace CRT
 private void UpdateTestAffordance(ComponentEntry? entry)
 {
     this._activeTestEntry = null;
+    if (!UserSettings.EnableMiniproExperimentalMode)
+    {
+        this.TestSection.IsVisible = false;
+        return;
+    }
     bool isIc = string.Equals(entry?.Category?.Trim(), "IC", StringComparison.OrdinalIgnoreCase);
     var cat = isIc ? IcTestCatalogue.Lookup(entry!.TechnicalNameOrValue) : null;
     if (cat is null)

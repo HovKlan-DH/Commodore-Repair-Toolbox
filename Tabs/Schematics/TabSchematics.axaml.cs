@@ -1032,13 +1032,25 @@ public partial class TabSchematics : UserControl
             return;
         }
 
-        double zoomFactor = e.Delta.Y > 0
-            ? AppConfig.SchematicsZoomFactor
-            : 1.0 / AppConfig.SchematicsZoomFactor;
+        double zoomFactor = ComputeWheelZoomFactor(e.Delta.Y, AppConfig.SchematicsZoomFactor);
 
         this.ApplySchematicsZoom(zoomFactor, zoomCenterInContainer);
 
         e.Handled = true;
+    }
+
+    // ###########################################################################################
+    // Scales the per-notch zoom factor by the actual reported wheel delta magnitude, instead of
+    // only its sign. Avalonia's Linux/GTK/libinput backends can report smaller or larger deltas
+    // per PointerWheelChanged event than the Windows backend's normalized 1.0-per-notch value, so
+    // treating every event as a full step caused very coarse, aggressive zooming on Linux.
+    // A delta magnitude of 1.0 (a normal Windows notch) reduces this to exactly baseFactor.
+    // ###########################################################################################
+    private static double ComputeWheelZoomFactor(double deltaY, double baseFactor)
+    {
+        double magnitude = Math.Clamp(Math.Abs(deltaY), 0.1, 3.0);
+        double factor = Math.Pow(baseFactor, magnitude);
+        return deltaY > 0 ? factor : 1.0 / factor;
     }
 
     // ###########################################################################################

@@ -38,6 +38,10 @@ namespace Handlers.DataHandling
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? MultipleInstancesForComponentPopup { get; set; }
 
+        [JsonPropertyName("enableMiniproExperimentalMode")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? EnableMiniproExperimentalMode { get; set; }
+
         [JsonPropertyName("contributorMode")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? ContributorMode { get; set; }
@@ -509,6 +513,17 @@ namespace Handlers.DataHandling
             }
         }
 
+        public static bool EnableMiniproExperimentalMode
+        {
+            get => _data.EnableMiniproExperimentalMode ?? false; // Default is false
+            set
+            {
+                _data.EnableMiniproExperimentalMode = value;
+                Logger.Info($"Setting changed: [EnableMiniproExperimentalMode] [{value}]");
+                Save();
+            }
+        }
+
         public static bool ContributorMode
         {
             get => _data.ContributorMode ?? false;
@@ -828,6 +843,7 @@ namespace Handlers.DataHandling
                     Logger.Info($"    Configuration:");
                     Logger.Info($"        [Theme] [{ThemeVariant}]");
                     Logger.Info($"        [OpenMultiplePopups] [{MultipleInstancesForComponentPopup}]");
+                    Logger.Info($"        [EnableMiniproExperimentalMode] [{EnableMiniproExperimentalMode}]");
                     Logger.Info($"        [CheckDataOnLaunch] [{CheckDataOnLaunch}]");
                     Logger.Info($"        [DownloadDataFromTestSource] [{(AppConfig.IsDebugBuild ? DownloadDataFromTestSource.ToString() : "Release build - forced off")}]");
                     Logger.Info($"        [AllowDeletionOfOrphanAndNonUsedFiles] [{AllowDeletionOfOrphanAndNonUsedFiles}]");
