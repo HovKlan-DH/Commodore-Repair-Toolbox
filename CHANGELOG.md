@@ -1,10 +1,11 @@
 - **Application**
   - **New**
     - MiniPro
+    - Added new button in "Configuration", hiding as default
   - **Changed**
     - Increased upload timeout from 1 minute inactivtry to 5 minuytes
   - **Fixed**
-    - nonme
+    - Mouse wheel zoom scales with reported scroll delta instead of fixed step per event, fixing overly coarse/aggressive zooming on some platforms
 - **Data**
   - **New**
     - Added **ZX Spectrum Issue 4B**
