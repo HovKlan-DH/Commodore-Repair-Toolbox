@@ -48,8 +48,15 @@ When a new version is released it will be shown to you in the application, and y
 
 - **Amstrad CPC 664**
   - **MC0005A**
+- **Commodore Plus/4**
+  - **310163**
+    - Oscilloscope baseline measurements for PAL and NTSC
 - **Commodore VIC-20**
+  - **324003**
+    - Covers _all_ components
+    - Oscilloscope baseline measurements for PAL and NTSC
   - **250403** (CR)
+    - Covers _all_ components
     - Oscilloscope baseline measurements for PAL and NTSC
 - **Commodore 64**
   - **KU-14194HB**
@@ -159,7 +166,7 @@ You can help specifically with these topics:
 
 There are several ways to get in contact with the developer:
 
-- Direct communication via [Retro Hardware Discord](https://discord.gg/HDWct2vxem) channel (accept invite on page)
+- Direct communication via [Retro Hardware Discord](https://discord.gg/kVTtdvZtzE) channel (accept invite on page)
 - CRT "Feedback" tab
 - GitHub [Issues](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/issues)
 
