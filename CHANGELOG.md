@@ -1,15 +1,10 @@
 - **Application**
   - **New**
-    - Added option to download data from BETA source
-      - Should only be used in agreement with developer, as data can be incomplete or even broken for some parts
-      - Used to test new functionalities, and should not be used as a normal data source!
+    - MiniPro
   - **Changed**
-    - Banner will show filenames when updating data from online source to show specific files being updated
-    - "Clear All" button will not be shown in collapsed "Important signals" when no selected signals
-    - "Clear All" button will not be shown in "Netlist names" when no selected signals
+    - Increased upload timeout from 1 minute inactivtry to 5 minuytes
   - **Fixed**
-    - Clean-up of orphan and non-used files did in some cases not delete all files in scope
-    - KiCad calibration points would be reset after using component label editor
+    - nonme
 - **Data**
   - **New**
     - Added **ZX Spectrum Issue 4B**

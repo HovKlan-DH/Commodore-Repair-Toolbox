@@ -82,6 +82,10 @@ namespace CRT
         // Used by: OnlineServices.SyncFilesAsync
         public static readonly TimeSpan DownloadTimeout = TimeSpan.FromSeconds(30);
 
+        // Timeout for feedback upload requests, which may include large attachments.
+        // Used by: TabFeedback.ProcessAndSendFeedbackAsync
+        public static readonly TimeSpan UploadTimeout = TimeSpan.FromMinutes(5);
+
         // ===== GitHub Updates ======================================================================
 
         // GitHub repository owner used to check for application updates via Velopack.

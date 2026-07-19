@@ -292,7 +292,7 @@ namespace CRT
             memoryStream.Position = 0;
 
             // 4. Construct form payload 
-            using var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(1) };
+            using var httpClient = new HttpClient { Timeout = AppConfig.UploadTimeout };
             using var formContent = new MultipartFormDataContent();
 
             formContent.Add(new StringContent(email), "email");

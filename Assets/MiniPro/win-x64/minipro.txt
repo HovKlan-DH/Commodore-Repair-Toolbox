@@ -1,0 +1,15 @@
+minipro — open-source command-line programmer for TL866/T48/T56-class devices.
+
+This bundled "minipro.exe" is cross-compiled (native WinUSB backend, no libusb DLL,
+no Zadig) from https://github.com/KevinWelton/minipro-win (a Windows fork of
+https://gitlab.com/DavidGriffith/minipro) with two small patches:
+
+1) device->vector_count uint8_t -> uint32_t  (>255-vector logic tests otherwise
+   wrap mod 256 to 0 and silently "pass" — CRITICAL).
+2) <Shlobj.h> -> shlobj.h case shim for mingw-w64.
+
+It is used only for the logic/PLA vector tests (which feed their vectors via
+"--logicic", so no device database is bundled).
+
+Both "minipro" and "Classic Repair Toolbox" is GPL-3.0 licenced, and "minipro"
+runs as a separate subprocess (mere aggregation).

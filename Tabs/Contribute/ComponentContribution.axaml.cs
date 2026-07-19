@@ -814,7 +814,7 @@ namespace CRT
 
             using var httpClient = new HttpClient
             {
-                Timeout = TimeSpan.FromMinutes(1)
+                Timeout = AppConfig.UploadTimeout
             };
 
             using var formContent = new MultipartFormDataContent();
