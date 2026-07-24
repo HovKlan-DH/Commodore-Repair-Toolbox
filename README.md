@@ -58,6 +58,9 @@ When a new version is released it will be shown to you in the application, and y
   - **250403** (CR)
     - Covers _all_ components
     - Oscilloscope baseline measurements for PAL and NTSC
+- **Commodore 16**
+  - **251789**
+    - Oscilloscope baseline measurements for PAL and NTSC
 - **Commodore 64**
   - **KU-14194HB**
     - Covers _all_ components
