@@ -28,7 +28,7 @@ namespace Handlers.OnlineHandling
 
         static OnlineServices()
         {
-            OnlineServices.UserAgent = $"{AppConfig.AppShortName} {AppConfig.AppVersionString}";
+            OnlineServices.UserAgent = $"{AppConfig.AppShortName} {AppConfig.AppDisplayVersionString}";
             OnlineServices.TrustedManifestUri = new Uri(AppConfig.ChecksumsUrl, UriKind.Absolute);
             OnlineServices.TrustedDownloadAuthority = OnlineServices.TrustedManifestUri.Authority;
         }

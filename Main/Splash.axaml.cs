@@ -10,7 +10,7 @@ namespace CRT
         {
             InitializeComponent();
 
-            this.VersionNumberRun.Text = AppConfig.AppVersionString;
+            this.VersionNumberRun.Text = AppConfig.AppDisplayVersionString;
 
             DataManager.StatusChanged += this.OnStatusChanged;
             DataManager.FileDownloadChanged += this.OnFileDownloadChanged;

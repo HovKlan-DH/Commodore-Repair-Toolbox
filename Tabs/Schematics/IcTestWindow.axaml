@@ -24,7 +24,7 @@
       <StackPanel Spacing="4">
         <TextBlock Text="Before you test" FontWeight="Bold" FontSize="12" />
         <TextBlock TextWrapping="Wrap" FontSize="12"
-                   Text="Remove the chip from the board and seat it in the programmer's ZIF socket, ensuring pin 1 of the chip aligns with pin 1 of the socket. Never test a chip in-circuit or while the board is powered." />
+                   Text="Insert the IC in the Minipro programmers ZIF socket and seat it correctly, ensuring pin 1 of the IC aligns with pin 1 of the ZIF socket. Doublecheck that your test and IC is matching to avoid voltage damage to the IC." />
       </StackPanel>
     </Border>
 

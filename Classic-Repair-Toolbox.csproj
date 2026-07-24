@@ -7,7 +7,11 @@
 		<Authors>Dennis Helligsø</Authors>
 		<Copyright>©2025-2026</Copyright>
 		<AssemblyName>Classic-Repair-Toolbox</AssemblyName>
-		<AssemblyVersion>2.2.999</AssemblyVersion>
+		<AssemblyVersion>2.3.0</AssemblyVersion>
+		<InformationalVersion>$(AssemblyVersion)</InformationalVersion>
+		<!--
+		<InformationalVersion>2.3.0-beta.6</InformationalVersion>
+		-->
         <OutputType>WinExe</OutputType>
 		<TargetFrameworks>net10.0</TargetFrameworks>
 		<RollForward>LatestMajor</RollForward>
@@ -20,19 +24,19 @@
         <PackageIcon>CRT_icon.png</PackageIcon>
         <ApplicationIcon>Assets\CRT_icon.ico</ApplicationIcon>
         <FileVersion>$(AssemblyVersion)</FileVersion>
-        <Version>$(AssemblyVersion)</Version>
+        <Version>$(InformationalVersion)</Version>
         <Description>A utility tool for classic and retro hardware repairing, troubleshooting and diagnosing.</Description>
 </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="12.0.3" />
-    <PackageReference Include="Avalonia.Desktop" Version="12.0.3" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.3" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.3" />
-	<PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.0.3" />
-    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.1" />
-    <PackageReference Include="EPPlus" Version="8.5.4" />
-    <PackageReference Include="Velopack" Version="0.0.1298" />
+    <PackageReference Include="Avalonia" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.0" />
+	<PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.1.0" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
+    <PackageReference Include="EPPlus" Version="8.6.3" />
+    <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
 
   <ItemGroup>

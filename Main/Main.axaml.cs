@@ -136,7 +136,7 @@ namespace CRT
             this.ComponentFilterListBox.SelectionChanged += this.OnComponentFilterSelectionChanged;
             this.PopulateHardwareDropDown();
 
-            var versionString = AppConfig.AppVersionString;
+            var versionString = AppConfig.AppDisplayVersionString;
             var assembly = Assembly.GetExecutingAssembly();
 
             this.PopulateAboutTab(assembly, versionString);

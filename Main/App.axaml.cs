@@ -116,15 +116,21 @@ namespace CRT
         public const int SplashHeight = 350;
 
         // ###########################################################################################
-        // Builds a display-safe semantic version string.
+        // Numeric application version used for version comparisons against versioned data files.
         // ###########################################################################################
-        public static readonly string AppVersionString = GetAppVersion();
+        public static readonly string AppNumericVersionString = GetNumericAppVersion();
 
         // ###########################################################################################
-        // Builds the application version string from the executing assembly metadata.
+        // Human-readable application version shown in UI and logs.
+        // Prefers InformationalVersion and strips SemVer build metadata.
+        // ###########################################################################################
+        public static readonly string AppDisplayVersionString = GetDisplayAppVersion();
+
+        // ###########################################################################################
+        // Builds the numeric application version from the executing assembly version metadata.
         // Includes the revision component only when it is explicitly greater than zero.
         // ###########################################################################################
-        private static string GetAppVersion()
+        private static string GetNumericAppVersion()
         {
             var version = Assembly.GetExecutingAssembly().GetName().Version;
 
@@ -133,11 +139,32 @@ namespace CRT
                 return "0.0.0";
             }
 
-            // Include the 4th digit (Revision) if it's explicitly set above 0,
-            // otherwise falling back to standard Major.Minor.Build format.
             return version.Revision > 0
                 ? $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}"
                 : $"{version.Major}.{version.Minor}.{version.Build}";
+        }
+
+        // ###########################################################################################
+        // Builds the display version from the executing assembly informational metadata.
+        // Falls back to the numeric version when no informational version is available.
+        // ###########################################################################################
+        private static string GetDisplayAppVersion()
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+
+            var informationalVersion = assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion;
+
+            if (!string.IsNullOrWhiteSpace(informationalVersion))
+            {
+                var plusIndex = informationalVersion.IndexOf('+');
+                return plusIndex >= 0
+                    ? informationalVersion.Substring(0, plusIndex)
+                    : informationalVersion;
+            }
+
+            return GetNumericAppVersion();
         }
 
         // ###########################################################################################
@@ -272,7 +299,7 @@ namespace CRT
             Logger.Initialize();
             this.SetupGlobalExceptionLogging();
 
-            Logger.Info($"Classic Repair Toolbox version [{AppConfig.AppVersionString}] launched");
+            Logger.Info($"Classic Repair Toolbox version [{AppConfig.AppDisplayVersionString}] launched");
 
             UserSettings.Load();
 

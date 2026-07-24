@@ -820,7 +820,7 @@ namespace CRT
             using var formContent = new MultipartFormDataContent();
             formContent.Add(new StringContent(email), "email");
             formContent.Add(new StringContent(this.BuildContributionFeedbackText(comment)), "feedback");
-            formContent.Add(new StringContent(AppConfig.AppVersionString), "version");
+            formContent.Add(new StringContent(AppConfig.AppDisplayVersionString), "version");
 //            formContent.Add(new StringContent("component-contribution"), "submissionType");
 
             var fileContent = new ByteArrayContent(memoryStream.ToArray());
@@ -830,7 +830,7 @@ namespace CRT
             using var progressContent = new ProgressableStreamContent(formContent, percent =>
                 progress.Report($"Sending to server... {percent}%"));
 
-            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(AppConfig.AppShortName + " " + AppConfig.AppVersionString);
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(AppConfig.AppShortName + " " + AppConfig.AppDisplayVersionString);
 
             var response = await httpClient.PostAsync("https://classic-repair-toolbox.dk/app-contribution/api/", progressContent);
             string responseBody = await response.Content.ReadAsStringAsync();
@@ -847,7 +847,7 @@ namespace CRT
         {
             return new ComponentContributionPayload
             {
-                ApplicationVersion = AppConfig.AppVersionString,
+                ApplicationVersion = AppConfig.AppDisplayVersionString,
                 HardwareName = this.thisHardwareName,
                 BoardName = this.thisBoardName,
                 Region = this.thisLocalRegion,

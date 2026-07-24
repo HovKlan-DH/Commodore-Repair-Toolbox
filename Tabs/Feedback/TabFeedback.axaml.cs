@@ -297,7 +297,7 @@ namespace CRT
 
             formContent.Add(new StringContent(email), "email");
             formContent.Add(new StringContent(feedbackText), "feedback");
-            formContent.Add(new StringContent(AppConfig.AppVersionString), "version");
+            formContent.Add(new StringContent(AppConfig.AppDisplayVersionString), "version");
 
             if (memoryStream.Length > 22) // More than empty zip header
             {
@@ -310,7 +310,7 @@ namespace CRT
             using var progressContent = new ProgressableStreamContent(formContent, percent => progress.Report($"Sending to server... {percent}%"));
 
             //Target URL
-            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("CRT "+ AppConfig.AppVersionString);
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("CRT "+ AppConfig.AppDisplayVersionString);
             var response = await httpClient.PostAsync("https://classic-repair-toolbox.dk/app-feedback/", progressContent);
 
             // Read the exact string back from the server

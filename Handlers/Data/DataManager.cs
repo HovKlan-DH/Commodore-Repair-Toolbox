@@ -94,7 +94,7 @@ namespace Handlers.DataHandling
             bool allowSyntheticLegacyFallback,
             string sourceDescription)
         {
-            Version appVersion = Version.TryParse(AppConfig.AppVersionString, out var parsedVersion)
+            Version appVersion = Version.TryParse(AppConfig.AppNumericVersionString, out var parsedVersion)
                 ? parsedVersion
                 : new Version(0, 0, 0, 0);
 

@@ -52,7 +52,10 @@ namespace CRT
             }
 
             this.RunButton.IsEnabled = entry.IsTestable;
-            this.DemoModeCheck.IsChecked = !MiniproPresent();   // real by default when minipro is available
+
+            this.DemoModeCheck.IsVisible = UserSettings.EnableMiniproExperimentalDemoMode;
+            this.DemoModeCheck.IsChecked = this.DemoModeCheck.IsVisible && !MiniproPresent();
+
             this.UpdateCoverageText();
         }
 

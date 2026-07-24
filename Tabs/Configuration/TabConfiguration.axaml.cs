@@ -33,6 +33,10 @@ namespace CRT
             this.ShowDevelopmentVersionNotificationCheckBox.IsChecked = UserSettings.ShowDevelopmentVersionNotification;
             this.MultipleInstancesForComponentPopupCheckBox.IsChecked = UserSettings.MultipleInstancesForComponentPopup;
             this.EnableMiniproExperimentalModeCheckBox.IsChecked = UserSettings.EnableMiniproExperimentalMode;
+            this.EnableMiniproExperimentalDemoModeCheckBox.IsChecked = UserSettings.EnableMiniproExperimentalDemoMode;
+            this.UpdateEnableMiniproExperimentalDemoModeCheckBoxState();
+
+            this.EnableMiniproExperimentalDemoModeCheckBox.IsCheckedChanged += this.OnEnableMiniproExperimentalDemoModeChanged;
 
             this.UpdateAllowDeletionOfOrphanAndNonUsedFilesCheckBoxState();
 
@@ -180,11 +184,38 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Persists the "Enable experimental mode for Minipro" preference when the checkbox is toggled.
+        // Enables the Minipro demo mode checkbox only while Minipro experimental mode is enabled.
+        // ###########################################################################################
+        private void UpdateEnableMiniproExperimentalDemoModeCheckBoxState()
+        {
+            bool isExperimentalModeEnabled = this.EnableMiniproExperimentalModeCheckBox.IsChecked == true;
+            this.EnableMiniproExperimentalDemoModeCheckBox.IsEnabled = isExperimentalModeEnabled;
+        }
+
+        // ###########################################################################################
+        // Persists the "Enable experimental mode for Minipro" preference and updates dependent UI.
         // ###########################################################################################
         private void OnEnableMiniproExperimentalModeChanged(object? sender, RoutedEventArgs e)
         {
-            UserSettings.EnableMiniproExperimentalMode = this.EnableMiniproExperimentalModeCheckBox.IsChecked == true;
+            bool isEnabled = this.EnableMiniproExperimentalModeCheckBox.IsChecked == true;
+            UserSettings.EnableMiniproExperimentalMode = isEnabled;
+
+            if (!isEnabled)
+            {
+                this.EnableMiniproExperimentalDemoModeCheckBox.IsChecked = false;
+                UserSettings.EnableMiniproExperimentalDemoMode = false;
+            }
+
+            this.UpdateEnableMiniproExperimentalDemoModeCheckBoxState();
+        }
+
+        // ###########################################################################################
+        // Persists the "Enable experimental demo mode for Minipro" preference when toggled.
+        // ###########################################################################################
+        private void OnEnableMiniproExperimentalDemoModeChanged(object? sender, RoutedEventArgs e)
+        {
+            UserSettings.EnableMiniproExperimentalDemoMode =
+                this.EnableMiniproExperimentalDemoModeCheckBox.IsChecked == true;
         }
 
         // ###########################################################################################
@@ -471,6 +502,7 @@ namespace CRT
                 await mainWindow.CheckForDataUpdatesNowAsync();
             }
         }
+
 
 
 

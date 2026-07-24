@@ -42,6 +42,10 @@ namespace Handlers.DataHandling
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? EnableMiniproExperimentalMode { get; set; }
 
+        [JsonPropertyName("enableMiniproExperimentalDemoMode")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? EnableMiniproExperimentalDemoMode { get; set; }
+
         [JsonPropertyName("contributorMode")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? ContributorMode { get; set; }
@@ -520,6 +524,17 @@ namespace Handlers.DataHandling
             {
                 _data.EnableMiniproExperimentalMode = value;
                 Logger.Info($"Setting changed: [EnableMiniproExperimentalMode] [{value}]");
+                Save();
+            }
+        }
+
+        public static bool EnableMiniproExperimentalDemoMode
+        {
+            get => _data.EnableMiniproExperimentalDemoMode ?? false; // Default is false
+            set
+            {
+                _data.EnableMiniproExperimentalDemoMode = value;
+                Logger.Info($"Setting changed: [EnableMiniproExperimentalDemoMode] [{value}]");
                 Save();
             }
         }
