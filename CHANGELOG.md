@@ -1,11 +1,14 @@
 - **Application**
   - **New**
-    - MiniPro
-    - Added new button in "Configuration", hiding as default
+    - Added __experimental__ possibility to test IC's with a MiniPro programmer (TL866/T48/T56)
+      - "Configuration" tab has a couple of options for enabling this (not enabled per default)
+      - Read [MiniPro programmer documentation](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/MiniPro-programmer-how%E2%80%90to) to see how to use this
+    - Added show of proper BETA version number, if applicable
   - **Changed**
-    - Increased upload timeout from 1 minute inactivtry to 5 minuytes
+    - Increased "Feedback" upload timeout from 1 minute inactivty to 5 minutes
   - **Fixed**
-    - Mouse wheel zoom scales with reported scroll delta instead of fixed step per event, fixing overly coarse/aggressive zooming on some platforms
+    - Mouse wheel zoom now scales with reported scroll delta instead of fixed step per event, fixing overly coarse/aggressive zooming on some platforms
 - **Data**
   - **New**
-    - Added **ZX Spectrum Issue 4B**
+    - Added **Commodore Plus/4**
+    - Added **Commodore 16**

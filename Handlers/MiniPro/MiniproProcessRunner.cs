@@ -115,7 +115,7 @@ public sealed class MiniproProcessRunner : IMiniproRunner
         try
         {
             if (!proc.Start())
-                return MiniproRunResult.NotStarted("minipro failed to start");
+                return MiniproRunResult.NotStarted("MiniPro failed to start");
         }
         catch (Exception ex)
         {
@@ -145,7 +145,7 @@ public sealed class MiniproProcessRunner : IMiniproRunner
             if (ct.IsCancellationRequested) throw;   // the user pressed Cancel
             // Our own timeout fired — return what we captured rather than hang.
             return new MiniproRunResult(true, -1, stdout.ToString(),
-                (stderr + "\nminipro did not respond within 5 minutes — aborted.").Trim());
+                (stderr + "\nMiniPro did not respond within 5 minutes — aborted").Trim());
         }
 
         return new MiniproRunResult(true, proc.ExitCode, stdout.ToString(), stderr.ToString());

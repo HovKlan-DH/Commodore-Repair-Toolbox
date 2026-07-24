@@ -422,7 +422,7 @@
 
 					<!-- IC test (shown only for ICs with a test-catalogue entry) -->
 					<StackPanel x:Name="TestSection" IsVisible="False" Spacing="4" Margin="0,8,0,0">
-						<Button x:Name="TestButton" Content="Test this IC with Minipro programmer" HorizontalAlignment="Left" Click="OnTestClick" />
+						<Button x:Name="TestButton" Content="Test this IC with MiniPro programmer" HorizontalAlignment="Left" Click="OnTestClick" />
 						<TextBlock x:Name="TestCaptionText" FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource Fg}" />
 					</StackPanel>
 					

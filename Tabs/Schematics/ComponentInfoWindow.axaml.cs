@@ -1399,7 +1399,7 @@ private void UpdateTestAffordance(ComponentEntry? entry)
     Logger.Info($"IC test affordance shown for [{this._boardLabel}] [{entry!.TechnicalNameOrValue}] (kind={cat.Kind}, support={cat.Support})");
     this.TestSection.IsVisible = true;
     this.TestButton.IsEnabled = cat.IsTestable;
-    this.TestButton.Content = cat.IsTestable ? "Test this IC with Minipro programmer" : "Test (functional-only)";
+    this.TestButton.Content = cat.IsTestable ? "Test this IC with MiniPro programmer" : "Test (functional-only)";
     this.TestCaptionText.Text = cat.IsTestable
         ? DescribeCoverage(cat)
         : "Sequential part: a vector test is a functional check; not exhaustive";

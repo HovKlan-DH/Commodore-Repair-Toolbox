@@ -96,13 +96,13 @@
 			<CheckBox x:Name="ShowDevelopmentVersionNotificationCheckBox"
                       Content="Allow notification for BETA versions" />
 
-			<TextBlock Text="Minipro programmer"
+			<TextBlock Text="MiniPro programmer"
                        FontSize="12"
                        FontWeight="SemiBold"
                        Margin="0,16,0,4" />
 
 			<CheckBox x:Name="EnableMiniproExperimentalModeCheckBox"
-                      Content="Enable experimental mode for Minipro programmer" />
+                      Content="Enable experimental mode for MiniPro programmer" />
 
 			<CheckBox x:Name="EnableMiniproExperimentalDemoModeCheckBox"
                       Content="Enable simulated demo mode (only required for CRT development)" />

@@ -24,7 +24,7 @@
       <StackPanel Spacing="4">
         <TextBlock Text="Before you test" FontWeight="Bold" FontSize="12" />
         <TextBlock TextWrapping="Wrap" FontSize="12"
-                   Text="Insert the IC in the Minipro programmers ZIF socket and seat it correctly, ensuring pin 1 of the IC aligns with pin 1 of the ZIF socket. Doublecheck that your test and IC is matching to avoid voltage damage to the IC." />
+                   Text="Insert the IC in the MiniPro programmers ZIF socket and seat it correctly, ensuring pin 1 of the IC aligns with pin 1 of the ZIF socket. Doublecheck that your test and IC is matching to avoid voltage damage to the IC." />
       </StackPanel>
     </Border>
 
@@ -75,7 +75,7 @@
          opened automatically only when something failed. ANSI-stripped in code. -->
     <Expander x:Name="LogExpander"
               Grid.Row="7"
-              Header="Raw minipro output"
+              Header="Raw MiniPro output"
               FontSize="12"
               IsExpanded="False"
               VerticalAlignment="Top">
