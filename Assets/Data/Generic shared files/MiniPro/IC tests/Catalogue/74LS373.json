@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "id": "74ls373",
+  "match": [
+    "74LS373"
+  ],
+  "description": "Octal transparent D-type latch, 3-state",
+  "kind": "logic-sequential",
+  "support": "functional-only",
+  "coverage": "functional",
+  "note": "Sequential part: vector testing is a functional check, not exhaustive. A pass does not certify the chip; a fail is still meaningful."
+}

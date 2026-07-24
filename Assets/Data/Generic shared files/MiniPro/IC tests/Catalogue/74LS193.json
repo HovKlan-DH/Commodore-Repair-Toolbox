@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "id": "74ls193",
+  "match": [
+    "74LS193"
+  ],
+  "description": "4-bit synchronous up/down binary counter",
+  "kind": "logic-sequential",
+  "support": "functional-only",
+  "coverage": "functional",
+  "note": "Sequential part: vector testing is a functional check, not exhaustive. A pass does not certify the chip; a fail is still meaningful."
+}
