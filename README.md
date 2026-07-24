@@ -27,7 +27,7 @@ It is (for now) primarily dedicated to Commodore, and have several built-in prof
   - [Commandline parameters](#commandline-parameters)
   - [How to contribute with data to CRT GitHub repository?](#how-to-contribute-with-data-to-crt-github-repository)
   - [Compiling yourself](#compiling-yourself)
-  - [MiniPro programmer how-to](#minipro)
+  - [MiniPro programmer how-to](#minipro-programmer-how-to)
   - [Controlling oscilloscope with keyboard/numpad](#controlling-oscilloscope-with-keyboardnumpad)
   - [Development tools used](#development-tools-used)
 - [Inspiration for building this application](#inspiration-for-building-this-application)
