@@ -27,7 +27,7 @@ It is (for now) primarily dedicated to Commodore, and have several built-in prof
   - [Commandline parameters](#commandline-parameters)
   - [How to contribute with data to CRT GitHub repository?](#how-to-contribute-with-data-to-crt-github-repository)
   - [Compiling yourself](#compiling-yourself)
-  - [Minipro programmer how-to](#minipro)
+  - [MiniPro programmer how-to](#minipro)
   - [Controlling oscilloscope with keyboard/numpad](#controlling-oscilloscope-with-keyboardnumpad)
   - [Development tools used](#development-tools-used)
 - [Inspiration for building this application](#inspiration-for-building-this-application)
@@ -246,7 +246,7 @@ As per default the Linux package is a one-large binary package that can be run d
 You can view the details in [BUILDING.md](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/blob/main/BUILDING.md)
 
 
-### Minipro programmer how-to
+### MiniPro programmer how-to
 
 You can view the details in Wiki [MiniPro programmer how‐to](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/MiniPro-programmer-how%E2%80%90to)
 
