@@ -5,9 +5,11 @@
       - Read [MiniPro programmer documentation](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/MiniPro-programmer-how%E2%80%90to) to see how to use this
     - Added show of proper BETA version number, if applicable
   - **Changed**
-    - Increased "Feedback" upload timeout from 1 minute inactivty to 5 minutes
+    - Minor changes in UI for "IC Test" popup
   - **Fixed**
-    - Mouse wheel zoom now scales with reported scroll delta instead of fixed step per event, fixing overly coarse/aggressive zooming on some platforms
+    - After closing "IC Test" window then it did require two clicks on test IC button to show popup
+  - **Removed**
+    - C64 PLA 65K test depth (can ideally be introduced later again)
 - **Data**
   - **New**
     - Added **Commodore Plus/4**

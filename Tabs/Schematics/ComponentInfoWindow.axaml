@@ -400,7 +400,7 @@
 		<!-- Right panel: component info -->
 		<Grid Grid.Column="2"
 			  Margin="12"
-			  RowDefinitions="Auto,*,Auto">
+			  RowDefinitions="Auto,Auto,*,Auto">
 
 			<SelectableTextBlock x:Name="TitleText"
 					 Grid.Row="0"
@@ -408,22 +408,25 @@
 					 FontWeight="SemiBold"
 					 Margin="0,0,0,8" />
 
-			<ScrollViewer Grid.Row="1"
+			<!-- Category | Part-number (hidden when empty). Kept outside the scrollable/
+			     overlaid area — together with TitleText above, this is the "header" that
+			     stays visible even while the IC test overlay covers everything below it. -->
+			<SelectableTextBlock x:Name="InfoCategoryPartNumber"
+								 Grid.Row="1"
+								 TextWrapping="Wrap"
+								 FontSize="12"
+								 Foreground="{DynamicResource Fg}"
+								 Margin="0,0,0,8"
+								 IsVisible="False" />
+
+			<ScrollViewer Grid.Row="2"
 						  HorizontalScrollBarVisibility="Disabled"
 						  VerticalScrollBarVisibility="Auto">
 				<StackPanel Spacing="8">
 
-					<!-- 2. Category | Part-number (hidden when empty) -->
-					<SelectableTextBlock x:Name="InfoCategoryPartNumber"
-										 TextWrapping="Wrap"
-										 FontSize="12"
-										 Foreground="{DynamicResource Fg}"
-										 IsVisible="False" />
-
 					<!-- IC test (shown only for ICs with a test-catalogue entry) -->
 					<StackPanel x:Name="TestSection" IsVisible="False" Spacing="4" Margin="0,8,0,0">
-						<Button x:Name="TestButton" Content="Test this IC with MiniPro programmer" HorizontalAlignment="Left" Click="OnTestClick" />
-						<TextBlock x:Name="TestCaptionText" FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource Fg}" />
+						<Button x:Name="TestButton" Content="Test IC with MiniPro programmer" HorizontalAlignment="Left" Click="OnTestClick" />
 					</StackPanel>
 					
 					<!-- 3. Component one-liner (hidden when empty) -->
@@ -559,7 +562,7 @@
 
 			<!-- Footer controls: local region, mousewheel behavior, keyboard handling, close -->
 			<Border x:Name="RegionControlsBorder"
-					Grid.Row="2"
+					Grid.Row="3"
 					BorderBrush="{DynamicResource Splitter}"
 					BorderThickness="0,1,0,0"
 					Padding="0,6,0,0"
@@ -633,6 +636,14 @@
 
 				</Grid>
 			</Border>
+
+			<!-- IC test overlay: covers everything below the title/category-part-number
+			     header (the scrollable info content + footer), leaving that header and the
+			     left-hand pinout/thumbnails untouched. Hidden by default. -->
+			<local:IcTestPanel x:Name="IcTestPanel"
+								Grid.Row="2"
+								Grid.RowSpan="2"
+								IsVisible="False" />
 
 		</Grid>
 

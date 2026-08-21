@@ -2187,18 +2187,6 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Opens the IC-test window for a test-catalogue entry resolved from the selected component.
-        // ###########################################################################################
-        internal void OpenIcTestWindow(Handlers.IcTesting.IcTestEntry entry, string boardLabel)
-        {
-            var window = new IcTestWindow();
-            window.Load(entry, boardLabel);
-            this.PositionFullscreenWindowOnSameScreen(window);
-            window.Show(this);
-            window.Focus();
-        }
-
-        // ###########################################################################################
         // Pushes the current oscilloscope session title state into any open component info popup
         // windows so their title suffix stays aligned with the oscilloscope tab.
         // ###########################################################################################

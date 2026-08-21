@@ -67,7 +67,7 @@ public sealed class IcTestService
                     Connection = MiniproConnectionState.Ok,
                     CoverageLabel = coverage,
                     TotalVectors = total,
-                    Headline = $"PASS — all {total} vectors matched. Logic verified (static test only — no timing).",
+                    Headline = $"PASS — All {total} vectors matched.\nLogic verified (static test only — no timing tested).",
                     RawOutput = Raw(run),
                 };
 
@@ -81,7 +81,7 @@ public sealed class IcTestService
                     FailingVectors = p.ErrorCount ?? p.Failures.Count,
                     FailingPins = p.FailingPins,
                     Headline = p.FailingPins.Count > 0
-                        ? $"FAIL — logic fault on pin(s) {string.Join(", ", p.FailingPins)}."
+                        ? $"FAIL — Logic fault on pin {string.Join(", ", p.FailingPins)}."
                         : "FAIL — the chip did not match the truth table.",
                     RawOutput = Raw(run),
                 };

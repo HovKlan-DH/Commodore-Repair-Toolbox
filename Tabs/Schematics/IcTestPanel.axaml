@@ -1,0 +1,122 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="CRT.IcTestPanel">
+
+  <!-- Outer Grid paints the full cell it's given (so it fully obscures whatever it's
+       overlaid on top of). No side/bottom margin here: the host already insets this
+       control the same way it insets the title/category-part-number header above it,
+       so this content lines up flush with that header rather than double-indenting. -->
+  <Grid Background="{DynamicResource Form_Bg}">
+    <Grid Margin="0,8,0,0" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ClipToBounds="True">
+
+      <TextBlock Grid.Row="0"
+                 Classes="ComponentResourceHeaderText"
+                 Text="MiniPro Programmer IC Test"
+                 Margin="0,0,0,8" />
+
+      <!-- Guided handling: chips are tested out of the board, never powered. -->
+      <Border Grid.Row="1"
+              Background="{DynamicResource Table_Bg}"
+              CornerRadius="3"
+              Padding="0,10,10,10"
+              Margin="0,0,0,8">
+        <StackPanel Spacing="4">
+          <TextBlock Text="Before you test" FontWeight="Bold" FontSize="12" />
+          <TextBlock TextWrapping="Wrap" FontSize="12"
+                     Text="Insert the IC in the MiniPro programmers ZIF socket and seat it correctly, ensuring pin 1 of the IC aligns with pin 1 of the ZIF socket. Doublecheck that your test and IC is matching to avoid voltage damage to the IC." />
+        </StackPanel>
+      </Border>
+
+      <TextBlock x:Name="CoverageText"
+                 Grid.Row="2"
+                 FontSize="12"
+                 TextWrapping="Wrap"
+                 Margin="0,0,0,16" />
+
+      <!-- Test depth (shown only for parts that offer more than one, e.g. the PLA) shares a
+           line with Run/Cancel — one control row instead of two. -->
+      <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,0,0,16">
+        <StackPanel x:Name="ModePanel"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    IsVisible="False">
+          <TextBlock Text="Test depth:" VerticalAlignment="Center" FontSize="12" />
+          <ComboBox x:Name="ModeCombo" MinWidth="170" SelectionChanged="OnModeChanged" />
+        </StackPanel>
+
+        <!-- Single-depth parts (e.g. logic-combinational): same layout, but the vector
+             count is fixed so it's shown disabled instead of as a real choice. -->
+        <StackPanel x:Name="SingleModePanel"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    IsVisible="False">
+          <TextBlock Text="Test depth:" VerticalAlignment="Center" FontSize="12" />
+          <ComboBox x:Name="SingleModeCombo" MinWidth="170" IsEnabled="False" />
+        </StackPanel>
+        <Button x:Name="RunButton"
+                Content="Run test"
+                Background="{DynamicResource Button_Highlighted_Bg}"
+                Foreground="{DynamicResource Button_Highlighted_Fg}"
+                BorderBrush="{DynamicResource Button_Highlighted_Border}"
+                Click="OnRun" />
+        <Button x:Name="CancelButton" Content="Cancel" IsEnabled="False" Click="OnCancel" />
+        <TextBlock x:Name="ElapsedText" VerticalAlignment="Center" FontSize="12"
+                   Foreground="{DynamicResource Fg}" />
+      </StackPanel>
+
+      <CheckBox x:Name="DemoModeCheck"
+                Grid.Row="4"
+                Content="Demo mode (no hardware — simulated result)"
+                FontSize="12"
+                Margin="0,0,0,8" />
+
+      <Border x:Name="ResultBorder"
+              Grid.Row="5"
+              CornerRadius="3"
+              Padding="10"
+              Margin="0,0,0,16"
+              IsVisible="False">
+        <StackPanel Spacing="4">
+          <TextBlock x:Name="OutcomeText" FontSize="20" FontWeight="Bold" />
+          <TextBlock x:Name="HeadlineText" TextWrapping="Wrap" FontSize="12" />
+          <TextBlock x:Name="DetailText" TextWrapping="Wrap" FontSize="11" />
+        </StackPanel>
+      </Border>
+
+      <!-- Raw per-vector grid: noise on a pass, useful on a fail. Tucked away and
+           opened automatically only when something failed. ANSI-stripped in code. -->
+      <Expander x:Name="LogExpander"
+                Grid.Row="6"
+                Header="Raw MiniPro output"
+                FontSize="12"
+                IsExpanded="False"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                VerticalContentAlignment="Stretch"
+                ClipToBounds="True">
+        <TextBox x:Name="LogBox"
+                 IsReadOnly="True"
+                 AcceptsReturn="True"
+                 TextWrapping="NoWrap"
+                 MinHeight="120"
+                 HorizontalAlignment="Stretch"
+                 VerticalAlignment="Stretch"
+                 FontFamily="Cascadia Mono,Consolas,Menlo,monospace"
+                 FontSize="11"
+                 VerticalContentAlignment="Top"
+                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto" />
+      </Expander>
+
+      <Button x:Name="CloseButton"
+              Grid.Row="7"
+              Content="Close MiniPro Test"
+              HorizontalAlignment="Right"
+              Margin="0,8,0,0"
+              Click="OnClose" />
+
+    </Grid>
+  </Grid>
+
+</UserControl>

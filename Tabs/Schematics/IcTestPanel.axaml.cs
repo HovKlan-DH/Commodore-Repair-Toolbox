@@ -18,8 +18,12 @@ namespace CRT
     // Full depth selector for parts that ship multiple sets (e.g. the PLA). Drives the real
     // MiniproProcessRunner, or the MockMiniproRunner in demo mode (no hardware). All device work
     // is async + cancellable, with a live elapsed timer so a long run never looks frozen.
+    //
+    // Embedded overlay (not a Window) inside ComponentInfoWindow's right panel — the host shows/
+    // hides it and re-uses the same instance across multiple "Test this IC" clicks, so Load()
+    // must fully reset state (including cancelling any still-running previous test).
     // ###########################################################################################
-    public partial class IcTestWindow : Window
+    public partial class IcTestPanel : UserControl
     {
         private IcTestEntry? _entry;
         private string _boardLabel = string.Empty;
@@ -28,16 +32,26 @@ namespace CRT
         private DispatcherTimer? _elapsedTimer;
         private readonly Stopwatch _elapsed = new();
 
-        public IcTestWindow()
+        // Raised when the user clicks Close — the host is responsible for hiding this panel
+        // and restoring whatever it was overlaying.
+        public event Action? CloseRequested;
+
+        public IcTestPanel()
         {
             InitializeComponent();
         }
 
         public void Load(IcTestEntry entry, string boardLabel)
         {
+            this._cts?.Cancel();   // a previous test may still be running if the panel is being re-used
+            this._cts = null;
+
             this._entry = entry;
             this._boardLabel = boardLabel;
-            this.TitleText.Text = $"Test {boardLabel}  —  {entry.Description} ({entry.Id})";
+
+            this.ResultBorder.IsVisible = false;
+            this.LogExpander.IsExpanded = false;
+            this.LogBox.Text = string.Empty;
 
             this._modes = entry.Modes ?? new List<IcTestMode>();
             if (this._modes.Count > 0)
@@ -45,12 +59,28 @@ namespace CRT
                 this.ModeCombo.ItemsSource = this._modes.Select(m => m.Label).ToList();
                 this.ModeCombo.SelectedIndex = 0;   // Quick first — fast feedback
                 this.ModePanel.IsVisible = true;
+                this.SingleModePanel.IsVisible = false;
             }
             else
             {
                 this.ModePanel.IsVisible = false;
+
+                // Single-depth parts still have a fixed vector count worth showing —
+                // just as a disabled choice instead of a real dropdown.
+                if (entry.IsTestable)
+                {
+                    int count = entry.VectorCount > 0 ? entry.VectorCount : (entry.Vectors?.Count ?? 0);
+                    this.SingleModeCombo.ItemsSource = new[] { $"{count} vectors" };
+                    this.SingleModeCombo.SelectedIndex = 0;
+                    this.SingleModePanel.IsVisible = true;
+                }
+                else
+                {
+                    this.SingleModePanel.IsVisible = false;
+                }
             }
 
+            this.SetRunning(false);
             this.RunButton.IsEnabled = entry.IsTestable;
 
             this.DemoModeCheck.IsVisible = UserSettings.EnableMiniproExperimentalDemoMode;
@@ -69,19 +99,20 @@ namespace CRT
         private void UpdateCoverageText()
         {
             if (this._entry is null) return;
-            if (!this._entry.IsTestable)
+            if (this._entry.IsFunctionalOnly)
             {
                 this.CoverageText.Text =
                     "Functional-only part: a vector test is a functional check, not exhaustive.";
                 return;
             }
-            var m = this.SelectedMode;
-            string cov = m?.Coverage ?? this._entry.Coverage;
-            int count = m is { VectorCount: > 0 } ? m.VectorCount
-                : this._entry.VectorCount > 0 ? this._entry.VectorCount : (this._entry.Vectors?.Count ?? 0);
-            string depth = cov == "exhaustive" ? $"exhaustive — all {count} vectors" : $"{cov} — {count} vectors";
+            if (!this._entry.IsTestable)
+            {
+                this.CoverageText.Text =
+                    "This part is not vector-testable — no automated test is available.";
+                return;
+            }
             this.CoverageText.Text =
-                $"Coverage: {depth}. A pass means the truth table held — static test only, no timing. A fail is definitive.";
+                "A pass means the truth table held, but this is static test only and no timing tested. A fail is definitive and can be trusted.";
         }
 
         private static bool MiniproPresent()
@@ -108,7 +139,7 @@ namespace CRT
 
             this.SetRunning(true);
             this.ResultBorder.IsVisible = false;
-            this.LogExpander.IsExpanded = false;
+            this.LogExpander.IsExpanded = true;
             this.LogBox.Text = string.Empty;
             this._cts = new CancellationTokenSource();
             this.StartElapsed(mode);
@@ -146,7 +177,11 @@ namespace CRT
 
         private void OnCancel(object? sender, RoutedEventArgs e) => this._cts?.Cancel();
 
-        private void OnClose(object? sender, RoutedEventArgs e) => this.Close();
+        private void OnClose(object? sender, RoutedEventArgs e)
+        {
+            this._cts?.Cancel();
+            this.CloseRequested?.Invoke();
+        }
 
         private void SetRunning(bool running)
         {
@@ -198,9 +233,7 @@ namespace CRT
 
             // Only the actionable extras here — coverage is already stated above the button.
             var detail = new StringBuilder();
-            if (r.FailingPins.Count > 0) detail.Append($"Failing pin(s): {string.Join(", ", r.FailingPins)}. ");
-            if (r.Connection != MiniproConnectionState.Ok && r.Connection != MiniproConnectionState.Unknown)
-                detail.Append($"{r.Connection}. ");
+            if (r.FailingPins.Count > 0) detail.Append($"Failing pin: {string.Join(", ", r.FailingPins)}. ");
             this.DetailText.Text = detail.ToString();
             this.DetailText.IsVisible = detail.Length > 0;
 
@@ -208,10 +241,7 @@ namespace CRT
             // stderr, which the live stdout stream above never surfaces — so on a
             // failure the box would otherwise look empty.
             if (!string.IsNullOrEmpty(r.RawOutput))
-                this.LogBox.Text = MiniproOutputParser.StripAnsi(r.RawOutput);
-
-            // The raw output only matters when something went wrong.
-            this.LogExpander.IsExpanded = r.Outcome is TestOutcome.Fail or TestOutcome.Error;
+                this.LogBox.Text = MiniproOutputParser.AlignVectorTableHeader(MiniproOutputParser.StripAnsi(r.RawOutput));
         }
     }
 }

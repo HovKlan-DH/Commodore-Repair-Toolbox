@@ -149,6 +149,8 @@ namespace CRT
 
             this.ThumbnailList.SelectionChanged += this.OnThumbnailSelectionChanged;
 
+            this.IcTestPanel.CloseRequested += this.OnIcTestPanelCloseRequested;
+
             // Map the interactions to the expanded top-panel boundaries area instead of the local box
             this.MainImageClickArea.PointerPressed += this.OnMainImageClickAreaPointerPressed;
             this.MainImageClickArea.PointerMoved += this.OnMainImageClickAreaPointerMoved;
@@ -1382,6 +1384,11 @@ namespace CRT
 // ###########################################################################################
 private void UpdateTestAffordance(ComponentEntry? entry)
 {
+    // The overlay shows a snapshot for whichever IC was active when opened — if the
+    // displayed component changes underneath it (e.g. clicking another chip on the
+    // schematic), it would otherwise keep showing stale test content.
+    this.OnIcTestPanelCloseRequested();
+
     this._activeTestEntry = null;
     if (!UserSettings.EnableMiniproExperimentalMode)
     {
@@ -1398,28 +1405,23 @@ private void UpdateTestAffordance(ComponentEntry? entry)
     this._activeTestEntry = cat;
     Logger.Info($"IC test affordance shown for [{this._boardLabel}] [{entry!.TechnicalNameOrValue}] (kind={cat.Kind}, support={cat.Support})");
     this.TestSection.IsVisible = true;
-    this.TestButton.IsEnabled = cat.IsTestable;
-    this.TestButton.Content = cat.IsTestable ? "Test this IC with MiniPro programmer" : "Test (functional-only)";
-    this.TestCaptionText.Text = cat.IsTestable
-        ? DescribeCoverage(cat)
-        : "Sequential part: a vector test is a functional check; not exhaustive";
+    this.TestButton.IsEnabled = true;   // always openable — the panel disables Run itself for non-testable parts
+    this.TestButton.Content = cat.IsTestable
+        ? "Test IC with MiniPro programmer"
+        : cat.IsFunctionalOnly
+            ? "View test info (functional-only)"
+            : "View test info (not supported)";
 }
-
-private static string DescribeCoverage(IcTestEntry e) => e.Kind switch
-{
-    "pla" => $"Exhaustive PLA test ({e.VectorCount} vectors)",
-    "rom" => "ROM verify (hash compare)",
-    "logic-combinational" => $"Exhaustive logic test ({e.Vectors?.Count ?? 0} vectors)",
-    _ => "Test",
-};
 
 private void OnTestClick(object? sender, RoutedEventArgs e)
 {
     if (this._activeTestEntry is null) return;
-    Logger.Info($"Opening IC test window for [{this._boardLabel}] [{this._activeTestEntry.Id}]");
-    if (this.Owner is Main mainOwner)
-        mainOwner.OpenIcTestWindow(this._activeTestEntry, this._boardLabel);
+    Logger.Info($"Opening IC test panel for [{this._boardLabel}] [{this._activeTestEntry.Id}]");
+    this.IcTestPanel.Load(this._activeTestEntry, this._boardLabel);
+    this.IcTestPanel.IsVisible = true;
 }
+
+private void OnIcTestPanelCloseRequested() => this.IcTestPanel.IsVisible = false;
 
         // ###########################################################################################
         // Queues oscilloscope auto-sync for the currently selected image.

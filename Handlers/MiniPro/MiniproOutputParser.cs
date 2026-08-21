@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Handlers.IcTesting;
@@ -18,6 +19,58 @@ public static class MiniproOutputParser
 
     /// <summary>Strip ANSI colour codes so raw minipro output reads cleanly in a TextBox.</summary>
     public static string StripAnsi(string? s) => Ansi.Replace(s ?? "", "");
+
+    /// <summary>Re-space the pin-number header line above the per-vector grid so it lines
+    /// up with the data: minipro prints each pin's data in a fixed 3-char field (see
+    /// VectorLine/failure-scan above) but writes the header numbers at their natural
+    /// width, so pins 10+ drift out of alignment with their column. We already know the
+    /// grid's true column layout from the first data row, so rebuild the header to match
+    /// it instead of trying to fix minipro's own spacing.</summary>
+    public static string AlignVectorTableHeader(string? s)
+    {
+        var text = s ?? "";
+        var lines = text.Replace("\r\n", "\n").Split('\n');
+
+        int dataIndex = -1;
+        Match? dataMatch = null;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var m = VectorLine.Match(lines[i]);
+            if (m.Success) { dataIndex = i; dataMatch = m; break; }
+        }
+        if (dataMatch is null) return text;   // no per-vector grid printed (e.g. clean pass)
+
+        int prefixLen = dataMatch.Groups[2].Index;
+
+        int headerIndex = -1;
+        List<int>? columns = null;
+        for (int i = 0; i < dataIndex; i++)
+        {
+            var tokens = lines[i].Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length < 2) continue;
+            var nums = new List<int>(tokens.Length);
+            bool ok = true;
+            foreach (var t in tokens)
+            {
+                if (!int.TryParse(t, out var n)) { ok = false; break; }
+                nums.Add(n);
+            }
+            if (!ok) continue;
+            bool increasing = true;
+            for (int k = 1; k < nums.Count; k++)
+                if (nums[k] <= nums[k - 1]) { increasing = false; break; }
+            if (increasing && nums[0] >= 1 && nums[0] <= 3) { headerIndex = i; columns = nums; break; }
+        }
+        if (headerIndex < 0 || columns is null) return text;   // no recognisable header
+
+        var sb = new StringBuilder();
+        sb.Append(' ', prefixLen);
+        foreach (var pin in columns)
+            sb.Append(pin.ToString().PadRight(2)).Append(' ');
+        lines[headerIndex] = sb.ToString();
+
+        return string.Join('\n', lines);
+    }
 
     public sealed record Parsed(
         bool? Passed,

@@ -15,27 +15,19 @@
   "modes": [
     {
       "name": "quick",
-      "label": "Quick (25)",
+      "label": "Quick (25 vectors)",
       "coverage": "sample",
       "vectorCount": 25,
-      "vectorsFile": "Vectors/906114-01-quick.logicic.xml.gz",
-      "vectorsCompressed": true
+      "vectorsFile": "Vectors/906114-01-quick.logicic.xml",
+      "vectorsCompressed": false
     },
     {
       "name": "standard",
-      "label": "Standard (512)",
+      "label": "Standard (512 vectors)",
       "coverage": "sample",
       "vectorCount": 512,
-      "vectorsFile": "Vectors/906114-01-standard.logicic.xml.gz",
-      "vectorsCompressed": true
-    },
-    {
-      "name": "full",
-      "label": "Full (65536)",
-      "coverage": "exhaustive",
-      "vectorCount": 65536,
-      "vectorsFile": "Vectors/906114-01-full.logicic.xml.gz",
-      "vectorsCompressed": true
+      "vectorsFile": "Vectors/906114-01-standard.logicic.xml",
+      "vectorsCompressed": false
     }
   ]
 }
