@@ -1,15 +1,10 @@
 - **Application**
-  - **New**
-    - Added __experimental__ possibility to test IC's with a MiniPro programmer (TL866/T48/T56)
-      - "Configuration" tab has a couple of options for enabling this (not enabled per default)
-      - Read [MiniPro programmer documentation](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/MiniPro-programmer-how%E2%80%90to) to see how to use this
-    - Added show of proper BETA version number, if applicable
   - **Changed**
-    - Minor changes in UI for "IC Test" popup
+    - Changed MiniPro Programmer IC test is now embedded in component info popup
   - **Fixed**
-    - After closing "IC Test" window then it did require two clicks on test IC button to show popup
+    - After closing MiniPro Programmer IC test then it did require two clicks on test IC button go to test
   - **Removed**
-    - C64 PLA 65K test depth (can ideally be introduced later again)
+    - C64 PLA 65K test depth (can ideally be introduced later again?)
 - **Data**
   - **New**
     - Added **Commodore Plus/4**
