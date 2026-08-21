@@ -137,6 +137,7 @@ public partial class TabSchematics : UserControl
     private long thisLastKiCadHoverHitTestTimestamp;
     private string thisLastKiCadNetConnectionsSignature = string.Empty;
     private string thisLastThumbnailHighlightSignature = string.Empty;
+    private string thisHighlightedBoardLabelsSignature = string.Empty;
 
     private readonly Dictionary<string, KiCadPcbNetRenderCache> thisKiCadPcbNetRenderCacheByKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, KiCadPcbHoverHitTestCache> thisKiCadPcbHoverHitTestCacheByKey = new(StringComparer.OrdinalIgnoreCase);
@@ -2520,6 +2521,10 @@ public partial class TabSchematics : UserControl
         {
             effectiveBoardLabels.Add(boardLabel);
         }
+
+        this.thisHighlightedBoardLabelsSignature = string.Join(
+            "\u001E",
+            effectiveBoardLabels.OrderBy(label => label, StringComparer.OrdinalIgnoreCase));
 
         this.highlightIndexBySchematic = new(StringComparer.OrdinalIgnoreCase);
 
@@ -9809,10 +9814,10 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     private string BuildThumbnailHighlightSignature(bool hasComponentSelection, bool hasKiCadSelection)
     {
+        // Keyed by the actual set of highlighted board labels rather than by which schematics have
+        // at least one highlight, since two different label sets can highlight the same schematics.
         string componentPart = hasComponentSelection
-            ? string.Join(
-                "\u001E",
-                this.highlightIndexBySchematic.Keys.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+            ? this.thisHighlightedBoardLabelsSignature
             : string.Empty;
 
         string componentBlinkPart = hasComponentSelection

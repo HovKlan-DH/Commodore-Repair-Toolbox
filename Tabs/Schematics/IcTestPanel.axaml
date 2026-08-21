@@ -7,7 +7,7 @@
        control the same way it insets the title/category-part-number header above it,
        so this content lines up flush with that header rather than double-indenting. -->
   <Grid Background="{DynamicResource Form_Bg}">
-    <Grid Margin="0,8,0,0" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ClipToBounds="True">
+    <Grid Margin="0,8,0,0" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ClipToBounds="True">
 
       <TextBlock Grid.Row="0"
                  Classes="ComponentResourceHeaderText"
@@ -83,34 +83,30 @@
         </StackPanel>
       </Border>
 
-      <!-- Raw per-vector grid: noise on a pass, useful on a fail. Tucked away and
-           opened automatically only when something failed. ANSI-stripped in code. -->
-      <Expander x:Name="LogExpander"
-                Grid.Row="6"
-                Header="Raw MiniPro output"
-                FontSize="12"
-                IsExpanded="False"
-                HorizontalAlignment="Stretch"
-                HorizontalContentAlignment="Stretch"
-                VerticalAlignment="Stretch"
-                VerticalContentAlignment="Stretch"
-                ClipToBounds="True">
-        <TextBox x:Name="LogBox"
-                 IsReadOnly="True"
-                 AcceptsReturn="True"
-                 TextWrapping="NoWrap"
-                 MinHeight="120"
-                 HorizontalAlignment="Stretch"
-                 VerticalAlignment="Stretch"
-                 FontFamily="Cascadia Mono,Consolas,Menlo,monospace"
-                 FontSize="11"
-                 VerticalContentAlignment="Top"
-                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                 ScrollViewer.VerticalScrollBarVisibility="Auto" />
-      </Expander>
+      <!-- Raw per-vector grid: noise on a pass, useful on a fail. Always visible
+           (no expand/collapse) — ANSI-stripped in code. -->
+      <TextBlock Grid.Row="6"
+                 Text="Raw MiniPro output:"
+                 FontSize="12"
+                 Margin="0,0,0,4" />
+
+      <TextBox x:Name="LogBox"
+               Grid.Row="7"
+               IsReadOnly="True"
+               AcceptsReturn="True"
+               TextWrapping="NoWrap"
+               MinHeight="120"
+               HorizontalAlignment="Stretch"
+               VerticalAlignment="Stretch"
+               FontFamily="Cascadia Mono,Consolas,Menlo,monospace"
+               FontSize="11"
+               VerticalContentAlignment="Top"
+               ScrollViewer.HorizontalScrollBarVisibility="Auto"
+               ScrollViewer.VerticalScrollBarVisibility="Auto"
+               Margin="0,0,0,16" />
 
       <Button x:Name="CloseButton"
-              Grid.Row="7"
+              Grid.Row="8"
               Content="Close MiniPro Test"
               HorizontalAlignment="Right"
               Margin="0,8,0,0"

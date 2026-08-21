@@ -50,7 +50,6 @@ namespace CRT
             this._boardLabel = boardLabel;
 
             this.ResultBorder.IsVisible = false;
-            this.LogExpander.IsExpanded = false;
             this.LogBox.Text = string.Empty;
 
             this._modes = entry.Modes ?? new List<IcTestMode>();
@@ -139,7 +138,6 @@ namespace CRT
 
             this.SetRunning(true);
             this.ResultBorder.IsVisible = false;
-            this.LogExpander.IsExpanded = true;
             this.LogBox.Text = string.Empty;
             this._cts = new CancellationTokenSource();
             this.StartElapsed(mode);
