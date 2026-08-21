@@ -32,6 +32,16 @@ namespace CRT
         private DispatcherTimer? _elapsedTimer;
         private readonly Stopwatch _elapsed = new();
 
+        // Bumped by Load() and by each new run. A run captures the value and re-checks it after
+        // every await, so a run belonging to a chip the user has navigated away from can no longer
+        // write its result, its streamed lines, or its running-state into the panel.
+        private int _runGeneration;
+
+        // Streaming log buffer - see AppendLog.
+        private readonly StringBuilder _log = new();
+        private bool _logDirty;
+        private DispatcherTimer? _logFlushTimer;
+
         // Raised when the user clicks Close — the host is responsible for hiding this panel
         // and restoring whatever it was overlaying.
         public event Action? CloseRequested;
@@ -43,14 +53,19 @@ namespace CRT
 
         public void Load(IcTestEntry entry, string boardLabel)
         {
+            // Retire any run still in flight: cancelling is not enough on its own, because a run
+            // whose process already exited is past the point where the token has any effect and
+            // would otherwise render its result into this freshly loaded chip's panel.
+            this._runGeneration++;
             this._cts?.Cancel();   // a previous test may still be running if the panel is being re-used
             this._cts = null;
+            this.StopLogFlushTimer();
 
             this._entry = entry;
             this._boardLabel = boardLabel;
 
             this.ResultBorder.IsVisible = false;
-            this.LogBox.Text = string.Empty;
+            this.ResetLog();
 
             this._modes = entry.Modes ?? new List<IcTestMode>();
             if (this._modes.Count > 0)
@@ -133,33 +148,48 @@ namespace CRT
 
         private async void OnRun(object? sender, RoutedEventArgs e)
         {
-            if (this._entry is null) return;
+            // Snapshot everything this run is about. The panel instance is re-used across chips,
+            // so by the time the await below returns, the fields may already describe a different
+            // component - see _runGeneration.
+            var entry = this._entry;
+            if (entry is null) return;
             var mode = this.SelectedMode;
+            string boardLabel = this._boardLabel;
+            int runGeneration = ++this._runGeneration;
 
             this.SetRunning(true);
             this.ResultBorder.IsVisible = false;
-            this.LogBox.Text = string.Empty;
-            this._cts = new CancellationTokenSource();
+            this.ResetLog();
+            var cts = new CancellationTokenSource();
+            this._cts = cts;
             this.StartElapsed(mode);
+            this.StartLogFlushTimer();
 
             IMiniproRunner runner = this.DemoModeCheck.IsChecked == true
                 ? new MockMiniproRunner { Scenario = MockScenario.GoodChip }
                 : new MiniproProcessRunner();
             var service = new IcTestService(runner);
-            var progress = new Progress<string>(this.AppendLog);
 
-            Logger.Info($"IC test run: [{this._boardLabel}] [{this._entry.Id}] " +
+            // Streamed lines are posted back asynchronously, so they can also outlive this run.
+            var progress = new Progress<string>(line =>
+            {
+                if (runGeneration != this._runGeneration) return;
+                this.AppendLog(line);
+            });
+
+            Logger.Info($"IC test run: [{boardLabel}] [{entry.Id}] " +
                         $"mode=[{mode?.Name ?? "(single)"}] demo=[{this.DemoModeCheck.IsChecked == true}]");
 
             IcTestResult result;
             try
             {
-                result = await service.RunAsync(this._entry, mode, progress, this._cts.Token);
+                result = await service.RunAsync(entry, mode, progress, cts.Token);
             }
             catch (OperationCanceledException)
             {
+                Logger.Info($"IC test cancelled: [{boardLabel}] [{entry.Id}]");
+                if (runGeneration != this._runGeneration) return;
                 this.AppendLog("— cancelled —");
-                Logger.Info($"IC test cancelled: [{this._boardLabel}] [{this._entry.Id}]");
                 this.SetRunning(false);
                 return;
             }
@@ -168,9 +198,14 @@ namespace CRT
                 result = IcTestResult.Connectionless(MiniproConnectionState.Unknown, ex.Message);
             }
 
-            this.RenderResult(result);
-            Logger.Info($"IC test result: [{this._boardLabel}] [{this._entry.Id}] -> {result.Outcome} ({result.Headline})");
+            Logger.Info($"IC test result: [{boardLabel}] [{entry.Id}] -> {result.Outcome} ({result.Headline})");
+
+            // A newer Load()/run owns the panel now - this result belongs to a chip the user has
+            // already navigated away from, so rendering it here would show the wrong verdict.
+            if (runGeneration != this._runGeneration) return;
+
             this.SetRunning(false);
+            this.RenderResult(result);
         }
 
         private void OnCancel(object? sender, RoutedEventArgs e) => this._cts?.Cancel();
@@ -192,6 +227,8 @@ namespace CRT
             this._elapsedTimer = null;
             this._elapsed.Stop();
             this.ElapsedText.Text = string.Empty;
+            this.StopLogFlushTimer();
+            this.FlushLog();   // the run is over - show whatever the last lines were
         }
 
         private void StartElapsed(IcTestMode? mode)
@@ -205,9 +242,62 @@ namespace CRT
             this._elapsedTimer.Start();
         }
 
-        private void AppendLog(string line) =>
-            this.LogBox.Text += ((this.LogBox.Text?.Length ?? 0) > 0 ? "\n" : string.Empty)
-                + MiniproOutputParser.StripAnsi(line);
+        // Buffer the streamed output instead of concatenating onto LogBox.Text per line: a failing
+        // run emits one line per failing vector (up to 65,536 for the PLA), and "Text +=" recopies
+        // the whole string every time, which is quadratic and lands on the UI thread. The TextBox
+        // is refreshed on a timer instead, so the cost no longer scales with the line count.
+        private void AppendLog(string line)
+        {
+            if (this._log.Length > 0)
+            {
+                this._log.Append('\n');
+            }
+
+            this._log.Append(MiniproOutputParser.StripAnsi(line));
+            this._logDirty = true;
+        }
+
+        // Replaces the whole log (the final, complete minipro output) and keeps the streaming
+        // buffer in step so a pending flush can never overwrite it.
+        private void SetLogText(string text)
+        {
+            this._log.Clear();
+            this._log.Append(text);
+            this._logDirty = false;
+            this.LogBox.Text = text;
+        }
+
+        private void ResetLog()
+        {
+            this._log.Clear();
+            this._logDirty = false;
+            this.LogBox.Text = string.Empty;
+        }
+
+        private void FlushLog()
+        {
+            if (!this._logDirty)
+            {
+                return;
+            }
+
+            this._logDirty = false;
+            this.LogBox.Text = this._log.ToString();
+        }
+
+        private void StartLogFlushTimer()
+        {
+            this.StopLogFlushTimer();
+            this._logFlushTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+            this._logFlushTimer.Tick += (_, _) => this.FlushLog();
+            this._logFlushTimer.Start();
+        }
+
+        private void StopLogFlushTimer()
+        {
+            this._logFlushTimer?.Stop();
+            this._logFlushTimer = null;
+        }
 
         private void RenderResult(IcTestResult r)
         {
@@ -239,7 +329,9 @@ namespace CRT
             // stderr, which the live stdout stream above never surfaces — so on a
             // failure the box would otherwise look empty.
             if (!string.IsNullOrEmpty(r.RawOutput))
-                this.LogBox.Text = MiniproOutputParser.AlignVectorTableHeader(MiniproOutputParser.StripAnsi(r.RawOutput));
+            {
+                this.SetLogText(MiniproOutputParser.AlignVectorTableHeader(MiniproOutputParser.StripAnsi(r.RawOutput)));
+            }
         }
     }
 }

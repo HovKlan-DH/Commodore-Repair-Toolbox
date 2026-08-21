@@ -283,7 +283,10 @@ namespace Handlers.Oscilloscope
         private static bool AreEquivalent(double left, double right)
         {
             double delta = Math.Abs(left - right);
-            double scale = Math.Max(1.0, Math.Max(Math.Abs(left), Math.Abs(right)));
+            // Purely relative. T/DIV values are in seconds, so a nanosecond timebase IS ~1e-9;
+            // flooring the scale at 1.0 made this an ABSOLUTE 1e-9 tolerance and turned every
+            // adjacent nanosecond value (1ns vs 2ns) into a false match.
+            double scale = Math.Max(Math.Abs(left), Math.Abs(right));
             return delta <= scale * 1e-9;
         }
 

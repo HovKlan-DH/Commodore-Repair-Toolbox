@@ -12,6 +12,11 @@ namespace Handlers.Oscilloscope
         private readonly TcpClient thisClient = new();
         private NetworkStream? thisStream;
 
+        // Grace period for the trailing CR/LF of a binary block to arrive before giving up on it.
+        // Only ever paid in full by a scope that sends no terminator at all.
+        private const int BinaryBlockTerminatorTimeoutMilliseconds = 1000;
+        private const int BinaryBlockTerminatorPollMilliseconds = 5;
+
         // ###########################################################################################
         // Connects to the target scope over TCP and prepares the SCPI network stream.
         // ###########################################################################################
@@ -99,6 +104,16 @@ namespace Handlers.Oscilloscope
 
         // ###########################################################################################
         // Consumes the trailing CR/LF terminator that may follow a SCPI binary block response.
+        //
+        // DataAvailable only reports bytes already sitting in the local receive buffer, so testing
+        // it once races the network: after a multi-segment binary transfer (a screenshot is often
+        // hundreds of KB) the trailing CR/LF is regularly still in flight. Leaving it in the socket
+        // desyncs the whole session - the next QueryLineAsync reads that stale newline and returns
+        // an empty string, shifting every later response by one.
+        //
+        // So wait a bounded time for the terminator instead, while still tolerating scopes that
+        // send none. A read is only ever started once a byte is already buffered, so giving up on
+        // the deadline can never leave a pending read that would steal the next response's bytes.
         // ###########################################################################################
         private async Task DiscardBinaryBlockTerminatorAsync(CancellationToken cancellationToken)
         {
@@ -107,13 +122,37 @@ namespace Handlers.Oscilloscope
                 throw new InvalidOperationException("No active oscilloscope session exists");
             }
 
-            if (!this.thisStream.DataAvailable)
+            var terminatorBuffer = new byte[1];
+            bool hasConsumedLineFeed = false;
+            long deadlineTicks = Environment.TickCount64 + BinaryBlockTerminatorTimeoutMilliseconds;
+
+            // LF is the SCPI message terminator, so a bare CR means the LF is still coming.
+            while (!hasConsumedLineFeed && Environment.TickCount64 < deadlineTicks)
             {
-                return;
+                if (!this.thisStream.DataAvailable)
+                {
+                    await Task.Delay(BinaryBlockTerminatorPollMilliseconds, cancellationToken);
+                    continue;
+                }
+
+                int read = await this.thisStream.ReadAsync(terminatorBuffer.AsMemory(0, 1), cancellationToken);
+                if (read == 0)
+                {
+                    return;
+                }
+
+                if (terminatorBuffer[0] != (byte)'\r' &&
+                    terminatorBuffer[0] != (byte)'\n')
+                {
+                    throw new InvalidOperationException("Unexpected extra data after SCPI binary block");
+                }
+
+                hasConsumedLineFeed = terminatorBuffer[0] == (byte)'\n';
             }
 
-            var terminatorBuffer = new byte[1];
-
+            // Drain any further terminator bytes that are already buffered, without waiting for
+            // more to arrive. Nothing else can legitimately be queued here: the caller only sends
+            // the next command after this returns, so responses are never pipelined.
             while (this.thisStream.DataAvailable)
             {
                 int read = await this.thisStream.ReadAsync(terminatorBuffer.AsMemory(0, 1), cancellationToken);

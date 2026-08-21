@@ -3,6 +3,10 @@
     - Changed MiniPro Programmer IC test is now embedded in component info popup
   - **Fixed**
     - After closing MiniPro Programmer IC test then it did require two clicks on test IC button go to test
+    - MiniPro Programmer IC test could show the result from the previously tested IC, if switching to another component while a test was still finishing
+    - MiniPro Programmer IC test could freeze the application for a long time when a test produced a large amount of output
+    - Oscilloscope T/DIV values in the nanosecond range could be matched to a wrong supported value, so a board value of `2ns` would set the oscilloscope to `1ns`, and stepping T/DIV up/down from such a value did nothing
+    - Oscilloscope image dump could leave the connection out of sync, so all following commands would read the previous command's response
   - **Removed**
     - C64 PLA 65K test depth (can ideally be introduced later again?)
 - **Data**
