@@ -15,22 +15,14 @@ It is (for now) primarily dedicated to Commodore, and have several built-in prof
 ## Table of Contents
 
 - [Installation and usage](#installation-and-usage)
+- [Technical and other documentation](#technical-and-other-documentation)
 - [Built-in hardware and boards](#built-in-hardware-and-boards)
 - [Data contributions being worked on currently](#data-contributions-being-worked-on-currently)
 - [Supported oscilloscopes](#supported-oscilloscopes)
 - [Requirements](#requirements)
+- [YouTube Quick-Help videos available](#youtube-quick-help-videos-available)
 - [Help wanted](#help-wanted)
 - [Contact developer](#contact-developer)
-- [Technical topics](#technical-topics)
-  - [YouTube Quick-Help videos available](#youtube-quick-help-videos-available)
-  - [Information automatically collected by CRT](#information-automatically-collected-by-crt)
-  - [Commandline parameters](#commandline-parameters)
-  - [How to contribute with data to CRT GitHub repository?](#how-to-contribute-with-data-to-crt-github-repository)
-  - [Compiling yourself](#compiling-yourself)
-  - [MiniPro programmer how-to](#minipro-programmer-how-to)
-  - [Controlling oscilloscope with keyboard/numpad](#controlling-oscilloscope-with-keyboardnumpad)
-  - [Development tools used](#development-tools-used)
-- [Inspiration for building this application](#inspiration-for-building-this-application)
 - [Screenshots](#screenshots)
 
 
@@ -43,6 +35,11 @@ If needed then the `data-root` folder can be changed via a commandline parameter
 Depending on your configuration settings, then _CRT_ will check for newer data at application launch. It is recommended to have this enabled, as there will come many updates over time.
 
 When a new version is released it will be shown to you in the application, and you can update directly from within the application.
+
+
+## Technical and other documentation
+
+Please go to [Wiki](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki) to view more technical documentation or other information related to _CRT_.
 
 
 ## Built-in hardware and boards
@@ -153,6 +150,17 @@ When a new version is released it will be shown to you in the application, and y
 Note that the newest .NET LTS (Long-Term Support) is embedded in application, which means you do not need to have this installed. It also does mean that even if you have .NET installed on your computer, then it will still use the one embedded in application. Do note that it is the newest LTS at build time - it will not get updated automatically and will stay as-is.
 
 
+## YouTube Quick-Help videos available
+
+You can view the below _Quick Help_ videos for introduction to specific topics in _CRT_:
+
+- [Short introduction](https://youtu.be/fwR018x39qg)
+- [How to do manual traces](https://youtu.be/JUNXeCHsrME)
+- [How to sync oscilloscope](https://youtu.be/CbTh1FFp3tU)
+- [How to use component label editor](https://youtu.be/u-UkD-m4Z6o)
+- [How to use interactive traces](https://youtu.be/Y55nC_gJbH4)
+
+
 ## Help wanted
 
 I will keep adding and enhancing data, but if this is only me providing data, then it will take many years before this will reach a "premium level" - **if ever** 😁 So, I really do hope that the community will contribute, so it quickly can become a good source of information.
@@ -173,111 +181,6 @@ There are several ways to get in contact with the developer:
 - Direct communication via [Retro Hardware Discord](https://discord.gg/kVTtdvZtzE) channel (accept invite on page)
 - CRT "Feedback" tab
 - GitHub [Issues](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/issues)
-
-
-## Technical topics
-
-### YouTube Quick-Help videos available
-
-You can view the below _Quick Help_ videos for introduction to specific topics in _CRT_:
-
-- [Short introduction](https://youtu.be/fwR018x39qg)
-- [How to do manual traces](https://youtu.be/JUNXeCHsrME)
-- [How to sync oscilloscope](https://youtu.be/CbTh1FFp3tU)
-- [How to use component label editor](https://youtu.be/u-UkD-m4Z6o)
-- [How to use interactive traces](https://youtu.be/Y55nC_gJbH4)
-
-
-### Information automatically collected by CRT
-
-I want to be transparent here, and inform that I am gathering information about your setup, at every application launch, where the application does a mandatory "check-in":
-
-- IP address
-  - Ex. `85.184.162.75`
-  - Used for pinning countries on a worldmap
-- Operating system version
-  - Ex. `Microsoft Windows 10.0.19045`
-  - Used for knowing if my rewrite to natively support Linux and macOS was worth it
-- CPU architechture used (32-bit or 64-bit)
-  - Ex. `64-bit`
-  - Used for knowing how wide usage that pesky self-contained .NET6 has (this is legacy and not used any more)
-
-I am allowing myself to gather this data for me to build the [CRT Fun facts](https://classic-repair-toolbox.dk/funfacts/) page, which is some statistics on usage. As a developer, this is a personal motivational point to see countries using my application and of course one always hope for that "upwards trend usage"... which never happens 🤣 I find this limited non-personal data a fair amount to "pay" for using this application, taking in consideration for the effort being put in to this.
-
-
-### Commandline parameters
-
-_CRT_ supports currently only a single commandline parameter, where you can specify which data folder you want to use. The data folder is where it place all its data files that can be fetched from its online source, and as this can be a lot of data (+500MB), then maybe in some cases it could be useful to save this somewhere else.
-
-If the path does not exists, it will try and create it.
-
-Parameter examples:
-- `--data-root=/mydata/crt`
-- `--data-root="D:\My Folder With Spaces\"`
-
-
-### How to contribute with data to CRT GitHub repository?
-
-One possibility to contribute data is by submitting it directly to the GitHub repository, and in this way you will also be seen as a contributor. There are are some basic steps that you can follow, if you want to contribute data to CRT. It is quite easy, but it does require you have a GitHub account.
-
-- Fork the _CRT_ GitHub repository
-- Clone the fork to your local computer
-- **Create a new branch** (important!)
-- Do your own modifications:
-  - Change existing files
-  - Add new files
-- Commit changes to your forked repo and the new branch you have created
-- Create a `Pull Request`
-  - Important - **make sure to validate your data before submitting this pull request, as bad data will be declined**
-- Wait for review
-
-There are of course more details to this, but please let me know if this does _not_ work for you.
-
-
-### Installing in Linux
-
-As per default the Linux package is a one-large binary package that can be run directly from whereever you have downloaded it - it will not install anything on system. If you want to have the _CRT_ application and icon available in your "Start" menu (not sure what this is called in Linux?), then you can install it with an application manager like e.g. **Gear Lever**. Just open **Gear Lever** and drag the _CRT_ file in to it, and afterwards you will be able to access it nice and easily:
-
-<img width="902" height="578" alt="image" src="https://github.com/user-attachments/assets/13edb9d5-8b61-4259-bcc7-e0986d88ed51" />
-
-
-### Compiling yourself
-
-You can view the details in [BUILDING.md](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/blob/main/BUILDING.md)
-
-
-### MiniPro programmer how-to
-
-You can view the details in Wiki [MiniPro programmer how‐to](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/MiniPro-programmer-how%E2%80%90to)
-
-
-### Controlling oscilloscope with keyboard/numpad
-
-_CRT_ can control a network connected oscilloscope, if it is supported, with the keyboard/numpad. You can use these keys:
-
-<img width="1051" height="358" alt="image" src="https://github.com/user-attachments/assets/8f339e2c-bf05-49bd-ab8d-9cad2a3b018b" />
-
-If your oscilloscope is not in the list or it actually does not work properly, then please do investigate which **SCPI commands** works for your specific oscilloscope model, as this varies quite a lot - even within same vendor. I do not know all oscilloscopes, nor do I have access to anything else than my own, so you will need to provide this data yourself. You can add and test the required data in the main Excel data file `Classic-Repair-Toolbox.xlsx` in the sheet `Oscilloscope`.
-
-
-### Development tools used
-
-_CRT_ has been developed in _Visual Studio Community 2026_. Where the old _Commodore_ project was primarily self-developed, then this new _Classic_ codebase has been developed primarily with GitHub Copilot, which is why I see myself more as a _conductor_ for this project, rather than the pure developer of this application - all credits to the people behind these LLM models 😁 As of March-2026 I have primarily used the _Gemini 3.1 Pro_ model, but also _Claude Sonnet 4.6_ and in some cases _GPT-5.3-Codex_ (these models will of course change for the future).
-
-NuGet packages used:
-- [Avalonia](https://avaloniaui.net/)
-- [EPPlus](https://epplussoftware.com/)
-- [Newtonsoft.Json](https://www.newtonsoft.com/json)
-- [Velopack](https://github.com/velopack/velopack)
-
-
-## Inspiration for building this application
-
-I have been repairing Commodore 64/128 computers for some years, but I still consider myself as a _beginner_ in this world of hardware, and as you probably can guess (since I did this application) then I am more a software person. The hardware side of things is really relaxing for me, focussing on some physical hardware, troubleshooting, soldering, replacing and seeing a broken machine being revived is just so satisfying, so this is a _must-have_ for me to relax a little from all my software projects 😁
-
-For my repairs I always forget _where_ and _what_ to check, and I struggle to find again all the relevant ressources and schematics to check, not to mention how to find the components in the schematics. I did often refer to the "Mainboards" section of [My Old Computer](https://myoldcomputer.nl/technical-info/mainboards/), and I noticed that Jeroen did have a prototype of an application named _Repair Help_, and it did have the easy layout I was looking for. However, it was never finalized from his side, so I took upon myself to create something similar, and a couple of years later (a lot of hiatus) I did come up with a very similar looking Windows application named **Commodore Repair Toolbox** (CRT).
-
-After a year with _CRT_ and due to several questions about "_is it Windows only_", then I investigated if it was realistic for me to do a native porting to other systems. As I in the same time wanted to explore vibe-coding with the new LLM models, then I decided to give it a go... a complete rewrite based on a new platform (Avalonia), giving me a great opportunity to lurk out previous design flaws in the old project, which was almost completely "hand-written". So, here we are now with a completely new project and natively supporting **Windows**, **Linux** and **macOS** - nice.
 
 
 ## Screenshots
