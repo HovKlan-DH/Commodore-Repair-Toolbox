@@ -15,6 +15,7 @@ It is (for now) primarily dedicated to Commodore, and have several built-in prof
 ## Table of Contents
 
 - [Installation and usage](#installation-and-usage)
+- [Technical and other documentation](#technical-and-other-documentation)
 - [Built-in hardware and boards](#built-in-hardware-and-boards)
 - [Data contributions being worked on currently](#data-contributions-being-worked-on-currently)
 - [Supported oscilloscopes](#supported-oscilloscopes)
@@ -34,6 +35,11 @@ If needed then the `data-root` folder can be changed via a commandline parameter
 Depending on your configuration settings, then _CRT_ will check for newer data at application launch. It is recommended to have this enabled, as there will come many updates over time.
 
 When a new version is released it will be shown to you in the application, and you can update directly from within the application.
+
+
+## Technical and other documentation
+
+Please go to [Wiki](wiki) to view more technical documentation or other information related to _CRT_.
 
 
 ## Built-in hardware and boards
