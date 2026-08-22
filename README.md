@@ -15,7 +15,7 @@ It is (for now) primarily dedicated to Commodore, and have several built-in prof
 ## Table of Contents
 
 - [Installation and usage](#installation-and-usage)
-- [Technical and other documentation](#technical-and-other-documentation)
+- [Technical and other documentation](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki)
 - [Built-in hardware and boards](#built-in-hardware-and-boards)
 - [Data contributions being worked on currently](#data-contributions-being-worked-on-currently)
 - [Supported oscilloscopes](#supported-oscilloscopes)
