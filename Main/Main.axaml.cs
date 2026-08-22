@@ -1188,24 +1188,34 @@ namespace CRT
 
             if (UserSettings.HasWindowPlacement && this.WindowState == Avalonia.Controls.WindowState.Normal)
             {
-                double scaling = this.RenderScaling > 0 ? this.RenderScaling : 1.0;
-                int centerX = this._restorePosition.X + (int)((this._restoreWidth * scaling) / 2);
-                int centerY = this._restorePosition.Y + (int)((this._restoreHeight * scaling) / 2);
-
-                bool isOnScreen = this.Screens.All.Any(s =>
-                    centerX >= s.Bounds.X &&
-                    centerY >= s.Bounds.Y &&
-                    centerX < s.Bounds.X + s.Bounds.Width &&
-                    centerY < s.Bounds.Y + s.Bounds.Height);
-
-                if (!isOnScreen)
+                if (UserSettings.WindowState == nameof(Avalonia.Controls.WindowState.Maximized))
                 {
-                    var primary = this.Screens.Primary;
-                    if (primary != null)
+                    // Some Linux window managers (X11/Wayland) ignore a Maximized WindowState set
+                    // before the window is shown/mapped, since the WM only honors the maximize
+                    // request once it can see the window. Re-assert it now that the window is open.
+                    this.WindowState = Avalonia.Controls.WindowState.Maximized;
+                }
+                else
+                {
+                    double scaling = this.RenderScaling > 0 ? this.RenderScaling : 1.0;
+                    int centerX = this._restorePosition.X + (int)((this._restoreWidth * scaling) / 2);
+                    int centerY = this._restorePosition.Y + (int)((this._restoreHeight * scaling) / 2);
+
+                    bool isOnScreen = this.Screens.All.Any(s =>
+                        centerX >= s.Bounds.X &&
+                        centerY >= s.Bounds.Y &&
+                        centerX < s.Bounds.X + s.Bounds.Width &&
+                        centerY < s.Bounds.Y + s.Bounds.Height);
+
+                    if (!isOnScreen)
                     {
-                        this.Position = new PixelPoint(
-                            primary.Bounds.X + Math.Max(0, (primary.Bounds.Width - (int)(this.Width * scaling)) / 2),
-                            primary.Bounds.Y + Math.Max(0, (primary.Bounds.Height - (int)(this.Height * scaling)) / 2));
+                        var primary = this.Screens.Primary;
+                        if (primary != null)
+                        {
+                            this.Position = new PixelPoint(
+                                primary.Bounds.X + Math.Max(0, (primary.Bounds.Width - (int)(this.Width * scaling)) / 2),
+                                primary.Bounds.Y + Math.Max(0, (primary.Bounds.Height - (int)(this.Height * scaling)) / 2));
+                        }
                     }
                 }
             }
