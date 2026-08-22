@@ -63,6 +63,36 @@
 			<Setter Property="Background" Value="Transparent" />
 		</Style>
 
+		<!-- "Circle-question" (fa-regular fa-circle-question) help icon that links to an external help page.
+		     Sized/clipped the same way as DataSyncStatusIconTextBlock in Main.axaml (fixed box noticeably
+		     larger than the font size, explicit ClipToBounds) since that is the proven-working icon-font
+		     recipe already used elsewhere in this app. -->
+		<Style Selector="Button.HelpIconButton">
+			<Setter Property="Width" Value="22" />
+			<Setter Property="Height" Value="22" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="ClipToBounds" Value="True" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Foreground" Value="Black" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="HorizontalContentAlignment" Value="Center" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+		</Style>
+
+		<Style Selector="Button.HelpIconButton /template/ ContentPresenter">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="ClipToBounds" Value="True" />
+		</Style>
+
+		<Style Selector="Button.HelpIconButton:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="Transparent" />
+		</Style>
+
+		<Style Selector="Button.HelpIconButton:pressed /template/ ContentPresenter">
+			<Setter Property="Background" Value="Transparent" />
+		</Style>
+
 		<Style Selector="Border.ComponentResourceRow">
 			<Setter Property="Background" Value="Transparent" />
 		</Style>
@@ -426,7 +456,23 @@
 
 					<!-- IC test (shown only for ICs with a test-catalogue entry) -->
 					<StackPanel x:Name="TestSection" IsVisible="False" Spacing="4" Margin="0,8,0,0">
-						<Button x:Name="TestButton" Content="Test IC with MiniPro programmer" HorizontalAlignment="Left" Click="OnTestClick" />
+						<StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+							<Button x:Name="TestButton" Content="Test IC with MiniPro programmer" HorizontalAlignment="Left" Click="OnTestClick" />
+							<Button x:Name="MiniProHelpButton"
+									Classes="HelpIconButton"
+									VerticalAlignment="Center"
+									ToolTip.Tip="Open help page for MiniPro programmer"
+									Click="OnMiniProHelpClick">
+								<TextBlock Text="&#xf059;"
+										   Width="22"
+										   Height="22"
+										   FontFamily="{StaticResource FontAwesomeRegular}"
+										   FontSize="18"
+										   TextAlignment="Center"
+										   HorizontalAlignment="Center"
+										   VerticalAlignment="Center" />
+							</Button>
+						</StackPanel>
 					</StackPanel>
 					
 					<!-- 3. Component one-liner (hidden when empty) -->
@@ -605,11 +651,27 @@
 						  Height="28"
 						  ColumnDefinitions="Auto,4,Auto"
 						  VerticalAlignment="Center">
-						<CheckBox x:Name="SyncOscilloscopeCheckBox"
-								  Content="Sync oscilloscope"
+						<CheckBox Grid.Column="0"
+								  x:Name="SyncOscilloscopeCheckBox"
+								  Content="Synchronize oscilloscope"
 								  IsChecked="True"
 								  FontSize="11"
 								  VerticalAlignment="Center" />
+						<Button Grid.Column="2"
+								x:Name="SyncOscilloscopeHelpButton"
+								Classes="HelpIconButton"
+								VerticalAlignment="Center"
+								ToolTip.Tip="Open help page for synchronizing the oscilloscope"
+								Click="OnSyncOscilloscopeHelpClick">
+							<TextBlock Text="&#xf059;"
+									   Width="22"
+									   Height="22"
+									   FontFamily="{StaticResource FontAwesomeRegular}"
+									   FontSize="18"
+									   TextAlignment="Center"
+									   HorizontalAlignment="Center"
+									   VerticalAlignment="Center" />
+						</Button>
 					</Grid>
 
 					<Grid Grid.Column="2"
@@ -617,10 +679,26 @@
 						  Height="28"
 						  ColumnDefinitions="Auto,4,Auto"
 						  VerticalAlignment="Center">
-						<CheckBox x:Name="NumpadOscilloscopeSwitch"
+						<CheckBox Grid.Column="0"
+								  x:Name="NumpadOscilloscopeSwitch"
 								  Content="Numpad controls oscilloscope"
 								  FontSize="11"
 								  VerticalAlignment="Center" />
+						<Button Grid.Column="2"
+								x:Name="NumpadOscilloscopeHelpButton"
+								Classes="HelpIconButton"
+								VerticalAlignment="Center"
+								ToolTip.Tip="Open help page for numpad oscilloscope controls"
+								Click="OnNumpadOscilloscopeHelpClick">
+							<TextBlock Text="&#xf059;"
+									   Width="22"
+									   Height="22"
+									   FontFamily="{StaticResource FontAwesomeRegular}"
+									   FontSize="18"
+									   TextAlignment="Center"
+									   HorizontalAlignment="Center"
+									   VerticalAlignment="Center" />
+						</Button>
 					</Grid>
 
 					<Grid Grid.Column="2"

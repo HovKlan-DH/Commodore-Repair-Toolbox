@@ -1,14 +1,17 @@
 - **Application**
+  - **Added**
+    - Help icon on numpad controls in component info popup
+    - Help icon on MiniPro IC test button
+    - Link to YouTube videos in "About" tab
   - **Changed**
-    - Changed MiniPro Programmer IC test is now embedded in component info popup
+    - Changed MiniPro IC test is embedded in component info popup
   - **Fixed**
-    - After closing MiniPro Programmer IC test then it did require two clicks on test IC button go to test
-    - MiniPro Programmer IC test could show the result from the previously tested IC, if switching to another component while a test was still finishing
-    - MiniPro Programmer IC test could freeze the application for a long time when a test produced a large amount of output
-    - Oscilloscope T/DIV values in the nanosecond range could be matched to a wrong supported value, so a board value of `2ns` would set the oscilloscope to `1ns`, and stepping T/DIV up/down from such a value did nothing
-    - Oscilloscope image dump could leave the connection out of sync, so all following commands would read the previous command's response
-  - **Removed**
-    - C64 PLA 65K test depth (can ideally be introduced later again?)
+    - After closing MiniPro IC test then it did require two clicks on test IC button to go to test
+    - MiniPro IC test could show the result from the previously tested IC, if switching to another component while a test was still finishing
+    - MiniPro IC test could freeze the application for a long time when a test produced a large amount of output
+    - Oscilloscope `T/DIV` values in the nanosecond range could be matched to a wrong supported value
+    - Oscilloscope image dump could leave the connection out of sync, so all following commands would read the previous commands response
+    - On Linux it now proper maximizes the application window, if this was its last state
 - **Data**
   - **New**
     - Added **Commodore Plus/4**

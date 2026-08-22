@@ -10,6 +10,10 @@
 				avares://Classic-Repair-Toolbox/Assets/Fonts/Font Awesome 7 Free-Solid-900.otf#Font Awesome 7 Free Solid
 			</FontFamily>
 
+			<FontFamily x:Key="FontAwesomeRegular">
+				avares://Classic-Repair-Toolbox/Assets/Fonts/Font Awesome 7 Free-Regular-400.otf#Font Awesome 7 Free Regular
+			</FontFamily>
+
 			<ResourceDictionary.ThemeDictionaries>
 
 				<!-- ########################################################################### -->

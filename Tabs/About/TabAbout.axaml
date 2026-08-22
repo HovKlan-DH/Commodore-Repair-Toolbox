@@ -97,6 +97,20 @@
 						Click="OnHelperPageClick" />
 			</StackPanel>
 
+			<StackPanel Orientation="Horizontal"
+            Margin="0,6,0,0"
+            Spacing="6">
+				<TextBlock Text="YouTube videos:"
+						   VerticalAlignment="Center" />
+				<Button Content="https://www.youtube.com/@HovKlan-DH"
+						Padding="0"
+						BorderThickness="0"
+						Cursor="Hand"
+						Background="Transparent"
+						Foreground="{DynamicResource Link_Fg}"
+						Click="OnYouTubeChannelClick" />
+			</StackPanel>
+
 			<!-- Board revision date section -->
 			<StackPanel x:Name="RevisionDatePanel"
 						Orientation="Horizontal"

@@ -3226,7 +3226,7 @@ namespace CRT
                 using (capturedBitmap)
                 {
                     Directory.CreateDirectory(outputDirectory);
-                    capturedBitmap.Save(outputFilePath);
+                    capturedBitmap.Save(outputFilePath, new PngBitmapEncoderOptions());
                 }
 
                 this.AppendOutputLine("Info", $"Saved oscilloscope image to [{outputFilePath}]");

@@ -117,6 +117,14 @@ namespace CRT
         }
 
         // ###########################################################################################
+        // Opens the YouTube channel from the About tab.
+        // ###########################################################################################
+        private void OnYouTubeChannelClick(object? sender, RoutedEventArgs e)
+        {
+            this.OpenUrl("https://www.youtube.com/@HovKlan-DH");
+        }
+
+        // ###########################################################################################
         // Builds and displays a tabular credits list from the loaded board data.
         // ###########################################################################################
         private void PopulateCreditsSection(List<CreditEntry>? credits)

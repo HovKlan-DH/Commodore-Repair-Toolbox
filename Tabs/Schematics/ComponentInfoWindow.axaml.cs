@@ -874,6 +874,30 @@ namespace CRT
         }
 
         // ###########################################################################################
+        // Opens the help page describing numpad oscilloscope controls.
+        // ###########################################################################################
+        private void OnNumpadOscilloscopeHelpClick(object? sender, RoutedEventArgs e)
+        {
+            this.OpenExternalTarget("https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/Controlling-oscilloscope-with-keyboard");
+        }
+
+        // ###########################################################################################
+        // Opens the help page describing MiniPro programmer usage.
+        // ###########################################################################################
+        private void OnMiniProHelpClick(object? sender, RoutedEventArgs e)
+        {
+            this.OpenExternalTarget("https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/MiniPro-programmer");
+        }
+
+        // ###########################################################################################
+        // Opens the help page describing oscilloscope synchronization.
+        // ###########################################################################################
+        private void OnSyncOscilloscopeHelpClick(object? sender, RoutedEventArgs e)
+        {
+            this.OpenExternalTarget("https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/Synchronize-oscilloscope");
+        }
+
+        // ###########################################################################################
         // Refreshes the image info overlays from the currently selected thumbnail item.
         // ###########################################################################################
         private void UpdateInfoOverlay()
