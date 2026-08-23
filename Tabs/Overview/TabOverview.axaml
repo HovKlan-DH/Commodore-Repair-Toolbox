@@ -48,11 +48,14 @@
 			<Setter Property="Foreground" Value="{DynamicResource Button_Highlighted_Fg}" />
 			<Setter Property="Padding" Value="12,7" />
 			<Setter Property="MinHeight" Value="0" />
-			<Setter Property="HorizontalAlignment" Value="Right" />
-			<Setter Property="VerticalAlignment" Value="Bottom" />
 			<Setter Property="HorizontalContentAlignment" Value="Center" />
 			<Setter Property="VerticalContentAlignment" Value="Center" />
-			<Setter Property="Margin" Value="0,0,12,12" />
+		</Style>
+		<Style Selector="Button.OverviewFloatingPrintButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Button_Highlighted_Bg}" />
+		</Style>
+		<Style Selector="Button.OverviewFloatingPrintButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Button_Highlighted_Bg}" />
 		</Style>
 	</UserControl.Styles>
 
@@ -69,6 +72,7 @@
 						Padding="0,12,0,0">
 					<Grid Margin="0,0,16,0">
 						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="32" />
 							<ColumnDefinition Width="96" />
 							<ColumnDefinition Width="130" />
 							<ColumnDefinition Width="150" />
@@ -79,6 +83,31 @@
 						</Grid.ColumnDefinitions>
 
 						<Grid Grid.Column="0">
+							<Grid RowDefinitions="Auto,Auto">
+								<Viewbox Grid.Row="0"
+								         Width="18"
+								         Height="18"
+								         Margin="8,0,0,0"
+								         HorizontalAlignment="Left"
+								         VerticalAlignment="Center">
+									<CheckBox x:Name="SelectAllPrintCheckBox"
+									          IsChecked="True"
+									          MinWidth="0"
+									          MinHeight="0"
+									          Margin="0"
+									          Padding="0"
+									          CornerRadius="2"
+									          Click="OnSelectAllPrintClick"
+									          ToolTip.Tip="Select or deselect every listed component for the printed component list and BOM" />
+								</Viewbox>
+								<Border Grid.Row="1"
+								        Height="1"
+								        Background="{DynamicResource Table_BorderRowLine}"
+								        Margin="8,4,8,8" />
+							</Grid>
+						</Grid>
+
+						<Grid Grid.Column="1">
 							<Grid RowDefinitions="Auto,Auto">
 								<TextBlock Grid.Row="0"
 								           Classes="OverviewHeaderText"
@@ -91,7 +120,7 @@
 							</Grid>
 						</Grid>
 
-						<Grid Grid.Column="1">
+						<Grid Grid.Column="2">
 							<Grid RowDefinitions="Auto,Auto">
 								<TextBlock Grid.Row="0"
 								           Classes="OverviewHeaderText"
@@ -104,7 +133,7 @@
 							</Grid>
 						</Grid>
 
-						<Grid Grid.Column="2">
+						<Grid Grid.Column="3">
 							<Grid RowDefinitions="Auto,Auto">
 								<TextBlock Grid.Row="0"
 								           Classes="OverviewHeaderText"
@@ -117,7 +146,7 @@
 							</Grid>
 						</Grid>
 
-						<Grid Grid.Column="3">
+						<Grid Grid.Column="4">
 							<Grid RowDefinitions="Auto,Auto">
 								<TextBlock Grid.Row="0"
 								           Classes="OverviewHeaderText"
@@ -130,7 +159,7 @@
 							</Grid>
 						</Grid>
 
-						<Grid Grid.Column="4">
+						<Grid Grid.Column="5">
 							<Grid RowDefinitions="Auto,Auto">
 								<TextBlock Grid.Row="0"
 								           Classes="OverviewHeaderText"
@@ -143,7 +172,7 @@
 							</Grid>
 						</Grid>
 
-						<Grid Grid.Column="5">
+						<Grid Grid.Column="6">
 							<Grid RowDefinitions="Auto,Auto">
 								<TextBlock Grid.Row="0"
 								           Classes="OverviewHeaderText"
@@ -156,7 +185,7 @@
 							</Grid>
 						</Grid>
 
-						<Grid Grid.Column="6">
+						<Grid Grid.Column="7">
 							<Grid RowDefinitions="Auto,Auto">
 								<TextBlock Grid.Row="0"
 								           Classes="OverviewHeaderText"
@@ -181,9 +210,11 @@
 								<Border Classes="OverviewRow"
 								        BorderBrush="{DynamicResource Table_BorderRowLine}"
 								        BorderThickness="0,0,0,1"
-								        Padding="0,4">
+								        Padding="0,4"
+								        Loaded="OnOverviewRowLoaded">
 									<Grid>
 										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="32" />
 											<ColumnDefinition Width="96" />
 											<ColumnDefinition Width="130" />
 											<ColumnDefinition Width="150" />
@@ -193,7 +224,22 @@
 											<ColumnDefinition Width="150" />
 										</Grid.ColumnDefinitions>
 
-										<Button Grid.Column="0"
+										<Viewbox Grid.Column="0"
+										         Width="18"
+										         Height="18"
+										         Margin="8,1,0,7"
+										         HorizontalAlignment="Left"
+										         VerticalAlignment="Top">
+											<CheckBox IsChecked="{Binding IsSelectedForPrint}"
+											          MinWidth="0"
+											          MinHeight="0"
+											          Margin="0"
+											          Padding="0"
+											          CornerRadius="2"
+											          ToolTip.Tip="Include this component in the printed component list and BOM" />
+										</Viewbox>
+
+										<Button Grid.Column="1"
 										        Classes="OverviewTextButton"
 										        Margin="8,4,8,4"
 										        VerticalAlignment="Top"
@@ -203,42 +249,42 @@
 											           Foreground="{DynamicResource Link_Fg}" />
 										</Button>
 
-										<SelectableTextBlock Grid.Column="1"
+										<SelectableTextBlock Grid.Column="2"
 										                     Text="{Binding TechnicalName}"
 										                     TextWrapping="Wrap"
 										                     Margin="8,4,8,4"
 										                     VerticalAlignment="Top"
 										                     Foreground="{DynamicResource Table_Fg}" />
 
-										<SelectableTextBlock Grid.Column="2"
+										<SelectableTextBlock Grid.Column="3"
 										                     Text="{Binding FriendlyName}"
 										                     TextWrapping="Wrap"
 										                     Margin="8,4,8,4"
 										                     VerticalAlignment="Top"
 										                     Foreground="{DynamicResource Table_Fg}" />
 
-										<SelectableTextBlock Grid.Column="3"
+										<SelectableTextBlock Grid.Column="4"
 										                     Text="{Binding PartNumber}"
 										                     TextWrapping="Wrap"
 										                     Margin="8,4,8,4"
 										                     VerticalAlignment="Top"
 										                     Foreground="{DynamicResource Table_Fg}" />
 
-										<SelectableTextBlock Grid.Column="4"
+										<SelectableTextBlock Grid.Column="5"
 										                     Text="{Binding ShortDescription}"
 										                     TextWrapping="Wrap"
 										                     Margin="8,4,8,4"
 										                     VerticalAlignment="Top"
 										                     Foreground="{DynamicResource Table_Fg}" />
 
-										<SelectableTextBlock Grid.Column="5"
+										<SelectableTextBlock Grid.Column="6"
 										                     Text="{Binding Notes}"
 										                     TextWrapping="Wrap"
 										                     Margin="8,4,8,4"
 										                     VerticalAlignment="Top"
 										                     Foreground="{DynamicResource Table_Fg}" />
 
-										<ItemsControl Grid.Column="6"
+										<ItemsControl Grid.Column="7"
 										              ItemsSource="{Binding Links}"
 										              Margin="8,4,8,4"
 										              VerticalAlignment="Top">
@@ -272,8 +318,17 @@
 			</Grid>
 		</Border>
 
-		<Button Classes="OverviewFloatingPrintButton"
-		        Content="Print component list"
-		        Click="OnPrintComponentListClick" />
+		<StackPanel Orientation="Horizontal"
+		            HorizontalAlignment="Right"
+		            VerticalAlignment="Bottom"
+		            Margin="0,0,12,12"
+		            Spacing="8">
+			<Button Classes="OverviewFloatingPrintButton"
+			        Content="Print BOM"
+			        Click="OnPrintComponentQuantitiesClick" />
+			<Button Classes="OverviewFloatingPrintButton"
+			        Content="Print component list"
+			        Click="OnPrintComponentListClick" />
+		</StackPanel>
 	</Grid>
 </UserControl>
