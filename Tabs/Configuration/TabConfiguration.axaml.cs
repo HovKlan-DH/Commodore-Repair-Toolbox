@@ -32,6 +32,7 @@ namespace CRT
                 UserSettings.AllowDeletionOfOrphanAndNonUsedFiles;
             this.ShowDevelopmentVersionNotificationCheckBox.IsChecked = UserSettings.ShowDevelopmentVersionNotification;
             this.MultipleInstancesForComponentPopupCheckBox.IsChecked = UserSettings.MultipleInstancesForComponentPopup;
+            this.EnableNetworkConnectedOscilloscopeTabCheckBox.IsChecked = UserSettings.EnableNetworkConnectedOscilloscopeTab;
             this.EnableMiniproExperimentalModeCheckBox.IsChecked = UserSettings.EnableMiniproExperimentalMode;
             this.EnableMiniproExperimentalDemoModeCheckBox.IsChecked = UserSettings.EnableMiniproExperimentalDemoMode;
             this.UpdateEnableMiniproExperimentalDemoModeCheckBoxState();
@@ -51,6 +52,7 @@ namespace CRT
             this.DownloadDataFromTestSourceCheckBox.IsCheckedChanged += this.OnDownloadDataFromTestSourceChanged;
             this.ShowDevelopmentVersionNotificationCheckBox.IsCheckedChanged += this.OnShowDevelopmentVersionNotificationChanged;
             this.MultipleInstancesForComponentPopupCheckBox.IsCheckedChanged += this.OnMultipleInstancesForComponentPopupChanged;
+            this.EnableNetworkConnectedOscilloscopeTabCheckBox.IsCheckedChanged += this.OnEnableNetworkConnectedOscilloscopeTabChanged;
             this.EnableMiniproExperimentalModeCheckBox.IsCheckedChanged += this.OnEnableMiniproExperimentalModeChanged;
         }
 
@@ -184,6 +186,21 @@ namespace CRT
         }
 
         // ###########################################################################################
+        // Persists the "Enable network connected oscilloscope tab" preference and shows or hides the
+        // "Oscilloscope" tab in the main window to match it.
+        // ###########################################################################################
+        private void OnEnableNetworkConnectedOscilloscopeTabChanged(object? sender, RoutedEventArgs e)
+        {
+            UserSettings.EnableNetworkConnectedOscilloscopeTab =
+                this.EnableNetworkConnectedOscilloscopeTabCheckBox.IsChecked == true;
+
+            if (TopLevel.GetTopLevel(this) is Main mainWindow)
+            {
+                mainWindow.ApplyOscilloscopeTabVisibility();
+            }
+        }
+
+        // ###########################################################################################
         // Enables the Minipro demo mode checkbox only while Minipro experimental mode is enabled.
         // ###########################################################################################
         private void UpdateEnableMiniproExperimentalDemoModeCheckBoxState()
@@ -193,7 +210,21 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Persists the "Enable experimental mode for Minipro" preference and updates dependent UI.
+        // Opens the help page describing the MiniPro programmer, through the shared launcher that
+        // every external target in this app goes through.
+        // ###########################################################################################
+        private void OnEnableMiniproExperimentalModeHelpClick(object? sender, RoutedEventArgs e)
+        {
+            const string helpUrl = "https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/MiniPro-programmer";
+
+            if (!ExternalTargetLauncher.TryOpen(helpUrl))
+            {
+                Logger.Warning($"Rejected external target from Configuration tab: [{helpUrl}]");
+            }
+        }
+
+        // ###########################################################################################
+        // Persists the "Enable MiniPro programmer functionality" preference and updates dependent UI.
         // ###########################################################################################
         private void OnEnableMiniproExperimentalModeChanged(object? sender, RoutedEventArgs e)
         {

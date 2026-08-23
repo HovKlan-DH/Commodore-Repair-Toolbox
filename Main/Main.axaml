@@ -426,7 +426,7 @@
 						<local:TabResources x:Name="TabResources" />
 					</TabItem>
 
-					<TabItem Header="Oscilloscope" IsVisible="True">
+					<TabItem x:Name="OscilloscopeTabItem" Header="Oscilloscope">
 						<local:TabOscilloscope x:Name="TabOscilloscope" />
 					</TabItem>
 

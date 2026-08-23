@@ -85,6 +85,8 @@ namespace CRT
             this.TabOverview.Initialize(this);
             this.TabContribute.Initialize(this);
 
+            this.ApplyOscilloscopeTabVisibility();
+
             // Restore left panel width from settings
             this.RootGrid.ColumnDefinitions[0].Width = new GridLength(UserSettings.LeftPanelWidth);
             this.RootGrid.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
@@ -1235,6 +1237,40 @@ namespace CRT
             {
                 this.ComponentSearchTextBox?.Focus();
             }, DispatcherPriority.Background);
+        }
+
+        // ###########################################################################################
+        // Shows or hides the "Oscilloscope" tab to match the "Enable network connected oscilloscope
+        // tab" configuration setting. If the tab is hidden while it is the selected one, selection
+        // falls back to the first still-visible tab so the tab control never shows an empty page.
+        //
+        // The same setting also governs auto-connect and the oscilloscope rows in the component info
+        // popups, so the tab is told to stop or resume its background work and any popup that is
+        // already open is refreshed here, rather than only when it is next opened.
+        // ###########################################################################################
+        public void ApplyOscilloscopeTabVisibility()
+        {
+            if (this.OscilloscopeTabItem == null || this.MainTabControl == null)
+                return;
+
+            bool isEnabled = UserSettings.EnableNetworkConnectedOscilloscopeTab;
+            this.OscilloscopeTabItem.IsVisible = isEnabled;
+
+            this.TabOscilloscopeControl.ApplyOscilloscopeTabAvailability();
+
+            this.UpdateComponentInfoWindowsOscilloscopeSessionState(
+                this.TabOscilloscopeControl.HasSeenEstablishedOscilloscopeSessionForTitleState(),
+                this.TabOscilloscopeControl.HasActiveEstablishedOscilloscopeSessionForTitleState());
+
+            if (isEnabled || !ReferenceEquals(this.MainTabControl.SelectedItem, this.OscilloscopeTabItem))
+                return;
+
+            var firstVisibleTab = this.MainTabControl.Items
+                .OfType<TabItem>()
+                .FirstOrDefault(tab => tab.IsVisible);
+
+            if (firstVisibleTab != null)
+                this.MainTabControl.SelectedItem = firstVisibleTab;
         }
 
         // ###########################################################################################

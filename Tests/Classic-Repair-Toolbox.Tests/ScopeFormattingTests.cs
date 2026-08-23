@@ -193,6 +193,60 @@ public class ScopeFormattingTests
         Assert.Equal(title, ScopeFormatting.GetMainWindowTitleBase(title));
     }
 
+    // -------------------------------------------------------------- BuildOscilloscopeWindowTitle
+
+    [Theory]
+    [InlineData(true, "CRT (oscilloscope connected)")]
+    [InlineData(false, "CRT (oscilloscope disconnected)")]
+    public void A_reported_session_state_appends_the_matching_suffix(bool hasEstablishedSession, string expected)
+    {
+        Assert.Equal(
+            expected,
+            ScopeFormatting.BuildOscilloscopeWindowTitle("CRT", true, true, hasEstablishedSession));
+    }
+
+    // Nothing worth reporting yet: no session has existed and (for the main window) auto-connect is
+    // off, so the title stays clean rather than announcing a scope the user never asked about.
+    [Fact]
+    public void Nothing_to_report_leaves_the_base_title_alone()
+    {
+        Assert.Equal("CRT", ScopeFormatting.BuildOscilloscopeWindowTitle("CRT", true, false, false));
+        Assert.Equal("CRT", ScopeFormatting.BuildOscilloscopeWindowTitle("CRT", true, false, true));
+    }
+
+    // The tab switch beats everything, INCLUDING a session that is still established. Hiding the
+    // oscilloscope tab tears the session down and stops auto-connect, so a window still claiming
+    // "(oscilloscope disconnected)" would be reporting on a feature the user has switched off.
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void A_disabled_oscilloscope_tab_suppresses_the_suffix_whatever_the_session_state(
+        bool shouldReportSessionState,
+        bool hasEstablishedSession)
+    {
+        Assert.Equal(
+            "CRT",
+            ScopeFormatting.BuildOscilloscopeWindowTitle(
+                "CRT",
+                isOscilloscopeTabEnabled: false,
+                shouldReportSessionState,
+                hasEstablishedSession));
+    }
+
+    // Round-trips with GetMainWindowTitleBase, which is what stops suffixes stacking up: the tab
+    // strips before it rebuilds, so the pair must agree on the exact suffix text.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void A_built_title_is_stripped_back_to_its_base(bool hasEstablishedSession)
+    {
+        string built = ScopeFormatting.BuildOscilloscopeWindowTitle("CRT", true, true, hasEstablishedSession);
+
+        Assert.Equal("CRT", ScopeFormatting.GetMainWindowTitleBase(built));
+    }
+
     // -------------------------------------------------------------- SanitizeCapturedOscilloscopeImageFileNamePart
 
     [Fact]

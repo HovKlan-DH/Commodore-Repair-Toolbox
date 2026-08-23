@@ -1,23 +1,19 @@
 - **Application**
-  - **New**
-    - BOM (Bill of Material) list to be printed in "Overview" tab
-    - Selector to include/exclude component from being printed in the two lists in "Overview" tab
-    - Help icon on numpad controls in component info popup
-    - Help icon on "Synchronize oscilloscope" checkbox in component info popup
-    - Help icon on MiniPro IC test button
-    - Link to YouTube videos in "About" tab
-  - **Changed**
-    - MiniPro IC test is embedded in component info popup and have several UI changes
-  - **Fixed**
-    - After closing MiniPro IC test then it did require two clicks on test IC button to go to test
-    - MiniPro IC test could show the result from the previously tested IC, if switching to another component while a test was still finishing
-    - MiniPro IC test could freeze the application for a long time when a test produced a large amount of output
-    - Oscilloscope `T/DIV` values in the nanosecond range could be matched to a wrong supported value
-    - Oscilloscope image dump could leave the connection out of sync, so all following commands would read the previous commands response
-    - Some buttons would reveal text below when hovering with mouse
-    - On Linux it now proper maximizes the application window, if this was its last state
-    - Refactored several parts of project for more efficient AI agent development, including unit test coverage (~19% total)
-- **Data (larger contributions since last release)**
-  - **New**
-    - Added **Commodore Plus/4**
-    - Added **Commodore 16**
+    - Added "External tooling availability" section in "Configuration" tab
+    - Added BOM (Bill of Material) list to be printed in "Overview" tab
+    - Added selector to include/exclude component from being printed in the two lists in "Overview" tab
+    - Added link to YouTube videos in "About" tab
+    - Added help icon on numpad controls in component info popup
+    - Added help icon on "Synchronize oscilloscope" checkbox in component info popup
+    - Added help icon on MiniPro IC test button
+    - Added help icon on "Enable MiniPro programmer functionality" checkbox in "Configuration" tab
+    - Changed MiniPro IC test from experimental to an official feature
+    - Changed MiniPro IC test is embedded in component info popup and have several UI changes
+    - Fixed closing MiniPro IC test would require two clicks on test IC button to go to test again
+    - Fixed MiniPro IC test could show the result from the previously tested IC, if switching to another component while a test was still finishing
+    - Fixed MiniPro IC test could freeze the application for a long time when a test produced a large amount of output
+    - Fixed oscilloscope `T/DIV` values in the nanosecond range could be matched to a wrong supported value
+    - Fixed oscilloscope image dump could leave the connection out of sync, so all following commands would read the previous commands response
+    - Fixed some buttons would reveal text below when hovering with mouse
+    - Fixed Linux proper maximizes the application window at launch, if this was its last state
+    - Refactored several parts of project for more efficient AI development, including unit test coverage (780 cases and ~19% coverage total)

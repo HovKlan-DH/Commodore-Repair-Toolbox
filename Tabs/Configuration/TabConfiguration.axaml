@@ -37,6 +37,36 @@
 		<Style Selector="ComboBoxItem:selected:pointerover">
 			<Setter Property="Foreground" Value="{DynamicResource Form_Selected_Fg}" />
 		</Style>
+
+		<!-- "Circle-question" (fa-regular fa-circle-question) help icon that links to an external help
+		     page. Same fixed-box + ClipToBounds icon-font recipe as ComponentInfoWindow's button of the
+		     same name, except the foreground follows the theme rather than being hardcoded black:
+		     this tab sits on the themed window background, where a black glyph vanishes in dark mode. -->
+		<Style Selector="Button.HelpIconButton">
+			<Setter Property="Width" Value="22" />
+			<Setter Property="Height" Value="22" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="ClipToBounds" Value="True" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Foreground" Value="{DynamicResource Form_Fg}" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="HorizontalContentAlignment" Value="Center" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+		</Style>
+
+		<Style Selector="Button.HelpIconButton /template/ ContentPresenter">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="ClipToBounds" Value="True" />
+		</Style>
+
+		<Style Selector="Button.HelpIconButton:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="Transparent" />
+		</Style>
+
+		<Style Selector="Button.HelpIconButton:pressed /template/ ContentPresenter">
+			<Setter Property="Background" Value="Transparent" />
+		</Style>
 	</UserControl.Styles>
 
 	<Grid RowDefinitions="*,Auto"
@@ -96,16 +126,38 @@
 			<CheckBox x:Name="ShowDevelopmentVersionNotificationCheckBox"
                       Content="Allow notification for BETA versions" />
 
-			<TextBlock Text="MiniPro programmer"
+			<TextBlock Text="External tooling availability"
                        FontSize="12"
                        FontWeight="SemiBold"
                        Margin="0,16,0,4" />
 
-			<CheckBox x:Name="EnableMiniproExperimentalModeCheckBox"
-                      Content="Enable experimental mode for MiniPro programmer" />
+			<CheckBox x:Name="EnableNetworkConnectedOscilloscopeTabCheckBox"
+                      Content="Enable network connected oscilloscope tab" />
+
+			<StackPanel Orientation="Horizontal"
+						Spacing="4"
+						HorizontalAlignment="Left">
+				<CheckBox x:Name="EnableMiniproExperimentalModeCheckBox"
+						  Content="Enable MiniPro programmer functionality"
+						  VerticalAlignment="Center" />
+				<Button x:Name="EnableMiniproExperimentalModeHelpButton"
+						Classes="HelpIconButton"
+						VerticalAlignment="Center"
+						ToolTip.Tip="Open help page for MiniPro programmer"
+						Click="OnEnableMiniproExperimentalModeHelpClick">
+					<TextBlock Text="&#xf059;"
+							   Width="22"
+							   Height="22"
+							   FontFamily="{StaticResource FontAwesomeRegular}"
+							   FontSize="18"
+							   TextAlignment="Center"
+							   HorizontalAlignment="Center"
+							   VerticalAlignment="Center" />
+				</Button>
+			</StackPanel>
 
 			<CheckBox x:Name="EnableMiniproExperimentalDemoModeCheckBox"
-                      Content="Enable simulated demo mode (only required for CRT development)" />
+                      Content="Enable MiniPro programmer simulated demo mode (only required for CRT development)" />
 			
 			<Button x:Name="OpenAppDataFolderButton"
                     Content="Open data/log/settings folder"

@@ -51,6 +51,57 @@ public sealed class UserSettingsTests : IDisposable
         Assert.True(UserSettings.SchematicsShowZones);
         Assert.True(UserSettings.SchematicsShowOppositeSideTraces);
         Assert.False(UserSettings.BlinkSelected);
+        Assert.True(UserSettings.EnableNetworkConnectedOscilloscopeTab);
+        Assert.True(UserSettings.EnableMiniproExperimentalMode);
+        Assert.False(UserSettings.EnableMiniproExperimentalDemoMode);
+    }
+
+    [Fact]
+    public void The_two_external_tooling_toggles_are_opt_out_but_the_demo_mode_is_opt_in()
+    {
+        // The two "External tooling availability" toggles default to TRUE, unlike most flags here,
+        // because they gate whether a whole feature is offered at all: the "Oscilloscope" tab and
+        // the MiniPro IC-test affordance in the component popup. An existing user upgrading into
+        // these settings has no key in their file and must keep the features they already had.
+        //
+        // The MiniPro demo mode next to them is the opposite - it simulates a programmer that is
+        // not attached, is only useful for CRT development, and so stays opt-in.
+        this.LoadSettings("{}");
+
+        Assert.True(UserSettings.EnableNetworkConnectedOscilloscopeTab);
+        Assert.True(UserSettings.EnableMiniproExperimentalMode);
+        Assert.False(UserSettings.EnableMiniproExperimentalDemoMode);
+    }
+
+    [Fact]
+    public void An_explicit_false_beats_an_opt_out_default()
+    {
+        // The whole point of a default-true setting is that the stored false must win, otherwise
+        // the feature switches itself back on at the next launch.
+        this.LoadSettings("""
+        {
+          "enableNetworkConnectedOscilloscopeTab": false,
+          "enableMiniproExperimentalMode": false
+        }
+        """);
+
+        Assert.False(UserSettings.EnableNetworkConnectedOscilloscopeTab);
+        Assert.False(UserSettings.EnableMiniproExperimentalMode);
+    }
+
+    [Fact]
+    public void Turning_the_network_connected_oscilloscope_tab_off_persists_and_survives_a_reload()
+    {
+        // The false value must actually reach the file - a default-true setting that is not
+        // written back would silently re-enable the tab on the next launch.
+        string path = this.LoadSettings("{}");
+
+        UserSettings.EnableNetworkConnectedOscilloscopeTab = false;
+
+        Assert.False(ReadJson(path)["enableNetworkConnectedOscilloscopeTab"]!.GetValue<bool>());
+
+        UserSettings.LoadFrom(path);
+        Assert.False(UserSettings.EnableNetworkConnectedOscilloscopeTab);
     }
 
     [Fact]

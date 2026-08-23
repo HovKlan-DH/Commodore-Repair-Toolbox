@@ -646,7 +646,8 @@
 							VerticalAlignment="Bottom"
 							Click="OnNtscRegionClick" />
 
-					<Grid Grid.Column="2"
+					<Grid x:Name="SyncOscilloscopeRow"
+						  Grid.Column="2"
 						  Grid.Row="0"
 						  Height="28"
 						  ColumnDefinitions="Auto,4,Auto"
@@ -674,7 +675,8 @@
 						</Button>
 					</Grid>
 
-					<Grid Grid.Column="2"
+					<Grid x:Name="NumpadOscilloscopeRow"
+						  Grid.Column="2"
 						  Grid.Row="2"
 						  Height="28"
 						  ColumnDefinitions="Auto,4,Auto"

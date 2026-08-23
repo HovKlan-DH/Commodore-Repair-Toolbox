@@ -141,7 +141,7 @@ namespace CRT
 
             this.SyncOscilloscopeCheckBox.IsChecked = UserSettings.ComponentInfoOscilloscopeSyncEnabled;
 
-            this.UpdateNumpadOscilloscopeSwitchAvailability();
+            this.UpdateOscilloscopeControlsAvailability();
 
             // Replace Checked/Unchecked with IsCheckedChanged
             this.MousewheelZoomCheckBox.IsCheckedChanged += this.OnMousewheelZoomSwitchChanged;
@@ -1384,7 +1384,7 @@ private void OnIcTestPanelCloseRequested() => this.IcTestPanel.IsVisible = false
             this._hasSeenOscilloscopeSessionTitleState = hasSeenOscilloscopeSession;
             this._hasActiveOscilloscopeSessionTitleState = hasActiveOscilloscopeSession;
 
-            this.UpdateNumpadOscilloscopeSwitchAvailability();
+            this.UpdateOscilloscopeControlsAvailability();
             this.ApplyOscilloscopeSessionTitleState();
         }
 
@@ -1398,17 +1398,15 @@ private void OnIcTestPanelCloseRequested() => this.IcTestPanel.IsVisible = false
                 ? this.TitleText.Text
                 : ScopeFormatting.GetMainWindowTitleBase(this.Title ?? string.Empty);
 
-            if (!this._hasSeenOscilloscopeSessionTitleState)
-            {
-                this.Title = baseTitle;
-                return;
-            }
-
-            string suffix = this._hasActiveOscilloscopeSessionTitleState
-                ? " (oscilloscope connected)"
-                : " (oscilloscope disconnected)";
-
-            this.Title = baseTitle + suffix;
+            // Unlike the main window this popup does not report a pending auto-connect - it only has
+            // something to say once a session has actually existed. A session can also still be live
+            // from before the oscilloscope tab was switched off, and the builder drops the suffix for
+            // that case: the popup must say nothing about an oscilloscope the user has turned off.
+            this.Title = ScopeFormatting.BuildOscilloscopeWindowTitle(
+                baseTitle,
+                UserSettings.EnableNetworkConnectedOscilloscopeTab,
+                this._hasSeenOscilloscopeSessionTitleState,
+                this._hasActiveOscilloscopeSessionTitleState);
         }
 
         // ###########################################################################################
@@ -1467,23 +1465,41 @@ private void OnIcTestPanelCloseRequested() => this.IcTestPanel.IsVisible = false
         }
 
         // ###########################################################################################
-        // Enables the popup's oscilloscope-related switches only while an active oscilloscope session exists.
-        // The checked states are preserved so behavior resumes automatically after reconnect.
+        // Hides the popup's oscilloscope rows entirely when the user has turned off the network
+        // connected oscilloscope tab, and otherwise enables them only while an active oscilloscope
+        // session exists. The checked states are preserved so behavior resumes automatically after
+        // reconnect - or after the oscilloscope tab is switched back on.
+        //
+        // Clearing IsEnabled is what actually disables the feature: CanSendOscilloscopeCommands and
+        // the numpad key handler both gate on it, so nothing can reach the oscilloscope from a popup
+        // whose rows are hidden.
         // ###########################################################################################
-        private void UpdateNumpadOscilloscopeSwitchAvailability()
+        private void UpdateOscilloscopeControlsAvailability()
         {
             if (!Dispatcher.UIThread.CheckAccess())
             {
                 Dispatcher.UIThread.InvokeAsync(
-                    this.UpdateNumpadOscilloscopeSwitchAvailability,
+                    this.UpdateOscilloscopeControlsAvailability,
                     DispatcherPriority.Background).GetAwaiter().GetResult();
                 return;
             }
 
-            bool isOscilloscopeAvailable = this._hasActiveOscilloscopeSessionTitleState;
+            bool isOscilloscopeTabEnabled = UserSettings.EnableNetworkConnectedOscilloscopeTab;
+            bool isOscilloscopeAvailable = isOscilloscopeTabEnabled && this._hasActiveOscilloscopeSessionTitleState;
+
+            this.SyncOscilloscopeRow.IsVisible = isOscilloscopeTabEnabled;
+            this.NumpadOscilloscopeRow.IsVisible = isOscilloscopeTabEnabled;
 
             this.NumpadOscilloscopeSwitch.IsEnabled = isOscilloscopeAvailable;
             this.SyncOscilloscopeCheckBox.IsEnabled = isOscilloscopeAvailable;
+
+            // Drop any sync this popup still has queued, the same way OnSyncOscilloscopeCheckBoxChanged
+            // does when sync is switched off - otherwise a debounced request from just before the tab
+            // was disabled could still reach the oscilloscope.
+            if (!isOscilloscopeTabEnabled && this.Owner is Main mainOwner)
+            {
+                mainOwner.TabOscilloscopeControl.QueueComponentImageOscilloscopeSync(null);
+            }
         }
 
         // ###########################################################################################

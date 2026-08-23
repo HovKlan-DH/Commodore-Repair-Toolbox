@@ -1811,6 +1811,11 @@ namespace CRT
                 return;
             }
 
+            if (!UserSettings.EnableNetworkConnectedOscilloscopeTab)
+            {
+                return;
+            }
+
             if (!this.thisShouldAutoReconnectEstablishedOscilloscopeSession)
             {
                 return;
@@ -1874,7 +1879,9 @@ namespace CRT
                 this.thisHasEstablishedOscilloscopeSession &&
                 this.thisConnectedScopeClient != null;
 
-            bool shouldShowTitleSuffix =
+            // Auto-connect alone is enough to report a state, so that a user who expects the scope to
+            // come up on its own can see it is still pending.
+            bool shouldReportSessionState =
                 this.thisHasSeenEstablishedOscilloscopeSession ||
                 UserSettings.OscilloscopeAutoConnect;
 
@@ -1888,11 +1895,11 @@ namespace CRT
                     this.thisMainWindowTitleBase = ScopeFormatting.GetMainWindowTitleBase(window.Title ?? string.Empty);
                 }
 
-                string newTitle = shouldShowTitleSuffix
-                    ? this.thisMainWindowTitleBase + (hasEstablishedSession
-                        ? " (oscilloscope connected)"
-                        : " (oscilloscope disconnected)")
-                    : this.thisMainWindowTitleBase;
+                string newTitle = ScopeFormatting.BuildOscilloscopeWindowTitle(
+                    this.thisMainWindowTitleBase,
+                    UserSettings.EnableNetworkConnectedOscilloscopeTab,
+                    shouldReportSessionState,
+                    hasEstablishedSession);
 
                 if (!string.Equals(window.Title, newTitle, StringComparison.Ordinal))
                 {
@@ -2134,7 +2141,7 @@ namespace CRT
             UserSettings.OscilloscopeAutoConnect = isEnabled;
             this.thisShouldAutoReconnectEstablishedOscilloscopeSession = isEnabled;
 
-            if (isEnabled)
+            if (isEnabled && UserSettings.EnableNetworkConnectedOscilloscopeTab)
             {
                 this.StartOscilloscopeAutoConnectLoop();
             }
@@ -2201,7 +2208,8 @@ namespace CRT
                 {
                     OscilloscopeSelectionSnapshot selectionSnapshot = this.CreateOscilloscopeSelectionSnapshot();
 
-                    if (!UserSettings.OscilloscopeAutoConnect)
+                    if (!UserSettings.OscilloscopeAutoConnect ||
+                        !UserSettings.EnableNetworkConnectedOscilloscopeTab)
                     {
                         await Task.Delay(
                             this.GetOscilloscopeAutoConnectRetryDelay(),
@@ -2265,11 +2273,56 @@ namespace CRT
             this.thisMainWindow = mainWindow;
             this.UpdateMainWindowOscilloscopeSessionState();
 
+            if (UserSettings.OscilloscopeAutoConnect &&
+                UserSettings.EnableNetworkConnectedOscilloscopeTab)
+            {
+                this.thisShouldAutoReconnectEstablishedOscilloscopeSession = true;
+                this.StartOscilloscopeAutoConnectLoop();
+            }
+        }
+
+        // ###########################################################################################
+        // Applies the "Enable network connected oscilloscope tab" setting after the user has toggled
+        // it. Hiding the tab must not leave oscilloscope work running behind it, so the retry loop is
+        // stopped and any established session is invalidated - which also drops the ping monitor, the
+        // keyboard workers and the stored SCPI client, and clears the flag the window titles read.
+        //
+        // Switching the tab back on restarts auto-connect if the user had it enabled. The session is
+        // not restored: it was torn down, so the scope reconnects the same way it would after any
+        // other disconnect.
+        // ###########################################################################################
+        public void ApplyOscilloscopeTabAvailability()
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.InvokeAsync(
+                    this.ApplyOscilloscopeTabAvailability,
+                    DispatcherPriority.Background).GetAwaiter().GetResult();
+                return;
+            }
+
+            // Before InitializeForMainWindow has run there is nothing started yet to stop, and that
+            // method applies the same setting itself - so leave the startup path to do it once.
+            if (this.thisMainWindow == null)
+            {
+                return;
+            }
+
+            if (!UserSettings.EnableNetworkConnectedOscilloscopeTab)
+            {
+                this.StopOscilloscopeAutoConnectLoop();
+                this.InvalidateEstablishedOscilloscopeSession();
+                this.UpdateMainWindowOscilloscopeSessionState();
+                return;
+            }
+
             if (UserSettings.OscilloscopeAutoConnect)
             {
                 this.thisShouldAutoReconnectEstablishedOscilloscopeSession = true;
                 this.StartOscilloscopeAutoConnectLoop();
             }
+
+            this.UpdateMainWindowOscilloscopeSessionState();
         }
 
         // ###########################################################################################

@@ -101,26 +101,56 @@ namespace Handlers.Oscilloscope
             return downTargetStep * triggerLevelStepVolts;
         }
 
+        // The two windows that carry a connection suffix - the main window and the component info
+        // popup - both build and strip it from here, so the strings cannot drift apart.
+        private const string ConnectedSuffix = " (oscilloscope connected)";
+        private const string DisconnectedSuffix = " (oscilloscope disconnected)";
+
         // ###########################################################################################
         // Strips any oscilloscope connection suffix from the main window title so the caller can
         // re-append the current one without the suffixes stacking up.
         // ###########################################################################################
         public static string GetMainWindowTitleBase(string windowTitle)
         {
-            const string connectedSuffix = " (oscilloscope connected)";
-            const string disconnectedSuffix = " (oscilloscope disconnected)";
-
-            if (windowTitle.EndsWith(connectedSuffix, StringComparison.Ordinal))
+            if (windowTitle.EndsWith(ConnectedSuffix, StringComparison.Ordinal))
             {
-                return windowTitle[..^connectedSuffix.Length];
+                return windowTitle[..^ConnectedSuffix.Length];
             }
 
-            if (windowTitle.EndsWith(disconnectedSuffix, StringComparison.Ordinal))
+            if (windowTitle.EndsWith(DisconnectedSuffix, StringComparison.Ordinal))
             {
-                return windowTitle[..^disconnectedSuffix.Length];
+                return windowTitle[..^DisconnectedSuffix.Length];
             }
 
             return windowTitle;
+        }
+
+        // ###########################################################################################
+        // Builds a window title carrying the oscilloscope connection suffix. This is the inverse of
+        // GetMainWindowTitleBase above, and the pair share the suffix constants.
+        //
+        // isOscilloscopeTabEnabled wins over everything else: with the oscilloscope tab switched off
+        // there is no auto-connect running and no session to report, so the caller gets its base
+        // title back untouched even if a session was live when the tab was hidden.
+        //
+        // shouldReportSessionState is the caller's own rule for when a state is worth reporting. The
+        // main window passes "a session has existed, OR auto-connect is enabled and still trying", so
+        // a user waiting for the scope to come up on its own can see that it has not yet. The popup
+        // passes only the former - it has nothing useful to say about a connection that has never
+        // happened.
+        // ###########################################################################################
+        public static string BuildOscilloscopeWindowTitle(
+            string baseTitle,
+            bool isOscilloscopeTabEnabled,
+            bool shouldReportSessionState,
+            bool hasEstablishedSession)
+        {
+            if (!isOscilloscopeTabEnabled || !shouldReportSessionState)
+            {
+                return baseTitle;
+            }
+
+            return baseTitle + (hasEstablishedSession ? ConnectedSuffix : DisconnectedSuffix);
         }
 
         // ###########################################################################################
