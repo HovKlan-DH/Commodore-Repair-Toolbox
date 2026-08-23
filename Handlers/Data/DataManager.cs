@@ -728,7 +728,7 @@ namespace Handlers.DataHandling
         // Parses --data-root from args, or falls back to a persistent AppData folder that survives
         // Velopack updates (which replace the install directory but leave AppData untouched).
         // ###########################################################################################
-        private static string ResolveDataRoot(string[] args)
+        internal static string ResolveDataRoot(string[] args)
         {
             foreach (var arg in args)
             {
@@ -738,6 +738,19 @@ namespace Handlers.DataHandling
 
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             return Path.Combine(appData, AppConfig.AppFolderName, "Data");
+        }
+
+        // ###########################################################################################
+        // Points the data layer at an explicit data root and main workbook and loads the hardware,
+        // board and oscilloscope definitions from it. This is the local half of InitializeAsync with
+        // no online sync and no seeding - the test suite uses it to load a temporary data root
+        // instead of the user's real one.
+        // ###########################################################################################
+        internal static void LoadFrom(string dataRoot, string mainExcelFileName)
+        {
+            _dataRoot = dataRoot;
+            ResolvedMainExcelFileName = mainExcelFileName;
+            LoadMainExcel();
         }
 
         // ###########################################################################################

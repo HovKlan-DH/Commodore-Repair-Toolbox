@@ -1,0 +1,524 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Handlers.DataHandling;
+
+namespace ClassicRepairToolbox.Tests;
+
+// Characterisation tests for UserSettings - the JSON preferences file in the user's AppData.
+//
+// UserSettings is a static singleton whose setters save to disk immediately, which is exactly
+// why it was untestable before: touching it from a test would rewrite the developer's real
+// settings. Load() now resolves the AppData path and delegates to the internal LoadFrom(path),
+// so these tests point it at a temporary file instead. NOTHING here calls Load().
+//
+// The class is global mutable state, so this whole file is one xUnit collection: the tests run
+// sequentially and each one re-loads a fresh settings file first.
+[Collection("UserSettings")]
+public sealed class UserSettingsTests : IDisposable
+{
+    private readonly TempWorkspace thisWorkspace = new();
+
+    public void Dispose()
+    {
+        // Detach from the temp file so nothing written later can reach a real settings file.
+        this.LoadSettings("{}");
+        this.thisWorkspace.Dispose();
+    }
+
+    /// <summary>Writes a settings file with the given JSON and loads it.</summary>
+    private string LoadSettings(string json)
+    {
+        string path = this.thisWorkspace.Path_(Guid.NewGuid().ToString("N") + ".json");
+        File.WriteAllText(path, json);
+        UserSettings.LoadFrom(path);
+        return path;
+    }
+
+    private static JsonNode ReadJson(string path) =>
+        JsonNode.Parse(File.ReadAllText(path))!;
+
+    // ---------------------------------------------------------------------- defaults
+
+    [Fact]
+    public void An_empty_settings_file_yields_documented_defaults()
+    {
+        this.LoadSettings("{}");
+
+        Assert.Equal("PAL", UserSettings.Region);
+        Assert.Equal("Light", UserSettings.ThemeVariant);
+        Assert.Equal(5025, UserSettings.OscilloscopePort);
+        Assert.Equal("192.168.0.100", UserSettings.OscilloscopeHost);
+        Assert.True(UserSettings.SchematicsShowZones);
+        Assert.True(UserSettings.SchematicsShowOppositeSideTraces);
+        Assert.False(UserSettings.BlinkSelected);
+    }
+
+    [Fact]
+    public void Values_present_in_the_file_are_read()
+    {
+        this.LoadSettings("""
+        {
+          "region": "NTSC",
+          "theme": "Dark",
+          "oscilloscopePort": 1234,
+          "blinkSelected": true
+        }
+        """);
+
+        Assert.Equal("NTSC", UserSettings.Region);
+        Assert.Equal("Dark", UserSettings.ThemeVariant);
+        Assert.Equal(1234, UserSettings.OscilloscopePort);
+        Assert.True(UserSettings.BlinkSelected);
+    }
+
+    [Fact]
+    public void A_malformed_settings_file_falls_back_to_defaults_instead_of_throwing()
+    {
+        // A hand-edited or truncated settings file must not stop the app from starting.
+        this.LoadSettings("{ this is not json");
+
+        Assert.Equal("PAL", UserSettings.Region);
+    }
+
+    [Fact]
+    public void A_missing_settings_file_is_not_an_error()
+    {
+        string path = this.thisWorkspace.Path_("does-not-exist.json");
+
+        Exception? thrown = Record.Exception(() => UserSettings.LoadFrom(path));
+
+        Assert.True(thrown is null);
+    }
+
+    // ----------------------------------------------------------------- persistence
+
+    [Fact]
+    public void Setting_a_value_writes_it_to_the_settings_file_immediately()
+    {
+        // There is no explicit Save button: every setter persists.
+        string path = this.LoadSettings("{}");
+
+        UserSettings.Region = "NTSC";
+
+        Assert.Equal("NTSC", ReadJson(path)["region"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void A_persisted_value_survives_a_reload()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.OscilloscopePort = 4242;
+        UserSettings.LoadFrom(path);
+
+        Assert.Equal(4242, UserSettings.OscilloscopePort);
+    }
+
+    [Fact]
+    public void A_short_circuiting_setter_does_not_rewrite_the_file_for_an_unchanged_value()
+    {
+        string path = this.LoadSettings("""{"interactiveCadTraceHoverMode": "Always"}""");
+        DateTime before = MarkFileAsOld(path);
+
+        UserSettings.InteractiveCadTraceHoverMode = "Always";
+
+        Assert.Equal(before, File.GetLastWriteTimeUtc(path));
+    }
+
+    [Fact]
+    public void Not_every_setter_short_circuits_an_unchanged_value()
+    {
+        // CURRENT BEHAVIOUR, and inconsistent: InteractiveCadTraceHoverMode, ContributorMode
+        // and SetLastHardware all return early when the value has not changed, but
+        // BlinkSelected (and several like it) write the whole file again regardless. Harmless,
+        // but it means re-applying UI state does real disk I/O and logs a "Setting changed"
+        // line that did not change anything.
+        string path = this.LoadSettings("""{"blinkSelected": true}""");
+        DateTime before = MarkFileAsOld(path);
+
+        UserSettings.BlinkSelected = true;
+
+        Assert.NotEqual(before, File.GetLastWriteTimeUtc(path));
+    }
+
+    /// <summary>Backdates the file so a rewrite is unambiguous rather than a timer-resolution race.</summary>
+    private static DateTime MarkFileAsOld(string path)
+    {
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(-5));
+        return File.GetLastWriteTimeUtc(path);
+    }
+
+    [Fact]
+    public void The_written_file_is_valid_indented_json()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.Region = "NTSC";
+
+        string json = File.ReadAllText(path);
+        Assert.Contains("\n", json);
+        Exception? thrown = Record.Exception(() => JsonDocument.Parse(json));
+        Assert.True(thrown is null, "the settings file must stay parseable");
+    }
+
+    [Fact]
+    public void Unknown_properties_in_the_file_do_not_break_loading()
+    {
+        // A settings file written by a newer build must still load in an older one.
+        this.LoadSettings("""{"region": "NTSC", "somethingFromTheFuture": 42}""");
+
+        Assert.Equal("NTSC", UserSettings.Region);
+    }
+
+    // ------------------------------------------------------------- per-board values
+
+    [Fact]
+    public void An_unset_board_splitter_ratio_is_reported_as_absent()
+    {
+        this.LoadSettings("{}");
+
+        Assert.False(UserSettings.HasSchematicsSplitterRatio("C64/250407"));
+    }
+
+    [Fact]
+    public void A_board_splitter_ratio_round_trips()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SetSchematicsSplitterRatio("C64/250407", 0.375);
+        UserSettings.LoadFrom(path);
+
+        Assert.True(UserSettings.HasSchematicsSplitterRatio("C64/250407"));
+        Assert.Equal(0.375, UserSettings.GetSchematicsSplitterRatio("C64/250407"));
+    }
+
+    [Fact]
+    public void Board_settings_are_kept_apart_per_board()
+    {
+        this.LoadSettings("{}");
+
+        UserSettings.SetSchematicsSplitterRatio("C64/250407", 0.25);
+        UserSettings.SetSchematicsSplitterRatio("Plus4/310163", 0.75);
+
+        Assert.Equal(0.25, UserSettings.GetSchematicsSplitterRatio("C64/250407"));
+        Assert.Equal(0.75, UserSettings.GetSchematicsSplitterRatio("Plus4/310163"));
+    }
+
+    [Fact]
+    public void The_last_schematic_round_trips_per_board()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SetLastSchematicForBoard("C64/250407", "Sheet 3");
+        UserSettings.LoadFrom(path);
+
+        Assert.Equal("Sheet 3", UserSettings.GetLastSchematicForBoard("C64/250407"));
+        Assert.Null(UserSettings.GetLastSchematicForBoard("Plus4/310163"));
+    }
+
+    [Fact]
+    public void A_blank_board_key_is_ignored_by_the_per_board_setters()
+    {
+        this.LoadSettings("{}");
+
+        Exception? thrown = Record.Exception(() =>
+            UserSettings.SetSchematicsSplitterRatio("   ", 0.5));
+
+        Assert.True(thrown is null);
+        Assert.False(UserSettings.HasSchematicsSplitterRatio("   "));
+    }
+
+    [Fact]
+    public void Selected_categories_round_trip_per_board()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SetSelectedCategories("C64/250407", new List<string> { "IC", "Capacitor" });
+        UserSettings.LoadFrom(path);
+
+        Assert.Equal(new[] { "IC", "Capacitor" }, UserSettings.GetSelectedCategories("C64/250407"));
+        Assert.Null(UserSettings.GetSelectedCategories("Plus4/310163"));
+    }
+
+    [Fact]
+    public void Schematic_order_round_trips_per_board()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SetSchematicsOrder("C64/250407", new List<string> { "Sheet 2", "Sheet 1" });
+        UserSettings.LoadFrom(path);
+
+        Assert.Equal(new[] { "Sheet 2", "Sheet 1" }, UserSettings.GetSchematicsOrder("C64/250407"));
+    }
+
+    // ------------------------------------------------------- last-used selections
+
+    [Fact]
+    public void The_last_hardware_round_trips()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SetLastHardware("C64");
+        UserSettings.LoadFrom(path);
+
+        Assert.Equal("C64", UserSettings.GetLastHardware());
+    }
+
+    [Fact]
+    public void A_blank_last_hardware_is_ignored()
+    {
+        this.LoadSettings("""{"lastHardware": "C64"}""");
+
+        UserSettings.SetLastHardware("   ");
+
+        Assert.Equal("C64", UserSettings.GetLastHardware());
+    }
+
+    [Fact]
+    public void The_last_board_is_remembered_per_hardware()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SetLastBoardForHardware("C64", "250407");
+        UserSettings.SetLastBoardForHardware("Plus4", "310163");
+        UserSettings.LoadFrom(path);
+
+        Assert.Equal("250407", UserSettings.GetLastBoardForHardware("C64"));
+        Assert.Equal("310163", UserSettings.GetLastBoardForHardware("Plus4"));
+        Assert.Null(UserSettings.GetLastBoardForHardware("VIC20"));
+    }
+
+    [Fact]
+    public void Hardware_lookup_is_case_insensitive()
+    {
+        this.LoadSettings("{}");
+
+        UserSettings.SetLastBoardForHardware("C64", "250407");
+
+        Assert.Equal("250407", UserSettings.GetLastBoardForHardware("c64"));
+    }
+
+    [Fact]
+    public void The_last_oscilloscope_series_is_remembered_per_vendor()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SetLastOscilloscopeSeriesForVendor("Rigol", "DS1000Z");
+        UserSettings.LoadFrom(path);
+
+        Assert.Equal("DS1000Z", UserSettings.GetLastOscilloscopeSeriesForVendor("Rigol"));
+        Assert.Null(UserSettings.GetLastOscilloscopeSeriesForVendor("Siglent"));
+    }
+
+    // ------------------------------------------------------------- theme colours
+
+    [Fact]
+    public void Missing_theme_colours_are_filled_in_with_defaults_on_load()
+    {
+        this.LoadSettings("{}");
+
+        var colors = UserSettings.GetUserThemeColors();
+
+        Assert.NotEmpty(colors);
+        Assert.True(colors.ContainsKey("Bg"));
+        Assert.True(colors.ContainsKey("Schematics_FirstPin"));
+    }
+
+    [Fact]
+    public void A_customised_theme_colour_is_not_overwritten_by_the_default()
+    {
+        this.LoadSettings("""{"userThemeColors": {"Bg": "#123456"}}""");
+
+        Assert.Equal("#123456", UserSettings.GetUserThemeColors()["Bg"]);
+    }
+
+    [Fact]
+    public void A_customised_theme_still_gains_any_newly_added_default_keys()
+    {
+        // Upgrading to a build with a new themed element must not leave that element unstyled.
+        this.LoadSettings("""{"userThemeColors": {"Bg": "#123456"}}""");
+
+        var colors = UserSettings.GetUserThemeColors();
+
+        Assert.Equal("#123456", colors["Bg"]);
+        Assert.True(colors.ContainsKey("Thumbnail_Border"));
+    }
+
+    [Fact]
+    public void IsUserThemeColorResourceKey_only_matches_the_four_trace_palette_colours()
+    {
+        // Despite the broad name, this predicate is NOT "is this a user theme colour" - it
+        // recognises only the four Schematics_TracePalette_ColorN keys. "Bg" is a themed
+        // colour and still returns false.
+        this.LoadSettings("{}");
+
+        Assert.True(UserSettings.IsUserThemeColorResourceKey("Schematics_TracePalette_Color1"));
+        Assert.True(UserSettings.IsUserThemeColorResourceKey("Schematics_TracePalette_Color4"));
+
+        Assert.False(UserSettings.IsUserThemeColorResourceKey("Bg"));
+        Assert.False(UserSettings.IsUserThemeColorResourceKey("NotAThemeKey"));
+    }
+
+    [Fact]
+    public void IsUserThemeColorResourceKey_is_case_sensitive()
+    {
+        this.LoadSettings("{}");
+
+        Assert.False(UserSettings.IsUserThemeColorResourceKey("schematics_tracepalette_color1"));
+    }
+
+    // --------------------------------------------------------- contributor mode
+
+    [Fact]
+    public void Contributor_mode_defaults_to_off()
+    {
+        this.LoadSettings("{}");
+
+        Assert.False(UserSettings.ContributorMode);
+    }
+
+    [Fact]
+    public void Legacy_settings_are_migrated_into_contributor_mode()
+    {
+        // Before contributor mode existed, the pair of validate-on-launch + debug-logging was
+        // what a contributor turned on. Those users keep their setup after upgrading.
+        this.LoadSettings("""{"validateDataOnLaunch": true, "debugLogging": true}""");
+
+        Assert.True(UserSettings.ContributorMode);
+    }
+
+    [Fact]
+    public void Only_one_legacy_flag_does_not_enable_contributor_mode()
+    {
+        this.LoadSettings("""{"validateDataOnLaunch": true, "debugLogging": false}""");
+
+        Assert.False(UserSettings.ContributorMode);
+    }
+
+    [Fact]
+    public void An_explicit_contributor_mode_value_is_never_overridden_by_migration()
+    {
+        this.LoadSettings("""
+        {"contributorMode": false, "validateDataOnLaunch": true, "debugLogging": true}
+        """);
+
+        Assert.False(UserSettings.ContributorMode);
+    }
+
+    [Fact]
+    public void Contributor_mode_drives_debug_logging()
+    {
+        this.LoadSettings("""{"contributorMode": true}""");
+
+        Assert.True(Logger.IsDebugEnabled);
+
+        this.LoadSettings("""{"contributorMode": false}""");
+
+        Assert.False(Logger.IsDebugEnabled);
+    }
+
+    [Fact]
+    public void Contributor_mode_round_trips_per_board()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SetContributorModeForBoard("C64/250407", true);
+        UserSettings.LoadFrom(path);
+
+        Assert.True(UserSettings.GetContributorModeForBoard("C64/250407"));
+    }
+
+    // ------------------------------------------------------------------- events
+
+    [Fact]
+    public void Changing_the_trace_hover_mode_raises_its_change_event()
+    {
+        this.LoadSettings("""{"interactiveCadTraceHoverMode": "Always"}""");
+
+        int raised = 0;
+        void Handler() => raised++;
+
+        UserSettings.InteractiveCadTraceHoverModeChanged += Handler;
+        try
+        {
+            UserSettings.InteractiveCadTraceHoverMode = "HoldShift";
+            Assert.Equal(1, raised);
+
+            UserSettings.InteractiveCadTraceHoverMode = "HoldShift";   // unchanged
+            Assert.Equal(1, raised);
+        }
+        finally
+        {
+            UserSettings.InteractiveCadTraceHoverModeChanged -= Handler;
+        }
+    }
+
+    [Theory]
+    [InlineData("Disabled", "Disabled")]
+    [InlineData("HoldShift", "HoldShift")]
+    [InlineData("holdshift", "HoldShift")]   // matched case-insensitively...
+    [InlineData("Always", "Always")]
+    [InlineData("Hold shift", "Always")]     // ...but a space is NOT the same token
+    [InlineData("nonsense", "Always")]       // anything unrecognised falls back to Always
+    public void The_trace_hover_mode_is_normalised_to_one_of_three_tokens(string input, string expected)
+    {
+        this.LoadSettings("{}");
+
+        UserSettings.InteractiveCadTraceHoverMode = input;
+
+        Assert.Equal(expected, UserSettings.InteractiveCadTraceHoverMode);
+    }
+
+    [Fact]
+    public void Changing_check_data_on_launch_raises_its_change_event_with_the_new_value()
+    {
+        this.LoadSettings("""{"checkDataOnLaunch": true}""");
+
+        bool? observed = null;
+        void Handler(bool value) => observed = value;
+
+        UserSettings.CheckDataOnLaunchChanged += Handler;
+        try
+        {
+            UserSettings.CheckDataOnLaunch = false;
+            Assert.False(observed);
+        }
+        finally
+        {
+            UserSettings.CheckDataOnLaunchChanged -= Handler;
+        }
+    }
+
+    // --------------------------------------------------------- window placement
+
+    [Fact]
+    public void Window_placement_round_trips()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SaveWindowPlacement(
+            "Maximized", 1280, 800, 10, 20, 0, 0, 1920, 1080, 1.5);
+        UserSettings.LoadFrom(path);
+
+        JsonNode json = ReadJson(path);
+
+        Assert.Equal("Maximized", json["windowState"]!.GetValue<string>());
+        Assert.Equal(1280, json["windowWidth"]!.GetValue<double>());
+        Assert.Equal(1.5, json["windowScreenScaling"]!.GetValue<double>());
+        Assert.True(json["hasWindowPlacement"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public void Component_info_window_layout_round_trips()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SaveComponentInfoWindowLayout("Normal", 900, 500, 0.4, 120);
+
+        JsonNode json = ReadJson(path);
+
+        Assert.Equal(900, json["componentInfoWindowWidth"]!.GetValue<double>());
+        Assert.Equal(0.4, json["componentInfoWindowLeftColumnRatio"]!.GetValue<double>());
+        Assert.True(json["hasComponentInfoWindowLayout"]!.GetValue<bool>());
+    }
+}

@@ -750,7 +750,7 @@ namespace CRT
                 {
                     string response = await scopeClient.QueryLineAsync(effectiveCommandText, cancellationToken).ConfigureAwait(false);
                     string loggedResponse = command == ScopeCommand.Identify
-                        ? this.MaskIdentifyResponseSerial(response)
+                        ? ScopeFormatting.MaskIdentifyResponseSerial(response)
                         : response;
 
                     this.AppendOutputLine("Debug", $"SCPI << {loggedResponse}");
@@ -806,8 +806,8 @@ namespace CRT
             this.AppendHexDump("Dumping FIRST 64 bytes from raw data stream:", rawData, 64, fromStart: true);
             this.AppendHexDump("Dumping LAST 64 bytes from raw data stream:", rawData, 64, fromStart: false);
 
-            if (this.TryExtractBinaryPayload(rawData, out byte[] payload) &&
-                this.TryReadBmpMetadata(payload, out int width, out int height, out short bitsPerPixel))
+            if (ScopePayloadParser.TryExtractBinaryPayload(rawData, out byte[] payload) &&
+                ScopePayloadParser.TryReadBmpMetadata(payload, out int width, out int height, out short bitsPerPixel))
             {
                 this.AppendOutputLine(
                     "Info",
@@ -883,7 +883,7 @@ namespace CRT
         // ###########################################################################################
         private string FormatParameterizedCommand(string baseCommandText, double value)
         {
-            string formattedValue = this.FormatScpiNumber(value);
+            string formattedValue = ScopeFormatting.FormatScpiNumber(value);
 
             if (baseCommandText.Contains("{0}", StringComparison.Ordinal))
             {
@@ -912,7 +912,7 @@ namespace CRT
                     if (double.TryParse(response, NumberStyles.Float, CultureInfo.InvariantCulture, out double triggerLevel))
                     {
                         this.thisLastTriggerLevelVolts = triggerLevel;
-                        this.AppendOutputLine("Info", $"Trigger level read as {this.FormatVoltage(triggerLevel)}");
+                        this.AppendOutputLine("Info", $"Trigger level read as {ScopeFormatting.FormatVoltage(triggerLevel)}");
                     }
                     break;
 
@@ -920,7 +920,7 @@ namespace CRT
                     if (double.TryParse(response, NumberStyles.Float, CultureInfo.InvariantCulture, out double timeDiv))
                     {
                         this.thisLastTimeDivSeconds = timeDiv;
-                        this.AppendOutputLine("Info", $"TIME/DIV read as {this.FormatTime(timeDiv)}");
+                        this.AppendOutputLine("Info", $"TIME/DIV read as {ScopeFormatting.FormatTime(timeDiv)}");
                     }
                     break;
 
@@ -928,7 +928,7 @@ namespace CRT
                     if (double.TryParse(response, NumberStyles.Float, CultureInfo.InvariantCulture, out double voltsDiv))
                     {
                         this.thisLastVoltsDivVolts = voltsDiv;
-                        this.AppendOutputLine("Info", $"VOLTS/DIV read as {this.FormatVoltage(voltsDiv)} per division");
+                        this.AppendOutputLine("Info", $"VOLTS/DIV read as {ScopeFormatting.FormatVoltage(voltsDiv)} per division");
                     }
                     break;
             }
@@ -944,21 +944,21 @@ namespace CRT
                 case ScopeCommandPalette.SetTriggerLevel:
                     if (this.thisLastTriggerLevelVolts.HasValue)
                     {
-                        this.AppendOutputLine("Info", $"Trigger level set to {this.FormatVoltage(this.thisLastTriggerLevelVolts.Value)}");
+                        this.AppendOutputLine("Info", $"Trigger level set to {ScopeFormatting.FormatVoltage(this.thisLastTriggerLevelVolts.Value)}");
                     }
                     break;
 
                 case ScopeCommandPalette.SetTimeDiv:
                     if (this.thisLastTimeDivSeconds.HasValue)
                     {
-                        this.AppendOutputLine("Info", $"TIME/DIV set to {this.FormatTime(this.thisLastTimeDivSeconds.Value)}");
+                        this.AppendOutputLine("Info", $"TIME/DIV set to {ScopeFormatting.FormatTime(this.thisLastTimeDivSeconds.Value)}");
                     }
                     break;
 
                 case ScopeCommandPalette.SetVoltsDiv:
                     if (this.thisLastVoltsDivVolts.HasValue)
                     {
-                        this.AppendOutputLine("Info", $"VOLTS/DIV set to {this.FormatVoltage(this.thisLastVoltsDivVolts.Value)} per division");
+                        this.AppendOutputLine("Info", $"VOLTS/DIV set to {ScopeFormatting.FormatVoltage(this.thisLastVoltsDivVolts.Value)} per division");
                     }
                     break;
             }
@@ -1104,117 +1104,8 @@ namespace CRT
 
             this.AppendOutputLine("Info", $"Vendor: {vendor}");
             this.AppendOutputLine("Info", $"Model: {model}");
-            this.AppendOutputLine("Info", $"Serial: {this.MaskScopeSerial(serial)}");
+            this.AppendOutputLine("Info", $"Serial: {ScopeFormatting.MaskScopeSerial(serial)}");
             this.AppendOutputLine("Info", $"Firmware: {firmware}");
-        }
-
-        // ###########################################################################################
-        // Formats a numeric SCPI value using invariant culture.
-        // ###########################################################################################
-        private string FormatScpiNumber(double value)
-        {
-            return value.ToString("G15", CultureInfo.InvariantCulture).Replace("E", "e", StringComparison.Ordinal);
-        }
-
-        // ###########################################################################################
-        // Formats a voltage value into a compact engineering string.
-        // ###########################################################################################
-        private string FormatVoltage(double volts)
-        {
-            double absoluteValue = Math.Abs(volts);
-
-            if (absoluteValue >= 1.0)
-            {
-                return $"{volts.ToString("0.###", CultureInfo.InvariantCulture)}V";
-            }
-
-            if (absoluteValue >= 0.001)
-            {
-                return $"{(volts * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)}mV";
-            }
-
-            return $"{(volts * 1000000.0).ToString("0.###", CultureInfo.InvariantCulture)}uV";
-        }
-
-        // ###########################################################################################
-        // Formats a time value into a compact engineering string.
-        // ###########################################################################################
-        private string FormatTime(double seconds)
-        {
-            double absoluteValue = Math.Abs(seconds);
-
-            if (absoluteValue >= 1.0)
-            {
-                return $"{seconds.ToString("0.###", CultureInfo.InvariantCulture)}S";
-            }
-
-            if (absoluteValue >= 0.001)
-            {
-                return $"{(seconds * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)}mS";
-            }
-
-            if (absoluteValue >= 0.000001)
-            {
-                return $"{(seconds * 1000000.0).ToString("0.###", CultureInfo.InvariantCulture)}uS";
-            }
-
-            return $"{(seconds * 1000000000.0).ToString("0.###", CultureInfo.InvariantCulture)}nS";
-        }
-
-        // ###########################################################################################
-        // Extracts the payload bytes from a raw SCPI definite-length binary block response.
-        // ###########################################################################################
-        private bool TryExtractBinaryPayload(byte[] rawData, out byte[] payload)
-        {
-            payload = Array.Empty<byte>();
-
-            if (rawData.Length < 3 || rawData[0] != (byte)'#')
-            {
-                return false;
-            }
-
-            int lengthDigits = rawData[1] - (byte)'0';
-            if (lengthDigits < 1 || rawData.Length < 2 + lengthDigits)
-            {
-                return false;
-            }
-
-            string lengthText = System.Text.Encoding.ASCII.GetString(rawData, 2, lengthDigits);
-            if (!int.TryParse(lengthText, out int payloadLength) ||
-                payloadLength < 0 ||
-                rawData.Length < 2 + lengthDigits + payloadLength)
-            {
-                return false;
-            }
-
-            payload = new byte[payloadLength];
-            Buffer.BlockCopy(rawData, 2 + lengthDigits, payload, 0, payloadLength);
-            return true;
-        }
-
-        // ###########################################################################################
-        // Reads basic BMP metadata from the dumped image payload when the format is BMP.
-        // ###########################################################################################
-        private bool TryReadBmpMetadata(byte[] imageBytes, out int width, out int height, out short bitsPerPixel)
-        {
-            width = 0;
-            height = 0;
-            bitsPerPixel = 0;
-
-            if (imageBytes.Length < 30)
-            {
-                return false;
-            }
-
-            if (imageBytes[0] != (byte)'B' || imageBytes[1] != (byte)'M')
-            {
-                return false;
-            }
-
-            width = BitConverter.ToInt32(imageBytes, 18);
-            height = BitConverter.ToInt32(imageBytes, 22);
-            bitsPerPixel = BitConverter.ToInt16(imageBytes, 28);
-            return true;
         }
 
         // ###########################################################################################
@@ -1286,7 +1177,7 @@ namespace CRT
             Window? window = this.thisMainWindow ?? TopLevel.GetTopLevel(this) as Window;
             if (window != null)
             {
-                this.thisMainWindowTitleBase = this.GetMainWindowTitleBase(window.Title ?? string.Empty);
+                this.thisMainWindowTitleBase = ScopeFormatting.GetMainWindowTitleBase(window.Title ?? string.Empty);
             }
 
             this.thisLastOscilloscopeConnectionState = null;
@@ -1425,27 +1316,6 @@ namespace CRT
             }
 
             this.UpdateMainWindowOscilloscopeSessionState();
-        }
-
-        // ###########################################################################################
-        // Removes any existing oscilloscope connection suffix from the main window title.
-        // ###########################################################################################
-        private string GetMainWindowTitleBase(string windowTitle)
-        {
-            const string connectedSuffix = " (oscilloscope connected)";
-            const string disconnectedSuffix = " (oscilloscope disconnected)";
-
-            if (windowTitle.EndsWith(connectedSuffix, StringComparison.Ordinal))
-            {
-                return windowTitle[..^connectedSuffix.Length];
-            }
-
-            if (windowTitle.EndsWith(disconnectedSuffix, StringComparison.Ordinal))
-            {
-                return windowTitle[..^disconnectedSuffix.Length];
-            }
-
-            return windowTitle;
         }
 
         // ###########################################################################################
@@ -2015,7 +1885,7 @@ namespace CRT
             {
                 if (string.IsNullOrWhiteSpace(this.thisMainWindowTitleBase))
                 {
-                    this.thisMainWindowTitleBase = this.GetMainWindowTitleBase(window.Title ?? string.Empty);
+                    this.thisMainWindowTitleBase = ScopeFormatting.GetMainWindowTitleBase(window.Title ?? string.Empty);
                 }
 
                 string newTitle = shouldShowTitleSuffix
@@ -2123,7 +1993,7 @@ namespace CRT
 
                     this.AppendOutputLine(
                         "Info",
-                        $"Keyboard TIME/DIV step: {this.FormatTime(currentTimeDivSeconds)} -> {mappedTimeDiv.MatchedDisplayValue}");
+                        $"Keyboard TIME/DIV step: {ScopeFormatting.FormatTime(currentTimeDivSeconds)} -> {mappedTimeDiv.MatchedDisplayValue}");
 
                     this.thisLastTimeDivSeconds = mappedTimeDiv.NumericValue;
                     this.thisLastOscilloscopeImageSyncSignature = string.Empty;
@@ -2165,7 +2035,7 @@ namespace CRT
                     }
 
                     double currentTriggerLevelVolts = this.thisLastTriggerLevelVolts!.Value;
-                    double targetTriggerLevelVolts = this.GetNextSnappedTriggerLevelVolts(
+                    double targetTriggerLevelVolts = ScopeFormatting.GetNextSnappedTriggerLevelVolts(
                         currentTriggerLevelVolts,
                         direction);
 
@@ -2179,39 +2049,10 @@ namespace CRT
 
                     this.AppendOutputLine(
                         "Info",
-                        $"Keyboard trigger level step: {this.FormatVoltage(currentTriggerLevelVolts)} -> {this.FormatVoltage(targetTriggerLevelVolts)}");
+                        $"Keyboard trigger level step: {ScopeFormatting.FormatVoltage(currentTriggerLevelVolts)} -> {ScopeFormatting.FormatVoltage(targetTriggerLevelVolts)}");
                 },
                 cancellationToken,
                 writeWarnings: true).ConfigureAwait(false);
-        }
-
-        // ###########################################################################################
-        // Snaps a trigger level to the next 0.25V boundary in the requested direction so keyboard
-        // stepping always moves predictably even when the current level is slightly off-grid.
-        // ###########################################################################################
-        private double GetNextSnappedTriggerLevelVolts(double currentTriggerLevelVolts, int direction)
-        {
-            const double triggerLevelStepVolts = 0.25;
-            const double stepTolerance = 1e-6;
-
-            double scaledValue = currentTriggerLevelVolts / triggerLevelStepVolts;
-            double nearestWholeStep = Math.Round(scaledValue, MidpointRounding.AwayFromZero);
-            bool isNearWholeStep = Math.Abs(scaledValue - nearestWholeStep) <= stepTolerance;
-
-            if (direction > 0)
-            {
-                double targetStep = isNearWholeStep
-                    ? nearestWholeStep + 1.0
-                    : Math.Ceiling(scaledValue);
-
-                return targetStep * triggerLevelStepVolts;
-            }
-
-            double downTargetStep = isNearWholeStep
-                ? nearestWholeStep - 1.0
-                : Math.Floor(scaledValue);
-
-            return downTargetStep * triggerLevelStepVolts;
         }
 
         // ###########################################################################################
@@ -2238,7 +2079,7 @@ namespace CRT
                     {
                         this.AppendOutputLine(
                             "Warning",
-                            $"Could not resolve keyboard VOLTS/DIV value [{this.FormatVoltage(targetVoltsDivVolts)}] from the oscilloscope definition list");
+                            $"Could not resolve keyboard VOLTS/DIV value [{ScopeFormatting.FormatVoltage(targetVoltsDivVolts)}] from the oscilloscope definition list");
                         return;
                     }
 
@@ -2572,7 +2413,7 @@ namespace CRT
 
                                 for (int i = 0; i < stepCount; i++)
                                 {
-                                    double targetTriggerLevelVolts = this.GetNextSnappedTriggerLevelVolts(
+                                    double targetTriggerLevelVolts = ScopeFormatting.GetNextSnappedTriggerLevelVolts(
                                         currentTriggerLevelVolts,
                                         direction);
 
@@ -2590,8 +2431,8 @@ namespace CRT
                                 this.AppendOutputLine(
                                     "Info",
                                     stepCount == 1
-                                        ? $"Keyboard trigger level step: {this.FormatVoltage(startingTriggerLevelVolts)} -> {this.FormatVoltage(currentTriggerLevelVolts)}"
-                                        : $"Keyboard trigger level step: {this.FormatVoltage(startingTriggerLevelVolts)} -> {this.FormatVoltage(currentTriggerLevelVolts)} ({stepCount} steps)");
+                                        ? $"Keyboard trigger level step: {ScopeFormatting.FormatVoltage(startingTriggerLevelVolts)} -> {ScopeFormatting.FormatVoltage(currentTriggerLevelVolts)}"
+                                        : $"Keyboard trigger level step: {ScopeFormatting.FormatVoltage(startingTriggerLevelVolts)} -> {ScopeFormatting.FormatVoltage(currentTriggerLevelVolts)} ({stepCount} steps)");
                             },
                             cancellationToken,
                             writeWarnings: true).ConfigureAwait(false);
@@ -2815,8 +2656,8 @@ namespace CRT
                                 this.AppendOutputLine(
                                     "Info",
                                     appliedStepCount == 1
-                                        ? $"Keyboard TIME/DIV step: {this.FormatTime(startingTimeDivSeconds)} -> {this.FormatTime(currentTimeDivSeconds)}"
-                                        : $"Keyboard TIME/DIV step: {this.FormatTime(startingTimeDivSeconds)} -> {this.FormatTime(currentTimeDivSeconds)} ({appliedStepCount} steps)");
+                                        ? $"Keyboard TIME/DIV step: {ScopeFormatting.FormatTime(startingTimeDivSeconds)} -> {ScopeFormatting.FormatTime(currentTimeDivSeconds)}"
+                                        : $"Keyboard TIME/DIV step: {ScopeFormatting.FormatTime(startingTimeDivSeconds)} -> {ScopeFormatting.FormatTime(currentTimeDivSeconds)} ({appliedStepCount} steps)");
                             },
                             cancellationToken,
                             writeWarnings: true).ConfigureAwait(false);
@@ -2969,7 +2810,7 @@ namespace CRT
                             {
                                 this.AppendOutputLine(
                                     "Warning",
-                                    $"Could not resolve keyboard VOLTS/DIV value [{this.FormatVoltage(pendingTargetVoltsDivVolts.Value)}] from the oscilloscope definition list");
+                                    $"Could not resolve keyboard VOLTS/DIV value [{ScopeFormatting.FormatVoltage(pendingTargetVoltsDivVolts.Value)}] from the oscilloscope definition list");
                                 return;
                             }
 
@@ -3295,7 +3136,7 @@ namespace CRT
 
             try
             {
-                if (this.TryExtractBinaryPayload(rawImageData, out byte[] payload) && payload.Length > 0)
+                if (ScopePayloadParser.TryExtractBinaryPayload(rawImageData, out byte[] payload) && payload.Length > 0)
                 {
                     using var payloadStream = new MemoryStream(payload, writable: false);
                     bitmap = new Bitmap(payloadStream);
@@ -3322,64 +3163,21 @@ namespace CRT
             string displayedRegion,
             string outputDirectory)
         {
-            string safeBoardLabel = this.SanitizeCapturedOscilloscopeImageFileNamePart(componentImageEntry.BoardLabel);
+            string safeBoardLabel = ScopeFormatting.SanitizeCapturedOscilloscopeImageFileNamePart(componentImageEntry.BoardLabel);
 
             string identityPart = !string.IsNullOrWhiteSpace(componentImageEntry.Pin)
-                ? this.SanitizeCapturedOscilloscopeImageFileNamePart(componentImageEntry.Pin)
-                : this.SanitizeCapturedOscilloscopeImageFileNamePart(componentImageEntry.Name);
+                ? ScopeFormatting.SanitizeCapturedOscilloscopeImageFileNamePart(componentImageEntry.Pin)
+                : ScopeFormatting.SanitizeCapturedOscilloscopeImageFileNamePart(componentImageEntry.Name);
 
             string safeRegion = string.IsNullOrWhiteSpace(displayedRegion)
                 ? string.Empty
-                : this.SanitizeCapturedOscilloscopeImageFileNamePart(displayedRegion);
+                : ScopeFormatting.SanitizeCapturedOscilloscopeImageFileNamePart(displayedRegion);
 
             string fileName = string.IsNullOrWhiteSpace(safeRegion)
                 ? $"{safeBoardLabel}_{identityPart}.png"
                 : $"{safeBoardLabel}_{identityPart}_{safeRegion}.png";
 
             return Path.Combine(outputDirectory, fileName);
-        }
-
-        // ###########################################################################################
-        // Replaces characters that are invalid in file names so oscilloscope captures can be written
-        // safely on all supported desktop platforms.
-        // ###########################################################################################
-        private string SanitizeCapturedOscilloscopeImageFileNamePart(string value)
-        {
-            string sanitized = string.IsNullOrWhiteSpace(value) ? "Unknown" : value.Trim();
-
-            foreach (char invalidChar in Path.GetInvalidFileNameChars())
-            {
-                sanitized = sanitized.Replace(invalidChar, '_');
-            }
-
-            return sanitized;
-        }
-
-        // ###########################################################################################
-        // Masks a scope serial number so logs and the output panel do not expose the real value.
-        // ###########################################################################################
-        private string MaskScopeSerial(string serial)
-        {
-            return string.IsNullOrEmpty(serial)
-                ? string.Empty
-                : new string('*', serial.Length);
-        }
-
-        // ###########################################################################################
-        // Masks only the serial field inside a standard *IDN? response while leaving the other parts
-        // unchanged for debugging and display purposes.
-        // ###########################################################################################
-        private string MaskIdentifyResponseSerial(string response)
-        {
-            var parts = (response ?? string.Empty).Split(',');
-
-            if (parts.Length > 2)
-            {
-                string trimmedSerial = parts[2].Trim();
-                parts[2] = this.MaskScopeSerial(trimmedSerial);
-            }
-
-            return string.Join(",", parts);
         }
 
 

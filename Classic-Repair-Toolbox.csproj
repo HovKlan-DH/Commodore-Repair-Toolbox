@@ -39,6 +39,22 @@
     <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
 
+  <!--
+  The test project lives in Tests/ INSIDE this project's folder, so the SDK's default
+  "**/*.cs" glob would otherwise compile the tests (and their bin/obj) into the app.
+  -->
+  <ItemGroup>
+    <Compile Remove="Tests/**" />
+    <EmbeddedResource Remove="Tests/**" />
+    <None Remove="Tests/**" />
+  </ItemGroup>
+
+  <!-- Much of Handlers/ is internal (KiCad loaders, board JSON storage, Excel reader/writer).
+       The test project needs to see it; nothing else does. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Classic-Repair-Toolbox.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <Compile Update="Tabs/Feedback/TabFeedback.axaml.cs">
       <DependentUpon>TabFeedback.axaml</DependentUpon>

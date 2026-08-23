@@ -793,7 +793,7 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
-        // Resolves the settings file path and loads persisted values.
+        // Resolves the settings file path in the user's AppData folder and loads persisted values.
         // Falls back to defaults silently on any failure.
         // ###########################################################################################
         public static void Load()
@@ -803,7 +803,26 @@ namespace Handlers.DataHandling
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 var directory = Path.Combine(appData, AppConfig.AppFolderName);
                 Directory.CreateDirectory(directory);
-                _settingsFilePath = Path.Combine(directory, AppConfig.SettingsFileName);
+                LoadFrom(Path.Combine(directory, AppConfig.SettingsFileName));
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to load settings: [{ex.Message}] - using defaults");
+            }
+        }
+
+        // ###########################################################################################
+        // Loads persisted values from an explicit settings file and makes that file the save target.
+        // Load() resolves the real AppData location and calls this; splitting the two keeps the
+        // "where do settings live" decision out of the load logic, and lets the test suite point at
+        // a temporary file instead of the user's real settings.
+        // Falls back to defaults silently on any failure.
+        // ###########################################################################################
+        internal static void LoadFrom(string settingsFilePath)
+        {
+            try
+            {
+                _settingsFilePath = settingsFilePath;
 
                 // Get and log system information completely independently of the configuration state
                 var os = RuntimeInformation.OSDescription;

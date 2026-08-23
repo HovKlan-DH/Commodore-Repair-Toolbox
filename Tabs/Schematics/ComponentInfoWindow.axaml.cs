@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Handlers.DataHandling;
+using Handlers.Geometry;
 using Handlers.IcTesting;
 using Handlers.Oscilloscope;
 using System;
@@ -540,20 +541,6 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Scales the per-notch zoom factor by the actual reported wheel delta magnitude, instead of
-        // only its sign. Avalonia's Linux/GTK/libinput backends can report smaller or larger deltas
-        // per PointerWheelChanged event than the Windows backend's normalized 1.0-per-notch value, so
-        // treating every event as a full step caused very coarse, aggressive zooming on Linux.
-        // A delta magnitude of 1.0 (a normal Windows notch) reduces this to exactly baseFactor.
-        // ###########################################################################################
-        private static double ComputeWheelZoomFactor(double deltaY, double baseFactor)
-        {
-            double magnitude = Math.Clamp(Math.Abs(deltaY), 0.1, 3.0);
-            double factor = Math.Pow(baseFactor, magnitude);
-            return deltaY > 0 ? factor : 1.0 / factor;
-        }
-
-        // ###########################################################################################
         // Intercepts scroll wheel events at the tunnel phase on the left panel and maps them to
         // thumbnail navigation. Scroll up → next (right), scroll down → previous (left).
         // ###########################################################################################
@@ -568,7 +555,7 @@ namespace CRT
             {
                 // We base our scaling layout transforms natively on the inner image dimensions accurately.
                 var pos = e.GetPosition(this.MainImageContainer);
-                double delta = ComputeWheelZoomFactor(e.Delta.Y, 1.2);
+                double delta = ViewportMath.ComputeWheelZoomFactor(e.Delta.Y, 1.2);
 
                 double newScale = this._imageMatrix.M11 * delta;
 
@@ -966,7 +953,7 @@ namespace CRT
         // ###########################################################################################
         private void SetInfoLabelPair(Border border, TextBlock prefixTextBlock, TextBlock valueTextBlock, string prefix, string? value)
         {
-            string trimmed = this.NormalizeScopeOverlayValue(value);
+            string trimmed = ScopeFormatting.NormalizeScopeOverlayValue(value);
             bool show = !string.IsNullOrWhiteSpace(trimmed);
 
             border.IsVisible = show;
@@ -979,36 +966,6 @@ namespace CRT
 
             prefixTextBlock.Text = prefix;
             valueTextBlock.Text = trimmed;
-        }
-
-        // ###########################################################################################
-        // Normalizes oscilloscope overlay values so the final unit character is uppercase and the
-        // preceding unit character, when alphabetic, is lowercase.
-        // Examples: 1US -> 1uS, 5MV -> 5mV, 1.5v -> 1.5V
-        // ###########################################################################################
-        private string NormalizeScopeOverlayValue(string? value)
-        {
-            string trimmed = value?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(trimmed))
-            {
-                return string.Empty;
-            }
-
-            char[] chars = trimmed.ToCharArray();
-            int lastIndex = chars.Length - 1;
-
-            if (char.IsLetter(chars[lastIndex]))
-            {
-                chars[lastIndex] = char.ToUpperInvariant(chars[lastIndex]);
-            }
-
-            int secondLastIndex = lastIndex - 1;
-            if (secondLastIndex >= 0 && char.IsLetter(chars[secondLastIndex]))
-            {
-                chars[secondLastIndex] = char.ToLowerInvariant(chars[secondLastIndex]);
-            }
-
-            return new string(chars);
         }
 
         // ###########################################################################################
@@ -1056,7 +1013,7 @@ namespace CRT
             var cts = this._loadCts;
 
             var displayableEntries = entries
-                .Where(HasDisplayableImageFile)
+                .Where(ComponentImageQueries.HasDisplayableImageFile)
                 .ToList();
 
             if (displayableEntries.Count == 0)
@@ -1111,7 +1068,7 @@ namespace CRT
                 .Select(x => new ComponentImageItem
                 {
                     ImageSource = x.Bitmap,
-                    Label = BuildImageLabel(x.Entry),
+                    Label = ComponentImageQueries.BuildImageLabel(x.Entry),
                     Pin = x.Entry.Pin.Trim(),
                     Name = x.Entry.Name,
                     ExpectedOscilloscopeReading = x.Entry.ExpectedOscilloscopeReading,
@@ -1159,20 +1116,6 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Builds the thumbnail overlay label: "Pin X" when a pin number exists, otherwise the name.
-        // ###########################################################################################
-        private static string BuildImageLabel(ComponentImageEntry entry)
-        {
-            if (!string.IsNullOrWhiteSpace(entry.Pin))
-                return $"Pin {entry.Pin.Trim()}";
-
-            if (!string.IsNullOrWhiteSpace(entry.Name))
-                return entry.Name.Trim();
-
-            return string.Empty;
-        }
-
-        // ###########################################################################################
         // Clears UI image references, resets the image note section, and disposes loaded bitmaps.
         // ###########################################################################################
         private void DisposeLoadedBitmaps()
@@ -1189,35 +1132,13 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Returns true when an image is visible for the requested region.
-        // Empty image regions are treated as shared and count for both PAL and NTSC.
-        // ###########################################################################################
-        private static bool IsImageVisibleInRegion(ComponentImageEntry image, string region)
-        {
-            return string.IsNullOrWhiteSpace(image.Region) ||
-                   string.Equals(image.Region.Trim(), region, StringComparison.OrdinalIgnoreCase);
-        }
-
-        // ###########################################################################################
-        // Counts how many displayable images belong to the current component for the requested region.
-        // Empty image regions are included in both counters. Entries without a File are excluded.
-        // ###########################################################################################
-        private int CountImagesForRegion(string region)
-        {
-            return this._allComponentImages.Count(img =>
-                string.Equals(img.BoardLabel, this._boardLabel, StringComparison.OrdinalIgnoreCase) &&
-                HasDisplayableImageFile(img) &&
-                IsImageVisibleInRegion(img, region));
-        }
-
-        // ###########################################################################################
         // Updates the PAL and NTSC button captions with per-region image counters.
         // Empty image regions are included in both counters.
         // ###########################################################################################
         private void UpdateRegionButtonCounters()
         {
-            int palCount = this.CountImagesForRegion("PAL");
-            int ntscCount = this.CountImagesForRegion("NTSC");
+            int palCount = ComponentImageQueries.CountImagesForRegion(this._allComponentImages, this._boardLabel, "PAL");
+            int ntscCount = ComponentImageQueries.CountImagesForRegion(this._allComponentImages, this._boardLabel, "NTSC");
 
             this.PalRegionButton.Content = $"PAL ({palCount})";
             this.NtscRegionButton.Content = $"NTSC ({ntscCount})";
@@ -1239,8 +1160,8 @@ namespace CRT
             var matchingEntries = this._allComponentImages
                 .Where(img =>
                     string.Equals(img.BoardLabel, this._boardLabel, StringComparison.OrdinalIgnoreCase) &&
-                    HasDisplayableImageFile(img) &&
-                    IsImageVisibleInRegion(img, this._localRegion))
+                    ComponentImageQueries.HasDisplayableImageFile(img) &&
+                    ComponentImageQueries.IsImageVisibleInRegion(img, this._localRegion))
                 .ToList();
 
             this.LoadImagesAsync(matchingEntries, this._dataRoot, currentPin);
@@ -1332,34 +1253,12 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Selects the best-fit ComponentEntry for the given region:
-        // exact region match → generic (empty region) → first available → null.
-        // ###########################################################################################
-        private ComponentEntry? PickComponentEntry(string region)
-        {
-            if (this._allComponentEntries.Count == 0)
-                return null;
-
-            var regionMatch = this._allComponentEntries.FirstOrDefault(e =>
-                string.Equals(e.Region?.Trim(), region, StringComparison.OrdinalIgnoreCase));
-            if (regionMatch != null)
-                return regionMatch;
-
-            var generic = this._allComponentEntries.FirstOrDefault(e =>
-                string.IsNullOrWhiteSpace(e.Region));
-            if (generic != null)
-                return generic;
-
-            return this._allComponentEntries[0];
-        }
-
-        // ###########################################################################################
         // Updates all region-sensitive text fields (title, category/part-number, description)
         // to reflect the current local region without affecting the global setting.
         // ###########################################################################################
         private void RefreshComponentText()
         {
-            var entry = this.PickComponentEntry(this._localRegion);
+            var entry = ComponentImageQueries.PickComponentEntry(this._allComponentEntries, this._localRegion);
 
             // Title: BoardLabel | FriendlyName | TechnicalNameOrValue (non-empty parts joined)
             var titleParts = new List<string>(3);
@@ -1459,26 +1358,13 @@ private void OnIcTestPanelCloseRequested() => this.IcTestPanel.IsVisible = false
             }
 
             if (!this.CanSendOscilloscopeCommands() ||
-                !IsOscilloscopeImage(selectedItem?.SourceEntry))
+                !ComponentImageQueries.IsOscilloscopeImage(selectedItem?.SourceEntry))
             {
                 mainOwner.TabOscilloscopeControl.QueueComponentImageOscilloscopeSync(null);
                 return;
             }
 
             mainOwner.TabOscilloscopeControl.QueueComponentImageOscilloscopeSync(selectedItem!.SourceEntry);
-        }
-
-        // ###########################################################################################
-        // Returns true when the selected component image represents an oscilloscope reference image.
-        // This requires a Pin value and at least one oscilloscope setting column to be populated.
-        // ###########################################################################################
-        private static bool IsOscilloscopeImage(ComponentImageEntry? componentImageEntry)
-        {
-            return componentImageEntry != null &&
-                   !string.IsNullOrWhiteSpace(componentImageEntry.Pin) &&
-                   (!string.IsNullOrWhiteSpace(componentImageEntry.TimeDiv) ||
-                    !string.IsNullOrWhiteSpace(componentImageEntry.VoltsDiv) ||
-                    !string.IsNullOrWhiteSpace(componentImageEntry.TriggerLevelVolts));
         }
 
         // ###########################################################################################
@@ -1510,7 +1396,7 @@ private void OnIcTestPanelCloseRequested() => this.IcTestPanel.IsVisible = false
         {
             string baseTitle = !string.IsNullOrWhiteSpace(this.TitleText.Text)
                 ? this.TitleText.Text
-                : this.GetOscilloscopeTitleBase(this.Title ?? string.Empty);
+                : ScopeFormatting.GetMainWindowTitleBase(this.Title ?? string.Empty);
 
             if (!this._hasSeenOscilloscopeSessionTitleState)
             {
@@ -1523,28 +1409,6 @@ private void OnIcTestPanelCloseRequested() => this.IcTestPanel.IsVisible = false
                 : " (oscilloscope disconnected)";
 
             this.Title = baseTitle + suffix;
-        }
-
-        // ###########################################################################################
-        // Removes any oscilloscope connection suffix from a popup window title so the component
-        // title can be rebuilt cleanly before a fresh session suffix is applied.
-        // ###########################################################################################
-        private string GetOscilloscopeTitleBase(string windowTitle)
-        {
-            const string connectedSuffix = " (oscilloscope connected)";
-            const string disconnectedSuffix = " (oscilloscope disconnected)";
-
-            if (windowTitle.EndsWith(connectedSuffix, StringComparison.Ordinal))
-            {
-                return windowTitle[..^connectedSuffix.Length];
-            }
-
-            if (windowTitle.EndsWith(disconnectedSuffix, StringComparison.Ordinal))
-            {
-                return windowTitle[..^disconnectedSuffix.Length];
-            }
-
-            return windowTitle;
         }
 
         // ###########################################################################################
@@ -1718,15 +1582,6 @@ private void OnIcTestPanelCloseRequested() => this.IcTestPanel.IsVisible = false
         private void HideFetchScopeImageOverlay()
         {
             this.FetchScopeImageOverlayBorder.IsVisible = false;
-        }
-
-        // ###########################################################################################
-        // Returns true when the component image entry points to a real image file path.
-        // Empty or whitespace-only File values are excluded from the thumbnail gallery.
-        // ###########################################################################################
-        private static bool HasDisplayableImageFile(ComponentImageEntry image)
-        {
-            return !string.IsNullOrWhiteSpace(image.File);
         }
 
         // ###########################################################################################

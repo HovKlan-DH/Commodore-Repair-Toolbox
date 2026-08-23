@@ -140,12 +140,12 @@ namespace CRT
             foreach (var entry in credits)
             {
                 bool isClickable = !string.IsNullOrWhiteSpace(entry.Contact)
-                    && (IsContactWebUrl(entry.Contact) || IsContactEmail(entry.Contact));
+                    && (ContactLinkFormatter.IsContactWebUrl(entry.Contact) || ContactLinkFormatter.IsContactEmail(entry.Contact));
 
                 Action? openAction = null;
                 if (isClickable && !string.IsNullOrWhiteSpace(entry.Contact))
                 {
-                    string href = BuildContactHref(entry.Contact);
+                    string href = ContactLinkFormatter.BuildContactHref(entry.Contact);
                     openAction = () => this.OpenUrl(href);
                 }
 
@@ -160,32 +160,6 @@ namespace CRT
             }
 
             this.CreditsSectionBorder.IsVisible = true;
-        }
-
-        // ###########################################################################################
-        // Returns true when the contact string looks like a web URL.
-        // ###########################################################################################
-        private static bool IsContactWebUrl(string contact)
-            => contact.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-            || contact.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
-            || contact.StartsWith("www.", StringComparison.OrdinalIgnoreCase);
-
-        // ###########################################################################################
-        // Returns true when the contact string looks like an email address.
-        // ###########################################################################################
-        private static bool IsContactEmail(string contact)
-            => contact.Contains('@') && !contact.Contains(' ');
-
-        // ###########################################################################################
-        // Builds the href to open from contact text.
-        // ###########################################################################################
-        private static string BuildContactHref(string contact)
-        {
-            if (IsContactEmail(contact))
-                return $"mailto:{contact}";
-            if (contact.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
-                return $"https://{contact}";
-            return contact;
         }
     }
 

@@ -16,6 +16,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Tabs.TabSchematics;
+using Handlers.Geometry;
 
 namespace CRT
 {
@@ -368,13 +369,13 @@ namespace CRT
                         ? "[1] file updated - please refresh board"
                         : $"[{syncResult.ChangedCount}] files updated - please refresh board";
 
-                    this.SetSyncBannerText(BuildSyncBannerText(bannerText, syncResult.ProtectedFilesCount));
+                    this.SetSyncBannerText(ComponentListBuilder.BuildSyncBannerText(bannerText, syncResult.ProtectedFilesCount));
                     this.SyncBannerRefreshButton.IsVisible = true;
                     this.SyncBanner.IsVisible = true;
                 }
                 else if (syncResult.ProtectedFilesCount > 0)
                 {
-                    this.SetSyncBannerText(BuildSyncBannerText("All data files are up to date", syncResult.ProtectedFilesCount));
+                    this.SetSyncBannerText(ComponentListBuilder.BuildSyncBannerText("All data files are up to date", syncResult.ProtectedFilesCount));
                     this.SyncBannerRefreshButton.IsVisible = false;
                     this.SyncBanner.IsVisible = true;
                 }
@@ -488,13 +489,13 @@ namespace CRT
                         ? "[1] file updated in background - please refresh board"
                         : $"[{changed}] files updated in background - please refresh board";
 
-                    this.SyncBannerText.Text = BuildSyncBannerText(bannerText, protectedFilesCount);
+                    this.SyncBannerText.Text = ComponentListBuilder.BuildSyncBannerText(bannerText, protectedFilesCount);
                     this.SyncBannerRefreshButton.IsVisible = true;
                     this.SyncBanner.IsVisible = true;
                 }
                 else if (protectedFilesCount > 0)
                 {
-                    this.SyncBannerText.Text = BuildSyncBannerText("All data files are up to date", protectedFilesCount);
+                    this.SyncBannerText.Text = ComponentListBuilder.BuildSyncBannerText("All data files are up to date", protectedFilesCount);
                     this.SyncBannerRefreshButton.IsVisible = false;
                     this.SyncBanner.IsVisible = true;
                 }
@@ -764,7 +765,7 @@ namespace CRT
             this.UpdateRegionButtonsState();
             this.PopulateBoardInfoSection(boardData.RevisionDate, boardData.Credits);
 
-            var categories = BuildDistinctCategories(boardData);
+            var categories = ComponentListBuilder.BuildDistinctCategories(boardData);
             this.CategoryFilterListBox.ItemsSource = categories;
 
             var savedCategories = UserSettings.GetSelectedCategories(boardKey);
@@ -797,7 +798,7 @@ namespace CRT
                 StringComparer.OrdinalIgnoreCase);
 
             string searchTerm = this.ComponentSearchTextBox?.Text ?? string.Empty;
-            var componentItems = BuildComponentItems(boardData, UserSettings.Region, activeCategories, searchTerm);
+            var componentItems = ComponentListBuilder.BuildComponentItems(boardData, UserSettings.Region, activeCategories, searchTerm);
 
             this._suppressComponentHighlightUpdate = true;
             this.ComponentFilterListBox.ItemsSource = componentItems;
@@ -820,7 +821,7 @@ namespace CRT
                 try
                 {
                     var highlightRects = await Task.Run(() =>
-                        TabSchematics.BuildHighlightRects(boardData, UserSettings.Region));
+                        HighlightRectBuilder.BuildHighlightRects(boardData, UserSettings.Region));
 
                     var schematicByName = boardData.Schematics
                         .Where(schematic => !string.IsNullOrWhiteSpace(schematic.SchematicName))
@@ -1014,7 +1015,7 @@ namespace CRT
 
                 var categoryFilter = new HashSet<string>(selected, StringComparer.OrdinalIgnoreCase);
                 var searchTerm = this.ComponentSearchTextBox?.Text ?? string.Empty;
-                var componentItems = BuildComponentItems(this._currentBoardData, this._localRegion, categoryFilter, searchTerm);
+                var componentItems = ComponentListBuilder.BuildComponentItems(this._currentBoardData, this._localRegion, categoryFilter, searchTerm);
 
                 this._suppressComponentHighlightUpdate = true;
                 this.ComponentFilterListBox.ItemsSource = componentItems;
@@ -1120,7 +1121,7 @@ namespace CRT
             if (Directory.Exists(kiCadDirectory))
             {
                 foreach (string path in Directory.EnumerateFiles(kiCadDirectory, "*.*", SearchOption.TopDirectoryOnly)
-                             .Where(Main.IsSupportedKiCadRawFile))
+                             .Where(ComponentListBuilder.IsSupportedKiCadRawFile))
                 {
                     paths.Add(path);
                 }
@@ -1132,23 +1133,6 @@ namespace CRT
                 .ToList();
 
             return result;
-        }
-
-        // ###########################################################################################
-        // Returns true when the supplied path points at a supported modern KiCad raw file.
-        // ###########################################################################################
-        private static bool IsSupportedKiCadRawFile(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return false;
-            }
-
-            string extension = Path.GetExtension(path.Trim());
-
-            return string.Equals(extension, ".kicad_pcb", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(extension, ".kicad_pro", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(extension, ".kicad_sch", StringComparison.OrdinalIgnoreCase);
         }
 
         // ###########################################################################################
@@ -1372,100 +1356,6 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Builds a distinct list of component categories in the order they first appear.
-        // ###########################################################################################
-        private static List<string> BuildDistinctCategories(BoardData boardData)
-        {
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var categories = new List<string>();
-
-            foreach (var component in boardData.Components)
-            {
-                if (!string.IsNullOrWhiteSpace(component.Category) && seen.Add(component.Category))
-                    categories.Add(component.Category);
-            }
-
-            return categories;
-        }
-
-        // ###########################################################################################
-        // Lightweight view model for a component list item.
-        // ###########################################################################################
-        internal sealed class ComponentListItem
-        {
-            public string DisplayText { get; init; } = string.Empty;
-            public string BoardLabel { get; init; } = string.Empty;
-            public string SelectionKey { get; init; } = string.Empty;
-            public override string ToString() => this.DisplayText;
-        }
-
-        // ###########################################################################################
-        // Builds component list items filtered by the given region and search string.
-        // ###########################################################################################
-        private static List<ComponentListItem> BuildComponentItems(BoardData boardData, string region, HashSet<string>? categoryFilter = null, string searchTerm = "")
-        {
-            var items = new List<ComponentListItem>();
-
-            var searchTerms = string.IsNullOrWhiteSpace(searchTerm)
-                ? Array.Empty<string>()
-                : searchTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var component in boardData.Components)
-            {
-                var componentRegion = component.Region?.Trim() ?? string.Empty;
-
-                if (!string.IsNullOrEmpty(componentRegion) &&
-                    !string.Equals(componentRegion, region, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                if (categoryFilter != null && !categoryFilter.Contains(component.Category ?? string.Empty))
-                    continue;
-
-                var parts = new List<string>(3);
-                if (!string.IsNullOrWhiteSpace(component.BoardLabel))
-                    parts.Add(component.BoardLabel.Trim());
-                if (!string.IsNullOrWhiteSpace(component.FriendlyName))
-                    parts.Add(component.FriendlyName.Trim());
-                if (!string.IsNullOrWhiteSpace(component.TechnicalNameOrValue))
-                    parts.Add(component.TechnicalNameOrValue.Trim());
-
-                if (parts.Count == 0)
-                    continue;
-
-                string displayString = string.Join(" | ", parts);
-
-                if (searchTerms.Length > 0)
-                {
-                    bool matches = true;
-                    foreach (var term in searchTerms)
-                    {
-                        if (displayString.IndexOf(term, StringComparison.OrdinalIgnoreCase) < 0)
-                        {
-                            matches = false;
-                            break;
-                        }
-                    }
-
-                    if (!matches)
-                        continue;
-                }
-
-                items.Add(new ComponentListItem
-                {
-                    BoardLabel = component.BoardLabel?.Trim() ?? string.Empty,
-                    DisplayText = displayString,
-                    SelectionKey = string.Join("\u001F",
-                        component.BoardLabel?.Trim() ?? string.Empty,
-                        component.FriendlyName?.Trim() ?? string.Empty,
-                        component.TechnicalNameOrValue?.Trim() ?? string.Empty,
-                        component.Region?.Trim() ?? string.Empty)
-                });
-            }
-
-            return items;
-        }
-
-        // ###########################################################################################
         // Opens the persistent AppData folder that contains the log and settings files.
         // ###########################################################################################
         private void OnOpenAppDataFolderClick(object? sender, RoutedEventArgs e)
@@ -1605,7 +1495,7 @@ namespace CRT
         {
             this._suppressRegionToggle = true;
             bool isNtsc = string.Equals(this._localRegion, "NTSC", StringComparison.OrdinalIgnoreCase);
-            bool hasExplicitRegionComponents = HasExplicitRegionComponents(this._currentBoardData);
+            bool hasExplicitRegionComponents = ComponentListBuilder.HasExplicitRegionComponents(this._currentBoardData);
 
             this.RegionButtonsGrid.IsVisible = hasExplicitRegionComponents;
 
@@ -1673,7 +1563,7 @@ namespace CRT
         {
             string componentKey = $"{boardLabel}\u001F{displayText}";
             var boardData = this._currentBoardData;
-            bool hasExplicitRegionComponents = HasExplicitRegionComponents(boardData);
+            bool hasExplicitRegionComponents = ComponentListBuilder.HasExplicitRegionComponents(boardData);
             var images = boardData?.ComponentImages ?? new List<ComponentImageEntry>();
             var localFiles = boardData?.ComponentLocalFiles ?? new List<ComponentLocalFileEntry>();
             var links = boardData?.ComponentLinks ?? new List<ComponentLinkEntry>();
@@ -1919,7 +1809,7 @@ namespace CRT
                 return;
 
             this.TabSchematicsControl.highlightRectsBySchematicAndLabel = await Task.Run(() =>
-                TabSchematics.BuildHighlightRects(this._currentBoardData, this._localRegion));
+                HighlightRectBuilder.BuildHighlightRects(this._currentBoardData, this._localRegion));
 
             var previouslySelectedKeys = new HashSet<string>(
                 this.ComponentFilterListBox.SelectedItems?.Cast<ComponentListItem>()
@@ -1931,7 +1821,7 @@ namespace CRT
                 StringComparer.OrdinalIgnoreCase);
 
             var searchTerm = this.ComponentSearchTextBox?.Text ?? string.Empty;
-            var componentItems = BuildComponentItems(this._currentBoardData, this._localRegion, activeCategories, searchTerm);
+            var componentItems = ComponentListBuilder.BuildComponentItems(this._currentBoardData, this._localRegion, activeCategories, searchTerm);
 
             this._suppressComponentHighlightUpdate = true;
             this.ComponentFilterListBox.ItemsSource = componentItems;
@@ -1998,7 +1888,7 @@ namespace CRT
                 this.CategoryFilterListBox.SelectedItems?.Cast<string>() ?? Enumerable.Empty<string>(),
                 StringComparer.OrdinalIgnoreCase);
 
-            var componentItems = BuildComponentItems(this._currentBoardData!, this._localRegion, activeCategories, searchTerm);
+            var componentItems = ComponentListBuilder.BuildComponentItems(this._currentBoardData!, this._localRegion, activeCategories, searchTerm);
 
             this._suppressComponentHighlightUpdate = true;
             this.ComponentFilterListBox.ItemsSource = componentItems;
@@ -2043,20 +1933,7 @@ namespace CRT
         // ###########################################################################################
         internal bool CurrentBoardHasExplicitRegionComponents()
         {
-            return HasExplicitRegionComponents(this._currentBoardData);
-        }
-
-        // ###########################################################################################
-        // Returns true when the provided board has at least one component explicitly tagged as PAL or NTSC.
-        // ###########################################################################################
-        private static bool HasExplicitRegionComponents(BoardData? boardData)
-        {
-            if (boardData == null)
-                return false;
-
-            return boardData.Components.Any(component =>
-                string.Equals(component.Region?.Trim(), "PAL", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(component.Region?.Trim(), "NTSC", StringComparison.OrdinalIgnoreCase));
+            return ComponentListBuilder.HasExplicitRegionComponents(this._currentBoardData);
         }
 
         // ###########################################################################################
@@ -2239,9 +2116,9 @@ namespace CRT
             string searchTerm = this.ComponentSearchTextBox?.Text ?? string.Empty;
 
             this.TabSchematicsControl.highlightRectsBySchematicAndLabel =
-                TabSchematics.BuildHighlightRects(this._currentBoardData, this._localRegion);
+                HighlightRectBuilder.BuildHighlightRects(this._currentBoardData, this._localRegion);
 
-            var componentItems = BuildComponentItems(this._currentBoardData, this._localRegion, activeCategories, searchTerm);
+            var componentItems = ComponentListBuilder.BuildComponentItems(this._currentBoardData, this._localRegion, activeCategories, searchTerm);
 
             this._suppressComponentHighlightUpdate = true;
             this.ComponentFilterListBox.ItemsSource = componentItems;
@@ -2574,16 +2451,6 @@ namespace CRT
             this.DataSyncStatusSpinnerEllipse.StrokeDashOffset = 0.0;
 
             this.UpdateDataSyncStatusIcon();
-        }
-
-        // ###########################################################################################
-        // Appends protected-file count information to a sync banner message when applicable.
-        // ###########################################################################################
-        private static string BuildSyncBannerText(string message, int protectedFilesCount)
-        {
-            return protectedFilesCount > 0
-                ? $"{message}; protected contribution related files are [{protectedFilesCount}]"
-                : message;
         }
 
         // ###########################################################################################

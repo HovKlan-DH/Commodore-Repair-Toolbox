@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:CRT"
+             xmlns:data="clr-namespace:Handlers.DataHandling"
              x:Class="CRT.TabOverview"
              FontSize="11">
 
@@ -206,7 +207,7 @@
 					<ItemsControl x:Name="OverviewItemsControl"
 					              Background="{DynamicResource Table_Bg}">
 						<ItemsControl.ItemTemplate>
-							<DataTemplate x:DataType="local:OverviewRow">
+							<DataTemplate x:DataType="data:OverviewRow">
 								<Border Classes="OverviewRow"
 								        BorderBrush="{DynamicResource Table_BorderRowLine}"
 								        BorderThickness="0,0,0,1"
@@ -289,7 +290,7 @@
 										              Margin="8,4,8,4"
 										              VerticalAlignment="Top">
 											<ItemsControl.ItemTemplate>
-												<DataTemplate x:DataType="local:OverviewLink">
+												<DataTemplate x:DataType="data:OverviewLink">
 													<Button Classes="OverviewTextButton"
 													        Margin="0,0,0,2"
 													        Cursor="Hand"

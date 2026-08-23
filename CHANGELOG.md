@@ -16,6 +16,7 @@
     - Oscilloscope image dump could leave the connection out of sync, so all following commands would read the previous commands response
     - Some buttons would reveal text below when hovering with mouse
     - On Linux it now proper maximizes the application window, if this was its last state
+    - Refactored several parts of project for more efficient AI agent development, including unit test coverage
 - **Data (larger contributions since last release)**
   - **New**
     - Added **Commodore Plus/4**

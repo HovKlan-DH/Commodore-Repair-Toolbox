@@ -1,0 +1,491 @@
+using Handlers.DataHandling;
+
+namespace ClassicRepairToolbox.Tests;
+
+// Characterisation tests for KiCadRawProjectLoader - the S-expression parser that turns raw
+// .kicad_pcb / .kicad_sch files into the model the Schematics overlay draws from. Everything
+// the interactive trace overlay renders comes out of here, so a silent regression in this
+// parser shows up as traces in the wrong place rather than as an error.
+//
+// The parser itself is a private nested class, so these drive it through the real LoadAsync
+// entry point with fixture files on disk. See KiCadFixtures.cs for the inputs.
+public sealed class KiCadRawProjectLoaderTests : IDisposable
+{
+    private readonly TempWorkspace thisWorkspace = new();
+
+    public void Dispose() => this.thisWorkspace.Dispose();
+
+    private Task<KiCadProjectRoot?> LoadAsync(params string[] paths) =>
+        KiCadRawProjectLoader.LoadAsync(paths);
+
+    private string WritePcb(string content = null!, string name = "board.kicad_pcb") =>
+        this.thisWorkspace.WriteFile(name, content ?? KiCadFixtures.Pcb);
+
+    // --------------------------------------------------------------- file selection
+
+    [Fact]
+    public async Task LoadAsync_returns_null_when_no_usable_file_was_given()
+    {
+        Assert.Null(await this.LoadAsync());
+    }
+
+    [Fact]
+    public async Task LoadAsync_skips_a_missing_file_instead_of_throwing()
+    {
+        // A board can reference a KiCad file that was never contributed.
+        Assert.Null(await this.LoadAsync(Path.Combine(this.thisWorkspace.Root, "nope.kicad_pcb")));
+    }
+
+    [Fact]
+    public async Task LoadAsync_ignores_files_with_an_unsupported_extension()
+    {
+        string txt = this.thisWorkspace.WriteFile("notes.txt", KiCadFixtures.Pcb);
+        Assert.Null(await this.LoadAsync(txt));
+    }
+
+    [Fact]
+    public async Task LoadAsync_deduplicates_the_same_file_listed_twice()
+    {
+        string pcb = this.WritePcb();
+
+        KiCadProjectRoot? root = await this.LoadAsync(pcb, pcb);
+
+        Assert.NotNull(root);
+        Assert.Single(root!.Pcb);
+    }
+
+    [Fact]
+    public async Task LoadAsync_expands_a_kicad_pro_file_to_its_sibling_pcb_and_schematic()
+    {
+        // Boards usually reference the project file; the loader finds the matching board and
+        // schematic beside it by base name.
+        this.thisWorkspace.WriteFile("board.kicad_pcb", KiCadFixtures.Pcb);
+        this.thisWorkspace.WriteFile("board.kicad_sch", KiCadFixtures.Schematic);
+        string pro = this.thisWorkspace.WriteFile("board.kicad_pro", "{}");
+
+        KiCadProjectRoot? root = await this.LoadAsync(pro);
+
+        Assert.NotNull(root);
+        Assert.Single(root!.Pcb);
+        Assert.Single(root.Schematics);
+    }
+
+    [Fact]
+    public async Task LoadAsync_reports_the_source_filename_on_the_pcb()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb(name: "c64-250407.kicad_pcb"));
+
+        Assert.Equal("c64-250407.kicad_pcb", root!.Pcb[0].Filename);
+    }
+
+    [Fact]
+    public async Task LoadAsync_marks_a_successful_load_as_ok()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+        Assert.True(root!.Ok);
+    }
+
+    // ------------------------------------------------------------------------- nets
+
+    [Fact]
+    public async Task Nets_are_collected_and_ordered_by_id()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        var nets = root!.Pcb[0].Nets.List;
+
+        Assert.Equal(3, nets.Count);
+        Assert.Equal(new[] { "0", "1", "2" }, nets.Select(n => n.Id));
+        Assert.Equal("GND", nets.Single(n => n.Id == "1").Name);
+    }
+
+    [Fact]
+    public async Task A_hierarchical_net_name_is_normalised_to_its_last_segment()
+    {
+        // "/Sheet1/CLK" is the same signal as "CLK" for highlighting purposes.
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        KiCadNetRef clk = root!.Pcb[0].Nets.List.Single(n => n.Id == "2");
+
+        Assert.Equal("/Sheet1/CLK", clk.Name);
+        Assert.Equal("CLK", clk.NormalizedName);
+    }
+
+    [Fact]
+    public async Task A_flat_net_name_is_left_alone_by_normalisation()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        KiCadNetRef gnd = root!.Pcb[0].Nets.List.Single(n => n.Id == "1");
+        Assert.Equal("GND", gnd.NormalizedName);
+    }
+
+    // ------------------------------------------------------------------- footprints
+
+    [Fact]
+    public async Task A_footprint_reference_is_read_from_fp_text()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        KiCadPcbFootprint footprint = Assert.Single(root!.Pcb[0].Footprints);
+        Assert.Equal("U1", footprint.Reference);
+        Assert.Equal("F.Cu", footprint.Layer);
+        Assert.Equal(2, footprint.Pads.Count);
+    }
+
+    [Fact]
+    public async Task A_footprint_reference_is_also_read_from_a_kicad7_property()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(
+            this.WritePcb(KiCadFixtures.PcbWithPropertyReference));
+
+        Assert.Equal("R1", Assert.Single(root!.Pcb[0].Footprints).Reference);
+    }
+
+    [Fact]
+    public async Task A_legacy_module_node_is_treated_as_a_footprint()
+    {
+        // Older .kicad_pcb files use (module ...) rather than (footprint ...).
+        KiCadProjectRoot? root = await this.LoadAsync(
+            this.WritePcb(KiCadFixtures.PcbWithLegacyModule));
+
+        KiCadPcbFootprint footprint = Assert.Single(root!.Pcb[0].Footprints);
+        Assert.Equal("U9", footprint.Reference);
+        Assert.Single(footprint.Pads);
+    }
+
+    [Fact]
+    public async Task A_pad_absolute_centre_is_the_footprint_origin_plus_the_pad_offset()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        KiCadPcbPad pad1 = root!.Pcb[0].Footprints[0].Pads.Single(p => p.Number == "1");
+
+        Assert.NotNull(pad1.AbsoluteCenter);
+        Assert.Equal(100 - 3.81, pad1.AbsoluteCenter!.X, precision: 9);
+        Assert.Equal(50 - 7.62, pad1.AbsoluteCenter.Y, precision: 9);
+    }
+
+    [Fact]
+    public async Task A_pad_on_a_bottom_layer_footprint_has_its_x_offset_mirrored()
+    {
+        // Bottom-side parts are viewed through the board, so local X flips.
+        KiCadProjectRoot? root = await this.LoadAsync(
+            this.WritePcb(KiCadFixtures.PcbBottomLayerFootprint));
+
+        KiCadPcbPad pad = root!.Pcb[0].Footprints[0].Pads[0];
+
+        Assert.Equal(100 - 5, pad.AbsoluteCenter!.X, precision: 9);   // +5 became -5
+        Assert.Equal(100 + 3, pad.AbsoluteCenter.Y, precision: 9);    // Y is unchanged
+    }
+
+    [Fact]
+    public async Task A_pad_on_a_rotated_footprint_rotates_about_the_footprint_origin()
+    {
+        // KiCad uses a Y-down angle convention, so +90 degrees sends +X to -Y.
+        KiCadProjectRoot? root = await this.LoadAsync(
+            this.WritePcb(KiCadFixtures.PcbRotatedFootprint));
+
+        KiCadPcbPad pad = root!.Pcb[0].Footprints[0].Pads[0];
+
+        Assert.Equal(100, pad.AbsoluteCenter!.X, precision: 6);
+        Assert.Equal(90, pad.AbsoluteCenter.Y, precision: 6);
+    }
+
+    [Fact]
+    public async Task Pad_shape_size_layers_and_net_are_captured()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        KiCadPcbPad pad1 = root!.Pcb[0].Footprints[0].Pads.Single(p => p.Number == "1");
+
+        Assert.Equal("rect", pad1.Shape);
+        Assert.Equal(1.6, pad1.Size!.X, precision: 9);
+        Assert.Equal(1.6, pad1.Size.Y, precision: 9);
+        Assert.Equal(new[] { "*.Cu", "*.Mask" }, pad1.Layers);
+        Assert.Equal("1", pad1.Net!.Id);
+        Assert.Equal("GND", pad1.Net.Name);
+    }
+
+    [Fact]
+    public async Task A_pad_net_name_falls_back_to_the_board_net_table()
+    {
+        // The pad here carries an inline name, so also prove the normalised form survives.
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        KiCadPcbPad pad2 = root!.Pcb[0].Footprints[0].Pads.Single(p => p.Number == "2");
+
+        Assert.Equal("2", pad2.Net!.Id);
+        Assert.Equal("CLK", pad2.Net.NormalizedName);
+    }
+
+    // ---------------------------------------------------------------------- routing
+
+    [Fact]
+    public async Task Track_segments_are_parsed_with_geometry_layer_and_net()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        var segments = root!.Pcb[0].Routing.Segments;
+
+        Assert.Equal(2, segments.Count);
+
+        KiCadPcbSegment first = segments[0];
+        Assert.Equal(100, first.Start!.X);
+        Assert.Equal(50, first.Start.Y);
+        Assert.Equal(110, first.End!.X);
+        Assert.Equal(50, first.End.Y);
+        Assert.Equal(0.25, first.Width);
+        Assert.Equal("F.Cu", first.Layer);
+        Assert.Equal("1", first.Net!.Id);
+    }
+
+    [Fact]
+    public async Task Segments_keep_their_layer_so_top_and_bottom_can_be_drawn_apart()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        var layers = root!.Pcb[0].Routing.Segments.Select(s => s.Layer).ToList();
+        Assert.Equal(new[] { "F.Cu", "B.Cu" }, layers);
+    }
+
+    [Fact]
+    public async Task Vias_are_parsed_with_position_size_layers_and_net()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        KiCadPcbVia via = Assert.Single(root!.Pcb[0].Routing.Vias);
+
+        Assert.Equal(105, via.At!.X);
+        Assert.Equal(55, via.At.Y);
+        Assert.Equal(0.8, via.Size);
+        Assert.Equal(new[] { "F.Cu", "B.Cu" }, via.Layers);
+        Assert.Equal("1", via.Net!.Id);
+    }
+
+    [Fact]
+    public async Task Arcs_are_parsed_with_all_three_control_points()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        KiCadPcbArc arc = Assert.Single(root!.Pcb[0].Routing.Arcs);
+
+        Assert.Equal(120, arc.Start!.X);
+        Assert.Equal(122, arc.Mid!.X);
+        Assert.Equal(124, arc.End!.X);
+        Assert.Equal("F.Cu", arc.Layer);
+        Assert.Equal("2", arc.Net!.Id);
+    }
+
+    [Fact]
+    public async Task Zones_are_parsed_with_outline_and_filled_polygons()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        KiCadPcbZone zone = Assert.Single(root!.Pcb[0].Routing.Zones);
+
+        Assert.Equal("1", zone.Net!.Id);
+        Assert.Equal("GND", zone.Net.Name);
+        Assert.Contains("B.Cu", zone.Layers);
+
+        Assert.Equal(4, Assert.Single(zone.OutlinePolygons).Points.Count);
+        Assert.Equal(4, Assert.Single(zone.FilledPolygons).Points.Count);
+    }
+
+    [Fact]
+    public async Task A_zone_with_no_polygons_is_dropped()
+    {
+        string content = """
+        (kicad_pcb (version 20221018)
+          (net 1 "GND")
+          (zone (net 1) (net_name "GND") (layer "B.Cu"))
+          (segment (start 0 0) (end 1 0) (width 0.25) (layer "F.Cu") (net 1))
+        )
+        """;
+
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb(content));
+
+        Assert.Empty(root!.Pcb[0].Routing.Zones);
+    }
+
+    // -------------------------------------------------------------- highlight index
+
+    [Fact]
+    public async Task The_highlight_index_groups_routing_items_by_net()
+    {
+        // This index is what the overlay uses to light up a whole net at once.
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        var index = root!.Pcb[0].HighlightIndex;
+
+        Assert.True(index.ContainsKey("1"));
+        Assert.True(index.ContainsKey("2"));
+
+        Assert.Equal(new[] { 0 }, index["1"].Segments);   // first segment is on net 1
+        Assert.Equal(new[] { 1 }, index["2"].Segments);   // second segment is on net 2
+        Assert.Equal(new[] { 0 }, index["1"].Vias);
+        Assert.Equal(new[] { 0 }, index["2"].Arcs);
+    }
+
+    // ------------------------------------------------------------- s-expression edges
+
+    [Fact]
+    public async Task The_parser_ignores_semicolon_comments()
+    {
+        string content = """
+        ; this whole line is a comment
+        (kicad_pcb (version 20221018)
+          (net 1 "GND")   ; trailing comment
+          (segment (start 0 0) (end 1 0) (width 0.25) (layer "F.Cu") (net 1))
+        )
+        """;
+
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb(content));
+
+        Assert.Single(root!.Pcb[0].Routing.Segments);
+    }
+
+    [Fact]
+    public async Task The_parser_keeps_spaces_inside_quoted_strings()
+    {
+        string content = """
+        (kicad_pcb (version 20221018)
+          (net 1 "Net with spaces")
+          (segment (start 0 0) (end 1 0) (width 0.25) (layer "F.Cu") (net 1))
+        )
+        """;
+
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb(content));
+
+        Assert.Equal("Net with spaces", root!.Pcb[0].Nets.List.Single(n => n.Id == "1").Name);
+    }
+
+    [Fact]
+    public async Task The_parser_unescapes_backslash_sequences_in_quoted_strings()
+    {
+        string content = """
+        (kicad_pcb (version 20221018)
+          (net 1 "Net \"quoted\" name")
+          (segment (start 0 0) (end 1 0) (width 0.25) (layer "F.Cu") (net 1))
+        )
+        """;
+
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb(content));
+
+        Assert.Equal("Net \"quoted\" name", root!.Pcb[0].Nets.List.Single(n => n.Id == "1").Name);
+    }
+
+    [Fact]
+    public async Task Numbers_are_parsed_with_an_invariant_decimal_point()
+    {
+        // Guards against a Danish/German locale reading 0.25 as 25.
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        Assert.Equal(0.25, root!.Pcb[0].Routing.Segments[0].Width);
+    }
+
+    [Fact]
+    public async Task Negative_coordinates_are_parsed()
+    {
+        string content = """
+        (kicad_pcb (version 20221018)
+          (net 1 "GND")
+          (segment (start -10.5 -20.25) (end 0 0) (width 0.25) (layer "F.Cu") (net 1))
+        )
+        """;
+
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb(content));
+
+        KiCadPoint2D start = root!.Pcb[0].Routing.Segments[0].Start!;
+
+        Assert.Equal(-10.5, start.X);
+        Assert.Equal(-20.25, start.Y);
+    }
+
+    [Fact]
+    public async Task A_file_that_is_not_a_kicad_pcb_root_yields_no_pcb()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb("(something_else (version 1))"));
+        Assert.Null(root);
+    }
+
+    [Fact]
+    public async Task An_empty_file_yields_no_project()
+    {
+        Assert.Null(await this.LoadAsync(this.WritePcb("")));
+    }
+
+    // ------------------------------------------------------------------ schematics
+
+    [Fact]
+    public async Task A_schematic_file_is_loaded_and_reports_its_filename()
+    {
+        string sch = this.thisWorkspace.WriteFile("board.kicad_sch", KiCadFixtures.Schematic);
+
+        KiCadProjectRoot? root = await this.LoadAsync(sch);
+
+        Assert.NotNull(root);
+        KiCadSchematic schematic = Assert.Single(root!.Schematics);
+        Assert.Equal("board.kicad_sch", schematic.Filename);
+    }
+
+    [Fact]
+    public async Task Schematic_wires_are_parsed()
+    {
+        string sch = this.thisWorkspace.WriteFile("board.kicad_sch", KiCadFixtures.Schematic);
+
+        KiCadProjectRoot? root = await this.LoadAsync(sch);
+
+        Assert.Equal(2, root!.Schematics[0].Wires.Count);
+    }
+
+    [Fact]
+    public async Task Schematic_labels_are_split_by_scope()
+    {
+        string sch = this.thisWorkspace.WriteFile("board.kicad_sch", KiCadFixtures.Schematic);
+
+        KiCadProjectRoot? root = await this.LoadAsync(sch);
+        KiCadSchematicLabels labels = root!.Schematics[0].Labels;
+
+        Assert.Contains(labels.Local, l => l.Text == "CLK");
+        Assert.Contains(labels.Global, l => l.Text == "GND");
+    }
+
+    [Fact]
+    public async Task Schematic_symbols_expose_their_reference()
+    {
+        string sch = this.thisWorkspace.WriteFile("board.kicad_sch", KiCadFixtures.Schematic);
+
+        KiCadProjectRoot? root = await this.LoadAsync(sch);
+
+        Assert.Contains(root!.Schematics[0].Symbols, s => s.Reference == "R1");
+    }
+
+    // ----------------------------------------------------------------------- views
+
+    [Fact]
+    public async Task A_view_is_built_for_each_source_file()
+    {
+        this.thisWorkspace.WriteFile("board.kicad_sch", KiCadFixtures.Schematic);
+        string pcb = this.WritePcb();
+        string sch = Path.Combine(this.thisWorkspace.Root, "board.kicad_sch");
+
+        KiCadProjectRoot? root = await this.LoadAsync(pcb, sch);
+
+        Assert.NotEmpty(root!.Project.Views);
+        Assert.Contains(root.Project.Views, v => v.SourceKind.Equals("pcb", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(root.Project.Views, v => v.SourceKind.Equals("schematic", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Pcb_views_point_back_at_their_pcb_by_index()
+    {
+        KiCadProjectRoot? root = await this.LoadAsync(this.WritePcb());
+
+        foreach (KiCadProjectView view in root!.Project.Views
+                     .Where(v => v.SourceKind.Equals("pcb", StringComparison.OrdinalIgnoreCase)))
+        {
+            Assert.InRange(view.SourceIndex, 0, root.Pcb.Count - 1);
+        }
+    }
+}

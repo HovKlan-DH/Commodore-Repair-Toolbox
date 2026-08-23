@@ -119,7 +119,7 @@ namespace CRT
             return rows
                 .Where(row =>
                 {
-                    string displayString = this.BuildOverviewDisplayString(row);
+                    string displayString = OverviewHtmlBuilder.BuildOverviewDisplayString(row);
                     if (string.IsNullOrWhiteSpace(displayString))
                         return false;
 
@@ -135,23 +135,6 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Builds the overview display string used by search and component popup text.
-        // ###########################################################################################
-        private string BuildOverviewDisplayString(OverviewRow row)
-        {
-            var parts = new List<string>(3);
-
-            if (!string.IsNullOrWhiteSpace(row.Component))
-                parts.Add(row.Component.Trim());
-            if (!string.IsNullOrWhiteSpace(row.FriendlyName))
-                parts.Add(row.FriendlyName.Trim());
-            if (!string.IsNullOrWhiteSpace(row.TechnicalName))
-                parts.Add(row.TechnicalName.Trim());
-
-            return string.Join(" | ", parts);
-        }
-
-        // ###########################################################################################
         // Returns the currently visible component board labels from the main component list.
         // ###########################################################################################
         private HashSet<string> GetVisibleOverviewBoardLabels()
@@ -163,7 +146,7 @@ namespace CRT
 
             return new HashSet<string>(
                 this._mainWindow.ComponentFilterListBox.ItemsSource?
-                    .Cast<Main.ComponentListItem>()
+                    .Cast<ComponentListItem>()
                     .Where(item => !string.IsNullOrWhiteSpace(item.BoardLabel))
                     .Select(item => item.BoardLabel.Trim())
                 ?? Enumerable.Empty<string>(),
@@ -182,7 +165,7 @@ namespace CRT
 
             return new HashSet<string>(
                 this._mainWindow.ComponentFilterListBox.SelectedItems?
-                    .Cast<Main.ComponentListItem>()
+                    .Cast<ComponentListItem>()
                     .Where(item => !string.IsNullOrWhiteSpace(item.BoardLabel))
                     .Select(item => item.BoardLabel.Trim())
                 ?? Enumerable.Empty<string>(),
@@ -220,64 +203,6 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Builds a temporary printable HTML document containing the current component table.
-        // ###########################################################################################
-        private string BuildPrintableHtml(IEnumerable<OverviewRow> rows)
-        {
-            static string Encode(string? text) => WebUtility.HtmlEncode(text ?? string.Empty);
-
-            var sb = new StringBuilder();
-
-            sb.AppendLine("<!DOCTYPE html>");
-            sb.AppendLine("<html>");
-            sb.AppendLine("<head>");
-            sb.AppendLine("<meta charset=\"utf-8\" />");
-            sb.AppendLine("<title>Component List</title>");
-            sb.AppendLine("<style>");
-            sb.AppendLine("@page { size: A4 portrait; margin: 12mm; }");
-            sb.AppendLine("html, body { margin: 0; padding: 0; }");
-            sb.AppendLine("body { font-family: Segoe UI, Arial, sans-serif; font-size: 12px; color: #000; box-sizing: border-box; padding: 5px; }");
-            sb.AppendLine("table { width: calc(100% - 1px); max-width: calc(100% - 4px); margin-right: 4px; border-collapse: collapse; table-layout: fixed; box-sizing: border-box; }");
-            sb.AppendLine("th, td { border: 1px solid #666; padding: 6px 8px; text-align: left; vertical-align: top; word-wrap: break-word; box-sizing: border-box; }");
-            sb.AppendLine("th { background: #eaeaea; font-weight: 700; }");
-            sb.AppendLine("</style>");
-            sb.AppendLine("<script>");
-            sb.AppendLine("window.addEventListener('load', function () { window.print(); });");
-            sb.AppendLine("</script>");
-            sb.AppendLine("</head>");
-            sb.AppendLine("<body>");
-            sb.AppendLine("<table>");
-            sb.AppendLine("<thead>");
-            sb.AppendLine("<tr>");
-            sb.AppendLine("<th>Component</th>");
-            sb.AppendLine("<th>Technical name</th>");
-            sb.AppendLine("<th>Friendly name</th>");
-            //            sb.AppendLine("<th>Part-number</th>");
-            sb.AppendLine("<th colspan='2'>&nbsp;</th>");
-            sb.AppendLine("</tr>");
-            sb.AppendLine("</thead>");
-            sb.AppendLine("<tbody>");
-
-            foreach (var row in rows)
-            {
-                sb.AppendLine("<tr>");
-                sb.AppendLine($"<td>{Encode(row.Component)}</td>");
-                sb.AppendLine($"<td>{Encode(row.TechnicalName)}</td>");
-                sb.AppendLine($"<td>{Encode(row.FriendlyName)}</td>");
-                //                sb.AppendLine($"<td>{Encode(row.PartNumber)}</td>");
-                sb.AppendLine("<td colspan='2'>&nbsp;</td>");
-                sb.AppendLine("</tr>");
-            }
-
-            sb.AppendLine("</tbody>");
-            sb.AppendLine("</table>");
-            sb.AppendLine("</body>");
-            sb.AppendLine("</html>");
-
-            return sb.ToString();
-        }
-
-        // ###########################################################################################
         // Opens a printable HTML document for the currently visible overview rows.
         // ###########################################################################################
         private void OnPrintComponentListClick(object? sender, RoutedEventArgs e)
@@ -295,7 +220,7 @@ namespace CRT
                     Path.GetTempPath(),
                     $"crt-overview-print-{Guid.NewGuid():N}.html");
 
-                File.WriteAllText(tempFilePath, this.BuildPrintableHtml(printableRows), Encoding.UTF8);
+                File.WriteAllText(tempFilePath, OverviewHtmlBuilder.BuildPrintableHtml(printableRows), Encoding.UTF8);
 
                 Process.Start(new ProcessStartInfo(tempFilePath)
                 {
@@ -306,91 +231,6 @@ namespace CRT
             {
                 Logger.Warning($"Failed to print overview component list - [{ex.Message}]");
             }
-        }
-
-        // ###########################################################################################
-        // Groups printable rows by category/technical name/friendly name for a bill-of-materials view.
-        // ###########################################################################################
-        private List<OverviewQuantityGroup> BuildQuantityGroups(IEnumerable<OverviewRow> rows)
-        {
-            return rows
-                .GroupBy(row => new
-                {
-                    Category = row.Category ?? string.Empty,
-                    TechnicalName = row.TechnicalName ?? string.Empty,
-                    FriendlyName = row.FriendlyName ?? string.Empty
-                })
-                .Select(g => new OverviewQuantityGroup
-                {
-                    Type = g.Key.Category,
-                    Components = string.Join(", ", g.Select(row => row.Component)),
-                    TechnicalName = g.Key.TechnicalName,
-                    FriendlyName = g.Key.FriendlyName,
-                    Quantity = g.Count()
-                })
-                .OrderBy(g => g.Type, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(g => g.TechnicalName, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-
-        // ###########################################################################################
-        // Builds a temporary printable HTML document containing the bill of materials table.
-        // ###########################################################################################
-        private string BuildPrintableQuantitiesHtml(IEnumerable<OverviewQuantityGroup> groups)
-        {
-            static string Encode(string? text) => WebUtility.HtmlEncode(text ?? string.Empty);
-
-            var sb = new StringBuilder();
-
-            sb.AppendLine("<!DOCTYPE html>");
-            sb.AppendLine("<html>");
-            sb.AppendLine("<head>");
-            sb.AppendLine("<meta charset=\"utf-8\" />");
-            sb.AppendLine("<title>Bill of Materials (BOM)</title>");
-            sb.AppendLine("<style>");
-            sb.AppendLine("@page { size: A4 portrait; margin: 12mm; }");
-            sb.AppendLine("html, body { margin: 0; padding: 0; }");
-            sb.AppendLine("body { font-family: Segoe UI, Arial, sans-serif; font-size: 12px; color: #000; box-sizing: border-box; padding: 5px; }");
-            sb.AppendLine("table { width: calc(100% - 1px); max-width: calc(100% - 4px); margin-right: 4px; border-collapse: collapse; table-layout: fixed; box-sizing: border-box; }");
-            sb.AppendLine("th, td { border: 1px solid #666; padding: 6px 8px; text-align: left; vertical-align: top; word-wrap: break-word; box-sizing: border-box; }");
-            sb.AppendLine("th { background: #eaeaea; font-weight: 700; }");
-            sb.AppendLine("</style>");
-            sb.AppendLine("<script>");
-            sb.AppendLine("window.addEventListener('load', function () { window.print(); });");
-            sb.AppendLine("</script>");
-            sb.AppendLine("</head>");
-            sb.AppendLine("<body>");
-            sb.AppendLine("<table>");
-            sb.AppendLine("<thead>");
-            sb.AppendLine("<tr>");
-            sb.AppendLine("<th>Type</th>");
-            sb.AppendLine("<th>Components</th>");
-            sb.AppendLine("<th>Technical name</th>");
-            sb.AppendLine("<th>Friendly name</th>");
-            sb.AppendLine("<th>Quantity</th>");
-            sb.AppendLine("<th>&nbsp;</th>");
-            sb.AppendLine("</tr>");
-            sb.AppendLine("</thead>");
-            sb.AppendLine("<tbody>");
-
-            foreach (var group in groups)
-            {
-                sb.AppendLine("<tr>");
-                sb.AppendLine($"<td>{Encode(group.Type)}</td>");
-                sb.AppendLine($"<td>{Encode(group.Components)}</td>");
-                sb.AppendLine($"<td>{Encode(group.TechnicalName)}</td>");
-                sb.AppendLine($"<td>{Encode(group.FriendlyName)}</td>");
-                sb.AppendLine($"<td>{group.Quantity}</td>");
-                sb.AppendLine("<td>&nbsp;</td>");
-                sb.AppendLine("</tr>");
-            }
-
-            sb.AppendLine("</tbody>");
-            sb.AppendLine("</table>");
-            sb.AppendLine("</body>");
-            sb.AppendLine("</html>");
-
-            return sb.ToString();
         }
 
         // ###########################################################################################
@@ -405,7 +245,7 @@ namespace CRT
                 return;
             }
 
-            var groups = this.BuildQuantityGroups(printableRows);
+            var groups = OverviewHtmlBuilder.BuildQuantityGroups(printableRows);
 
             try
             {
@@ -413,7 +253,7 @@ namespace CRT
                     Path.GetTempPath(),
                     $"crt-overview-print-bom-{Guid.NewGuid():N}.html");
 
-                File.WriteAllText(tempFilePath, this.BuildPrintableQuantitiesHtml(groups), Encoding.UTF8);
+                File.WriteAllText(tempFilePath, OverviewHtmlBuilder.BuildPrintableQuantitiesHtml(groups), Encoding.UTF8);
 
                 Process.Start(new ProcessStartInfo(tempFilePath)
                 {
@@ -464,7 +304,7 @@ namespace CRT
         {
             if (sender is Button button && button.DataContext is OverviewRow row && this._mainWindow != null)
             {
-                string displayText = this.BuildOverviewDisplayString(row);
+                string displayText = OverviewHtmlBuilder.BuildOverviewDisplayString(row);
                 this._mainWindow.OpenComponentInfoPopup(row.Component, displayText);
             }
         }
@@ -500,67 +340,6 @@ namespace CRT
                     }
                 }
             }
-        }
-    }
-
-    public class OverviewRow : INotifyPropertyChanged
-    {
-        private bool _isSelectedForPrint = true;
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        public bool IsSelectedForPrint
-        {
-            get => this._isSelectedForPrint;
-            set
-            {
-                if (this._isSelectedForPrint == value)
-                    return;
-
-                this._isSelectedForPrint = value;
-                this.PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(this.IsSelectedForPrint)));
-            }
-        }
-
-        public string Component { get; init; } = string.Empty;
-        public string Category { get; init; } = string.Empty;
-        public string TechnicalName { get; init; } = string.Empty;
-        public string FriendlyName { get; init; } = string.Empty;
-        public string PartNumber { get; init; } = string.Empty;
-        public string ShortDescription { get; init; } = string.Empty;
-        public string Notes { get; init; } = string.Empty;
-        public List<OverviewLink> Links { get; init; } = new();
-    }
-
-    public class OverviewQuantityGroup
-    {
-        public string Type { get; init; } = string.Empty;
-        public string Components { get; init; } = string.Empty;
-        public string TechnicalName { get; init; } = string.Empty;
-        public string FriendlyName { get; init; } = string.Empty;
-        public int Quantity { get; init; }
-    }
-
-    public enum OverviewLinkType
-    {
-        LocalFile,
-        WebLink
-    }
-
-    public class OverviewLink
-    {
-        public string Name { get; }
-        public string Target { get; }
-        public OverviewLinkType Type { get; }
-
-        public bool IsLocalFile => this.Type == OverviewLinkType.LocalFile;
-        public bool IsWebLink => this.Type == OverviewLinkType.WebLink;
-
-        public OverviewLink(string name, string target, OverviewLinkType type)
-        {
-            this.Name = name;
-            this.Target = target;
-            this.Type = type;
         }
     }
 

@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using System;
 using System.Collections.Generic;
+using Handlers.Geometry;
 
 namespace Tabs.TabSchematics
 {
@@ -158,7 +159,7 @@ namespace Tabs.TabSchematics
                 return;
             }
 
-            var contentRect = GetImageContentRect(this.Bounds.Size, this.thisBitmapPixelSize);
+            var contentRect = RectGeometry.GetImageContentRect(this.Bounds.Size, this.thisBitmapPixelSize);
             if (contentRect.Width <= 0 || contentRect.Height <= 0)
             {
                 return;
@@ -203,8 +204,8 @@ namespace Tabs.TabSchematics
             for (int i = 0; i < this.thisRectangles.Count; i++)
             {
                 var pixelRect = this.thisRectangles[i];
-                var localRect = PixelToLocalRect(pixelRect, contentRect, this.thisBitmapPixelSize);
-                var borderRect = InsetRectForStroke(localRect, borderThickness);
+                var localRect = RectGeometry.PixelToLocalRect(pixelRect, contentRect, this.thisBitmapPixelSize);
+                var borderRect = RectGeometry.InsetRectForStroke(localRect, borderThickness);
 
                 bool isSelected = selectedIndices.Contains(i);
                 bool showMarkers = isSelected && i == this.thisHoveredIndex;
@@ -220,8 +221,8 @@ namespace Tabs.TabSchematics
 
             foreach (var guide in this.thisSnapGuides)
             {
-                var start = PixelToLocalPoint(guide.Start, contentRect, this.thisBitmapPixelSize);
-                var end = PixelToLocalPoint(guide.End, contentRect, this.thisBitmapPixelSize);
+                var start = RectGeometry.PixelToLocalPoint(guide.Start, contentRect, this.thisBitmapPixelSize);
+                var end = RectGeometry.PixelToLocalPoint(guide.End, contentRect, this.thisBitmapPixelSize);
 
                 if (Math.Abs(start.X - end.X) > 0.01 || Math.Abs(start.Y - end.Y) > 0.01)
                 {
@@ -231,25 +232,12 @@ namespace Tabs.TabSchematics
 
             if (this.thisDraftRectangle.HasValue)
             {
-                var localDraftRect = PixelToLocalRect(this.thisDraftRectangle.Value, contentRect, this.thisBitmapPixelSize);
-                var draftBorderRect = InsetRectForStroke(localDraftRect, borderThickness);
+                var localDraftRect = RectGeometry.PixelToLocalRect(this.thisDraftRectangle.Value, contentRect, this.thisBitmapPixelSize);
+                var draftBorderRect = RectGeometry.InsetRectForStroke(localDraftRect, borderThickness);
 
                 context.DrawRectangle(draftFillBrush, null, localDraftRect);
                 context.DrawRectangle(null, draftPen, draftBorderRect);
             }
-        }
-
-        // ###########################################################################################
-        // Insets a rectangle by half the stroke thickness so the drawn border remains visually
-        // inside the original bounds instead of growing outward.
-        // ###########################################################################################
-        private static Rect InsetRectForStroke(Rect rect, double strokeThickness)
-        {
-            double inset = strokeThickness / 2.0;
-            double width = Math.Max(0.0, rect.Width - strokeThickness);
-            double height = Math.Max(0.0, rect.Height - strokeThickness);
-
-            return new Rect(rect.X + inset, rect.Y + inset, width, height);
         }
 
         // ###########################################################################################
@@ -320,60 +308,6 @@ namespace Tabs.TabSchematics
                 context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, centerY - verticalSideHalf, markerThickness, verticalSideLength));
                 context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, centerY - verticalSideHalf, markerThickness, verticalSideLength));
             }
-        }
-
-        // ###########################################################################################
-        // Computes the image content rect in the overlay's local coordinate space.
-        // Must match the normal schematic highlight overlay exactly, where the image content starts
-        // at top-left with no centering offset applied.
-        // ###########################################################################################
-        private static Rect GetImageContentRect(Size controlSize, PixelSize bitmapPixelSize)
-        {
-            if (controlSize.Width <= 0 || controlSize.Height <= 0)
-            {
-                return new Rect(controlSize);
-            }
-
-            double containerAspect = controlSize.Width / controlSize.Height;
-            double bitmapAspect = (double)bitmapPixelSize.Width / bitmapPixelSize.Height;
-
-            if (bitmapAspect > containerAspect)
-            {
-                return new Rect(0, 0, controlSize.Width, controlSize.Width / bitmapAspect);
-            }
-            else
-            {
-                return new Rect(0, 0, controlSize.Height * bitmapAspect, controlSize.Height);
-            }
-        }
-
-        // ###########################################################################################
-        // Converts a pixel-space rectangle into the overlay's local coordinate system.
-        // ###########################################################################################
-        private static Rect PixelToLocalRect(Rect pixelRect, Rect contentRect, PixelSize pixelSize)
-        {
-            double sx = contentRect.Width / pixelSize.Width;
-            double sy = contentRect.Height / pixelSize.Height;
-
-            double x = contentRect.X + (pixelRect.X * sx);
-            double y = contentRect.Y + (pixelRect.Y * sy);
-            double w = pixelRect.Width * sx;
-            double h = pixelRect.Height * sy;
-
-            return new Rect(x, y, w, h);
-        }
-
-        // ###########################################################################################
-        // Converts a pixel-space point into the overlay's local coordinate system.
-        // ###########################################################################################
-        private static Point PixelToLocalPoint(Point pixelPoint, Rect contentRect, PixelSize pixelSize)
-        {
-            double sx = contentRect.Width / pixelSize.Width;
-            double sy = contentRect.Height / pixelSize.Height;
-
-            return new Point(
-                contentRect.X + (pixelPoint.X * sx),
-                contentRect.Y + (pixelPoint.Y * sy));
         }
 
         // ###########################################################################################

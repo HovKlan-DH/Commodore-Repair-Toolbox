@@ -1,0 +1,707 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
+using Avalonia.Input;
+using Avalonia.Input.GestureRecognizers;
+using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
+using Handlers.DataHandling;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Globalization;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Tabs.TabSchematics;
+using Handlers.Geometry;
+
+namespace CRT;
+
+// ###########################################################################################
+// Raw pointer, wheel, gesture and keyboard event handlers for the schematics surface.
+// These only dispatch - the actual behaviour lives in the Viewport, LabelEditor,
+// KiCad and Highlights parts.
+//
+// Part of the TabSchematics partial class - see TabSchematics.axaml.cs for the tab overview.
+// ###########################################################################################
+public partial class TabSchematics
+{
+    // ###########################################################################################
+    // Handles mouse wheel zoom on the Schematics image, centered on the cursor position.
+    // Wheel input over interactive overlay panels is consumed there and must not zoom the
+    // schematic viewer underneath, even when a nested scroll viewer reaches its top or bottom.
+    // ###########################################################################################
+    private void OnSchematicsZoom(object? sender, PointerWheelEventArgs e)
+    {
+        var zoomCenterInContainer = e.GetPosition(this.SchematicsContainer);
+
+        if (this.IsPointerInsideInteractiveOverlayPanel(zoomCenterInContainer))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        double zoomFactor = ViewportMath.ComputeWheelZoomFactor(e.Delta.Y, AppConfig.SchematicsZoomFactor);
+
+        this.ApplySchematicsZoom(zoomFactor, zoomCenterInContainer);
+
+        e.Handled = true;
+    }
+
+    // ###########################################################################################
+    // Handles trackpad pinch zoom. macOS trackpad pinch does not reliably come through as a mouse
+    // wheel event, so this explicit gesture path is needed.
+    // ###########################################################################################
+    private void OnSchematicsPinch(object? sender, PinchEventArgs e)
+    {
+        if (this.currentFullResBitmap == null)
+        {
+            return;
+        }
+
+        Point zoomCenterInContainer = new(
+            this.SchematicsContainer.Bounds.Width / 2.0,
+            this.SchematicsContainer.Bounds.Height / 2.0);
+
+        this.ApplySchematicsZoom(e.Scale, zoomCenterInContainer);
+
+        e.Handled = true;
+    }
+
+    // ###########################################################################################
+    // Handles two-finger trackpad pan gestures independently of right-mouse panning.
+    // Uses strict edge clamping so manual pan cannot drag the image below or beyond the viewport.
+    // If the direction feels reversed on a specific platform, flip the signs below.
+    // ###########################################################################################
+    private void OnSchematicsScrollGesture(object? sender, ScrollGestureEventArgs e)
+    {
+        if (this.currentFullResBitmap == null)
+        {
+            return;
+        }
+
+        if (this.isPanning)
+        {
+            return;
+        }
+
+        Vector delta = e.Delta;
+
+        if (Math.Abs(delta.X) < 0.001 && Math.Abs(delta.Y) < 0.001)
+        {
+            return;
+        }
+
+        this.schematicsMatrix = this.schematicsMatrix * Matrix.CreateTranslation(delta.X, delta.Y);
+//hest        this.schematicsMatrix = this.schematicsMatrix * Matrix.CreateTranslation(-delta.X, -delta.Y); // replace above line if two-finger pan feels inverted on macOS
+        this.ClampSchematicsMatrix(useStrictEdgeClamp: true);
+
+        e.Handled = true;
+    }
+
+    // ###########################################################################################
+    // Handles right-click for panning on the schematic view and selection toggling on release.
+    // Left-click selects hovered component, single-click opens component info popup, and while the
+    // new KiCad trace calibration mode is active the same pointer pipeline is reused for moving and
+    // resizing the temporary calibration box.
+    // ###########################################################################################
+    private void OnSchematicsPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        var point = e.GetPosition(this.SchematicsContainer);
+        var pointer = e.GetCurrentPoint(this.SchematicsContainer);
+
+        this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
+
+        if (this.IsPointerInsideKiCadNetConnectionsPanel(point))
+        {
+            this.ClearTransientHoverForKiCadNetConnectionsPanel();
+            return;
+        }
+
+        if (this.IsPointerInsideLabelEditorMenu(point) || this.IsPointerInsideNewLabelPrompt(point))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (this.thisIsLabelEditorMode && this.SchematicsNewLabelPromptBorder.IsVisible)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (pointer.Properties.IsLeftButtonPressed && this.thisIsShowingLabelEditorMenu)
+        {
+            this.HideLabelEditorMenu();
+        }
+
+        if (this.thisIsKiCadTraceCalibrationMode)
+        {
+            if (pointer.Properties.IsRightButtonPressed)
+            {
+                this.isPanning = true;
+                this.panStartPoint = point;
+                this.panStartMatrix = this.schematicsMatrix;
+
+                this.HideSchematicsHoverUi();
+                this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.SizeAll);
+
+                e.Pointer.Capture(this.SchematicsContainer);
+                e.Handled = true;
+                return;
+            }
+
+            if (pointer.Properties.IsLeftButtonPressed)
+            {
+                if (!this.TryGetSchematicsImagePixelPoint(point, out var pixelPoint))
+                {
+                    e.Handled = true;
+                    return;
+                }
+
+                if (this.TryGetKiCadTraceCalibrationHandleAtContainerPoint(point, out var resizeMode))
+                {
+                    this.StartKiCadTraceCalibrationDrag(pixelPoint, resizeMode);
+                    this.UpdateKiCadTraceCalibrationCursor(point);
+                    e.Handled = true;
+                    return;
+                }
+
+                if (this.IsPointerInsideCurrentKiCadCalibrationBounds(point))
+                {
+                    this.StartKiCadTraceCalibrationDrag(pixelPoint, LabelEditorDragMode.Move);
+                    this.UpdateKiCadTraceCalibrationCursor(point);
+                    e.Handled = true;
+                    return;
+                }
+
+                e.Handled = true;
+                return;
+            }
+        }
+
+        if (this.thisIsLabelEditorMode)
+        {
+            if (pointer.Properties.IsRightButtonPressed)
+            {
+                this.isPanning = true;
+                this.panStartPoint = point;
+                this.panStartMatrix = this.schematicsMatrix;
+
+                this.HideSchematicsHoverUi();
+                this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.SizeAll);
+
+                e.Pointer.Capture(this.SchematicsContainer);
+                e.Handled = true;
+                return;
+            }
+
+            if (pointer.Properties.IsLeftButtonPressed)
+            {
+                bool isCtrlDown = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+
+                if (!this.TryGetLabelEditorPixelPoint(point, out var pixelPoint))
+                {
+                    if (!isCtrlDown)
+                    {
+                        this.ClearSelectedLabelEditorHighlight();
+                    }
+
+                    e.Handled = true;
+                    return;
+                }
+
+                if (isCtrlDown)
+                {
+                    if (this.TryGetLabelEditorHighlightAtContainerPoint(point, out var toggleIndex))
+                    {
+                        this.ToggleSelectedLabelEditorHighlight(this.thisLabelEditorWorkingHighlights[toggleIndex]);
+                    }
+
+                    e.Handled = true;
+                    return;
+                }
+
+                if (this.TryGetSelectedLabelEditorHandleAtContainerPoint(point, out var handleIndex, out var resizeMode))
+                {
+                    this.StartLabelEditorDrag(handleIndex, pixelPoint, resizeMode);
+                    e.Handled = true;
+                    return;
+                }
+
+                if (this.TryGetSelectedLabelEditorHighlightAtContainerPoint(point, out var selectedWorkingIndex))
+                {
+                    this.StartLabelEditorDrag(selectedWorkingIndex, pixelPoint, LabelEditorDragMode.Move);
+                    e.Handled = true;
+                    return;
+                }
+
+                if (this.TryGetLabelEditorHighlightAtContainerPoint(point, out var workingIndex))
+                {
+                    this.SetSingleSelectedLabelEditorHighlight(this.thisLabelEditorWorkingHighlights[workingIndex], refresh: false);
+                    this.StartLabelEditorDrag(workingIndex, pixelPoint, LabelEditorDragMode.Move);
+                    e.Handled = true;
+                    return;
+                }
+
+                this.ClearSelectedLabelEditorHighlights(refresh: false);
+                this.StartDrawingLabelEditorRectangle(pixelPoint);
+
+                e.Handled = true;
+                return;
+            }
+        }
+
+        bool hoveringComponent = this.TryGetHoveredBoardLabel(point, out var boardLabel, out var displayText);
+        string? activeHoveredKiCadNetName = this.GetActiveHoveredKiCadNetName();
+        bool hoveringKiCadNet = !string.IsNullOrWhiteSpace(activeHoveredKiCadNetName);
+
+        if (RectGeometry.TryInvert(this.schematicsMatrix, out var inv) && !hoveringKiCadNet)
+        {
+            var localPoint = new Point(
+                (point.X * inv.M11) + (point.Y * inv.M21) + inv.M31,
+                (point.X * inv.M12) + (point.Y * inv.M22) + inv.M32);
+
+            if (this.polylineManager != null && this.polylineManager.OnPointerPressed(point, localPoint, pointer, hoveringComponent))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
+        if (pointer.Properties.IsRightButtonPressed)
+        {
+            this.isPanning = true;
+            this.panStartPoint = point;
+            this.panStartMatrix = this.schematicsMatrix;
+
+            this.HideSchematicsHoverUi();
+            this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.SizeAll);
+
+            e.Pointer.Capture(this.SchematicsContainer);
+            e.Handled = true;
+            return;
+        }
+
+        if (pointer.Properties.IsLeftButtonPressed && !this.thisIsLabelEditorMode)
+        {
+            bool lockedChanged = false;
+
+            if (hoveringKiCadNet)
+            {
+                if (this.thisLockedKiCadNetNames.Contains(activeHoveredKiCadNetName!))
+                {
+                    this.thisLockedKiCadNetNames.Remove(activeHoveredKiCadNetName!);
+                    this.thisHoveredKiCadNetName = null;
+                }
+                else
+                {
+                    this.thisLockedKiCadNetNames.Add(activeHoveredKiCadNetName!);
+                }
+
+                lockedChanged = true;
+                this.RefreshKiCadOverlay();
+                this.RefreshBlinkStateFromCurrentSelection();
+            }
+
+            if (lockedChanged)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (hoveringComponent)
+            {
+                this.SelectComponentByBoardLabel(boardLabel);
+
+                if (e.ClickCount == 1 && this.MainWindow != null)
+                {
+                    this.MainWindow.OpenComponentInfoPopup(boardLabel, displayText);
+                }
+
+                e.Handled = true;
+                return;
+            }
+        }
+    }
+
+    // ###########################################################################################
+    // Translates the schematics image while the right mouse button is held down.
+    // Routes movement and shift key state to Polyline Manager, label editor, and the new KiCad
+    // trace calibration box interaction mode.
+    // ###########################################################################################
+    private void OnSchematicsPointerMoved(object? sender, PointerEventArgs e)
+    {
+        var point = e.GetPosition(this.SchematicsContainer);
+        bool isShiftDown = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
+
+        if (!this.isPanning && this.IsPointerInsideKiCadNetConnectionsPanel(point))
+        {
+            this.ClearTransientHoverForKiCadNetConnectionsPanel();
+            return;
+        }
+
+        if (this.thisIsKiCadTraceCalibrationMode && this.thisKiCadTraceCalibrationDragMode != LabelEditorDragMode.None)
+        {
+            if (this.TryGetSchematicsImagePixelPoint(point, out var pixelPoint))
+            {
+                this.UpdateKiCadTraceCalibrationDrag(pixelPoint);
+            }
+
+            this.UpdateKiCadTraceCalibrationCursor(point);
+            e.Handled = true;
+            return;
+        }
+
+        if (this.thisIsLabelEditorMode && this.thisLabelEditorDragMode != LabelEditorDragMode.None)
+        {
+            if (this.SchematicsLabelEditorOverlay.HoveredIndex != -1)
+            {
+                this.SetLabelEditorOverlayTransientState(hoveredIndex: -1);
+            }
+
+            this.UpdateLabelEditorCursor(point);
+
+            if (this.TryGetLabelEditorPixelPoint(point, out var pixelPoint))
+            {
+                this.UpdateLabelEditorDrag(pixelPoint, e.KeyModifiers);
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        if (this.thisIsLabelEditorMode && this.thisIsDrawingLabelEditorRectangle)
+        {
+            if (this.SchematicsLabelEditorOverlay.HoveredIndex != -1)
+            {
+                this.SetLabelEditorOverlayTransientState(hoveredIndex: -1);
+            }
+
+            this.UpdateLabelEditorCursor(point);
+
+            if (this.TryGetLabelEditorPixelPoint(point, out var pixelPoint))
+            {
+                this.UpdateDrawingLabelEditorRectangle(pixelPoint, e.KeyModifiers);
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        if (!this.thisIsLabelEditorMode && !this.thisIsKiCadTraceCalibrationMode && RectGeometry.TryInvert(this.schematicsMatrix, out var inv))
+        {
+            var localPoint = new Point(
+                (point.X * inv.M11) + (point.Y * inv.M21) + inv.M31,
+                (point.X * inv.M12) + (point.Y * inv.M22) + inv.M32);
+
+            if (this.polylineManager != null && this.polylineManager.OnPointerMoved(localPoint, isShiftDown))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
+        if (this.isPanning)
+        {
+            var delta = point - this.panStartPoint;
+            this.schematicsMatrix = this.panStartMatrix * Matrix.CreateTranslation(delta.X, delta.Y);
+            this.ClampSchematicsMatrix();
+            e.Handled = true;
+            return;
+        }
+
+        if (this.thisIsKiCadTraceCalibrationMode)
+        {
+            this.UpdateKiCadTraceCalibrationCursor(point);
+            this.SchematicsHoverLabelBorder.IsVisible = false;
+            this.SchematicsHoverLabelText.Text = string.Empty;
+            this.SchematicsHoverPadBorder.IsVisible = false;
+            this.SchematicsHoverPadText.Text = string.Empty;
+
+            if (this.MainWindow != null)
+            {
+                this.MainWindow.isHoveringComponent = false;
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        if (!this.thisIsLabelEditorMode)
+        {
+            if (this.ShouldProcessKiCadHoverHitTest(point))
+            {
+                this.HitTestKiCadOverlayForHover(point);
+            }
+        }
+
+        if (this.thisIsLabelEditorMode)
+        {
+            int hoveredIndex = -1;
+
+            if (this.TryGetSelectedLabelEditorHighlightAtContainerPoint(point, out var hoveredSelectedIndex))
+            {
+                hoveredIndex = hoveredSelectedIndex;
+            }
+
+            if (this.SchematicsLabelEditorOverlay.HoveredIndex != hoveredIndex)
+            {
+                this.SetLabelEditorOverlayTransientState(hoveredIndex: hoveredIndex);
+            }
+        }
+
+        this.UpdateSchematicsHoverUi(point);
+    }
+
+    // ###########################################################################################
+    // Exits pan mode when the right mouse button is released, finalizes label-editor operations,
+    // and handles the new KiCad trace calibration move/resize workflow including empty-space
+    // right-click access to Apply or Discard actions.
+    // Keeps keyboard focus on the schematics control while KiCad trace calibration mode is active.
+    // ###########################################################################################
+    private void OnSchematicsPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        var point = e.GetPosition(this.SchematicsContainer);
+
+        this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
+
+        if (!this.isPanning && this.IsPointerInsideKiCadNetConnectionsPanel(point))
+        {
+            this.ClearTransientHoverForKiCadNetConnectionsPanel();
+            return;
+        }
+
+        if (this.thisIsKiCadTraceCalibrationMode && this.thisKiCadTraceCalibrationDragMode != LabelEditorDragMode.None)
+        {
+            this.CompleteKiCadTraceCalibrationDrag();
+            this.UpdateKiCadTraceCalibrationCursor(point);
+            this.SchematicsContainer.Focus();
+            this.Focus();
+            e.Handled = true;
+            return;
+        }
+
+        if (this.thisIsLabelEditorMode && this.thisLabelEditorDragMode != LabelEditorDragMode.None)
+        {
+            this.CompleteLabelEditorDrag();
+            this.UpdateLabelEditorCursor(point);
+            e.Handled = true;
+            return;
+        }
+
+        if (this.thisIsLabelEditorMode && this.thisIsDrawingLabelEditorRectangle)
+        {
+            if (this.TryGetLabelEditorPixelPoint(point, out var pixelPoint))
+            {
+                this.CompleteDrawingLabelEditorRectangle(point, pixelPoint, e.KeyModifiers);
+            }
+            else
+            {
+                this.thisIsDrawingLabelEditorRectangle = false;
+                this.thisLabelEditorDraftRectangle = null;
+                this.RefreshLabelEditorOverlay();
+            }
+
+            this.UpdateLabelEditorCursor(point);
+            e.Handled = true;
+            return;
+        }
+
+        if (!this.thisIsLabelEditorMode && !this.thisIsKiCadTraceCalibrationMode && RectGeometry.TryInvert(this.schematicsMatrix, out var inv))
+        {
+            var localPoint = new Point(
+                (point.X * inv.M11) + (point.Y * inv.M21) + inv.M31,
+                (point.X * inv.M12) + (point.Y * inv.M22) + inv.M32);
+
+            if (this.polylineManager != null && this.polylineManager.OnPointerReleased(point, localPoint))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
+        if (!this.isPanning)
+        {
+            if (this.thisIsKiCadTraceCalibrationMode)
+            {
+                this.UpdateKiCadTraceCalibrationCursor(point);
+                this.SchematicsContainer.Focus();
+                this.Focus();
+            }
+
+            return;
+        }
+
+        this.isPanning = false;
+        e.Pointer.Capture(null);
+
+        var delta = point - this.panStartPoint;
+        bool isStationaryRightClick = Math.Abs(delta.X) < 4 && Math.Abs(delta.Y) < 4;
+
+        if (isStationaryRightClick)
+        {
+            if (this.thisIsKiCadTraceCalibrationMode)
+            {
+                this.ShowLabelEditorMenu(point);
+            }
+            else if (this.thisIsLabelEditorMode)
+            {
+                if (this.TryGetLabelEditorHighlightAtContainerPoint(point, out var workingIndex))
+                {
+                    this.DeleteLabelEditorHighlight(workingIndex);
+                    this.HideLabelEditorMenu();
+                }
+                else
+                {
+                    this.ShowLabelEditorMenu(point);
+                }
+            }
+            else
+            {
+                string? activeHoveredKiCadNetName = this.GetActiveHoveredKiCadNetName();
+
+                if (this.TryGetHoveredBoardLabel(point, out var boardLabel, out _))
+                {
+                    this.ToggleComponentSelectionByBoardLabel(boardLabel);
+                }
+                else if (!string.IsNullOrWhiteSpace(activeHoveredKiCadNetName) && this.thisLockedKiCadNetNames.Contains(activeHoveredKiCadNetName))
+                {
+                    this.thisLockedKiCadNetNames.Remove(activeHoveredKiCadNetName);
+                    this.thisHoveredKiCadNetName = null;
+                    this.RefreshKiCadOverlay();
+                    this.RefreshBlinkStateFromCurrentSelection();
+                }
+                else if (this.thisLockedKiCadNetNames.Count > 0)
+                {
+                    this.thisLockedKiCadNetNames.Clear();
+                    this.RefreshKiCadOverlay();
+                    this.RefreshBlinkStateFromCurrentSelection();
+                }
+                else
+                {
+                    this.ShowLabelEditorMenu(point);
+                }
+            }
+        }
+
+        if (this.thisIsKiCadTraceCalibrationMode)
+        {
+            this.SchematicsContainer.Focus();
+            this.Focus();
+        }
+
+        this.UpdateSchematicsHoverUi(e.GetPosition(this.SchematicsContainer));
+        e.Handled = true;
+    }
+
+    // ###########################################################################################
+    // Clears hover UI when pointer exits schematic area.
+    // Uses a batched overlay update so exiting the editor does not trigger extra redraw churn.
+    // ###########################################################################################
+    private void OnSchematicsPointerExited(object? sender, PointerEventArgs e)
+    {
+        if (this.isPanning)
+        {
+            return;
+        }
+
+        if (this.thisIsLabelEditorMode && this.SchematicsLabelEditorOverlay.HoveredIndex != -1)
+        {
+            this.SetLabelEditorOverlayTransientState(hoveredIndex: -1);
+        }
+
+        this.HideSchematicsHoverUi();
+    }
+
+    // ###########################################################################################
+    // Handles keyboard interaction for label-editor and KiCad calibration workflows.
+    // Ctrl+Z undoes label-editor changes and Ctrl+Y redoes them within the current editor session.
+    // Pressing D duplicates the currently selected editor rectangle and opens the new-label prompt.
+    // ###########################################################################################
+    private void OnSchematicsKeyDown(object? sender, KeyEventArgs e)
+    {
+        this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
+
+        if (this.thisIsKiCadTraceCalibrationMode)
+        {
+            if (e.Key == Key.Escape)
+            {
+                this.CancelKiCadTraceCalibrationMode();
+                e.Handled = true;
+                return;
+            }
+
+            if (this.ApplyKiCadTraceCalibrationKeyboardStep(e.Key, e.KeyModifiers))
+            {
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        if (!this.thisIsLabelEditorMode)
+        {
+            return;
+        }
+
+        if (this.SchematicsNewLabelPromptBorder.IsVisible)
+        {
+            return;
+        }
+
+        bool thisIsCtrlDown = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+
+        if (thisIsCtrlDown && e.Key == Key.Z)
+        {
+            if (this.TryUndoLabelEditorChange())
+            {
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        if (thisIsCtrlDown && e.Key == Key.Y)
+        {
+            if (this.TryRedoLabelEditorChange())
+            {
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        if (!thisIsCtrlDown &&
+            !e.KeyModifiers.HasFlag(KeyModifiers.Alt) &&
+            e.Key == Key.D)
+        {
+            if (this.TryDuplicateSelectedLabelEditorHighlight())
+            {
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        if (this.ApplySelectedLabelEditorKeyboardStep(e.Key, e.KeyModifiers))
+        {
+            e.Handled = true;
+        }
+    }
+
+    // ###########################################################################################
+    // Tracks key releases so SHIFT-based KiCad hover highlighting updates immediately.
+    // ###########################################################################################
+    private void OnSchematicsKeyUp(object? sender, KeyEventArgs e)
+    {
+        this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
+    }
+}
