@@ -72,8 +72,12 @@
 	<Grid RowDefinitions="*,Auto"
           Margin="16">
 
-		<StackPanel Grid.Row="0"
-                    Spacing="8"
+		<ScrollViewer Grid.Row="0"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      AllowAutoHide="False">
+
+		<StackPanel Spacing="8"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Top">
 
@@ -165,6 +169,8 @@
                     HorizontalAlignment="Left"
                     Click="OnOpenAppDataFolderClick" />
 		</StackPanel>
+
+		</ScrollViewer>
 
 	</Grid>
 </UserControl>

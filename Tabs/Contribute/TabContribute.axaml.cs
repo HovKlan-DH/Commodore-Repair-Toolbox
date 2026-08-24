@@ -32,7 +32,6 @@ namespace CRT
             if (boardData == null)
             {
                 this.UpdateRevisionDate(null);
-                this.CategoriesHeaderControl.ItemsSource = null;
                 this.CategoriesItemsControl.ItemsSource = null;
                 return;
             }
@@ -92,7 +91,6 @@ namespace CRT
                 })
                 .ToList();
 
-            this.CategoriesHeaderControl.ItemsSource = columns;
             this.CategoriesItemsControl.ItemsSource = columns;
         }
 

@@ -10,6 +10,8 @@
     - Changed MiniPro IC test from experimental to an official feature
     - Changed MiniPro IC test is embedded in component info popup and have several UI changes
     - Changed application launch to be faster, as all shipped builds are now ahead-of-time compiled
+    - Fixed missing page overflow scrollbar in "Configuration" tab
+    - Fixed missing page overflow scrollbar in "Contribution" tab
     - Fixed closing MiniPro IC test would require two clicks on test IC button to go to test again
     - Fixed MiniPro IC test could show the result from the previously tested IC, if switching to another component while a test was still finishing
     - Fixed MiniPro IC test could freeze the application for a long time when a test produced a large amount of output

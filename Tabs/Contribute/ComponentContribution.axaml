@@ -75,7 +75,8 @@
 		<ScrollViewer x:Name="MainScrollViewer"
 				  Grid.Row="1"
 				  VerticalScrollBarVisibility="Auto"
-				  HorizontalScrollBarVisibility="Disabled">
+				  HorizontalScrollBarVisibility="Disabled"
+				  AllowAutoHide="False">
 			<StackPanel Spacing="16">
 
 				<Border BorderBrush="{DynamicResource Panel_Border}"

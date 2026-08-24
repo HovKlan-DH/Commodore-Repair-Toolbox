@@ -56,73 +56,50 @@
 
 		<ScrollViewer Grid.Row="2"
 					  HorizontalScrollBarVisibility="Auto"
-					  VerticalScrollBarVisibility="Disabled">
-			<Grid VerticalAlignment="Stretch">
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="*" />
-				</Grid.RowDefinitions>
-
-				<ItemsControl Grid.Row="0" x:Name="CategoriesHeaderControl" Margin="12,0,12,0">
-					<ItemsControl.ItemsPanel>
-						<ItemsPanelTemplate>
-							<StackPanel Orientation="Horizontal" Spacing="30" />
-						</ItemsPanelTemplate>
-					</ItemsControl.ItemsPanel>
-					<ItemsControl.ItemTemplate>
-						<DataTemplate x:DataType="local:CategoryColumn">
-							<Grid Width="140">
-								<Grid.RowDefinitions>
-									<RowDefinition Height="Auto"/>
-									<RowDefinition Height="Auto"/>
-								</Grid.RowDefinitions>
-								<TextBlock Grid.Row="0"
-								           Text="{Binding CategoryName}"
-								           FontWeight="Bold"
-								           FontSize="14"
-								           TextTrimming="CharacterEllipsis"/>
-								<Border Grid.Row="1"
-								        Height="1"
-								        Background="{DynamicResource Table_BorderRowLine}"
-								        Margin="0,4,0,8" />
-							</Grid>
-						</DataTemplate>
-					</ItemsControl.ItemTemplate>
-				</ItemsControl>
-
-				<ScrollViewer Grid.Row="1"
-				              VerticalScrollBarVisibility="Auto"
-				              HorizontalScrollBarVisibility="Disabled"
-				              Margin="0,0,0,12">
-					<ItemsControl x:Name="CategoriesItemsControl" Margin="12,0,12,0">
-						<ItemsControl.ItemsPanel>
-							<ItemsPanelTemplate>
-								<StackPanel Orientation="Horizontal" Spacing="30" />
-							</ItemsPanelTemplate>
-						</ItemsControl.ItemsPanel>
-						<ItemsControl.ItemTemplate>
-							<DataTemplate x:DataType="local:CategoryColumn">
-								<Grid Width="140" VerticalAlignment="Top">
-									<ItemsControl ItemsSource="{Binding Components}">
-										<ItemsControl.ItemTemplate>
-											<DataTemplate x:DataType="local:ContributeComponentItem">
-												<Border Classes="ContributeRow"
-												        Margin="0,2,0,2">
-													<Button Classes="ComponentEntryButton"
-													        Content="{Binding DisplayText}"
-													        Tag="{Binding}"
-													        ToolTip.Tip="{Binding ToolTipText}"
-													        Click="OnComponentClick" />
-												</Border>
-											</DataTemplate>
-										</ItemsControl.ItemTemplate>
-									</ItemsControl>
-								</Grid>
-							</DataTemplate>
-						</ItemsControl.ItemTemplate>
-					</ItemsControl>
-				</ScrollViewer>
-			</Grid>
+					  VerticalScrollBarVisibility="Auto"
+					  AllowAutoHide="False">
+			<ItemsControl x:Name="CategoriesItemsControl" Margin="12,0,12,12">
+				<ItemsControl.ItemsPanel>
+					<ItemsPanelTemplate>
+						<StackPanel Orientation="Horizontal" Spacing="60" />
+					</ItemsPanelTemplate>
+				</ItemsControl.ItemsPanel>
+				<ItemsControl.ItemTemplate>
+					<DataTemplate x:DataType="local:CategoryColumn">
+						<Grid Width="110"
+						      VerticalAlignment="Top">
+							<Grid.RowDefinitions>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="Auto"/>
+							</Grid.RowDefinitions>
+							<TextBlock Grid.Row="0"
+							           Text="{Binding CategoryName}"
+							           FontWeight="Bold"
+							           FontSize="14"
+							           TextTrimming="CharacterEllipsis"/>
+							<Border Grid.Row="1"
+							        Height="1"
+							        Background="{DynamicResource Table_BorderRowLine}"
+							        Margin="0,4,0,8" />
+							<ItemsControl Grid.Row="2" ItemsSource="{Binding Components}">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate x:DataType="local:ContributeComponentItem">
+										<Border Classes="ContributeRow"
+										        Margin="0,2,0,2">
+											<Button Classes="ComponentEntryButton"
+											        Content="{Binding DisplayText}"
+											        Tag="{Binding}"
+											        ToolTip.Tip="{Binding ToolTipText}"
+											        Click="OnComponentClick" />
+										</Border>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+						</Grid>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
 		</ScrollViewer>
 	</Grid>
 </UserControl>
