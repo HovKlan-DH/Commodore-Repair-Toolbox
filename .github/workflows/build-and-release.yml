@@ -1,10 +1,10 @@
-name: Build, Security Scan and Release
+name: Build, Test, Scan and Release
 
 #
 # Releases are made by hand from the Actions tab ("Run workflow"), never by pushing a
 # tag. That ordering matters: the tag is created by the final "Create GitHub Release"
 # step, so it only ever comes into existence for a release that actually passed. A run
-# that fails the test gate leaves nothing behind to clean up, and the same version
+# that fails the unit test gate leaves nothing behind to clean up, and the same version
 # number can simply be re-run once the fix is pushed.
 #
 on:
@@ -30,7 +30,7 @@ env:
 
 jobs:
   ###############################################################
-  # BUILD AND TEST GATE
+  # BUILD AND UNIT TEST GATE
   ###############################################################
   # Nothing gets published unless the commit being released builds clean and the
   # full test suite passes. This duplicates build-and-unittest.yml on purpose:
@@ -38,7 +38,7 @@ jobs:
   # exact commit being released is shippable - a release can be started from any
   # branch at any moment, including a commit that never went through that check.
   test:
-    name: Build and test
+    name: Build and unit test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -55,14 +55,14 @@ jobs:
       - name: Build (Release)
         run: dotnet build ${{ env.SOLUTION }} -c Release --no-restore
 
-      - name: Test
+      - name: Unit Test
         run: dotnet test ${{ env.SOLUTION }} -c Release --no-build --logger "console;verbosity=normal"
 
   ###############################################################
   # CODEQL SECURITY SCAN
   ###############################################################
   security-scan:
-    name: CodeQL Security Scan
+    name: CodeQL security scan
     runs-on: ubuntu-latest
     permissions:
       actions: read
