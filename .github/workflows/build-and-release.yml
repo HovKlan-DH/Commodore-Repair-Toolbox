@@ -5,7 +5,7 @@ name: Build, Security Scan and Release
 # tag. That ordering matters: the tag is created by the final "Create GitHub Release"
 # step, so it only ever comes into existence for a release that actually passed. A run
 # that fails the test gate leaves nothing behind to clean up, and the same version
-# number can simply be re-run once the fix is pushed.
+# number can simply be re-run once the fix is pushed..
 #
 on:
   workflow_dispatch:
