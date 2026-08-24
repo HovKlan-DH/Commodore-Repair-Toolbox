@@ -20,6 +20,18 @@ on:
   pull_request:
     branches: [main]
 
+#
+# Only ever keep the newest run per branch alive. Pushing several commits in a row
+# would otherwise leave a queue of runs all testing superseded code; the older ones
+# are cancelled the moment a newer push arrives. Cancelled runs show up grey in the
+# Actions tab, which is not a failure - it just means a newer commit took over.
+#
+# Grouped per branch, so work on one branch never cancels another branch's run.
+#
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   SOLUTION: Classic-Repair-Toolbox.slnx
 
