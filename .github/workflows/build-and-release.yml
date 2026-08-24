@@ -1,9 +1,13 @@
 name: Build, Security Scan and Release
 
+#
+# Releases are made by hand from the Actions tab ("Run workflow"), never by pushing a
+# tag. That ordering matters: the tag is created by the final "Create GitHub Release"
+# step, so it only ever comes into existence for a release that actually passed. A run
+# that fails the test gate leaves nothing behind to clean up, and the same version
+# number can simply be re-run once the fix is pushed.
+#
 on:
-  push:
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+*' # asterisk allows suffixes like -beta or beta.2 or -rc or -rc.2
   workflow_dispatch:
     inputs:
       tag_name:
@@ -28,10 +32,11 @@ jobs:
   ###############################################################
   # BUILD AND TEST GATE
   ###############################################################
-  # Nothing gets published unless the tagged commit builds clean and the full
-  # test suite passes. This duplicates ci.yml on purpose: ci.yml proves main is
-  # healthy, this proves THIS tag is shippable, and a tag can point at any
-  # commit - including one that never went through CI.
+  # Nothing gets published unless the commit being released builds clean and the
+  # full test suite passes. This duplicates build-and-unittest.yml on purpose:
+  # that one proves main is healthy on every push, while this one proves the
+  # exact commit being released is shippable - a release can be started from any
+  # branch at any moment, including a commit that never went through that check.
   test:
     name: Build and test
     runs-on: ubuntu-latest

@@ -49,6 +49,13 @@ oscilloscope, no MiniPro programmer and no display, and runs in about two second
    update, and never delete a test to make a change pass.
 3. **ALWAYS run `dotnet test Classic-Repair-Toolbox.slnx` before reporting any code change as done.**
    "It compiles" is not a completed change. Report the real result, including failures and counts.
+   **This rule is machine-enforced, not a courtesy.** The `Stop` hook in [settings.json](settings.json)
+   runs [hooks/require-green-tests.sh](hooks/require-green-tests.sh) when you try to end a turn, and a
+   red suite blocks the handover with the failing tests fed back to you. It builds Release (matching
+   CI) and only fires when `.cs`, `.csproj`, `.axaml` or `.slnx` files actually changed, so it is free
+   on turns that touch no code. GitHub then runs the suite again on every push
+   ([.github/workflows/build-and-unittest.yml](../.github/workflows/build-and-unittest.yml)), and a
+   red suite blocks releases too.
 4. **A failing test is a question, not an obstacle.** Decide whether the behaviour change was intended.
    If it was, update the expectation and say so explicitly in your summary. If it wasn't, fix the code.
    Never edit an assertion just to get to green, and never weaken one (e.g. loosening a tolerance or
@@ -297,7 +304,11 @@ contribution, not a code change.
 ## Release process
 
 Versioning lives in [Classic-Repair-Toolbox.csproj](../Classic-Repair-Toolbox.csproj)
-(`AssemblyVersion`/`InformationalVersion`). Tagging a release triggers
-[.github/workflows/build-release-poc.yml](../.github/workflows/build-release-poc.yml), which runs a CodeQL
-scan and builds/signs/packages (Velopack) self-contained builds for win-x64, linux-x64, osx-x64, and
-osx-arm64, then publishes a GitHub Release using [CHANGELOG.md](../CHANGELOG.md) as the release body.
+(`AssemblyVersion`/`InformationalVersion`). Releases are made by hand from the GitHub Actions tab —
+run [.github/workflows/build-and-release.yml](../.github/workflows/build-and-release.yml) and type the
+version — **never by pushing a tag**; that trigger was deliberately removed. It runs the test suite
+first and stops there if it is red, then a CodeQL scan, then builds/signs/packages (Velopack)
+self-contained builds for win-x64, linux-x64, osx-x64 and osx-arm64, and finally publishes a GitHub
+Release using [CHANGELOG.md](../CHANGELOG.md) as the release body. The tag is created by that last
+step, so a failed run leaves nothing behind to clean up and the same version number can simply be
+re-run once the fix is pushed.

@@ -1,10 +1,10 @@
-name: CI
+name: Build and Unit Test
 
 #
 # Fast health check on every push and pull request: builds Release and runs the
 # full test suite on a clean machine.
 #
-# Deliberately kept separate from the release workflow (build-release-poc.yml).
+# Deliberately kept separate from the release workflow (build-and-release.yml).
 # This one must stay cheap, fast and free of side effects so it can run on
 # everything; that one signs binaries with the YubiKey and publishes a public
 # release, so it stays on tags only. The release workflow runs its own copy of
