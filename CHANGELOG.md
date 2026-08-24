@@ -16,4 +16,4 @@
     - Fixed oscilloscope image dump could leave the connection out of sync, so all following commands would read the previous commands response
     - Fixed some buttons would reveal text below when hovering with mouse
     - Fixed Linux proper maximizes the application window at launch, if this was its last state
-    - Refactored several parts of project for more efficient AI development, including unit test coverage (780 cases and ~19% coverage total)
+    - Refactored several parts of project for more efficient AI development, including unit/UI test coverage (793 cases and ~19% coverage total)
