@@ -17,6 +17,12 @@
 		<TargetFrameworks>net10.0</TargetFrameworks>
 		<RollForward>LatestMajor</RollForward>
         <Nullable>enable</Nullable>
+        <!--
+        Warnings are errors in Release - the configuration CI, the release gate and the
+        Stop hook all build. Debug stays warnings-only so a half-finished edit does not
+        break the F5/watch loop. The build was at zero warnings when this went in.
+        -->
+        <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
         <ApplicationManifest>Main\app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
@@ -94,9 +100,9 @@
   </ItemGroup>
 
 	<!--
-	Bundled MiniPro, per-RID, flattened next to the EXE (so "MiniproProcessRunner.ResolveBinary" finds 
-	it via "AppContext.BaseDirectory"). A RID-targeted publish uses the RID as-is; a plain dev build 
-	(no RID) falls back to the host OS's natural RID so the committed "minipro.exe" is staged automatically. 
+	Bundled MiniPro, per-RID, flattened next to the EXE (so "MiniproProcessRunner.ResolveBinary" finds
+	it via "AppContext.BaseDirectory"). A RID-targeted publish uses the RID as-is; a plain dev build
+	(no RID) falls back to the host OS's natural RID so the committed "minipro.exe" is staged automatically.
 	-->
 	<PropertyGroup>
 		<MiniproRid>$(RuntimeIdentifier)</MiniproRid>
@@ -120,10 +126,6 @@
     <ItemGroup>
         <AvaloniaResource Include="Assets/Changelog.txt" />
     </ItemGroup>
-
-  <ItemGroup>
-    <None Include=".github/copilot-instructions.md" />
-  </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Update="Properties/Resources.resx">

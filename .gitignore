@@ -8,7 +8,13 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/Dotnet.gitignore
 
 .vs/
-.vscode/
+# VS Code: share the build and debug configuration, keep personal state out.
+# Must be ".vscode/*" and not ".vscode/" - git will not descend into an ignored
+# directory, so the negations below would never be considered.
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
 bin/
 obj/
 Flowcharts/.*
