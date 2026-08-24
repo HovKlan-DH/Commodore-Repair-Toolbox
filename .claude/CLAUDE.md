@@ -63,6 +63,8 @@ oscilloscope, no MiniPro programmer and no display, and runs in about two second
 5. **When you fix a bug, first add the test that fails because of it.** Then fix the code and show
    the test going green. That test is the thing that stops the bug coming back.
 6. **Never write a test that needs hardware, a network call, a display, or that starts a process.**
+   Headless UI tests do not breach this - Avalonia's headless platform needs no display - but they
+   must go through `UiTest.Run(...)`; see [Headless UI tests](#headless-ui-tests).
    `ExternalTargetLauncher`'s accept path calls `Process.Start`, so its tests exercise the private
    containment predicates by reflection instead; the header comment in `ExternalTargetLauncherTests.cs`
    explains the reasoning. Follow the same principle for anything else with real-world side effects.
@@ -90,6 +92,7 @@ number formats.
 | KiCad | `KiCadRawProjectLoader`, `KiCadProjectLoader`, the `KiCadProjectData` model |
 | Board data | `BoardDataReader`, `BoardDataWriter`, `BoardComponentHighlightStorage`, `ComponentListBuilder`, `ComponentImageQueries`, `OverviewHtmlBuilder`, `ContactLinkFormatter` |
 | Settings / startup | `UserSettings`, `DataManager` (data-root + master workbook), `DataValidator` (smoke only) |
+| UI construction (`Tests/.../Ui/`) | All eight tabs, built headlessly - see [Headless UI tests](#headless-ui-tests) |
 | Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry` |
 
 That is about **67% of `Handlers/`** and **19.5% of the app assembly** (5,187 of 26,621 instrumented
@@ -137,9 +140,32 @@ Use `TempWorkspace` for anything that touches the filesystem; it creates and del
 Tests that mutate `UserSettings` or `DataManager` static state live in the `"UserSettings"` and
 `"DataManager"` xUnit collections so they run sequentially.
 
+### Headless UI tests
+
+`Tests/Classic-Repair-Toolbox.Tests/Ui/` builds every tab through Avalonia's headless platform -
+no display, no GPU, so it runs on CI like any other test. Three files: `TestAppBuilder.cs`
+(a `CRT.App` subclass whose `OnFrameworkInitializationCompleted` is deliberately empty, since the
+real one calls `Logger.Initialize()`, shows a splash and syncs over the network), `UiTest.cs`
+(runs a body on the UI thread), and `TabConstructionTests.cs`.
+
+**Do NOT add the `Avalonia.Headless.XUnit` package to get `[AvaloniaFact]`.** At 12.1.1 it depends
+on xunit **v3** while this suite is on xunit 2.9.3; adding it makes every `Fact` and `InlineData`
+in the project ambiguous and produces ~850 build errors. `UiTest.Run(...)` drives the same public
+session API directly and keeps xunit 2. Anything touching a control must go through it, or
+Avalonia throws for want of a dispatcher.
+
+**Know what these do and do not catch.** The XAML compiler already fails the build on a renamed
+`x:Name` (CS1061) and on a broken `avares://` path, and a missing `StaticResource` key is silently
+tolerated by Avalonia at runtime - all three were tested. So construction tests do not guard the
+markup; what they add is that constructor *logic* cannot throw, plus a foundation for interaction
+tests (`HeadlessWindowExtensions` gives `MouseDown`, `KeyPress`, `MouseWheel`). Prefer adding
+interaction tests that assert observable state over more construction tests.
+
 ### Deliberately not covered
 
-- **Everything in `Tabs/` and `Main/`** — Avalonia rendering, layout and pointer interaction.
+- **Rendering, layout and pointer interaction in `Tabs/` and `Main/`.** The tabs are now built
+  headlessly (below), which proves they construct; whether the result *looks* right is still
+  verified by running the app. `Main` itself is not constructed by any test.
 - **I/O boundary classes**: `OnlineServices`, `UpdateService` (real HTTP), `ScopeScpiClient` (real
   TCP), `MiniproProcessRunner` (spawns a process), and `DataManager`'s sync/seed/orphan-cleanup half.
   The abstraction below each of these (`IMiniproRunner`) is the thing to test, not the boundary.
