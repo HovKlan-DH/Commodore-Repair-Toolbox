@@ -12,7 +12,7 @@
 		<!--
 		BETA
 		-->
-		<InformationalVersion>2.4.0-beta.7</InformationalVersion>
+		<InformationalVersion>2.4.0-beta.8</InformationalVersion>
         <OutputType>WinExe</OutputType>
 		<TargetFrameworks>net10.0</TargetFrameworks>
 		<RollForward>LatestMajor</RollForward>
@@ -27,6 +27,19 @@
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
         <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
+        <!--
+        Ahead-of-time compile the app and the self-contained .NET runtime at publish time.
+        Without this every framework method on the way to the first pixel is JIT-compiled while the
+        user stares at nothing - and none of that time was even visible in the log, because logging
+        only starts once Avalonia is already up (see StartupTimeline).
+
+        Conditioned on RuntimeIdentifier because ReadyToRun requires a target RID; a bare
+        "dotnet publish" with no -r would otherwise fail. Every publish in
+        .github/workflows/build-and-release.yml passes -r, so all four shipped builds get it.
+        It trades install size for launch time, which is the right way round for an app that
+        already ships ~1 GB of hardware data.
+        -->
+        <PublishReadyToRun Condition="'$(RuntimeIdentifier)' != ''">true</PublishReadyToRun>
         <PackageProjectUrl>https://github.com/HovKlan-DH/Classic-Repair-Toolbox</PackageProjectUrl>
         <PackageIcon>CRT_icon.png</PackageIcon>
         <ApplicationIcon>Assets\CRT_icon.ico</ApplicationIcon>

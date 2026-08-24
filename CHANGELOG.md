@@ -9,6 +9,7 @@
     - Added help icon on "Enable MiniPro programmer functionality" checkbox in "Configuration" tab
     - Changed MiniPro IC test from experimental to an official feature
     - Changed MiniPro IC test is embedded in component info popup and have several UI changes
+    - Changed application launch to be faster, as all shipped builds are now ahead-of-time compiled
     - Fixed closing MiniPro IC test would require two clicks on test IC button to go to test again
     - Fixed MiniPro IC test could show the result from the previously tested IC, if switching to another component while a test was still finishing
     - Fixed MiniPro IC test could freeze the application for a long time when a test produced a large amount of output
@@ -16,4 +17,4 @@
     - Fixed oscilloscope image dump could leave the connection out of sync, so all following commands would read the previous commands response
     - Fixed some buttons would reveal text below when hovering with mouse
     - Fixed Linux proper maximizes the application window at launch, if this was its last state
-    - Refactored several parts of project for more efficient AI development, including unit/UI test coverage (793 cases and ~19% coverage total)
+    - Refactored several parts of project for more efficient AI development, including unit/UI test coverage (819 cases and ~27% coverage total)

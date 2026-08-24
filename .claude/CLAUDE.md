@@ -95,10 +95,20 @@ number formats.
 | UI construction (`Tests/.../Ui/`) | All eight tabs, built headlessly - see [Headless UI tests](#headless-ui-tests) |
 | Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry` |
 
-That is about **67% of `Handlers/`** and **19.5% of the app assembly** (5,187 of 26,621 instrumented
-lines, `dotnet test --collect:"XPlat Code Coverage"`). Quote that denominator when you re-measure —
-a bare percentage is not comparable between runs. Nearly all of the uncovered remainder is
-`Tabs/` and `Main/`: Avalonia code-behind, verified by running the app.
+`Handlers/` is where the real coverage is; most of the uncovered remainder is `Tabs/` and `Main/`,
+Avalonia code-behind that is verified by running the app.
+
+**No coverage percentage is recorded here on purpose** - a figure in a document goes stale silently
+and then gets quoted as fact. Measure it when you actually need it:
+
+```
+dotnet test Classic-Repair-Toolbox.slnx --collect:"XPlat Code Coverage"
+```
+
+and read `lines-covered` / `lines-valid` from the `coverage.cobertura.xml` it writes under
+`Tests/.../TestResults/`. **Always quote the denominator alongside the percentage, and say which
+build configuration you used** - Debug and Release instrument different numbers of lines (~26.7k vs
+~21.4k), so two bare percentages from different configurations are not comparable.
 
 ### `Handlers/Geometry/` — pure logic pulled out of the UI
 

@@ -299,7 +299,23 @@ namespace CRT
             Logger.Initialize();
             this.SetupGlobalExceptionLogging();
 
-            Logger.Info($"Classic Repair Toolbox version [{AppConfig.AppDisplayVersionString}] launched");
+            // The build configuration goes on this line because startup timings are meaningless
+            // without it: DEBUG builds are JIT-only and skip the online sync, and ReadyToRun applies
+            // only to a RID-targeted publish - so a timing from the wrong build is worse than none.
+            Logger.Info($"Classic Repair Toolbox version [{AppConfig.AppDisplayVersionString}] [{(AppConfig.IsDebugBuild ? "DEBUG" : "RELEASE")} build] launched");
+
+            // Startup timing. The first milestone covers everything that happened before the log
+            // file even existed - Velopack, the Avalonia AppBuilder, platform detection and parsing
+            // App.axaml - which is exactly the stretch where nothing is on screen yet.
+            var processStartTime = StartupTimeline.TryResolveProcessStartTime();
+            var startupTimeline = new StartupTimeline(processStartTime ?? DateTime.Now);
+
+            if (processStartTime == null)
+            {
+                Logger.Warning("Process start time unavailable - startup milestones are measured from the first log line, not from process start");
+            }
+
+            Logger.Info(startupTimeline.Record("Runtime and UI framework ready", DateTime.Now));
 
             UserSettings.Load();
 
@@ -333,15 +349,20 @@ namespace CRT
                 // Wait until Avalonia explicitly fires the "opened" event, guaranteeing the UI is visibly drawn
                 await splashOpened.Task;
 
+                Logger.Info(startupTimeline.Record("Splash visible", DateTime.Now));
+
                 // Either use local data or sync it from online source
 //                await DataManager.InitializeAsync(desktop.Args ?? []);
                 await DataManager.InitializeAsync(desktop.Args ?? Array.Empty<string>()); // supporting .NET6
+
+                Logger.Info(startupTimeline.Record("Data initialised", DateTime.Now));
 
                 var main = new Main();
                 desktop.MainWindow = main;
                 main.Show();
                 splash.Close();
 
+                Logger.Info(startupTimeline.Record("Main window shown", DateTime.Now));
                 Logger.Info("Application UI opened");
 
                 // UI has finished loading, so we can do a check-in
