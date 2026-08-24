@@ -1,0 +1,49 @@
+name: CI
+
+#
+# Fast health check on every push and pull request: builds Release and runs the
+# full test suite on a clean machine.
+#
+# Deliberately kept separate from the release workflow (build-release-poc.yml).
+# This one must stay cheap, fast and free of side effects so it can run on
+# everything; that one signs binaries with the YubiKey and publishes a public
+# release, so it stays on tags only. The release workflow runs its own copy of
+# these steps as a gate, because a tag can point at any commit.
+#
+# Note: a "branches" filter means tag pushes do NOT trigger this - the release
+# workflow handles those.
+#
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+env:
+  SOLUTION: Classic-Repair-Toolbox.slnx
+
+jobs:
+  ###############################################################
+  # BUILD AND TEST
+  ###############################################################
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore ${{ env.SOLUTION }}
+
+      - name: Build (Release)
+        run: dotnet build ${{ env.SOLUTION }} -c Release --no-restore
+
+      - name: Test
+        run: dotnet test ${{ env.SOLUTION }} -c Release --no-build --logger "console;verbosity=normal"

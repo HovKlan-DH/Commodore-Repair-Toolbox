@@ -58,3 +58,6 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Stop-hook marker: fingerprint of the last verified-green test run
+.claude/.tests-green

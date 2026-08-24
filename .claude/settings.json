@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/require-green-tests.sh\"",
+            "timeout": 300,
+            "statusMessage": "Verifying the test suite is green..."
+          }
+        ]
+      }
+    ]
+  }
+}
