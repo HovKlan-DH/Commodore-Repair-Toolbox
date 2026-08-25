@@ -9,7 +9,7 @@ The project is a direct spin-off from an older project, **Commodore Repair Toolb
 
 With _CRT_ you can easily view technical schematics, zoom, identify components, view chip pinouts, use interactive (KiCad) traces or do manual circuit tracing, study datasheets, view oscilloscope images, ressources and various other information, helping you diagnosing and repairing old vintage hardware.
 
-It is (for now) primarily dedicated to Commodore, and have several built-in profiles for Commodore computers and it has a single Amstrad computer also, but it can support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simple" and have good documentation available, like schematics, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
+It is (for now) primarily dedicated to Commodore, and have several built-in systems for Commodore, it also has an Amstrad and a ZX Spectrum board, but it can support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simple" and have good documentation available, like schematics, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
 
 
 ## Table of Contents
@@ -24,13 +24,14 @@ It is (for now) primarily dedicated to Commodore, and have several built-in prof
 - [Help wanted](#help-wanted)
 - [Contact developer](#contact-developer)
 - [Screenshots](#screenshots)
+- [License](#license)
 
 
 ## Installation and usage
 
 Download the newest normal (non-BETA) _CRT_ version from [Releases](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/releases), and install it afterwards. The installation folder cannot be chosen by the user and is determined by the installation process. In the `Configuration` tab you can open the folder and see where the configuration and data files are stored.
 
-If needed then the `data-root` folder can be changed via a commandline parameter, view [Commandline parameters](#commandline-parameters).
+If needed then the `data-root` folder can be changed via a commandline parameter, view [Commandline parameters](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/Commandline-parameters).
 
 Depending on your configuration settings, then _CRT_ will check for newer data at application launch. It is recommended to have this enabled, as there will come many updates over time.
 
@@ -46,6 +47,7 @@ Please go to [Wiki](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki) t
 
 - **Amstrad CPC 664**
   - **MC0005A**
+    - Oscilloscope baseline measurements
 - **Commodore Plus/4**
   - **310163**
     - Oscilloscope baseline measurements for PAL and NTSC
@@ -85,10 +87,11 @@ Please go to [Wiki](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki) t
     - Interactive (KiCad) traces and netlists
   - **250477** (C128DCR, metal cabinet)
     - Covers _all_ components
+    - No oscilloscope baseline measurements yet - PAL is being worked on
     - Would appreciate help with:
       - Oscilloscope baseline for NTSC
 - **ZX Spectrum 16K/48K**
-  - **Issue 4**
+  - **Issue 4B**
     - Interactive (KiCad) traces and netlists
     - Would appreciate help with:
       - Oscilloscope baseline for PAL and NTSC (not sure if they have differences for these regions?)
@@ -96,8 +99,6 @@ Please go to [Wiki](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki) t
 
 ### Data contributions being worked on currently
 
-- **@Rabs** is doing an oscilloscope baseline for **Amstrad CPC 664**
-- I will do the **PAL** oscilloscope baseline for **C128 DCR** - just need some time
 - Please let me know if you want to contribute with something, so it can be visualized here to avoid duplicate work.
 
 
@@ -108,6 +109,8 @@ Please go to [Wiki](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki) t
   - InfiniiVision 6000 X
   - InfiniiVision 6000L
 - **Rigol**
+  - DHO800
+  - DHO900
   - DHO1000
   - DHO4000
   - DS1000Z
@@ -144,8 +147,9 @@ Please go to [Wiki](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki) t
 
 - Operating systems supported:
   - **Windows 10** or newer (64-bit)
-  - **macOS** (64-bit)
+  - **macOS** on both **Apple Silicon** (arm64) and **Intel** (x64)
   - **Linux** (64-bit)
+- Disk space needed: ~**2GB**
 
 Note that the newest .NET LTS (Long-Term Support) is embedded in application, which means you do not need to have this installed. It also does mean that even if you have .NET installed on your computer, then it will still use the one embedded in application. Do note that it is the newest LTS at build time - it will not get updated automatically and will stay as-is.
 
@@ -205,3 +209,13 @@ One specific image from the oscilloscope baseline:
 
 Some images can also have detailed explanation:
 <img width="900" height="539" alt="image" src="https://github.com/user-attachments/assets/f0505e76-a7ce-4bb2-a854-1cccf06be372" />
+
+
+## License
+
+_CRT_ is licensed under the **GNU General Public License v3** - see [LICENSE.txt](LICENSE.txt) for the
+full license text.
+
+Do note that this covers the application itself. The hardware reference data (schematics, datasheets,
+component images and similar) is collected and contributed material, and the individual pieces of it
+have their own origins and rights holders. For most important authors and contributors there is a link.
