@@ -25,6 +25,10 @@ namespace Tabs.TabSchematics
         public Pen? Pen { get; init; }
         public IBrush? Fill { get; init; }
         public Geometry? Geometry { get; init; }
+
+        // Rotation about Rect.Center, in Avalonia's clockwise Y-down degrees. Only Rectangle and
+        // Ellipse honour it; it carries a rotated KiCad pad's true orientation.
+        public double RotationDegrees { get; init; }
     }
 
     public sealed class KiCadOverlayRenderControl : Control
@@ -133,6 +137,30 @@ namespace Tabs.TabSchematics
         }
 
         // ###########################################################################################
+        // Pushes the rotation a primitive asks for, turning about the centre of its own rect so a
+        // rotated KiCad pad keeps its position and only changes orientation. Axis-aligned primitives
+        // - which is nearly all of them - get an identity transform rather than a special case, so
+        // the caller can always wrap the draw in a using block.
+        // ###########################################################################################
+        private static DrawingContext.PushedState PushPrimitiveRotation(
+            DrawingContext context,
+            KiCadOverlayPrimitive primitive)
+        {
+            if (Handlers.Geometry.KiCadPadGeometry.IsAxisAligned(primitive.RotationDegrees))
+            {
+                return context.PushTransform(Matrix.Identity);
+            }
+
+            Point centre = primitive.Rect.Center;
+            double radians = primitive.RotationDegrees * Math.PI / 180.0;
+
+            return context.PushTransform(
+                Matrix.CreateTranslation(-centre.X, -centre.Y) *
+                Matrix.CreateRotation(radians) *
+                Matrix.CreateTranslation(centre.X, centre.Y));
+        }
+
+        // ###########################################################################################
         // Draws all KiCad overlay primitives in one control instead of creating thousands of child
         // controls on a Canvas.
         // ###########################################################################################
@@ -159,16 +187,22 @@ namespace Tabs.TabSchematics
                         break;
 
                     case KiCadOverlayPrimitiveKind.Rectangle:
-                        context.DrawRectangle(primitive.Fill, primitive.Pen, primitive.Rect);
+                        using (PushPrimitiveRotation(context, primitive))
+                        {
+                            context.DrawRectangle(primitive.Fill, primitive.Pen, primitive.Rect);
+                        }
                         break;
 
                     case KiCadOverlayPrimitiveKind.Ellipse:
-                        context.DrawEllipse(
-                            primitive.Fill,
-                            primitive.Pen,
-                            primitive.Rect.Center,
-                            primitive.Rect.Width / 2.0,
-                            primitive.Rect.Height / 2.0);
+                        using (PushPrimitiveRotation(context, primitive))
+                        {
+                            context.DrawEllipse(
+                                primitive.Fill,
+                                primitive.Pen,
+                                primitive.Rect.Center,
+                                primitive.Rect.Width / 2.0,
+                                primitive.Rect.Height / 2.0);
+                        }
                         break;
 
                     case KiCadOverlayPrimitiveKind.Polyline:

@@ -1,4 +1,4 @@
-using Handlers.DataHandling;
+﻿using Handlers.DataHandling;
 
 namespace ClassicRepairToolbox.Tests;
 
@@ -167,16 +167,67 @@ public sealed class KiCadRawProjectLoaderTests : IDisposable
     }
 
     [Fact]
-    public async Task A_pad_on_a_bottom_layer_footprint_has_its_x_offset_mirrored()
+    public async Task A_pad_on_a_bottom_layer_footprint_keeps_the_offset_the_file_stores()
     {
-        // Bottom-side parts are viewed through the board, so local X flips.
+        // KiCad bakes the flip into the stored pad coordinates the moment a footprint is moved to
+        // the back, so a bottom-side pad needs no mirroring here - it is already in board space.
+        // Mirroring it again moved every back-side pad off its own tracks; on the one bottom-side
+        // footprint in the shipped boards (Open128's RGBI connector) the mirrored pads landed
+        // 8-20 mm away from the track ends they are soldered to, while the stored coordinates
+        // land exactly on them. Flipping the whole view for a bottom-side photo is a separate,
+        // view-level concern and is handled by the calibration mirror flags.
         KiCadProjectRoot? root = await this.LoadAsync(
             this.WritePcb(KiCadFixtures.PcbBottomLayerFootprint));
 
         KiCadPcbPad pad = root!.Pcb[0].Footprints[0].Pads[0];
 
-        Assert.Equal(100 - 5, pad.AbsoluteCenter!.X, precision: 9);   // +5 became -5
-        Assert.Equal(100 + 3, pad.AbsoluteCenter.Y, precision: 9);    // Y is unchanged
+        Assert.Equal(100 + 5, pad.AbsoluteCenter!.X, precision: 9);
+        Assert.Equal(100 + 3, pad.AbsoluteCenter.Y, precision: 9);
+    }
+
+    [Fact]
+    public async Task A_pad_rotation_is_captured_as_the_absolute_angle_the_file_states()
+    {
+        // A pad's (at x y angle) mixes frames: x/y are footprint-local and unrotated, but the angle
+        // is absolute - KiCad has already added the parent footprint's rotation into it. So the
+        // loader must store the angle verbatim and must not add the footprint angle a second time.
+        // Every pad below sits in a footprint rotated 90 degrees.
+        KiCadProjectRoot? root = await this.LoadAsync(
+            this.WritePcb(KiCadFixtures.PcbRotatedPads));
+
+        System.Collections.Generic.List<KiCadPcbPad> pads = root!.Pcb[0].Footprints[0].Pads;
+
+        Assert.Equal(90, pads.Single(pad => pad.Number == "1").RotationDegrees, precision: 9);
+        Assert.Equal(90, pads.Single(pad => pad.Number == "2").RotationDegrees, precision: 9);
+        Assert.Equal(180, pads.Single(pad => pad.Number == "3").RotationDegrees, precision: 9);
+    }
+
+    [Fact]
+    public async Task A_pad_with_no_stated_angle_has_no_rotation()
+    {
+        // Most pads omit the third value in (at ...) entirely, and those must stay axis-aligned
+        // rather than inheriting anything from the footprint they sit in.
+        KiCadProjectRoot? root = await this.LoadAsync(
+            this.WritePcb(KiCadFixtures.PcbRotatedPads));
+
+        KiCadPcbPad pad4 = root!.Pcb[0].Footprints[0].Pads.Single(pad => pad.Number == "4");
+
+        Assert.Equal(0, pad4.RotationDegrees, precision: 9);
+    }
+
+    [Fact]
+    public async Task A_rotated_pad_keeps_the_size_the_file_states_rather_than_swapping_it()
+    {
+        // The size is stated in the pad's own frame and stays that way; orientation is carried by
+        // the rotation alone. Swapping width and height here instead would double-rotate the pad
+        // once the renderer applies that rotation.
+        KiCadProjectRoot? root = await this.LoadAsync(
+            this.WritePcb(KiCadFixtures.PcbRotatedPads));
+
+        KiCadPcbPad pad1 = root!.Pcb[0].Footprints[0].Pads.Single(pad => pad.Number == "1");
+
+        Assert.Equal(2, pad1.Size!.X, precision: 9);
+        Assert.Equal(0.8, pad1.Size.Y, precision: 9);
     }
 
     [Fact]

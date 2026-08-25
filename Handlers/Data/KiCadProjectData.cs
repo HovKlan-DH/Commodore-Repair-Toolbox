@@ -139,6 +139,12 @@ namespace Handlers.DataHandling
         [JsonPropertyName("size")]
         public KiCadSize2D? Size { get; init; }
 
+        // The pad's rotation in degrees, as KiCad stores it: already absolute, meaning it includes
+        // the parent footprint's rotation. Without this a rotated rect/oval pad is drawn with its
+        // width and height swapped - a vertical pad appears horizontal.
+        [JsonPropertyName("rotation")]
+        public double RotationDegrees { get; init; }
+
         [JsonPropertyName("layers")]
         public List<string> Layers { get; init; } = new();
 

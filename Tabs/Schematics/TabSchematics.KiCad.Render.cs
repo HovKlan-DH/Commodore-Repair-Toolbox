@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
@@ -496,27 +496,24 @@ public partial class TabSchematics
 
             var pen = new Pen(padBrush, 1.2);
 
-            if (string.Equals(pad.Shape?.Trim(), "rect", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(pad.Shape?.Trim(), "roundrect", StringComparison.OrdinalIgnoreCase))
+            // The rect above is built axis-aligned from the pad's own width and height; the pad's
+            // rotation is what turns it the right way round on the board. Without this a 90-degree
+            // rect or oval pad is drawn with its width and height swapped.
+            double rotationDegrees = KiCadPadGeometry.ResolveScreenRotationDegrees(
+                pad.RotationDegrees,
+                calibration.MirrorX,
+                calibration.MirrorY);
+
+            primitives.Add(new KiCadOverlayPrimitive
             {
-                primitives.Add(new KiCadOverlayPrimitive
-                {
-                    Kind = KiCadOverlayPrimitiveKind.Rectangle,
-                    Rect = rect,
-                    Pen = pen,
-                    Fill = padBrush
-                });
-            }
-            else
-            {
-                primitives.Add(new KiCadOverlayPrimitive
-                {
-                    Kind = KiCadOverlayPrimitiveKind.Ellipse,
-                    Rect = rect,
-                    Pen = pen,
-                    Fill = padBrush
-                });
-            }
+                Kind = KiCadPadGeometry.IsRectangularShape(pad.Shape)
+                    ? KiCadOverlayPrimitiveKind.Rectangle
+                    : KiCadOverlayPrimitiveKind.Ellipse,
+                Rect = rect,
+                RotationDegrees = rotationDegrees,
+                Pen = pen,
+                Fill = padBrush
+            });
         }
 
         void AddTracePrimitivesForLayer(

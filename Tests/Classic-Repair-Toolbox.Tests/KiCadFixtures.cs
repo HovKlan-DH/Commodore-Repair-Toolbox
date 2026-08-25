@@ -1,4 +1,4 @@
-namespace ClassicRepairToolbox.Tests;
+﻿namespace ClassicRepairToolbox.Tests;
 
 // Minimal but structurally real KiCad file content used by the loader tests. These are hand
 // written rather than copied from Assets/Data so each test can isolate one feature, and so the
@@ -55,7 +55,9 @@ internal static class KiCadFixtures
     )
     """;
 
-    // A footprint placed on the bottom copper layer: pad X is mirrored.
+    // A footprint placed on the bottom copper layer. KiCad flips a footprint by rewriting the
+    // pads' stored local coordinates, so what the file holds is already the flipped geometry and
+    // the loader must not mirror it a second time.
     public const string PcbBottomLayerFootprint = """
     (kicad_pcb (version 20221018)
       (net 1 "GND")
@@ -63,6 +65,22 @@ internal static class KiCadFixtures
         (at 100 100)
         (fp_text reference "U2" (at 0 0) (layer "B.SilkS"))
         (pad "1" thru_hole circle (at 5 3) (size 1 1) (layers "*.Cu") (net 1 "GND"))
+      )
+    )
+    """;
+
+    // Rotated rectangular and oval pads. The footprint sits at 90 degrees, so KiCad writes 90 into
+    // each pad's own (at ...) too; pad 3 additionally carries a further 90 of its own, giving 180.
+    public const string PcbRotatedPads = """
+    (kicad_pcb (version 20221018)
+      (net 1 "GND")
+      (footprint "Connector" (layer "F.Cu")
+        (at 50 50 90)
+        (fp_text reference "CN1" (at 0 0) (layer "F.SilkS"))
+        (pad "1" smd rect (at 0 0 90) (size 2 0.8) (layers "F.Cu") (net 1 "GND"))
+        (pad "2" thru_hole oval (at 2 0 90) (size 2 0.8) (layers "*.Cu") (net 1 "GND"))
+        (pad "3" smd roundrect (at 4 0 180) (size 2 0.8) (layers "F.Cu") (net 1 "GND"))
+        (pad "4" smd rect (at 6 0) (size 2 0.8) (layers "F.Cu") (net 1 "GND"))
       )
     )
     """;

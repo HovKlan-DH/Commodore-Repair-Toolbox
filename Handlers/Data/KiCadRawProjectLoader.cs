@@ -351,22 +351,18 @@ namespace Handlers.DataHandling
                 string reference = ExtractFootprintTextValue(footprintNode, "reference") ?? string.Empty;
 
                 double footprintAngle = footprintAt?.Angle ?? 0.0;
-                bool isBottomLayer = footprintLayer.StartsWith("B.", StringComparison.OrdinalIgnoreCase);
 
                 var pads = new List<KiCadPcbPad>();
 
                 foreach (var padNode in Children(footprintNode, "pad"))
                 {
+                    // A pad's (at x y angle) mixes two frames: x/y are footprint-local and
+                    // unrotated, while the angle is already absolute - KiCad writes the parent
+                    // footprint's rotation into it. So the position needs rotating here and the
+                    // angle does not. Back-side footprints need no mirroring either: KiCad bakes
+                    // the flip into the stored local coordinates when the footprint is flipped.
                     var padAt = ExtractAt(Child(padNode, "at")) ?? new KiCadPoint2DAngle();
-                    double padLocalX = padAt.X;
-                    double padLocalY = padAt.Y;
-
-                    if (isBottomLayer)
-                    {
-                        padLocalX = -padLocalX;
-                    }
-
-                    var rotated = RotatePoint(padLocalX, padLocalY, footprintAngle);
+                    var rotated = RotatePoint(padAt.X, padAt.Y, footprintAngle);
 
                     var netNode = Child(padNode, "net");
                     string? netId = Arg(netNode, 0);
@@ -391,6 +387,7 @@ namespace Handlers.DataHandling
                         Shape = Arg(padNode, 2),
                         AbsoluteCenter = absoluteCenter,
                         Size = ExtractSize(Child(padNode, "size")),
+                        RotationDegrees = padAt.Angle ?? 0.0,
                         Layers = Args(Child(padNode, "layers")).ToList(),
                         Net = string.IsNullOrWhiteSpace(netId) && string.IsNullOrWhiteSpace(netName)
                             ? null
