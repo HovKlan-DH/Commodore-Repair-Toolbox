@@ -80,6 +80,8 @@ namespace Handlers.DataHandling
         [JsonPropertyName("componentInfoWindowHeight")] public double ComponentInfoWindowHeight { get; set; } = 420.0;
         [JsonPropertyName("componentInfoWindowLeftColumnRatio")] public double ComponentInfoWindowLeftColumnRatio { get; set; } = 0.5;
         [JsonPropertyName("componentInfoWindowThumbnailRowHeight")] public double ComponentInfoWindowThumbnailRowHeight { get; set; } = 100.0;
+        [JsonPropertyName("componentInfoWindowX")] public int ComponentInfoWindowX { get; set; } = 0;
+        [JsonPropertyName("componentInfoWindowY")] public int ComponentInfoWindowY { get; set; } = 0;
         [JsonPropertyName("componentInfoScrollAction")] public string ComponentInfoScrollAction { get; set; } = "Image change";
         [JsonPropertyName("schematicsLabelBoard")] public bool SchematicsLabelBoard { get; set; } = false;
         [JsonPropertyName("schematicsLabelTechnical")] public bool SchematicsLabelTechnical { get; set; } = false;
@@ -686,6 +688,8 @@ namespace Handlers.DataHandling
         public static double ComponentInfoWindowHeight => _data.ComponentInfoWindowHeight;
         public static double ComponentInfoWindowLeftColumnRatio => _data.ComponentInfoWindowLeftColumnRatio;
         public static double ComponentInfoWindowThumbnailRowHeight => _data.ComponentInfoWindowThumbnailRowHeight;
+        public static int ComponentInfoWindowX => _data.ComponentInfoWindowX;
+        public static int ComponentInfoWindowY => _data.ComponentInfoWindowY;
 
         public static string ComponentInfoScrollAction
         {
@@ -701,7 +705,7 @@ namespace Handlers.DataHandling
         // ###########################################################################################
         // Saves component info window layout values atomically in a single disk write.
         // ###########################################################################################
-        public static void SaveComponentInfoWindowLayout(string state, double width, double height, double leftColumnRatio, double thumbnailRowHeight)
+        public static void SaveComponentInfoWindowLayout(string state, double width, double height, double leftColumnRatio, double thumbnailRowHeight, int x, int y)
         {
             _data.HasComponentInfoWindowLayout = true;
             _data.ComponentInfoWindowState = state;
@@ -709,7 +713,9 @@ namespace Handlers.DataHandling
             _data.ComponentInfoWindowHeight = height;
             _data.ComponentInfoWindowLeftColumnRatio = leftColumnRatio;
             _data.ComponentInfoWindowThumbnailRowHeight = thumbnailRowHeight;
-            Logger.Info($"Setting changed: [ComponentInfoWindowLayout] [{state}] [{width:F0}x{height:F0}] [LeftRatio: {leftColumnRatio:F3}] [ThumbnailHeight: {thumbnailRowHeight:F1}]");
+            _data.ComponentInfoWindowX = x;
+            _data.ComponentInfoWindowY = y;
+            Logger.Info($"Setting changed: [ComponentInfoWindowLayout] [{state}] [{width:F0}x{height:F0}] [LeftRatio: {leftColumnRatio:F3}] [ThumbnailHeight: {thumbnailRowHeight:F1}] [Position: {x},{y}]");
             Save();
         }
 
@@ -903,7 +909,7 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [DebugLogging] [{DebugLogging}]");
                     Logger.Info($"    Various other settings:");
                     Logger.Info($"        [BlinkSelected] [{BlinkSelected}]");
-                    Logger.Info($"        [ComponentInfoWindowLayout] [{_data.ComponentInfoWindowState}] [{_data.ComponentInfoWindowWidth:F0}x{_data.ComponentInfoWindowHeight:F0}] [LeftRatio: {_data.ComponentInfoWindowLeftColumnRatio:F3}] [ThumbnailHeight: {_data.ComponentInfoWindowThumbnailRowHeight:F1}]");
+                    Logger.Info($"        [ComponentInfoWindowLayout] [{_data.ComponentInfoWindowState}] [{_data.ComponentInfoWindowWidth:F0}x{_data.ComponentInfoWindowHeight:F0}] [LeftRatio: {_data.ComponentInfoWindowLeftColumnRatio:F3}] [ThumbnailHeight: {_data.ComponentInfoWindowThumbnailRowHeight:F1}] [Position: {_data.ComponentInfoWindowX},{_data.ComponentInfoWindowY}]");
                     Logger.Info($"        [ComponentInfoKeyboardHandling] [{ComponentInfoKeyboardHandling}]");
                     Logger.Info($"        [ComponentInfoScrollAction] [{ComponentInfoScrollAction}]");
                     Logger.Info($"        [ContactEmail] [{(string.IsNullOrWhiteSpace(ContactEmail) ? "empty" : "set")}]");

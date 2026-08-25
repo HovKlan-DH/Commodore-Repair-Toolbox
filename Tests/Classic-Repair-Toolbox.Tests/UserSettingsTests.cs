@@ -564,12 +564,14 @@ public sealed class UserSettingsTests : IDisposable
     {
         string path = this.LoadSettings("{}");
 
-        UserSettings.SaveComponentInfoWindowLayout("Normal", 900, 500, 0.4, 120);
+        UserSettings.SaveComponentInfoWindowLayout("Normal", 900, 500, 0.4, 120, 150, 80);
 
         JsonNode json = ReadJson(path);
 
         Assert.Equal(900, json["componentInfoWindowWidth"]!.GetValue<double>());
         Assert.Equal(0.4, json["componentInfoWindowLeftColumnRatio"]!.GetValue<double>());
+        Assert.Equal(150, json["componentInfoWindowX"]!.GetValue<int>());
+        Assert.Equal(80, json["componentInfoWindowY"]!.GetValue<int>());
         Assert.True(json["hasComponentInfoWindowLayout"]!.GetValue<bool>());
     }
 }

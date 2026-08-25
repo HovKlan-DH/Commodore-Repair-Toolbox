@@ -1675,7 +1675,19 @@ namespace CRT
 
             if (!this._singleComponentInfoWindow.IsVisible)
             {
-                this.PositionPopupOnSameScreen(this._singleComponentInfoWindow);
+                // Single-instance popups reuse the last on-screen position (when not maximized)
+                // instead of re-cascading from the main window every time they are reopened.
+                if (UserSettings.HasComponentInfoWindowLayout &&
+                    this._singleComponentInfoWindow.WindowState != Avalonia.Controls.WindowState.Maximized)
+                {
+                    this._singleComponentInfoWindow.Position =
+                        new PixelPoint(UserSettings.ComponentInfoWindowX, UserSettings.ComponentInfoWindowY);
+                }
+                else
+                {
+                    this.PositionPopupOnSameScreen(this._singleComponentInfoWindow);
+                }
+
                 this._singleComponentInfoWindow.Show(this);
                 this._singleComponentInfoWindow.Focus();
             }

@@ -6,6 +6,7 @@
     - Added help icon in various places, linking to GitHub Wiki page
     - Changed MiniPro IC test from experimental to an official feature
     - Changed MiniPro IC test is embedded in component info popup and has several UI changes
+    - Changed component info popup window opens in same position, if only a single window gets opened
     - Fixed missing page overflow scrollbar in "Configuration" tab
     - Fixed missing page overflow scrollbar in "Contribution" tab
     - Fixed closing MiniPro IC test would require two clicks on test IC button to go to test again

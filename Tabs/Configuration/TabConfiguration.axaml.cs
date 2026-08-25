@@ -354,7 +354,7 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Persists the "Open multiple windows for popup" preference when the checkbox is toggled.
+        // Persists the "Open multiple component info windows" preference when the checkbox is toggled.
         // ###########################################################################################
         private void OnMultipleInstancesForComponentPopupChanged(object? sender, RoutedEventArgs e)
         {

@@ -75,6 +75,8 @@ namespace CRT
         private bool _suppressRegionToggle = false;
         private double _normalWidth = 680.0;
         private double _normalHeight = 420.0;
+        private int _normalX;
+        private int _normalY;
         private bool _hasExplicitRegionComponents = false;
 
         // Image matrix for zoom and pan capabilities
@@ -115,6 +117,9 @@ namespace CRT
             this._normalHeight = UserSettings.HasComponentInfoWindowLayout
                 ? UserSettings.ComponentInfoWindowHeight
                 : 420.0;
+
+            this._normalX = UserSettings.HasComponentInfoWindowLayout ? UserSettings.ComponentInfoWindowX : 0;
+            this._normalY = UserSettings.HasComponentInfoWindowLayout ? UserSettings.ComponentInfoWindowY : 0;
 
             if (UserSettings.HasComponentInfoWindowLayout)
             {
@@ -182,6 +187,17 @@ namespace CRT
                 }
             };
 
+            // Keep _normalX/_normalY up to date so a reopened single-instance popup can restore
+            // the last on-screen position instead of re-cascading from the main window.
+            this.PositionChanged += (_, _) =>
+            {
+                if (this.WindowState == WindowState.Normal)
+                {
+                    this._normalX = this.Position.X;
+                    this._normalY = this.Position.Y;
+                }
+            };
+
             this.Deactivated += (_, _) =>
             {
                 if (!this.CloseOnDeactivate)
@@ -211,7 +227,7 @@ namespace CRT
                 if (thumbHeight <= 0.0)
                     thumbHeight = UserSettings.ComponentInfoWindowThumbnailRowHeight;
 
-                UserSettings.SaveComponentInfoWindowLayout(state, this._normalWidth, this._normalHeight, leftRatio, thumbHeight);
+                UserSettings.SaveComponentInfoWindowLayout(state, this._normalWidth, this._normalHeight, leftRatio, thumbHeight, this._normalX, this._normalY);
             };
 
             this.Closed += (_, _) =>

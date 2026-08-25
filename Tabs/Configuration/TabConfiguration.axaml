@@ -106,7 +106,7 @@
                        Margin="0,16,0,4" />
 
 			<CheckBox x:Name="MultipleInstancesForComponentPopupCheckBox"
-					  Content="Open multiple windows for popup" />
+					  Content="Open multiple component info windows" />
 
 			<TextBlock Text="Application Update"
                        FontSize="12"
