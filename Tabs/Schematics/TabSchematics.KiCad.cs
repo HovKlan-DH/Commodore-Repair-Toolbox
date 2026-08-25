@@ -252,12 +252,15 @@ public partial class TabSchematics
         var rawPaths = this.MainWindow?.GetCurrentBoardKiCadRawPaths() ?? new List<string>();
         if (rawPaths.Count == 0)
         {
+            this.SetKiCadInitializingIndicatorVisible(false);
             this.thisCurrentKiCadRuntimeCacheScopeKey = string.Empty;
             this.RebuildImportantSignalsPanel();
             this.RestoreBoardSettings(expectedBoardKey);
             this.RefreshKiCadOverlay();
             return;
         }
+
+        this.SetKiCadInitializingIndicatorVisible(true);
 
         var boardEntry = this.MainWindow?.GetCurrentBoardEntry();
         string hardwareName = boardEntry?.HardwareName ?? string.Empty;
@@ -277,12 +280,15 @@ public partial class TabSchematics
 
         if (loadVersion != this.thisKiCadProjectLoadVersion)
         {
+            // A newer load is already running and owns the indicator, so leave it showing for that one.
             return;
         }
 
         string currentBoardKey = this.MainWindow?.GetCurrentBoardKey() ?? string.Empty;
         if (!string.Equals(expectedBoardKey, currentBoardKey, StringComparison.OrdinalIgnoreCase))
         {
+            // The board moved on without starting another KiCad load, so nothing is initializing.
+            this.SetKiCadInitializingIndicatorVisible(false);
             return;
         }
 
@@ -343,6 +349,20 @@ public partial class TabSchematics
         this.RebuildImportantSignalsPanel();
         this.RestoreBoardSettings(currentBoardKey);
         this.RefreshKiCadOverlay();
+
+        this.SetKiCadInitializingIndicatorVisible(false);
+    }
+
+    // ###########################################################################################
+    // Shows or hides the bottom-right "KiCad data initializing..." indicator.
+    //
+    // A board's KiCad project loads in the background so the schematic image can appear straight
+    // away, which leaves a few seconds where traces, nets and pads do not respond yet. The
+    // indicator is what tells the user that gap is data still arriving rather than a dead overlay.
+    // ###########################################################################################
+    public void SetKiCadInitializingIndicatorVisible(bool isVisible)
+    {
+        this.KiCadInitializingIndicator.IsVisible = isVisible;
     }
 
     // ###########################################################################################

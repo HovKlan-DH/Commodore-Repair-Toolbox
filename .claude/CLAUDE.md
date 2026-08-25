@@ -10,6 +10,20 @@ oscilloscope baselines, and interactive KiCad traces for a curated set of hardwa
 plus Amstrad and ZX Spectrum boards). It also drives real test equipment: SCPI oscilloscopes over TCP
 and a MiniPro USB IC programmer/tester.
 
+## Hands off CHANGELOG.md
+
+**Never create, edit, rewrite, reformat or delete [CHANGELOG.md](../CHANGELOG.md) unless the
+maintainer explicitly asks for it in that message.** It is written by hand, in the maintainer's own
+words, and it is the body of every GitHub Release — an "improvement" there is not a small edit, it
+is words the maintainer never wrote going out under their name.
+
+This holds even when a change would normally warrant a changelog entry, and even when the file
+already has uncommitted edits in it (those are the maintainer's, in progress). Do not touch it as a
+"finishing touch" on a feature, do not tidy its formatting, and do not stage, commit, revert or
+`git checkout` it. If you think an entry is needed, say so in your summary and let the maintainer
+write it. "Update the changelog" from the maintainer is the only permission — and it covers that
+one request, not the rest of the session.
+
 ## Build, test, run, publish
 
 There is a unit test suite covering the UI-free logic in `Handlers/`. **Always run it, always add
@@ -361,4 +375,5 @@ then runs the test suite and stops there if it is red, then a CodeQL scan, then 
 (Velopack) self-contained builds for win-x64, linux-x64, osx-x64 and osx-arm64, and finally publishes a
 GitHub Release using [CHANGELOG.md](../CHANGELOG.md) as the release body. The tag is created by that
 last step, so a failed run leaves nothing behind to clean up and the same version number can simply be
-re-run once the fix is pushed.
+re-run once the fix is pushed. That release body is written by hand and is off-limits to Claude —
+see [Hands off CHANGELOG.md](#hands-off-changelogmd).

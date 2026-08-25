@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -537,42 +537,65 @@
 					</Border>
 				</Grid>
 
-				<!-- DYNAMIC POLYLINE TRACES LIST PANEL -->
-				<Border x:Name="TracesPanel"
-						IsVisible="False"
-						HorizontalAlignment="Right"
-						VerticalAlignment="Bottom"
-						Margin="0,0,10,10"
-						ZIndex="200"
-						Background="{DynamicResource Schematics_Panels_Bg}"
-						BorderBrush="{DynamicResource Schematics_Panels_Border}"
-						BorderThickness="1"
-						CornerRadius="4"
-						Padding="8,8">
-					<StackPanel Spacing="6">
-						<StackPanel Orientation="Horizontal" Spacing="6">
-							<TextBlock Text="Traces visible"
-									   FontSize="11"
-									   VerticalAlignment="Center"
-									   FontWeight="Bold"
-									   Foreground="{DynamicResource SchematicsPanels_Fg}" />
-							<Button x:Name="ClearTracesButton"
-									Content="Clear All"
+				<!-- BOTTOM-RIGHT OVERLAY STACK -->
+				<StackPanel x:Name="SchematicsBottomRightOverlayStack"
+							HorizontalAlignment="Right"
+							VerticalAlignment="Bottom"
+							Margin="0,0,10,10"
+							Spacing="8"
+							ZIndex="200">
+
+					<!-- KICAD DATA INITIALIZING INDICATOR -->
+					<Border x:Name="KiCadInitializingIndicator"
+							IsVisible="False"
+							IsHitTestVisible="False"
+							HorizontalAlignment="Right"
+							Background="{DynamicResource Schematics_Name_Bg}"
+							BorderBrush="{DynamicResource Schematics_Name_Border}"
+							BorderThickness="1"
+							CornerRadius="4"
+							Padding="8,4">
+						<TextBlock x:Name="KiCadInitializingIndicatorText"
+								   Text="KiCad data initializing..."
+								   FontSize="11"
+								   FontWeight="Normal"
+								   Foreground="{DynamicResource Schematics_Name_Fg}" />
+					</Border>
+
+					<!-- DYNAMIC POLYLINE TRACES LIST PANEL -->
+					<Border x:Name="TracesPanel"
+							IsVisible="False"
+							HorizontalAlignment="Right"
+							Background="{DynamicResource Schematics_Panels_Bg}"
+							BorderBrush="{DynamicResource Schematics_Panels_Border}"
+							BorderThickness="1"
+							CornerRadius="4"
+							Padding="8,8">
+						<StackPanel Spacing="6">
+							<StackPanel Orientation="Horizontal" Spacing="6">
+								<TextBlock Text="Traces visible"
+										   FontSize="11"
+										   VerticalAlignment="Center"
+										   FontWeight="Bold"
+										   Foreground="{DynamicResource SchematicsPanels_Fg}" />
+								<Button x:Name="ClearTracesButton"
+										Content="Clear All"
+										FontSize="9"
+										Padding="6,2"
+										VerticalAlignment="Center" />
+							</StackPanel>
+							<StackPanel x:Name="TracesListPanel" Spacing="4" />
+
+							<Button x:Name="UndoDeletedTraceButton"
+									Content="Undo deletion"
 									FontSize="9"
 									Padding="6,2"
-									VerticalAlignment="Center" />
+									HorizontalAlignment="Stretch"
+									HorizontalContentAlignment="Center"
+									IsVisible="False" />
 						</StackPanel>
-						<StackPanel x:Name="TracesListPanel" Spacing="4" />
-
-						<Button x:Name="UndoDeletedTraceButton"
-								Content="Undo deletion"
-								FontSize="9"
-								Padding="6,2"
-								HorizontalAlignment="Stretch"
-								HorizontalContentAlignment="Center"
-								IsVisible="False" />
-					</StackPanel>
-				</Border>
+					</Border>
+				</StackPanel>
 
 				<!-- CONTEXTUAL FLOATING TRACE PALETTE -->
 				<Border x:Name="TraceFloatingPalette"

@@ -912,6 +912,10 @@ namespace CRT
                             return;
                         }
 
+                        // The schematic image is about to appear while the KiCad project is still
+                        // loading behind it, so flag that wait as soon as the board has KiCad data.
+                        this.TabSchematicsControl.SetKiCadInitializingIndicatorVisible(rawPaths.Count > 0);
+
                         this.TabSchematicsControl.highlightRectsBySchematicAndLabel = highlightRects;
                         this.TabSchematicsControl.schematicByName = schematicByName;
                         this.TabSchematicsControl.highlightIndexBySchematic = new(StringComparer.OrdinalIgnoreCase);

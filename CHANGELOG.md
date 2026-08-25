@@ -4,6 +4,7 @@
     - Added selector to include/exclude component from being printed in the two lists in "Overview" tab
     - Added link to YouTube videos in "About" tab
     - Added help icon in various places, linking to GitHub Wiki page
+    - Added KiCad data initializing indicator in "Schematics" tab
     - Changed MiniPro IC test from experimental to an official feature
     - Changed MiniPro IC test is embedded in component info popup and has several UI changes
     - Changed mouse location is keeping logical position when zooming
