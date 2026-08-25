@@ -92,7 +92,7 @@ number formats.
 | KiCad | `KiCadRawProjectLoader`, `KiCadProjectLoader`, the `KiCadProjectData` model |
 | Board data | `BoardDataReader`, `BoardDataWriter`, `BoardComponentHighlightStorage`, `ComponentListBuilder`, `ComponentImageQueries`, `OverviewHtmlBuilder`, `ContactLinkFormatter` |
 | Settings / startup | `UserSettings`, `DataManager` (data-root + master workbook), `DataValidator` (smoke only) |
-| UI construction (`Tests/.../Ui/`) | All eight tabs, built headlessly - see [Headless UI tests](#headless-ui-tests) |
+| Headless UI (`Tests/.../Ui/`) | All eight tabs built headlessly, plus component highlight selection and schematics zoom - see [Headless UI tests](#headless-ui-tests) |
 | Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `KiCadPadGeometry`, `OverlayCullGeometry`, `KiCadOverlayCacheKeys`, `KiCadOverlayNetCache`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry` |
 
 `Handlers/` is where the real coverage is; most of the uncovered remainder is `Tabs/` and `Main/`,
@@ -157,10 +157,16 @@ pass alone and fail intermittently in the full run.
 ### Headless UI tests
 
 `Tests/Classic-Repair-Toolbox.Tests/Ui/` builds every tab through Avalonia's headless platform -
-no display, no GPU, so it runs on CI like any other test. Three files: `TestAppBuilder.cs`
-(a `CRT.App` subclass whose `OnFrameworkInitializationCompleted` is deliberately empty, since the
-real one calls `Logger.Initialize()`, shows a splash and syncs over the network), `UiTest.cs`
-(runs a body on the UI thread), and `TabConstructionTests.cs`.
+no display, no GPU, so it runs on CI like any other test. Two of the files are the harness:
+`TestAppBuilder.cs` (a `CRT.App` subclass whose `OnFrameworkInitializationCompleted` is deliberately
+empty, since the real one calls `Logger.Initialize()`, shows a splash and syncs over the network)
+and `UiTest.cs` (runs a body on the UI thread). The rest are the tests themselves:
+
+| File | Covers |
+| --- | --- |
+| `TabConstructionTests.cs` | Every tab constructs without throwing |
+| `ComponentHighlightSelectionTests.cs` | Selecting/deselecting in the component filter box, and the highlights that appear and vanish across the main image and every thumbnail |
+| `SchematicsZoomTests.cs` | The schematic viewer's zoom limits, and zoom anchoring - that the point under the mouse pointer stays under the mouse pointer |
 
 **Do NOT add the `Avalonia.Headless.XUnit` package to get `[AvaloniaFact]`.** At 12.1.1 it depends
 on xunit **v3** while this suite is on xunit 2.9.3; adding it makes every `Fact` and `InlineData`

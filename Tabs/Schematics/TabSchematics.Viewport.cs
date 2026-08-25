@@ -217,10 +217,14 @@ public partial class TabSchematics
     }
 
     // ###########################################################################################
-    // Clamps the current schematics matrix while preserving zoom-anchor stability by default.
-    // Manual panning can opt into strict edge clamping so the image cannot be dragged beyond the
-    // currently visible viewport after edge-docked overlay panels have been accounted for.
+    // Clamps the current schematics matrix so the image cannot be moved beyond the currently
+    // visible viewport, once edge-docked overlay panels have been accounted for, while still
+    // leaving room for whatever position a cursor-anchored zoom asks for.
     // Also allows baseline-scale panning when overlay panels reduce the effectively visible area.
+    //
+    // The two demands are reconciled per axis in ViewportMath.ComputeAxisTranslationRange - read
+    // that before changing anything here, because tightening this clamp is what breaks the
+    // guarantee that the point under the mouse pointer stays under the mouse pointer.
     // ###########################################################################################
     private void ClampSchematicsMatrix(bool useStrictEdgeClamp = false)
     {
@@ -249,20 +253,21 @@ public partial class TabSchematics
 
         const double minimumScaleEpsilon = 0.000001;
 
-        double scaledLeftAtZero = scale * contentRect.Left;
-        double scaledTopAtZero = scale * contentRect.Top;
-        double scaledRightAtZero = scale * contentRect.Right;
-        double scaledBottomAtZero = scale * contentRect.Bottom;
+        // Both the pannable range and the room a cursor-anchored zoom needs - see
+        // ViewportMath.ComputeAxisTranslationRange for why the two have to be taken together.
+        (double minTx, double maxTx) = ViewportMath.ComputeAxisTranslationRange(
+            viewportRect.Left,
+            viewportRect.Right,
+            contentRect.Left,
+            contentRect.Right,
+            scale);
 
-        double leftAlignedTx = viewportRect.Left - scaledLeftAtZero;
-        double rightAlignedTx = viewportRect.Right - scaledRightAtZero;
-        double topAlignedTy = viewportRect.Top - scaledTopAtZero;
-        double bottomAlignedTy = viewportRect.Bottom - scaledBottomAtZero;
-
-        double minTx = Math.Min(leftAlignedTx, rightAlignedTx);
-        double maxTx = Math.Max(leftAlignedTx, rightAlignedTx);
-        double minTy = Math.Min(topAlignedTy, bottomAlignedTy);
-        double maxTy = Math.Max(topAlignedTy, bottomAlignedTy);
+        (double minTy, double maxTy) = ViewportMath.ComputeAxisTranslationRange(
+            viewportRect.Top,
+            viewportRect.Bottom,
+            contentRect.Top,
+            contentRect.Bottom,
+            scale);
 
         bool shouldUseStrictEdgeClamp = useStrictEdgeClamp || this.isPanning;
 

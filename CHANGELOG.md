@@ -6,6 +6,7 @@
     - Added help icon in various places, linking to GitHub Wiki page
     - Changed MiniPro IC test from experimental to an official feature
     - Changed MiniPro IC test is embedded in component info popup and has several UI changes
+    - Changed mouse location is keeping logical position when zooming
     - Changed component info popup window opens in same position, if only a single window gets opened
     - Fixed KiCad trace overlay was slow to zoom and to hover on boards with many components
     - Fixed KiCad rectangular and oval pads ignored their rotation
@@ -21,4 +22,4 @@
     - Fixed oscilloscope image dump could leave the connection out of sync, so all following commands would read the previous commands response
     - Fixed some buttons would reveal text below when hovering with mouse
     - Fixed Linux proper maximizes the application window at launch, if this was its last state
-    - Refactored several parts of project for more efficient AI development, including unit/UI test coverage (934 cases and ~29% coverage total)
+    - Refactored several parts of project for more efficient AI development, including unit/UI test coverage (951 cases and ~29% coverage total)
