@@ -42,10 +42,12 @@ namespace Handlers.OnlineHandling
 #else
             try
             {
-                _manager = new UpdateManager(new GithubSource(
-                    $"https://github.com/{AppConfig.GitHubOwner}/{AppConfig.GitHubRepo}",
-                    null,
-                    UserSettings.ShowDevelopmentVersionNotification));
+                _manager = new UpdateManager(
+                    new GithubSource(
+                        $"https://github.com/{AppConfig.GitHubOwner}/{AppConfig.GitHubRepo}",
+                        null,
+                        UserSettings.ShowDevelopmentVersionNotification),
+                    new UpdateOptions { AllowVersionDowngrade = true });
 
                 _pendingUpdate = await _manager.CheckForUpdatesAsync();
                 return _pendingUpdate != null;

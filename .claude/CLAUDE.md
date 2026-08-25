@@ -340,11 +340,15 @@ contribution, not a code change.
 ## Release process
 
 Versioning lives in [Classic-Repair-Toolbox.csproj](../Classic-Repair-Toolbox.csproj)
-(`AssemblyVersion`/`InformationalVersion`). Releases are made by hand from the GitHub Actions tab —
-run [.github/workflows/build-and-release.yml](../.github/workflows/build-and-release.yml) and type the
-version — **never by pushing a tag**; that trigger was deliberately removed. It runs the test suite
-first and stops there if it is red, then a CodeQL scan, then builds/signs/packages (Velopack)
-self-contained builds for win-x64, linux-x64, osx-x64 and osx-arm64, and finally publishes a GitHub
-Release using [CHANGELOG.md](../CHANGELOG.md) as the release body. The tag is created by that last
-step, so a failed run leaves nothing behind to clean up and the same version number can simply be
+(`AssemblyVersion`/`InformationalVersion`) — bump `InformationalVersion` there before releasing, since
+that is the only place a release version is entered. Releases are made by hand from the GitHub Actions
+tab — run [.github/workflows/build-and-release.yml](../.github/workflows/build-and-release.yml) with no
+inputs — **never by pushing a tag**; that trigger was deliberately removed. Its first job reads
+`InformationalVersion` straight from the csproj (via `dotnet msbuild -getProperty:InformationalVersion`)
+and derives pre-release status from it (a version containing `-`, e.g. `2.5.0-beta.1`, is a pre-release;
+a bare `X.Y.Z` is not) — every other job consumes that one job's output rather than re-deriving it. It
+then runs the test suite and stops there if it is red, then a CodeQL scan, then builds/signs/packages
+(Velopack) self-contained builds for win-x64, linux-x64, osx-x64 and osx-arm64, and finally publishes a
+GitHub Release using [CHANGELOG.md](../CHANGELOG.md) as the release body. The tag is created by that
+last step, so a failed run leaves nothing behind to clean up and the same version number can simply be
 re-run once the fix is pushed.

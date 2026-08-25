@@ -3,13 +3,9 @@
     - Added BOM (Bill of Material) list to be printed in "Overview" tab
     - Added selector to include/exclude component from being printed in the two lists in "Overview" tab
     - Added link to YouTube videos in "About" tab
-    - Added help icon on numpad controls in component info popup
-    - Added help icon on "Synchronize oscilloscope" checkbox in component info popup
-    - Added help icon on MiniPro IC test button
-    - Added help icon on "Enable MiniPro programmer functionality" checkbox in "Configuration" tab
+    - Added help icon in various places, linking to GitHub Wiki page
     - Changed MiniPro IC test from experimental to an official feature
-    - Changed MiniPro IC test is embedded in component info popup and have several UI changes
-    - Changed application launch to be faster, as all shipped builds are now ahead-of-time compiled
+    - Changed MiniPro IC test is embedded in component info popup and has several UI changes
     - Fixed missing page overflow scrollbar in "Configuration" tab
     - Fixed missing page overflow scrollbar in "Contribution" tab
     - Fixed closing MiniPro IC test would require two clicks on test IC button to go to test again

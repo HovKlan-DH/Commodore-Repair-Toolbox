@@ -7,18 +7,14 @@ name: Build, Test, Scan and Release
 # that fails the unit test gate leaves nothing behind to clean up, and the same version
 # number can simply be re-run once the fix is pushed.
 #
+# The version is not typed in here - it is read from InformationalVersion in
+# Classic-Repair-Toolbox.csproj, the same property the running app reports (see
+# Main/App.axaml.cs). Bumping that property before running this workflow is the only
+# place a release version is entered. Pre-release status follows semver: a version
+# with a "-" (e.g. "2.5.0-beta.1") is a pre-release, a bare "X.Y.Z" is a full release.
+#
 on:
   workflow_dispatch:
-    inputs:
-      tag_name:
-        description: 'Version for release (ex. 1.0.0 or 1.0.0-beta.1 or 1.0.0-rc.1)'
-        required: true
-        default: '2.5.0-beta.1'
-      is_prerelease:
-        description: 'Is this a pre-release?'
-        type: boolean
-        required: true
-        default: true
 
 env:
   PACK_ID: Classic-Repair-Toolbox
@@ -29,6 +25,39 @@ env:
   TFM_MODERN: net10.0
 
 jobs:
+  ###############################################################
+  # DETERMINE VERSION
+  ###############################################################
+  # Reads the release version straight out of the project instead of asking for it by
+  # hand - see the comment at the top of this file. Every other job reads it from here
+  # rather than re-deriving it, so there is exactly one place this happens.
+  determine-version:
+    name: Determine version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      is_prerelease: ${{ steps.ver.outputs.is_prerelease }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Read version from project
+        id: ver
+        run: |
+          VERSION=$(dotnet msbuild ${{ env.PROJECT }} -getProperty:InformationalVersion -nologo)
+          echo "Read version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if [[ "$VERSION" == *"-"* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
   ###############################################################
   # BUILD AND UNIT TEST GATE
   ###############################################################
@@ -95,7 +124,7 @@ jobs:
   # WINDOWS BUILD (x64 with self-contained .NET10)
   ###############################################################
   build-windows:
-    needs: test
+    needs: [test, determine-version]
     name: Build Windows (x64 with self-contained .NET10)
     runs-on: self-hosted
     steps:
@@ -107,13 +136,6 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Set version
-        id: ver
-        shell: powershell -ExecutionPolicy Bypass -File "{0}"
-        run: |
-          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.tag_name }}" } else { "${{ github.ref_name }}" }
-          "version=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
       - name: Publish Windows (x64)
         shell: powershell
         run: |
@@ -122,7 +144,7 @@ jobs:
             -f ${{ env.TFM_MODERN }} `
             -r win-x64 `
             --self-contained `
-            -p:Version=${{ steps.ver.outputs.version }} `
+            -p:Version=${{ needs.determine-version.outputs.version }} `
             -o publish/windows-x64
 
       - name: Sign executable
@@ -151,7 +173,7 @@ jobs:
         run: |
           vpk pack `
             --packId ${{ env.PACK_ID }} `
-            --packVersion ${{ steps.ver.outputs.version }} `
+            --packVersion ${{ needs.determine-version.outputs.version }} `
             --packDir publish/windows-x64 `
             --mainExe ${{ env.EXE_WINDOWS }} `
             --noPortable `
@@ -173,7 +195,7 @@ jobs:
             $installer.FullName
 
       - name: Upload Velopack artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: velopack-windows-x64
           path: velopack-output/*
@@ -182,7 +204,7 @@ jobs:
   # LINUX BUILD (x64 with self-contained .NET10)
   ###############################################################
   build-linux:
-    needs: test
+    needs: [test, determine-version]
     name: Build Linux (x64 with self-contained .NET10)
     runs-on: ubuntu-latest
     steps:
@@ -194,15 +216,6 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Set version
-        id: ver
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "version=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          fi
-
       - name: Publish Linux (x64)
         run: |
           dotnet publish ${{ env.PROJECT }} \
@@ -210,7 +223,7 @@ jobs:
             -f ${{ env.TFM_MODERN }} \
             -r linux-x64 \
             --self-contained \
-            -p:Version=${{ steps.ver.outputs.version }} \
+            -p:Version=${{ needs.determine-version.outputs.version }} \
             -o publish/linux-x64
 
       - name: Copy data pack
@@ -225,14 +238,14 @@ jobs:
           vpk pack \
             --packId ${{ env.PACK_ID }} \
             --packTitle "Classic Repair Toolbox" \
-            --packVersion ${{ steps.ver.outputs.version }} \
+            --packVersion ${{ needs.determine-version.outputs.version }} \
             --packDir publish/linux-x64 \
             --mainExe ${{ env.EXE_UNIX }} \
             --icon "Assets/CRT_icon.png" \
             --outputDir velopack-output
 
       - name: Upload Velopack artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: velopack-linux-x64
           path: velopack-output/*
@@ -241,7 +254,7 @@ jobs:
   # MACOS BUILD (arm64 + x64 with self-contained .NET10)
   ###############################################################
   build-macos:
-    needs: test
+    needs: [test, determine-version]
     name: Build macOS (arm64 + x64 with self-contained .NET10)
     runs-on: macos-latest
     steps:
@@ -253,15 +266,6 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Set version
-        id: ver
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "version=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          fi
-
       - name: Publish macOS (arm64)
         run: |
           dotnet publish ${{ env.PROJECT }} \
@@ -269,7 +273,7 @@ jobs:
             -f ${{ env.TFM_MODERN }} \
             -r osx-arm64 \
             --self-contained \
-            -p:Version=${{ steps.ver.outputs.version }} \
+            -p:Version=${{ needs.determine-version.outputs.version }} \
             -o publish/macos-arm64
 
       - name: Publish macOS (x64)
@@ -279,7 +283,7 @@ jobs:
             -f ${{ env.TFM_MODERN }} \
             -r osx-x64 \
             --self-contained \
-            -p:Version=${{ steps.ver.outputs.version }} \
+            -p:Version=${{ needs.determine-version.outputs.version }} \
             -o publish/macos-x64
 
       - name: Copy data pack
@@ -295,7 +299,7 @@ jobs:
           vpk pack \
             --packId ${{ env.PACK_ID }} \
             --packTitle "Classic Repair Toolbox" \
-            --packVersion ${{ steps.ver.outputs.version }} \
+            --packVersion ${{ needs.determine-version.outputs.version }} \
             --packDir publish/macos-arm64 \
             --mainExe ${{ env.EXE_UNIX }} \
             --channel osx-arm64 \
@@ -308,7 +312,7 @@ jobs:
           vpk pack \
             --packId ${{ env.PACK_ID }} \
             --packTitle "Classic Repair Toolbox" \
-            --packVersion ${{ steps.ver.outputs.version }} \
+            --packVersion ${{ needs.determine-version.outputs.version }} \
             --packDir publish/macos-x64 \
             --mainExe ${{ env.EXE_UNIX }} \
             --channel osx-x64 \
@@ -317,7 +321,7 @@ jobs:
             --outputDir velopack-output
 
       - name: Upload Velopack artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: velopack-macos
           path: velopack-output/*
@@ -328,7 +332,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-windows, build-linux, build-macos, security-scan]
+    needs: [determine-version, build-windows, build-linux, build-macos, security-scan]
     permissions:
       contents: write
     steps:
@@ -336,7 +340,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Download all Velopack artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: release-assets
           merge-multiple: true
@@ -344,24 +348,12 @@ jobs:
       - name: Set release tag
         id: tag
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          fi
+          echo "tag=${{ needs.determine-version.outputs.version }}" >> $GITHUB_OUTPUT
 
       - name: Determine if Pre-release
         id: prerelease_check
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            IS_PRE="${{ inputs.is_prerelease }}"
-          else
-            if [[ "${{ github.ref_name }}" == *"-"* ]]; then
-              IS_PRE="true"
-            else
-              IS_PRE="false"
-            fi
-          fi
+          IS_PRE="${{ needs.determine-version.outputs.is_prerelease }}"
 
           echo "is_prerelease=$IS_PRE" >> $GITHUB_OUTPUT
 
