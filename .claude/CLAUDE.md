@@ -102,7 +102,7 @@ number formats.
 | --- | --- |
 | Oscilloscope | `ScopeValueMapper`, `ScopeCommandResolver`, `ScopeCommandPaletteDefinitions`, `ScopeFormatting`, `ScopePayloadParser` |
 | IC testing | `MiniproOutputParser`, `IcTestService` (via `MockMiniproRunner` and local test doubles) |
-| Security | `ExternalTargetLauncher` |
+| Security | `ExternalTargetLauncher`, `OnlineServices`' manifest-validation predicates |
 | KiCad | `KiCadRawProjectLoader`, `KiCadProjectLoader`, the `KiCadProjectData` model |
 | Board data | `BoardDataReader`, `BoardDataWriter`, `BoardComponentHighlightStorage`, `ComponentListBuilder`, `ComponentImageQueries`, `OverviewHtmlBuilder`, `ContactLinkFormatter` |
 | Settings / startup | `UserSettings`, `DataManager` (data-root + master workbook), `DataValidator` (smoke only) |
@@ -200,9 +200,17 @@ interaction tests that assert observable state over more construction tests.
 - **Rendering, layout and pointer interaction in `Tabs/` and `Main/`.** The tabs are now built
   headlessly (below), which proves they construct; whether the result *looks* right is still
   verified by running the app. `Main` itself is not constructed by any test.
-- **I/O boundary classes**: `OnlineServices`, `UpdateService` (real HTTP), `ScopeScpiClient` (real
-  TCP), `MiniproProcessRunner` (spawns a process), and `DataManager`'s sync/seed/orphan-cleanup half.
+- **I/O boundary classes**: `OnlineServices`' network half (`FetchManifestAsync`, `SyncFilesAsync`,
+  `DownloadFileAsync`), `UpdateService` (real HTTP), `ScopeScpiClient` (real TCP),
+  `MiniproProcessRunner` (spawns a process), and `DataManager`'s sync/seed/orphan-cleanup half.
   The abstraction below each of these (`IMiniproRunner`) is the thing to test, not the boundary.
+  **`OnlineServices` is only half excluded.** The four predicates that validate a manifest entry
+  before anything is written — `TryValidateManifestEntry`, `TryResolveValidatedLocalPath`,
+  `TryNormalizeManifestChecksum`, `TryCreateTrustedDownloadUri` — are pure string/`Uri`/`Path` logic
+  and *are* covered, by `OnlineServicesTests` via reflection (the same approach and the same
+  reasoning as `ExternalTargetLauncherTests`). They decide where a downloaded file lands and which
+  server it may come from, on input that arrives over the network, so they are a trust boundary
+  rather than an I/O one.
 - **`DataValidator`'s findings.** `ValidateAllDataAsync` returns a bare `Task` and reports everything
   through `Logger`, so the tests only prove it walks real data without throwing. Testing what it
   actually detects means changing it to return its findings — a public API change, and a decision for
