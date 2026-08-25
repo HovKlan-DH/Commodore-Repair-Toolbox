@@ -9,6 +9,11 @@ namespace ClassicRepairToolbox.Tests;
 //   - highlight rectangles go to the sidecar .json, not the workbook;
 //   - a component the editor invented is appended to the Components sheet without disturbing
 //     the rows already there.
+// BoardDataReader keeps its loaded boards in a static, non-thread-safe Dictionary. This class and
+// BoardDataWriterTests both add to and remove from it, so they share one collection and run
+// sequentially - the same treatment UserSettings and DataManager already get. Left in parallel,
+// concurrent writes to that dictionary drop entries and a cached board comes back as null.
+[Collection("BoardData")]
 public sealed class BoardDataWriterTests : IDisposable
 {
     private readonly TempWorkspace thisWorkspace = new();

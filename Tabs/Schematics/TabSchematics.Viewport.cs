@@ -57,6 +57,7 @@ public partial class TabSchematics
             return;
         }
 
+
         double currentScale = this.schematicsMatrix.M11;
         double newScale = currentScale * zoomFactor;
 
@@ -313,6 +314,7 @@ public partial class TabSchematics
 
         this.schematicsMatrix = new Matrix(scale, 0, 0, scale, tx, ty);
 
+
         ((MatrixTransform)this.SchematicsImage.RenderTransform!).Matrix = this.schematicsMatrix;
         ((MatrixTransform)this.SchematicsHighlightsOverlay.RenderTransform!).Matrix = this.schematicsMatrix;
         ((MatrixTransform)this.SchematicsHoverHighlightsOverlay.RenderTransform!).Matrix = this.schematicsMatrix;
@@ -320,6 +322,10 @@ public partial class TabSchematics
         ((MatrixTransform)this.SchematicsPolylineCanvas.RenderTransform!).Matrix = this.schematicsMatrix;
         ((MatrixTransform)this.SchematicsLabelsCanvas.RenderTransform!).Matrix = this.schematicsMatrix;
         ((MatrixTransform)this.SchematicsKiCadOverlayCanvas.RenderTransform!).Matrix = this.schematicsMatrix;
+
+        // The KiCad overlay culls to the visible area, so it needs the same view matrix the
+        // highlights overlay uses. Assigning it does not invalidate anything on its own.
+        this.SchematicsKiCadOverlayCanvas.ViewMatrix = this.schematicsMatrix;
 
         this.SchematicsHighlightsOverlay.ViewMatrix = this.schematicsMatrix;
         this.SchematicsHighlightsOverlay.InvalidateVisual();
@@ -342,7 +348,9 @@ public partial class TabSchematics
             isVisible: this.SchematicsLabelEditorOverlay.IsVisible);
 
         this.polylineManager?.UpdateScaleFactor(scale);
+
         this.UpdateComponentLabelsScale(scale);
+
     }
 
     // ###########################################################################################

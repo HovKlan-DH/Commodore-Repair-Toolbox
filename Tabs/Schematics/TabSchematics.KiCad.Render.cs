@@ -31,6 +31,16 @@ namespace CRT;
 // ###########################################################################################
 public partial class TabSchematics
 {
+    // Per-net primitive cache. A hover change alters the appearance of exactly two nets - the one
+    // entered and the one left - but rebuilding the overlay used to recompute all of them, profiled
+    // at ~222 ms with everything selected on a dense board. Caching each net's primitives against
+    // the state they were built for turns that into recomputing two nets.
+    //
+    // The decision of when an entry may be reused lives in KiCadOverlayNetCache, where it is unit
+    // tested: serving an entry that should have been dropped draws copper for a state that no longer
+    // applies, and that looks entirely plausible on screen rather than failing anything.
+    private readonly KiCadOverlayNetCache<KiCadOverlayPrimitive> thisKiCadNetPrimitiveCache = new();
+
     private bool thisIsKiCadOverlayRefreshQueued;
 
     private int thisKiCadOverlayRefreshRequestVersion;
@@ -462,7 +472,41 @@ public partial class TabSchematics
         var primitives = new List<KiCadOverlayPrimitive>();
         var firstPinBrush = this.ResolveThemeBrush("Schematics_FirstPin", new SolidColorBrush(Colors.Orange));
 
-        void AddPadPrimitive(KiCadPcbPad pad, IBrush padBrush)
+        // Everything a cached net depends on beyond its own appearance. Built by
+        // KiCadOverlayCacheKeys so the field list can be tested: a missing field here does not fail a
+        // build, it draws stale copper.
+        string cacheGeneration = KiCadOverlayCacheKeys.BuildGenerationKey(new KiCadOverlaySharedState
+        {
+            BoardScopeKey = this.thisCurrentKiCadRuntimeCacheScopeKey,
+            SchematicName = currentSchematicName,
+            ViewId = view.Id ?? string.Empty,
+            ViewSourceIndex = view.SourceIndex,
+            PrimaryLayer = primaryLayer,
+            ContentRect = contentRect,
+            WorldBounds = worldBounds,
+            CalibrationScaleX = calibration.ScaleX,
+            CalibrationScaleY = calibration.ScaleY,
+            CalibrationOffsetX = calibration.OffsetX,
+            CalibrationOffsetY = calibration.OffsetY,
+            CalibrationMirrorX = calibration.MirrorX,
+            CalibrationMirrorY = calibration.MirrorY,
+            OverlayColor = overlayColor,
+            OppositeTraceColor = oppositeTraceHighlightColor,
+            TranslatedOpacity = translatedOpacity,
+            ShowOppositeSideTraces = showOppositeSideTraces,
+            ShowZones = showZones,
+            IsCalibrationMode = this.thisIsKiCadTraceCalibrationMode,
+            ActiveReferences = activeReferences.ToList(),
+            SelectedReferences = this.thisSelectedKiCadReferences.ToList()
+        });
+
+        this.thisKiCadNetPrimitiveCache.BeginRebuild(cacheGeneration);
+
+        // Built once rather than per net. It does not vary by net, and a dense board runs this loop
+        // 249 times per rebuild.
+        var selectedImportantSignalNetNames = this.BuildSelectedImportantSignalNetNames();
+
+        void AddPadPrimitive(List<KiCadOverlayPrimitive> target, KiCadPcbPad pad, IBrush padBrush)
         {
             if (pad.AbsoluteCenter == null)
             {
@@ -504,7 +548,7 @@ public partial class TabSchematics
                 calibration.MirrorX,
                 calibration.MirrorY);
 
-            primitives.Add(new KiCadOverlayPrimitive
+            target.Add(new KiCadOverlayPrimitive
             {
                 Kind = KiCadPadGeometry.IsRectangularShape(pad.Shape)
                     ? KiCadOverlayPrimitiveKind.Rectangle
@@ -517,6 +561,7 @@ public partial class TabSchematics
         }
 
         void AddTracePrimitivesForLayer(
+            List<KiCadOverlayPrimitive> target,
             KiCadPcbNetRenderCache cache,
             HashSet<string> activeDrawIds,
             IBrush strokeBrush)
@@ -560,7 +605,7 @@ public partial class TabSchematics
                             calibration))
                         .ToList();
 
-                    primitives.Add(new KiCadOverlayPrimitive
+                    target.Add(new KiCadOverlayPrimitive
                     {
                         Kind = KiCadOverlayPrimitiveKind.Polyline,
                         Points = localPoints,
@@ -606,7 +651,7 @@ public partial class TabSchematics
 
                 var sampledArcPoints = this.SampleQuadraticBezier(start, mid, end, 20);
 
-                primitives.Add(new KiCadOverlayPrimitive
+                target.Add(new KiCadOverlayPrimitive
                 {
                     Kind = KiCadOverlayPrimitiveKind.Polyline,
                     Points = sampledArcPoints,
@@ -625,7 +670,6 @@ public partial class TabSchematics
             bool isHoveredNet = string.Equals(activeHoveredKiCadNetName, netInfo.Name, StringComparison.OrdinalIgnoreCase);
             bool isLockedNet = this.thisLockedKiCadNetNames.Contains(netInfo.Name);
 
-            var selectedImportantSignalNetNames = this.BuildSelectedImportantSignalNetNames();
             bool isImportantSignalDerivedNet = selectedImportantSignalNetNames.Contains(netInfo.Name);
 
             bool isExplicitHighlight = isLockedNet || isHoveredNet || isImportantSignalDerivedNet;
@@ -636,7 +680,28 @@ public partial class TabSchematics
             double blinkFactor = shouldBlinkThisNet ? this.thisCurrentHighlightBlinkFactor : 1.0;
             double effectiveOpacity = Math.Clamp(translatedOpacity * blinkFactor, 0.0, 1.0);
 
-            IBrush primaryBrush = isHoveredNet && !shouldBlinkThisNet
+            // Per-net, not global: hovering a component only changes pin-1 marking on that
+            // component's own pads. See KiCadOverlayCacheKeys for why that distinction matters.
+            string hoveredComponentOnThisNet = KiCadOverlayCacheKeys.ResolveHoveredComponentForNet(
+                this.thisHoveredComponentBoardLabel,
+                bucket.Pads.Select(padRef => padRef.Reference));
+
+            var appearance = new KiCadNetAppearance(
+                isExplicitHighlight,
+                isHoveredNet,
+                shouldBlinkThisNet,
+                effectiveOpacity,
+                hoveredComponentOnThisNet);
+
+            if (this.thisKiCadNetPrimitiveCache.TryGet(netInfo.Id, appearance, out var cachedNetPrimitives))
+            {
+                primitives.AddRange(cachedNetPrimitives);
+                continue;
+            }
+
+            var netPrimitives = new List<KiCadOverlayPrimitive>();
+
+            SolidColorBrush primaryBrush = isHoveredNet && !shouldBlinkThisNet
                 ? new SolidColorBrush(overlayColor, 1.0)
                 : new SolidColorBrush(overlayColor, effectiveOpacity);
 
@@ -684,7 +749,7 @@ public partial class TabSchematics
                                 ? Math.Min(1.0, Math.Clamp(translatedOpacity * 0.65, 0.10, 0.38) + 0.12)
                                 : Math.Clamp(effectiveOpacity * 0.65, 0.10, 0.38);
 
-                            primitives.Add(new KiCadOverlayPrimitive
+                            netPrimitives.Add(new KiCadOverlayPrimitive
                             {
                                 Kind = KiCadOverlayPrimitiveKind.Geometry,
                                 Geometry = zoneGeometry,
@@ -694,7 +759,7 @@ public partial class TabSchematics
                         }
                     }
 
-                    AddTracePrimitivesForLayer(oppositeCache, oppositeActiveDrawIds, oppositeBrush);
+                    AddTracePrimitivesForLayer(netPrimitives, oppositeCache, oppositeActiveDrawIds, oppositeBrush);
                 }
             }
 
@@ -739,7 +804,7 @@ public partial class TabSchematics
                         ? 0.32
                         : Math.Clamp(effectiveOpacity * 0.65, 0.10, 0.38);
 
-                    primitives.Add(new KiCadOverlayPrimitive
+                    netPrimitives.Add(new KiCadOverlayPrimitive
                     {
                         Kind = KiCadOverlayPrimitiveKind.Geometry,
                         Geometry = zoneGeometry,
@@ -749,7 +814,7 @@ public partial class TabSchematics
                 }
             }
 
-            AddTracePrimitivesForLayer(primaryCache, primaryActiveDrawIds, primaryBrush);
+            AddTracePrimitivesForLayer(netPrimitives, primaryCache, primaryActiveDrawIds, primaryBrush);
 
             foreach (var viaNode in primaryCache.ViaNodes)
             {
@@ -771,7 +836,7 @@ public partial class TabSchematics
                     contentRect,
                     calibration);
 
-                primitives.Add(new KiCadOverlayPrimitive
+                netPrimitives.Add(new KiCadOverlayPrimitive
                 {
                     Kind = KiCadOverlayPrimitiveKind.Ellipse,
                     Rect = new Rect(
@@ -800,8 +865,11 @@ public partial class TabSchematics
                     ? firstPinBrush
                     : primaryBrush;
 
-                AddPadPrimitive(padNode.Pad, padBrush);
+                AddPadPrimitive(netPrimitives, padNode.Pad, padBrush);
             }
+
+            this.thisKiCadNetPrimitiveCache.Store(netInfo.Id, appearance, netPrimitives);
+            primitives.AddRange(netPrimitives);
         }
 
         if (this.HasPin1HighlightTargetReference())
@@ -829,10 +897,11 @@ public partial class TabSchematics
                         continue;
                     }
 
-                    AddPadPrimitive(pad, firstPinBrush);
+                    AddPadPrimitive(primitives, pad, firstPinBrush);
                 }
             }
         }
+
 
         this.SchematicsKiCadOverlayCanvas.SetGeometry(primitives);
     }

@@ -8,6 +8,11 @@ namespace ClassicRepairToolbox.Tests;
 // column headers are a public contract. These tests build a workbook in that exact shape
 // (see BoardWorkbookBuilder) and assert the reader maps it correctly; if a header constant is
 // renamed without a data migration, they fail.
+// BoardDataReader keeps its loaded boards in a static, non-thread-safe Dictionary. This class and
+// BoardDataWriterTests both add to and remove from it, so they share one collection and run
+// sequentially - the same treatment UserSettings and DataManager already get. Left in parallel,
+// concurrent writes to that dictionary drop entries and a cached board comes back as null.
+[Collection("BoardData")]
 public sealed class BoardDataReaderTests : IDisposable
 {
     private readonly TempWorkspace thisWorkspace = new();

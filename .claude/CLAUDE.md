@@ -93,7 +93,7 @@ number formats.
 | Board data | `BoardDataReader`, `BoardDataWriter`, `BoardComponentHighlightStorage`, `ComponentListBuilder`, `ComponentImageQueries`, `OverviewHtmlBuilder`, `ContactLinkFormatter` |
 | Settings / startup | `UserSettings`, `DataManager` (data-root + master workbook), `DataValidator` (smoke only) |
 | UI construction (`Tests/.../Ui/`) | All eight tabs, built headlessly - see [Headless UI tests](#headless-ui-tests) |
-| Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `KiCadPadGeometry`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry` |
+| Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `KiCadPadGeometry`, `OverlayCullGeometry`, `KiCadOverlayCacheKeys`, `KiCadOverlayNetCache`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry` |
 
 `Handlers/` is where the real coverage is; most of the uncovered remainder is `Tabs/` and `Main/`,
 Avalonia code-behind that is verified by running the app.
@@ -148,7 +148,11 @@ has an `internal` seam; the test project sees them via `InternalsVisibleTo` in t
 
 Use `TempWorkspace` for anything that touches the filesystem; it creates and deletes a temp folder.
 Tests that mutate `UserSettings` or `DataManager` static state live in the `"UserSettings"` and
-`"DataManager"` xUnit collections so they run sequentially.
+`"DataManager"` xUnit collections so they run sequentially. `BoardDataReader` has the same
+problem — its loaded boards sit in a static, non-thread-safe `Dictionary` — so `BoardDataReaderTests`
+and `BoardDataWriterTests` share the `"BoardData"` collection.
+**Any new test class that touches one of these statics must join its collection**, or it will
+pass alone and fail intermittently in the full run.
 
 ### Headless UI tests
 

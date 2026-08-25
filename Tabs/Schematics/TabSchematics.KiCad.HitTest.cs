@@ -59,7 +59,12 @@ public partial class TabSchematics
             return;
 
         this.thisHoveredKiCadNetName = netName;
-        this.RefreshKiCadOverlay();
+
+        // Immediate on purpose. This was briefly debounced while a hover rebuild cost ~262 ms, but
+        // the per-net primitive cache brought that down to ~32 ms, and the delay was worse than the
+        // cost it avoided: moving slowly across traces kept restarting the quiet period, so the
+        // highlight only appeared once the pointer stopped and traces in between were skipped.
+        this.RefreshKiCadOverlay(forceImmediate: true);
     }
 
     // ###########################################################################################
