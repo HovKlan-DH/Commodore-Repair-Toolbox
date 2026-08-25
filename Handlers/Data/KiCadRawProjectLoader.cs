@@ -26,6 +26,7 @@ namespace Handlers.DataHandling
 
             var pcbs = new List<KiCadPcb>();
             var schematics = new List<KiCadSchematic>();
+            var schematicPaths = new List<string>();
 
             foreach (string path in expandedPaths)
             {
@@ -48,16 +49,11 @@ namespace Handlers.DataHandling
 
                 if (string.Equals(extension, ".kicad_sch", StringComparison.OrdinalIgnoreCase))
                 {
-                    await LoadSchematicAndChildSheetsAsync(
-                            path,
-                            null,
-                            schematics,
-                            new HashSet<string>(StringComparer.OrdinalIgnoreCase))
-                        .ConfigureAwait(false);
-
-                    continue;
+                    schematicPaths.Add(path);
                 }
             }
+
+            await LoadSchematicsAsync(schematicPaths, schematics).ConfigureAwait(false);
 
             if (pcbs.Count == 0 && schematics.Count == 0)
             {
@@ -820,25 +816,96 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
-        // Loads a KiCad schematic file and recursively loads any child sheet files referenced by it.
+        // Loads every schematic in a board folder exactly once, starting from its root sheets.
+        //
+        // A hierarchical KiCad design names its child sheets inside the parent, and the board folder
+        // holds those child files too - so treating every .kicad_sch on disk as a root sheet loads
+        // each child twice. The two copies then disagree about their own name: reached through its
+        // parent a sheet is named by that parent's "Sheetname" property, loaded standalone it falls
+        // back to its filename. That name is what a contributor copies into the board workbook's
+        // "CAD name" column, so one sheet offering two names is a trap rather than merely wasteful.
+        //
+        // Root sheets - files no other file references as a child - are therefore identified first,
+        // and the walk runs from those through one shared visited set. Anything still unvisited
+        // afterwards (a reference cycle, or a child whose parent is not in the folder) is then loaded
+        // as its own root, so no sheet is ever silently dropped.
         // ###########################################################################################
-        private static async Task LoadSchematicAndChildSheetsAsync(
-            string path,
-            string? displayName,
-            List<KiCadSchematic> schematics,
-            HashSet<string> visited)
+        private static async Task LoadSchematicsAsync(
+            IReadOnlyList<string> schematicPaths,
+            List<KiCadSchematic> schematics)
         {
-            string fullPath = Path.GetFullPath(path);
+            var parsedRoots = new Dictionary<string, SExpressionNode>(StringComparer.OrdinalIgnoreCase);
 
-            if (!visited.Add(fullPath))
+            foreach (string path in schematicPaths)
             {
-                return;
+                string fullPath = Path.GetFullPath(path);
+
+                if (parsedRoots.ContainsKey(fullPath))
+                {
+                    continue;
+                }
+
+                var parsedRoot = await ReadSchematicRootAsync(fullPath).ConfigureAwait(false);
+
+                if (parsedRoot != null)
+                {
+                    parsedRoots[fullPath] = parsedRoot;
+                }
             }
 
+            var childPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in parsedRoots)
+            {
+                string directory = Path.GetDirectoryName(entry.Key) ?? string.Empty;
+
+                foreach (var sheetRef in ExtractSchematicSheetRefs(entry.Value))
+                {
+                    if (string.IsNullOrWhiteSpace(sheetRef.FileName))
+                    {
+                        continue;
+                    }
+
+                    childPaths.Add(Path.GetFullPath(Path.Combine(directory, sheetRef.FileName)));
+                }
+            }
+
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // Root sheets first, so a child is always reached through its parent and keeps the name
+            // that parent gives it - regardless of where the child sorts in the folder listing.
+            foreach (string path in schematicPaths)
+            {
+                string fullPath = Path.GetFullPath(path);
+
+                if (parsedRoots.ContainsKey(fullPath) && !childPaths.Contains(fullPath))
+                {
+                    await LoadSchematicAndChildSheetsAsync(fullPath, null, schematics, visited, parsedRoots)
+                        .ConfigureAwait(false);
+                }
+            }
+
+            foreach (string path in schematicPaths)
+            {
+                string fullPath = Path.GetFullPath(path);
+
+                if (parsedRoots.ContainsKey(fullPath))
+                {
+                    await LoadSchematicAndChildSheetsAsync(fullPath, null, schematics, visited, parsedRoots)
+                        .ConfigureAwait(false);
+                }
+            }
+        }
+
+        // ###########################################################################################
+        // Reads and parses one KiCad schematic file, returning its root node or null with a warning.
+        // ###########################################################################################
+        private static async Task<SExpressionNode?> ReadSchematicRootAsync(string fullPath)
+        {
             if (!File.Exists(fullPath))
             {
                 Logger.Warning($"KiCad schematic file not found: [{fullPath}]");
-                return;
+                return null;
             }
 
             string content = await File.ReadAllTextAsync(fullPath).ConfigureAwait(false);
@@ -849,6 +916,37 @@ namespace Handlers.DataHandling
             if (root == null)
             {
                 Logger.Warning($"KiCad schematic root not found in file: [{fullPath}]");
+            }
+
+            return root;
+        }
+
+        // ###########################################################################################
+        // Loads a KiCad schematic file and recursively loads any child sheet files referenced by it.
+        // Files already parsed by the caller are reused; a child sheet that was not in the board
+        // folder listing is read from disk here.
+        // ###########################################################################################
+        private static async Task LoadSchematicAndChildSheetsAsync(
+            string path,
+            string? displayName,
+            List<KiCadSchematic> schematics,
+            HashSet<string> visited,
+            IReadOnlyDictionary<string, SExpressionNode> parsedRoots)
+        {
+            string fullPath = Path.GetFullPath(path);
+
+            if (!visited.Add(fullPath))
+            {
+                return;
+            }
+
+            if (!parsedRoots.TryGetValue(fullPath, out var root))
+            {
+                root = await ReadSchematicRootAsync(fullPath).ConfigureAwait(false);
+            }
+
+            if (root == null)
+            {
                 return;
             }
 
@@ -866,7 +964,12 @@ namespace Handlers.DataHandling
 
                 string childPath = Path.Combine(directory, sheetRef.FileName);
 
-                await LoadSchematicAndChildSheetsAsync(childPath, sheetRef.SheetName, schematics, visited)
+                await LoadSchematicAndChildSheetsAsync(
+                        childPath,
+                        sheetRef.SheetName,
+                        schematics,
+                        visited,
+                        parsedRoots)
                     .ConfigureAwait(false);
             }
         }

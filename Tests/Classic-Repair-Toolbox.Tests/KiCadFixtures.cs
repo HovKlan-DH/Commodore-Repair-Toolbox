@@ -97,6 +97,58 @@ internal static class KiCadFixtures
     )
     """;
 
+    // A hierarchical design: the root sheet names its child both by file and by "Sheetname". KiCad
+    // writes the child file into the same folder, so a board folder listing contains both files.
+    public const string SchematicRootWithChildSheet = """
+    (kicad_sch (version 20230121) (generator eeschema)
+      (uuid "aaaaaaaa-0000-0000-0000-000000000001")
+      (wire (pts (xy 10 10) (xy 20 10)))
+      (sheet
+        (at 100 100)
+        (uuid "aaaaaaaa-0000-0000-0000-000000000002")
+        (property "Sheetname" "Power supply")
+        (property "Sheetfile" "child.kicad_sch")
+      )
+    )
+    """;
+
+    // The child of SchematicRootWithChildSheet, which on its own knows nothing about that name.
+    public const string SchematicChildSheet = """
+    (kicad_sch (version 20230121) (generator eeschema)
+      (uuid "bbbbbbbb-0000-0000-0000-000000000001")
+      (wire (pts (xy 30 30) (xy 40 30)))
+      (label "VCC" (at 35 30 0))
+    )
+    """;
+
+    // Two sheets that reference each other. No file is a root, so a naive "start from the roots"
+    // walk would load neither.
+    public const string SchematicCycleA = """
+    (kicad_sch (version 20230121) (generator eeschema)
+      (uuid "cccccccc-0000-0000-0000-000000000001")
+      (wire (pts (xy 1 1) (xy 2 1)))
+      (sheet
+        (at 10 10)
+        (uuid "cccccccc-0000-0000-0000-000000000002")
+        (property "Sheetname" "B side")
+        (property "Sheetfile" "cycleB.kicad_sch")
+      )
+    )
+    """;
+
+    public const string SchematicCycleB = """
+    (kicad_sch (version 20230121) (generator eeschema)
+      (uuid "dddddddd-0000-0000-0000-000000000001")
+      (wire (pts (xy 3 3) (xy 4 3)))
+      (sheet
+        (at 10 10)
+        (uuid "dddddddd-0000-0000-0000-000000000002")
+        (property "Sheetname" "A side")
+        (property "Sheetfile" "cycleA.kicad_sch")
+      )
+    )
+    """;
+
     public const string Schematic = """
     (kicad_sch (version 20230121) (generator eeschema)
       (uuid "11111111-2222-3333-4444-555555555555")

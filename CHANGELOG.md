@@ -10,6 +10,7 @@
     - Fixed KiCad rectangular and oval pads ignored their rotation
     - Fixed KiCad pads on bottom side components were placed mirrored
     - Fixed KiCad traces would not highlight when selecting a component on the bottom side of a board
+    - Fixed KiCad hierarchical sheets were loaded twice, listing the same schematic under two different "CAD name" values in the log
     - Fixed missing page overflow scrollbar in "Configuration" tab
     - Fixed missing page overflow scrollbar in "Contribution" tab
     - Fixed closing MiniPro IC test would require two clicks on test IC button to go to test again
@@ -19,4 +20,4 @@
     - Fixed oscilloscope image dump could leave the connection out of sync, so all following commands would read the previous commands response
     - Fixed some buttons would reveal text below when hovering with mouse
     - Fixed Linux proper maximizes the application window at launch, if this was its last state
-    - Refactored several parts of project for more efficient AI development, including unit/UI test coverage (851 cases and ~27% coverage total)
+    - Refactored several parts of project for more efficient AI development, including unit/UI test coverage (858 cases and ~27% coverage total)

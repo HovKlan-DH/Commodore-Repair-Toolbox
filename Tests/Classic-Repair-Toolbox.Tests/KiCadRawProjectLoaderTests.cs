@@ -270,6 +270,126 @@ public sealed class KiCadRawProjectLoaderTests : IDisposable
         Assert.Equal("CLK", pad2.Net.NormalizedName);
     }
 
+    // ------------------------------------------------------- hierarchical sheets
+
+    // A hierarchical KiCad design keeps its child sheets in the same folder as the root sheet, so
+    // the board folder listing hands the loader both files. Treating each of them as a root sheet
+    // used to load every child twice - and the two copies disagreed about their own name, because a
+    // sheet reached through its parent is named by that parent's "Sheetname" while a sheet loaded
+    // standalone falls back to its filename. That name is what a contributor copies into the board
+    // workbook's "CAD name" column, so the duplicate was a data-entry trap and not just wasted work.
+
+    [Fact]
+    public async Task A_child_sheet_listed_beside_its_parent_is_loaded_only_once()
+    {
+        string parent = this.thisWorkspace.WriteFile("root.kicad_sch", KiCadFixtures.SchematicRootWithChildSheet);
+        string child = this.thisWorkspace.WriteFile("child.kicad_sch", KiCadFixtures.SchematicChildSheet);
+
+        KiCadProjectRoot? root = await this.LoadAsync(parent, child);
+
+        Assert.Equal(2, root!.Schematics.Count);
+        Assert.Equal(
+            new[] { "child.kicad_sch", "root.kicad_sch" },
+            root.Schematics.Select(schematic => schematic.Filename).OrderBy(name => name).ToArray());
+    }
+
+    [Fact]
+    public async Task A_child_sheet_is_named_by_its_parent_rather_than_by_its_filename()
+    {
+        string parent = this.thisWorkspace.WriteFile("root.kicad_sch", KiCadFixtures.SchematicRootWithChildSheet);
+        string child = this.thisWorkspace.WriteFile("child.kicad_sch", KiCadFixtures.SchematicChildSheet);
+
+        KiCadProjectRoot? root = await this.LoadAsync(parent, child);
+
+        Assert.Equal(
+            new[] { "Power supply", "root" },
+            root!.Project.Views.Select(view => view.DisplayName).OrderBy(name => name).ToArray());
+    }
+
+    [Fact]
+    public async Task A_child_sheet_keeps_its_parents_name_even_when_it_is_listed_first()
+    {
+        // The board folder is listed alphabetically, so "child.kicad_sch" reaches the loader before
+        // "root.kicad_sch". Order must not decide which name a sheet ends up with.
+        string parent = this.thisWorkspace.WriteFile("root.kicad_sch", KiCadFixtures.SchematicRootWithChildSheet);
+        string child = this.thisWorkspace.WriteFile("child.kicad_sch", KiCadFixtures.SchematicChildSheet);
+
+        KiCadProjectRoot? root = await this.LoadAsync(child, parent);
+
+        Assert.Equal(2, root!.Schematics.Count);
+        Assert.Contains(root.Project.Views, view => view.DisplayName == "Power supply");
+        Assert.DoesNotContain(root.Project.Views, view => view.DisplayName == "child");
+    }
+
+    [Fact]
+    public async Task The_root_sheet_is_loaded_first_so_page_ordinals_start_at_it()
+    {
+        // A board whose "CAD name" column is blank falls back to matching "Schematics #1 of 2" by
+        // page ordinal, which indexes the schematic views in load order. Page 1 must be the root
+        // sheet, not whichever child happened to sort first on disk.
+        string parent = this.thisWorkspace.WriteFile("root.kicad_sch", KiCadFixtures.SchematicRootWithChildSheet);
+        string child = this.thisWorkspace.WriteFile("child.kicad_sch", KiCadFixtures.SchematicChildSheet);
+
+        KiCadProjectRoot? root = await this.LoadAsync(child, parent);
+
+        Assert.Equal("root.kicad_sch", root!.Schematics[0].Filename);
+        Assert.Equal("child.kicad_sch", root.Schematics[1].Filename);
+    }
+
+    [Fact]
+    public async Task A_child_sheet_that_was_not_listed_is_still_loaded_from_disk()
+    {
+        // Only the root sheet is handed to the loader; the child must still be followed and named.
+        string parent = this.thisWorkspace.WriteFile("root.kicad_sch", KiCadFixtures.SchematicRootWithChildSheet);
+        this.thisWorkspace.WriteFile("child.kicad_sch", KiCadFixtures.SchematicChildSheet);
+
+        KiCadProjectRoot? root = await this.LoadAsync(parent);
+
+        Assert.Equal(2, root!.Schematics.Count);
+        Assert.Contains(root.Project.Views, view => view.DisplayName == "Power supply");
+    }
+
+    [Fact]
+    public async Task Sheets_that_only_reference_each_other_are_still_loaded_once_each()
+    {
+        // Neither file is a root, so a walk that only starts from root sheets would load nothing.
+        // Every sheet must survive, and the cycle must not recurse forever.
+        string a = this.thisWorkspace.WriteFile("cycleA.kicad_sch", KiCadFixtures.SchematicCycleA);
+        string b = this.thisWorkspace.WriteFile("cycleB.kicad_sch", KiCadFixtures.SchematicCycleB);
+
+        KiCadProjectRoot? root = await this.LoadAsync(a, b);
+
+        Assert.Equal(2, root!.Schematics.Count);
+        Assert.Equal(
+            new[] { "cycleA.kicad_sch", "cycleB.kicad_sch" },
+            root.Schematics.Select(schematic => schematic.Filename).OrderBy(name => name).ToArray());
+    }
+
+    [Fact]
+    public async Task Every_loaded_schematic_gets_exactly_one_view_so_the_log_can_name_it()
+    {
+        // The startup log prints one "Display name" line per view, grouped by source file, and that
+        // is where a contributor reads the value for the workbook's "CAD name" column. One view per
+        // schematic is what makes that listing complete and unambiguous.
+        string parent = this.thisWorkspace.WriteFile("root.kicad_sch", KiCadFixtures.SchematicRootWithChildSheet);
+        string child = this.thisWorkspace.WriteFile("child.kicad_sch", KiCadFixtures.SchematicChildSheet);
+        string pcb = this.WritePcb();
+
+        KiCadProjectRoot? root = await this.LoadAsync(pcb, parent, child);
+
+        var schematicViews = root!.Project.Views
+            .Where(view => view.Type == "schematic")
+            .ToList();
+
+        Assert.Equal(root.Schematics.Count, schematicViews.Count);
+        Assert.Equal(
+            schematicViews.Count,
+            schematicViews.Select(view => view.DisplayName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+
+        // Two PCB views (top and bottom) plus one per schematic.
+        Assert.Equal((root.Pcb.Count * 2) + root.Schematics.Count, root.Project.Views.Count);
+    }
+
     // ---------------------------------------------------------------------- routing
 
     [Fact]
