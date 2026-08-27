@@ -404,11 +404,23 @@ namespace Handlers.DataHandling
         // ###########################################################################################
         public static HashSet<string> CollectReferencedLocalFiles(string excelPath)
         {
-            var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            TryCollectReferencedLocalFiles(excelPath, out var files);
+            return files;
+        }
+
+        // ###########################################################################################
+        // Same collection, but reports whether the workbook could actually be read. Orphan cleanup
+        // uses this: a workbook that FAILS to read references an unknown set of files, which is not
+        // the same as referencing none - treating it as empty would orphan that board's assets.
+        // A missing workbook returns true with an empty set (an absent file references nothing).
+        // ###########################################################################################
+        public static bool TryCollectReferencedLocalFiles(string excelPath, out HashSet<string> files)
+        {
+            files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             if (string.IsNullOrWhiteSpace(excelPath) || !File.Exists(excelPath))
             {
-                return files;
+                return true;
             }
 
             ExcelPackage.License.SetNonCommercialPersonal("Dennis Helligsø");
@@ -453,13 +465,15 @@ namespace Handlers.DataHandling
                         files.Add(file);
                     }
                 }
+
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.Warning($"Failed to collect referenced local files from board Excel file [{excelPath}] - [{ex.Message}]");
+                files.Clear();
+                return false;
             }
-
-            return files;
         }
 
         // ###########################################################################################

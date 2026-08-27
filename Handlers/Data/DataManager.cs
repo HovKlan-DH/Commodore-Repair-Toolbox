@@ -664,7 +664,9 @@ namespace Handlers.DataHandling
             var protectedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             protectedFiles.Add(thisNormalizeRelativePath(userContributionRelativePath));
 
-            var contributionEntries = thisReadHardwareBoardEntriesFromWorkbook(userContributionFullPath);
+            // Protection building stays tolerant: an unreadable sidecar simply protects fewer
+            // files here. The destructive path (orphan cleanup) checks the result and aborts.
+            thisTryReadHardwareBoardEntriesFromWorkbook(userContributionFullPath, out var contributionEntries);
 
             foreach (var contributionEntry in contributionEntries)
             {
@@ -843,7 +845,7 @@ namespace Handlers.DataHandling
 
                     if (File.Exists(userContributionFullPath))
                     {
-                        var contributionEntries = thisReadHardwareBoardEntriesFromWorkbook(userContributionFullPath);
+                        thisTryReadHardwareBoardEntriesFromWorkbook(userContributionFullPath, out var contributionEntries);
 
                         if (contributionEntries.Count > 0)
                         {
@@ -1109,11 +1111,13 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
-        // Reads hardware and board entries from a main-format Excel workbook.
+        // Reads hardware and board entries from a main-format Excel workbook. Returns false when the
+        // workbook cannot be read or does not contain the expected sheet and headers - callers that
+        // delete based on the result (orphan cleanup) must treat that as "unknown", not as "empty".
         // ###########################################################################################
-        private static List<HardwareBoardEntry> thisReadHardwareBoardEntriesFromWorkbook(string excelPath)
+        private static bool thisTryReadHardwareBoardEntriesFromWorkbook(string excelPath, out List<HardwareBoardEntry> entries)
         {
-            var entries = new List<HardwareBoardEntry>();
+            entries = new List<HardwareBoardEntry>();
 
             ExcelPackage.License.SetNonCommercialPersonal("Dennis Helligsø");
 
@@ -1125,8 +1129,8 @@ namespace Handlers.DataHandling
 
                 if (sheet == null)
                 {
-                    Logger.Warning($"Sheet [{SheetHardwareBoard}] not found in user contribution main Excel file");
-                    return entries;
+                    Logger.Warning($"Sheet [{SheetHardwareBoard}] not found in main-format Excel file [{excelPath}]");
+                    return false;
                 }
 
                 var hardwareRequiredCols = new[] { ColHardwareName, ColBoardName, ColExcelDataFile, ColHardwareNotes };
@@ -1134,8 +1138,8 @@ namespace Handlers.DataHandling
 
                 if (colMap == null)
                 {
-                    Logger.Warning($"Header row not found in user contribution [{SheetHardwareBoard}] sheet");
-                    return entries;
+                    Logger.Warning($"Header row not found in [{SheetHardwareBoard}] sheet of [{excelPath}]");
+                    return false;
                 }
 
                 int maxRow = sheet.Dimension?.End.Row ?? 0;
@@ -1170,13 +1174,15 @@ namespace Handlers.DataHandling
                         HardwareNotes = notes
                     });
                 }
+
+                return true;
             }
             catch (Exception ex)
             {
-                Logger.Warning($"Failed to read user contribution main Excel file [{excelPath}] - [{ex.Message}]");
+                Logger.Warning($"Failed to read main-format Excel file [{excelPath}] - [{ex.Message}]");
+                entries.Clear();
+                return false;
             }
-
-            return entries;
         }
 
         // ###########################################################################################
@@ -1204,6 +1210,10 @@ namespace Handlers.DataHandling
         // files, board Excel files, board JSON sidecars, and KiCad files. Deletions are strictly
         // contained inside the data root and only run while launch-time data sync is enabled.
         // Empty directories left behind are removed afterwards, still strictly within the data root.
+        // FAIL CLOSED: this is the only code path that deletes user files, so it refuses to run when
+        // the referenced-file map could be incomplete - no manifest snapshot (offline launch or a
+        // failed fetch), a missing resolved main workbook, or any workbook that exists but cannot
+        // be read. Every gap in the map would otherwise become a deletion.
         // ###########################################################################################
         public static async Task<int> DeleteOrphanAndUnusedFilesAsync()
         {
@@ -1219,9 +1229,28 @@ namespace Handlers.DataHandling
                 return 0;
             }
 
+            return await DeleteOrphanAndUnusedFilesAsync(_lastFetchedManifest);
+        }
+
+        // ###########################################################################################
+        // The cleanup itself, with the manifest snapshot passed in explicitly. The public overload
+        // above applies the user-setting gates and hands over the last fetched manifest; the test
+        // suite calls this one directly so it can control the snapshot without touching UserSettings.
+        // ###########################################################################################
+        internal static async Task<int> DeleteOrphanAndUnusedFilesAsync(List<DataFileEntry>? manifestSnapshot)
+        {
             if (string.IsNullOrWhiteSpace(_dataRoot) || !Directory.Exists(_dataRoot))
             {
                 Logger.Warning("Orphan/non-used file cleanup skipped - data root is not available");
+                return 0;
+            }
+
+            // Fail closed: with no manifest snapshot (offline launch, failed fetch) there is no
+            // authority on which files the server provides, so "orphan" cannot be determined and
+            // every unreferenced-but-legitimate file would be deleted.
+            if (manifestSnapshot == null || manifestSnapshot.Count == 0)
+            {
+                Logger.Warning("Orphan/non-used file cleanup skipped - no online manifest snapshot is available (offline or failed sync), so orphans cannot be identified safely");
                 return 0;
             }
 
@@ -1232,7 +1261,15 @@ namespace Handlers.DataHandling
                 return await Task.Run(() =>
                 {
                     string dataRootFullPath = thisEnsureTrailingDirectorySeparator(Path.GetFullPath(_dataRoot));
-                    var mappedFiles = CollectAllReferencedDataFiles(dataRootFullPath);
+                    var mappedFiles = CollectAllReferencedDataFiles(dataRootFullPath, manifestSnapshot);
+
+                    // Fail closed: an incomplete map means an unknown set of files would be
+                    // wrongly classified as orphans, so nothing may be deleted.
+                    if (mappedFiles == null)
+                    {
+                        Logger.Warning("Orphan/non-used file cleanup aborted - the referenced-file map could not be built completely, nothing was deleted");
+                        return 0;
+                    }
 
                     Logger.Info(
                         $"Starting orphan/non-used file cleanup inside data root [{dataRootFullPath}] with [{mappedFiles.Count}] mapped files");
@@ -1284,16 +1321,18 @@ namespace Handlers.DataHandling
 
         // ###########################################################################################
         // Builds the full referenced-file map used by orphan cleanup across the online manifest,
-        // all main workbooks, and all referenced board workbooks.
+        // all main workbooks, and all referenced board workbooks. Returns null when the map could
+        // not be built completely (a workbook that exists but fails to read, or a missing resolved
+        // main workbook) - the caller must then abort the cleanup rather than delete on a gap.
         // ###########################################################################################
-        private static HashSet<string> CollectAllReferencedDataFiles(string dataRootFullPath)
+        private static HashSet<string>? CollectAllReferencedDataFiles(string dataRootFullPath, List<DataFileEntry>? manifestSnapshot)
         {
             var mappedFiles = new HashSet<string>(
                 OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
                     ? StringComparer.OrdinalIgnoreCase
                     : StringComparer.Ordinal);
 
-            thisAddMappedFilesFromManifestSnapshot(mappedFiles, dataRootFullPath);
+            thisAddMappedFilesFromManifestSnapshot(mappedFiles, dataRootFullPath, manifestSnapshot);
 
             var mainExcelRelativePaths = thisGetAllMainExcelRelativePaths(dataRootFullPath);
 
@@ -1307,7 +1346,10 @@ namespace Handlers.DataHandling
                 Logger.Info(
                     $"Orphan cleanup will map only resolved main Excel data file: [{resolvedMainExcelRelativePath}]");
 
-                thisAddMappedFilesFromMainExcel(mappedFiles, dataRootFullPath, resolvedMainExcelRelativePath);
+                if (!thisTryAddMappedFilesFromMainExcel(mappedFiles, dataRootFullPath, resolvedMainExcelRelativePath))
+                {
+                    return null;
+                }
             }
             else
             {
@@ -1316,7 +1358,10 @@ namespace Handlers.DataHandling
 
                 foreach (string mainExcelRelativePath in mainExcelRelativePaths)
                 {
-                    thisAddMappedFilesFromMainExcel(mappedFiles, dataRootFullPath, mainExcelRelativePath);
+                    if (!thisTryAddMappedFilesFromMainExcel(mappedFiles, dataRootFullPath, mainExcelRelativePath))
+                    {
+                        return null;
+                    }
                 }
             }
 
@@ -1333,9 +1378,10 @@ namespace Handlers.DataHandling
         // ###########################################################################################
         private static void thisAddMappedFilesFromManifestSnapshot(
             HashSet<string> mappedFiles,
-            string dataRootFullPath)
+            string dataRootFullPath,
+            List<DataFileEntry>? manifestSnapshot)
         {
-            if (_lastFetchedManifest == null || _lastFetchedManifest.Count == 0)
+            if (manifestSnapshot == null || manifestSnapshot.Count == 0)
             {
                 Logger.Warning("No online manifest snapshot was available for orphan cleanup mapping");
                 return;
@@ -1343,7 +1389,7 @@ namespace Handlers.DataHandling
 
             int originalCount = mappedFiles.Count;
 
-            foreach (DataFileEntry entry in _lastFetchedManifest)
+            foreach (DataFileEntry entry in manifestSnapshot)
             {
                 thisTryAddMappedRelativePath(mappedFiles, dataRootFullPath, entry.File, "online manifest");
             }
@@ -1376,9 +1422,10 @@ namespace Handlers.DataHandling
 
         // ###########################################################################################
         // Adds all referenced files from one main Excel workbook and its optional user-contribution
-        // sidecar workbook into the orphan-cleanup mapped-file set.
+        // sidecar workbook into the orphan-cleanup mapped-file set. Returns false when the map would
+        // be incomplete: the main workbook is missing, or any workbook exists but cannot be read.
         // ###########################################################################################
-        private static void thisAddMappedFilesFromMainExcel(
+        private static bool thisTryAddMappedFilesFromMainExcel(
             HashSet<string> mappedFiles,
             string dataRootFullPath,
             string mainExcelRelativePath)
@@ -1392,12 +1439,20 @@ namespace Handlers.DataHandling
             if (!File.Exists(mainExcelFullPath))
             {
                 Logger.Warning($"Main Excel data file missing during orphan cleanup mapping: [{mainExcelRelativePath}]");
-                return;
+                return false;
             }
 
-            foreach (HardwareBoardEntry entry in thisReadHardwareBoardEntriesFromWorkbook(mainExcelFullPath))
+            if (!thisTryReadHardwareBoardEntriesFromWorkbook(mainExcelFullPath, out List<HardwareBoardEntry> entries))
             {
-                thisAddMappedFilesFromBoardExcel(mappedFiles, dataRootFullPath, entry.ExcelDataFile);
+                return false;
+            }
+
+            foreach (HardwareBoardEntry entry in entries)
+            {
+                if (!thisTryAddMappedFilesFromBoardExcel(mappedFiles, dataRootFullPath, entry.ExcelDataFile))
+                {
+                    return false;
+                }
             }
 
             string userContributionRelativePath = thisGetUserContributionMainExcelRelativePathFor(mainExcelRelativePath);
@@ -1407,7 +1462,7 @@ namespace Handlers.DataHandling
 
             if (!File.Exists(userContributionFullPath))
             {
-                return;
+                return true;
             }
 
             thisTryAddMappedRelativePath(
@@ -1416,16 +1471,31 @@ namespace Handlers.DataHandling
                 userContributionRelativePath,
                 "user contribution main Excel data file");
 
-            foreach (HardwareBoardEntry entry in thisReadHardwareBoardEntriesFromWorkbook(userContributionFullPath))
+            // The sidecar names the user's own local-only boards, so an unreadable sidecar means
+            // exactly those unrestorable files would be misclassified as orphans - fail closed.
+            if (!thisTryReadHardwareBoardEntriesFromWorkbook(userContributionFullPath, out List<HardwareBoardEntry> contributionEntries))
             {
-                thisAddMappedFilesFromBoardExcel(mappedFiles, dataRootFullPath, entry.ExcelDataFile);
+                return false;
             }
+
+            foreach (HardwareBoardEntry entry in contributionEntries)
+            {
+                if (!thisTryAddMappedFilesFromBoardExcel(mappedFiles, dataRootFullPath, entry.ExcelDataFile))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         // ###########################################################################################
         // Adds one board Excel file and all files it uses to the orphan-cleanup mapped-file set.
+        // Returns false when the board workbook exists but cannot be read - its reference set is
+        // then unknown, which is not the same as empty. A missing board workbook is fine: it
+        // references nothing, and its synced assets stay protected through the manifest snapshot.
         // ###########################################################################################
-        private static void thisAddMappedFilesFromBoardExcel(
+        private static bool thisTryAddMappedFilesFromBoardExcel(
             HashSet<string> mappedFiles,
             string dataRootFullPath,
             string boardExcelRelativePath)
@@ -1433,7 +1503,7 @@ namespace Handlers.DataHandling
             string normalizedBoardExcelRelativePath = thisNormalizeRelativePath(boardExcelRelativePath);
             if (string.IsNullOrWhiteSpace(normalizedBoardExcelRelativePath))
             {
-                return;
+                return true;
             }
 
             thisTryAddMappedRelativePath(
@@ -1456,10 +1526,16 @@ namespace Handlers.DataHandling
 
             if (!File.Exists(boardExcelFullPath))
             {
-                return;
+                return true;
             }
 
-            foreach (string referencedFile in BoardDataReader.CollectReferencedLocalFiles(boardExcelFullPath))
+            if (!BoardDataReader.TryCollectReferencedLocalFiles(boardExcelFullPath, out HashSet<string> referencedFiles))
+            {
+                Logger.Warning($"Board Excel data file could not be read during orphan cleanup mapping: [{normalizedBoardExcelRelativePath}]");
+                return false;
+            }
+
+            foreach (string referencedFile in referencedFiles)
             {
                 thisTryAddMappedRelativePath(mappedFiles, dataRootFullPath, referencedFile, "board Excel referenced file");
             }
@@ -1469,7 +1545,7 @@ namespace Handlers.DataHandling
 
             if (!Directory.Exists(kiCadDirectory))
             {
-                return;
+                return true;
             }
 
             foreach (string kiCadFile in Directory.EnumerateFiles(kiCadDirectory, "*", SearchOption.AllDirectories))
@@ -1477,6 +1553,8 @@ namespace Handlers.DataHandling
                 string relativeKiCadFile = thisNormalizeRelativePath(Path.GetRelativePath(dataRootFullPath, kiCadFile));
                 thisTryAddMappedRelativePath(mappedFiles, dataRootFullPath, relativeKiCadFile, "KiCad data file");
             }
+
+            return true;
         }
 
         // ###########################################################################################
