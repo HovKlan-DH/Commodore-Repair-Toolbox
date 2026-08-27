@@ -1,5 +1,6 @@
 ﻿using Handlers.DataHandling;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -9,8 +10,30 @@ namespace CRT
     public static class ExternalTargetLauncher
     {
         // ###########################################################################################
+        // File extensions the launcher will hand to the OS shell. TryStart uses ShellExecute, and
+        // the shell RUNS executables, scripts and shortcuts rather than displaying them - so a
+        // *.exe/*.bat/*.lnk inside the (network-synced, community-contributed) data root must never
+        // become code execution just because a workbook cell references it. Only the document,
+        // image and data formats that board data actually contains are openable; anything else,
+        // including a file with no extension, is rejected (fail closed). Extend this set when board
+        // data legitimately gains a new non-executable file type.
+        // ###########################################################################################
+        private static readonly HashSet<string> AllowedFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            // Images
+            ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg",
+            // Documents
+            ".pdf", ".txt", ".md", ".html", ".htm", ".csv",
+            // Data
+            ".json", ".xml", ".xlsx", ".xls",
+            // Domain-specific files shipped with board data (scope captures, CAD schematics)
+            ".fsc", ".sch", ".kicad_pcb", ".kicad_sch"
+        };
+
+        // ###########################################################################################
         // Opens a validated external target. Allowed URI schemes are HTTP/HTTPS/mailto, and local
-        // files must resolve inside the configured data-root boundary.
+        // files must resolve inside the configured data-root boundary and carry an extension from
+        // the document/image/data allowlist above - never an executable, script or shortcut.
         // ###########################################################################################
         public static bool TryOpen(string target, string? dataRootOverride = null)
         {
@@ -57,7 +80,8 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Resolves a local file path and rejects anything outside the configured data-root.
+        // Resolves a local file path and rejects anything outside the configured data-root, plus
+        // any file whose extension is not on the openable-document allowlist.
         // Relative paths are resolved against data-root; absolute paths must still stay inside it.
         // ###########################################################################################
         private static bool TryResolveDataRootScopedFilePath(string target, string dataRoot, out string localPath)
@@ -85,6 +109,9 @@ namespace CRT
                 if (!normalizedTarget.StartsWith(normalizedDataRootWithSeparator, pathComparison))
                     return false;
 
+                if (!ExternalTargetLauncher.HasAllowedFileExtension(normalizedTarget))
+                    return false;
+
                 if (!File.Exists(normalizedTarget))
                     return false;
 
@@ -95,6 +122,19 @@ namespace CRT
             {
                 return false;
             }
+        }
+
+        // ###########################################################################################
+        // Returns whether the normalized path carries an extension from the openable allowlist.
+        // The extension is taken from the already-normalized full path, so Windows quirks like
+        // trailing dots or alternate data streams cannot smuggle a second, executable extension.
+        // ###########################################################################################
+        private static bool HasAllowedFileExtension(string normalizedPath)
+        {
+            string extension = Path.GetExtension(normalizedPath);
+
+            return !string.IsNullOrEmpty(extension) &&
+                   ExternalTargetLauncher.AllowedFileExtensions.Contains(extension);
         }
 
         // ###########################################################################################

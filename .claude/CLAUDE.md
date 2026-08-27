@@ -366,8 +366,9 @@ contribution, not a code change.
   conditional `ItemGroup` in [Classic-Repair-Toolbox.csproj](../Classic-Repair-Toolbox.csproj).
 - `Security/ExternalTargetLauncher` — the only sanctioned way to open an external link or local file from
   the UI; it restricts targets to HTTP/HTTPS/mailto URIs or local paths that resolve inside the current
-  data root, rejecting anything else. Use this rather than shelling out directly when opening
-  user/data-supplied links or files.
+  data root *and* carry a document/image/data file extension from its allowlist (it hands files to the
+  OS shell, which would run a `.exe`/`.bat`/`.lnk` instead of displaying it), rejecting anything else.
+  Use this rather than shelling out directly when opening user/data-supplied links or files.
 
 ## Release process
 

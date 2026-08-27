@@ -957,22 +957,43 @@ namespace Handlers.DataHandling
             }
         }
 
+        private static readonly JsonSerializerOptions SaveJsonOptions = new() { WriteIndented = true };
+
         // ###########################################################################################
-        // Serializes current settings and writes them to the JSON file.
+        // Serializes current settings and writes them to the JSON file. The write goes to a
+        // sibling ".tmp" file which is then swapped over the real one (the same pattern
+        // OnlineServices.DownloadFileAsync uses): an in-place write truncates first, so a crash,
+        // power loss or full disk mid-write would wipe every preference at once and the next
+        // launch would silently fall back to defaults. With the swap, a failed save loses only
+        // that one save - the previous file stays intact and parseable.
         // ###########################################################################################
         private static void Save()
         {
             if (string.IsNullOrEmpty(_settingsFilePath))
                 return;
 
+            string tempPath = _settingsFilePath + ".tmp";
+
             try
             {
-                var json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(_settingsFilePath, json);
+                var json = JsonSerializer.Serialize(_data, SaveJsonOptions);
+                File.WriteAllText(tempPath, json);
+
+                // File.Replace, not File.Move: on Windows a rename-over cannot displace a file
+                // that another handle (backup tool, sync client, antivirus) has open for reading,
+                // while ReplaceFile swaps the names and succeeds. Move only ever runs for the
+                // very first save, when no settings file exists yet to replace.
+                if (File.Exists(_settingsFilePath))
+                    File.Replace(tempPath, _settingsFilePath, destinationBackupFileName: null, ignoreMetadataErrors: true);
+                else
+                    File.Move(tempPath, _settingsFilePath);
             }
             catch (Exception ex)
             {
                 Logger.Warning($"Failed to save settings: [{ex.Message}]");
+
+                // Clean up the temp file if it was left behind
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
             }
         }
 

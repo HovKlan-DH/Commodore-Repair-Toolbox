@@ -221,6 +221,67 @@ public sealed class UserSettingsTests : IDisposable
         Assert.Equal("NTSC", UserSettings.Region);
     }
 
+    // ------------------------------------------------------------- atomic saving
+    //
+    // Save must never write the settings file in place: an in-place write truncates first, so a
+    // crash, power loss or full disk in that window destroys EVERY preference at once, and the
+    // next launch silently falls back to defaults. Save therefore writes a sibling ".tmp" file
+    // and swaps it over the real one (the same pattern OnlineServices.DownloadFileAsync uses).
+    // A hard crash mid-write cannot be forced from a unit test, so these tests pin the two
+    // observable halves of that mechanism instead: the swap (not an in-place write) is what
+    // touches the real file, and a temp left behind by a crash is harmless and cleaned up.
+
+    [Fact]
+    public void Saving_succeeds_while_another_handle_reads_the_settings_file()
+    {
+        // Backup tools, sync clients and antivirus scanners read the settings file while the app
+        // runs. On Windows an in-place rewrite needs write access and dies on a sharing
+        // violation, silently losing the change; the atomic swap only needs to replace the name,
+        // which a read-sharing handle permits. (Unix does not enforce sharing modes, so there
+        // this documents the swap; on Windows it proves it.)
+        string path = this.LoadSettings("""{"region": "PAL"}""");
+
+        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete))
+        {
+            UserSettings.Region = "NTSC";
+        }
+
+        UserSettings.LoadFrom(path);
+        Assert.Equal("NTSC", UserSettings.Region);
+    }
+
+    [Fact]
+    public void A_leftover_temp_file_from_a_crashed_save_is_harmless_and_cleaned_up()
+    {
+        // A crash between writing the temp and swapping it in leaves "<settings>.tmp" behind
+        // while the real file stays intact. The next load must read the real file, and the next
+        // save must clear the leftover away instead of accumulating it forever.
+        string path = this.LoadSettings("""{"region": "NTSC"}""");
+        string tempPath = path + ".tmp";
+        File.WriteAllText(tempPath, "{ garbage from a crashed save");
+
+        UserSettings.LoadFrom(path);
+        Assert.Equal("NTSC", UserSettings.Region);
+
+        UserSettings.OscilloscopePort = 4242;
+
+        Assert.False(File.Exists(tempPath), "a successful save must leave no .tmp file behind");
+        Assert.Equal(4242, ReadJson(path)["oscilloscopePort"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public void A_save_that_cannot_complete_leaves_the_previous_settings_file_intact()
+    {
+        // Fail closed: blocking the temp path (a directory squats on the name) makes the save
+        // fail before the swap, so the real file must still hold the old, parseable content.
+        string path = this.LoadSettings("""{"region": "NTSC"}""");
+        Directory.CreateDirectory(path + ".tmp");
+
+        UserSettings.Region = "PAL";   // save fails silently - logged, not thrown
+
+        Assert.Equal("NTSC", ReadJson(path)["region"]!.GetValue<string>());
+    }
+
     // ------------------------------------------------------------- per-board values
 
     [Fact]

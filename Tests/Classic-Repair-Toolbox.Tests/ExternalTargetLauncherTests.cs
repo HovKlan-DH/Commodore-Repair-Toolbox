@@ -201,6 +201,77 @@ public sealed class ExternalTargetLauncherTests : IDisposable
         Assert.False(TryResolveDataRootScopedFilePath(target, this.thisDataRoot, out _));
     }
 
+    // ------------------------------------------------------- file-extension allowlist
+    //
+    // TryStart hands the resolved path to the OS shell (UseShellExecute = true), and the shell
+    // RUNS executables, scripts and shortcuts rather than displaying them. Board data is synced
+    // from the network and community-contributed, so a *.exe/*.bat/*.lnk landing inside the data
+    // root must never become code execution just because a workbook cell references it. Only
+    // document, image and data formats may be opened; anything else fails closed.
+    //
+    // These cases stay on the private predicate on purpose: planting "tool.exe" and calling the
+    // public TryOpen would hand the file to the OS shell if the check ever regressed.
+
+    /// <summary>Creates a harmless file inside the temp data root and returns its relative path.</summary>
+    private string PlantDataRootFile(string fileName)
+    {
+        string relative = Path.Combine("Commodore", "C64", fileName);
+        File.WriteAllText(Path.Combine(this.thisDataRoot, relative), "planted by test");
+        return relative;
+    }
+
+    [Theory]
+    [InlineData("tool.exe")]
+    [InlineData("script.bat")]
+    [InlineData("script.cmd")]
+    [InlineData("legacy.com")]
+    [InlineData("screensaver.scr")]
+    [InlineData("script.ps1")]
+    [InlineData("script.vbs")]
+    [InlineData("script.js")]
+    [InlineData("installer.msi")]
+    [InlineData("shortcut.lnk")]
+    [InlineData("library.dll")]
+    [InlineData("script.sh")]
+    [InlineData("launcher.desktop")]
+    [InlineData("archive.jar")]
+    [InlineData("TOOL.EXE")]
+    public void An_executable_script_or_shortcut_inside_the_data_root_is_rejected(string fileName)
+    {
+        string relative = this.PlantDataRootFile(fileName);
+
+        Assert.False(TryResolveDataRootScopedFilePath(relative, this.thisDataRoot, out _));
+    }
+
+    [Fact]
+    public void A_file_without_an_extension_is_rejected()
+    {
+        // Fail closed: no extension means no way to know what the shell would do with it.
+        string relative = this.PlantDataRootFile("README");
+
+        Assert.False(TryResolveDataRootScopedFilePath(relative, this.thisDataRoot, out _));
+    }
+
+    [Theory]
+    [InlineData("datasheet.pdf")]
+    [InlineData("photo.png")]
+    [InlineData("photo.jpg")]
+    [InlineData("notes.txt")]
+    [InlineData("reference.html")]
+    [InlineData("board-data.xlsx")]
+    [InlineData("pinout.csv")]
+    [InlineData("capture.fsc")]
+    [InlineData("calibration.json")]
+    [InlineData("Issue 4.sch")]
+    [InlineData("board.kicad_pcb")]
+    [InlineData("DATASHEET.PDF")]
+    public void A_document_image_or_data_file_inside_the_data_root_is_accepted(string fileName)
+    {
+        string relative = this.PlantDataRootFile(fileName);
+
+        Assert.True(TryResolveDataRootScopedFilePath(relative, this.thisDataRoot, out _));
+    }
+
     [Fact]
     public void An_empty_data_root_rejects_everything()
     {
