@@ -24,16 +24,137 @@ using Handlers.DataHandling;
 
 namespace CRT
 {
-    public sealed class ContributionComponentRow
+    public sealed class ContributionComponentRow : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            this.PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         public string UuidV4 { get; set; } = string.Empty;
-        public string BoardLabel { get; set; } = string.Empty;
+
+        private string thisBoardLabel = string.Empty;
+        public string BoardLabel
+        {
+            get => this.thisBoardLabel;
+            set
+            {
+                if (this.thisBoardLabel != value)
+                {
+                    this.thisBoardLabel = value;
+                    this.OnPropertyChanged();
+
+                    // Typing into the box answers the complaint, so the mark goes at once rather
+                    // than surviving until the next attempt to send.
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        this.HasBoardLabelError = false;
+                        this.BoardLabelErrorText = string.Empty;
+                    }
+                }
+            }
+        }
+
         public string FriendlyName { get; set; } = string.Empty;
         public string TechnicalNameOrValue { get; set; } = string.Empty;
         public string PartNumber { get; set; } = string.Empty;
-        public string Category { get; set; } = string.Empty;
+
+        private string thisCategory = string.Empty;
+        public string Category
+        {
+            get => this.thisCategory;
+            set
+            {
+                if (this.thisCategory != value)
+                {
+                    this.thisCategory = value;
+                    this.OnPropertyChanged();
+
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        this.HasCategoryError = false;
+                        this.CategoryErrorText = string.Empty;
+                    }
+                }
+            }
+        }
+
         public string Region { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+
+        // Set by the pre-submit validation of a NEW component, whose board label is the one field
+        // that must be filled in and must not already be taken. The board label box turns red and
+        // BoardLabelErrorText appears beneath it. Never part of the uploaded payload.
+        private bool thisHasBoardLabelError;
+        [JsonIgnore]
+        public bool HasBoardLabelError
+        {
+            get => this.thisHasBoardLabelError;
+            set
+            {
+                if (this.thisHasBoardLabelError != value)
+                {
+                    this.thisHasBoardLabelError = value;
+                    this.OnPropertyChanged();
+                }
+            }
+        }
+
+        private string thisBoardLabelErrorText = string.Empty;
+        [JsonIgnore]
+        public string BoardLabelErrorText
+        {
+            get => this.thisBoardLabelErrorText;
+            set
+            {
+                if (this.thisBoardLabelErrorText != value)
+                {
+                    this.thisBoardLabelErrorText = value;
+                    this.OnPropertyChanged();
+                }
+            }
+        }
+
+        // The categories this board already uses, offered as you type. Suggestions only - a
+        // category the board has never used is still accepted, it just has to be typed in full.
+        // Never part of the uploaded payload.
+        [JsonIgnore]
+        public ObservableCollection<string> AvailableCategories { get; } = new();
+
+        // The same marking for the category, which a new component is equally unusable without:
+        // the main window builds its category filter from the categories in the data and skips
+        // blank ones, so a component with none is invisible there however complete it otherwise is.
+        private bool thisHasCategoryError;
+        [JsonIgnore]
+        public bool HasCategoryError
+        {
+            get => this.thisHasCategoryError;
+            set
+            {
+                if (this.thisHasCategoryError != value)
+                {
+                    this.thisHasCategoryError = value;
+                    this.OnPropertyChanged();
+                }
+            }
+        }
+
+        private string thisCategoryErrorText = string.Empty;
+        [JsonIgnore]
+        public string CategoryErrorText
+        {
+            get => this.thisCategoryErrorText;
+            set
+            {
+                if (this.thisCategoryErrorText != value)
+                {
+                    this.thisCategoryErrorText = value;
+                    this.OnPropertyChanged();
+                }
+            }
+        }
     }
 
     public interface IContributionFileRow
@@ -120,6 +241,39 @@ namespace CRT
 
         [JsonIgnore]
         public string PreviewStatusText { get; set; } = "No preview available";
+
+        // Set by the pre-submit validation so the row can show where the problem is: the row
+        // border turns red and FileErrorText appears inside it. Cleared as soon as the row is
+        // given a usable file. Never part of the uploaded payload.
+        private bool thisHasFileError;
+        [JsonIgnore]
+        public bool HasFileError
+        {
+            get => this.thisHasFileError;
+            set
+            {
+                if (this.thisHasFileError != value)
+                {
+                    this.thisHasFileError = value;
+                    this.OnPropertyChanged();
+                }
+            }
+        }
+
+        private string thisFileErrorText = string.Empty;
+        [JsonIgnore]
+        public string FileErrorText
+        {
+            get => this.thisFileErrorText;
+            set
+            {
+                if (this.thisFileErrorText != value)
+                {
+                    this.thisFileErrorText = value;
+                    this.OnPropertyChanged();
+                }
+            }
+        }
     }
 
     public sealed class ContributionComponentLocalFileRow : INotifyPropertyChanged, IContributionFileRow
@@ -291,6 +445,20 @@ namespace CRT
         private string thisDataRoot = string.Empty;
         private string thisComponentUuidV4 = string.Empty;
 
+        // True when the window was opened on a component that is not in the board data at all. The
+        // board label then comes from the contributor rather than from the board, which is what the
+        // extra validation guards - see LoadNewComponent and ValidateNewComponentRow.
+        private bool thisIsNewComponent;
+
+        // Every board label already on the board, so a new component cannot reuse one of them.
+        private readonly HashSet<string> thisExistingBoardLabels = new(StringComparer.OrdinalIgnoreCase);
+
+        // The categories this board already uses, offered as suggestions on every component row.
+        private readonly List<string> thisAvailableCategories = new();
+
+        // Shown in place of the component summary while a new component has no label yet.
+        private const string NewComponentTitleText = "New component - not yet part of the board data";
+
         private static readonly JsonSerializerOptions thisContributionPayloadJsonOptions = new()
         {
             WriteIndented = true
@@ -318,16 +486,12 @@ namespace CRT
         // ###########################################################################################
         public void LoadComponent(BoardData boardData, string dataRoot, string hardwareName, string boardName, string region, string boardLabel, string boardExcelFile)
         {
-            this.thisDataRoot = dataRoot;
-            this.thisHardwareName = hardwareName;
-            this.thisBoardName = boardName;
-            this.thisBoardExcelFile = boardExcelFile?.Trim().Replace('\\', '/') ?? string.Empty;
-            this.thisBoardRevisionDate = boardData.RevisionDate?.Trim() ?? string.Empty;
-            this.thisLocalRegion = region;
+            this.ApplyBoardContext(boardData, dataRoot, hardwareName, boardName, region, boardExcelFile);
+
+            this.thisIsNewComponent = false;
+            this.thisExistingBoardLabels.Clear();
             this.thisBoardLabel = boardLabel;
             this.thisComponentUuidV4 = string.Empty;
-
-            this.PopulateEndFolders(dataRoot);
 
             var primaryComponent = boardData.Components.FirstOrDefault(c =>
                 string.Equals(c.BoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase) &&
@@ -341,6 +505,97 @@ namespace CRT
 
             this.PopulateHeader();
             this.LoadRows(boardData, boardLabel);
+        }
+
+        // ###########################################################################################
+        // Opens the editor on a component this board does not have yet. Nothing is preloaded for the
+        // component itself - the single blank row is where the contributor names it - but the
+        // board-wide sections are loaded exactly as for an existing component: those are diffed
+        // against the server as a whole, so sending them empty would read as a request to delete
+        // every board local file and board link the board has.
+        // ###########################################################################################
+        public void LoadNewComponent(BoardData boardData, string dataRoot, string hardwareName, string boardName, string region, string boardExcelFile)
+        {
+            this.ApplyBoardContext(boardData, dataRoot, hardwareName, boardName, region, boardExcelFile);
+
+            this.thisIsNewComponent = true;
+            this.thisBoardLabel = string.Empty;
+            this.thisComponentUuidV4 = string.Empty;
+            this.thisComponentDisplayText = NewComponentTitleText;
+
+            // Every label on the board, whatever its region: the server resolves a contribution by
+            // board label alone, so a label another region's component holds is taken here too.
+            this.thisExistingBoardLabels.Clear();
+            foreach (var component in boardData.Components)
+            {
+                string existingLabel = component.BoardLabel?.Trim() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(existingLabel))
+                {
+                    this.thisExistingBoardLabels.Add(existingLabel);
+                }
+            }
+
+            this.PopulateHeader();
+            this.LoadRows(boardData, string.Empty);
+
+            var newRow = new ContributionComponentRow
+            {
+                Region = this.thisLocalRegion
+            };
+
+            this.SetAvailableCategories(newRow);
+            this.thisComponentRows.Add(newRow);
+
+            // The one section that has to be filled in, so it does not start folded away.
+            this.ComponentExpander.IsExpanded = true;
+        }
+
+        // ###########################################################################################
+        // Applies the board-level context shared by both ways of opening the window.
+        // ###########################################################################################
+        private void ApplyBoardContext(BoardData boardData, string dataRoot, string hardwareName, string boardName, string region, string boardExcelFile)
+        {
+            this.thisDataRoot = dataRoot;
+            this.thisHardwareName = hardwareName;
+            this.thisBoardName = boardName;
+            this.thisBoardExcelFile = boardExcelFile?.Trim().Replace('\\', '/') ?? string.Empty;
+            this.thisBoardRevisionDate = boardData.RevisionDate?.Trim() ?? string.Empty;
+            this.thisLocalRegion = region;
+
+            this.PopulateEndFolders(dataRoot);
+            this.PopulateAvailableCategories(boardData);
+        }
+
+        // ###########################################################################################
+        // Collects the categories the board already uses, so a component row can suggest them while
+        // the category is being typed. Matching the existing spelling matters: the main window groups
+        // and filters components by this exact string, so "Capacitors" beside "Capacitor" splits one
+        // group into two rather than joining the one that is there.
+        // ###########################################################################################
+        private void PopulateAvailableCategories(BoardData boardData)
+        {
+            this.thisAvailableCategories.Clear();
+
+            var categories = boardData.Components
+                .Select(component => component.Category?.Trim() ?? string.Empty)
+                .Where(category => !string.IsNullOrWhiteSpace(category))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(category => category, StringComparer.OrdinalIgnoreCase);
+
+            this.thisAvailableCategories.AddRange(categories);
+        }
+
+        // ###########################################################################################
+        // Fills one component row's category suggestion list from the board's categories.
+        // ###########################################################################################
+        private void SetAvailableCategories(ContributionComponentRow row)
+        {
+            row.AvailableCategories.Clear();
+
+            foreach (var category in this.thisAvailableCategories)
+            {
+                row.AvailableCategories.Add(category);
+            }
         }
 
         // ###########################################################################################
@@ -406,9 +661,26 @@ namespace CRT
         // ###########################################################################################
         private void PopulateHeader()
         {
-            this.Title = string.IsNullOrWhiteSpace(this.thisBoardLabel)
-                ? "Component contribution"
-                : $"Component contribution - {this.thisBoardLabel}";
+            if (this.thisIsNewComponent)
+            {
+                this.Title = "Component contribution - new component";
+            }
+            else
+            {
+                this.Title = string.IsNullOrWhiteSpace(this.thisBoardLabel)
+                    ? "Component contribution"
+                    : $"Component contribution - {this.thisBoardLabel}";
+            }
+
+            // Both ways of opening the window carry the same warning - what is sent is a
+            // suggestion for the online data, not an edit of anything on this machine - so only the
+            // wording changes with the mode.
+            this.ContributionNoticeHeadingTextBlock.Text = this.thisIsNewComponent
+                ? "You are adding a component this board does not have yet"
+                : "You are modifying an existing component";
+
+            this.NewComponentNoticeTextBlock.IsVisible = this.thisIsNewComponent;
+            this.ExistingComponentNoticeTextBlock.IsVisible = !this.thisIsNewComponent;
 
             this.ComponentTitleTextBlock.Text = this.thisComponentDisplayText;
             this.HardwareContextTextBlock.Text = $"Hardware: {this.thisHardwareName}";
@@ -422,6 +694,12 @@ namespace CRT
         // ###########################################################################################
         private void LoadRows(BoardData boardData, string boardLabel)
         {
+            // A new component owns nothing that is already on the board - not even a stray data row
+            // carrying a blank board label, which comparing against a blank label would drag in.
+            bool BelongsToComponent(string? rowBoardLabel) =>
+                !this.thisIsNewComponent &&
+                string.Equals(rowBoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase);
+
             foreach (var row in this.thisComponentImageRows)
             {
                 this.DisposeComponentImagePreview(row);
@@ -435,10 +713,9 @@ namespace CRT
             this.thisBoardLinkRows.Clear();
             this.thisComponentHighlightRows.Clear();
 
-            foreach (var row in boardData.Components.Where(c =>
-                string.Equals(c.BoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase)))
+            foreach (var row in boardData.Components.Where(c => BelongsToComponent(c.BoardLabel)))
             {
-                this.thisComponentRows.Add(new ContributionComponentRow
+                var componentRow = new ContributionComponentRow
                 {
                     UuidV4 = row.UuidV4,
                     BoardLabel = row.BoardLabel,
@@ -448,11 +725,14 @@ namespace CRT
                     Category = row.Category,
                     Region = row.Region,
                     Description = row.Description
-                });
+                };
+
+                this.SetAvailableCategories(componentRow);
+                this.thisComponentRows.Add(componentRow);
             }
 
             foreach (var row in boardData.ComponentImages.Where(c =>
-                string.Equals(c.BoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase) &&
+                BelongsToComponent(c.BoardLabel) &&
                 (string.IsNullOrWhiteSpace(c.Region) ||
                  string.Equals(c.Region.Trim(), this.thisLocalRegion, StringComparison.OrdinalIgnoreCase))))
             {
@@ -479,8 +759,7 @@ namespace CRT
                 this.thisComponentImageRows.Add(imageRow);
             }
 
-            foreach (var row in boardData.ComponentHighlights.Where(c =>
-                string.Equals(c.BoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase)))
+            foreach (var row in boardData.ComponentHighlights.Where(c => BelongsToComponent(c.BoardLabel)))
             {
                 this.thisComponentHighlightRows.Add(new ComponentHighlightEntry
                 {
@@ -493,8 +772,7 @@ namespace CRT
                 });
             }
 
-            foreach (var row in boardData.ComponentLocalFiles.Where(c =>
-                string.Equals(c.BoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase)))
+            foreach (var row in boardData.ComponentLocalFiles.Where(c => BelongsToComponent(c.BoardLabel)))
             {
                 string fileLocation = this.GetExistingFileLocation(row, row.File);
 
@@ -512,8 +790,7 @@ namespace CRT
                 this.thisComponentLocalFileRows.Add(localFileRow);
             }
 
-            foreach (var row in boardData.ComponentLinks.Where(c =>
-                string.Equals(c.BoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase)))
+            foreach (var row in boardData.ComponentLinks.Where(c => BelongsToComponent(c.BoardLabel)))
             {
                 this.thisComponentLinkRows.Add(new ContributionComponentLinkRow
                 {
@@ -567,15 +844,79 @@ namespace CRT
                 return boardLabel;
             }
 
-            var parts = new List<string>();
-            if (!string.IsNullOrWhiteSpace(component.BoardLabel))
-                parts.Add(component.BoardLabel.Trim());
-            if (!string.IsNullOrWhiteSpace(component.FriendlyName))
-                parts.Add(component.FriendlyName.Trim());
-            if (!string.IsNullOrWhiteSpace(component.TechnicalNameOrValue))
-                parts.Add(component.TechnicalNameOrValue.Trim());
+            return BuildComponentDisplayText(
+                component.BoardLabel,
+                component.FriendlyName,
+                component.TechnicalNameOrValue,
+                boardLabel);
+        }
 
-            return parts.Count == 0 ? boardLabel : string.Join(" | ", parts);
+        // ###########################################################################################
+        // Builds the same compact label from loose values, for a component that exists only as an
+        // edited row and therefore has no board data entry to read it from.
+        // ###########################################################################################
+        private static string BuildComponentDisplayText(
+            string? boardLabel,
+            string? friendlyName,
+            string? technicalNameOrValue,
+            string fallbackText)
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(boardLabel))
+                parts.Add(boardLabel.Trim());
+            if (!string.IsNullOrWhiteSpace(friendlyName))
+                parts.Add(friendlyName.Trim());
+            if (!string.IsNullOrWhiteSpace(technicalNameOrValue))
+                parts.Add(technicalNameOrValue.Trim());
+
+            return parts.Count == 0 ? fallbackText : string.Join(" | ", parts);
+        }
+
+        // ###########################################################################################
+        // The board label this whole contribution belongs to. For an existing component that is the
+        // label the window was opened on; for a new one it is whatever was typed into the single
+        // component row, which is the only place it exists.
+        // ###########################################################################################
+        private string ResolveEffectiveBoardLabel()
+        {
+            if (!this.thisIsNewComponent)
+            {
+                return this.thisBoardLabel?.Trim() ?? string.Empty;
+            }
+
+            return this.thisComponentRows.FirstOrDefault()?.BoardLabel?.Trim() ?? string.Empty;
+        }
+
+        // ###########################################################################################
+        // The component summary carried by the payload and the notification email. A new component
+        // is described by what has just been typed rather than by the header text, which was written
+        // before it had a name.
+        // ###########################################################################################
+        private string ResolveComponentDisplayText()
+        {
+            var row = this.thisIsNewComponent ? this.thisComponentRows.FirstOrDefault() : null;
+            if (row == null)
+            {
+                return this.thisComponentDisplayText;
+            }
+
+            return BuildComponentDisplayText(
+                row.BoardLabel,
+                row.FriendlyName,
+                row.TechnicalNameOrValue,
+                this.thisComponentDisplayText);
+        }
+
+        // ###########################################################################################
+        // The board label a component-scoped row belongs to. Rows added in this window are stamped
+        // with it as they are created, but a new component has no label at that point - so a row
+        // still blank at send time inherits the label finally entered.
+        // ###########################################################################################
+        private static string ResolveRowBoardLabel(string? rowBoardLabel, string effectiveBoardLabel)
+        {
+            string trimmed = rowBoardLabel?.Trim() ?? string.Empty;
+
+            return string.IsNullOrWhiteSpace(trimmed) ? effectiveBoardLabel : trimmed;
         }
 
 /*
@@ -763,12 +1104,31 @@ namespace CRT
 
             if (string.IsNullOrWhiteSpace(comment))
             {
+                this.RevealMandatoryComment();
                 this.ShowStatus("Please provide a mandatory change comment before sending", true);
+                return;
+            }
+
+            var newComponentProblem = this.ValidateNewComponentRow();
+            if (newComponentProblem != null)
+            {
+                this.RevealComponentRow(newComponentProblem.Value.Row);
+                this.ShowStatus(newComponentProblem.Value.Message, true);
+                return;
+            }
+
+            var componentImageProblem = this.ValidateComponentImageRows();
+            if (componentImageProblem != null)
+            {
+                this.RevealComponentImageRow(componentImageProblem.Value.Row);
+                this.ShowStatus(componentImageProblem.Value.Message, true);
                 return;
             }
 
             UserSettings.ContactEmail = email;
             this.SubmitButton.IsEnabled = false;
+
+            bool submissionAccepted = false;
 
             try
             {
@@ -781,19 +1141,22 @@ namespace CRT
 
                 if (result.Success)
                 {
-                    this.ShowStatus("Contribution submitted successfully - thank you :-)", false);
+                    submissionAccepted = true;
+                    this.ShowStatus(this.BuildSubmissionSuccessText(), false);
                 }
                 else
                 {
                     Logger.Warning($"Component contribution submission failed. HTTP {result.StatusCode}. Server responded with: {result.ResponseBody}");
 
-                    if (ContributionPackaging.TryParseOutdatedVersionResponse(result.ResponseBody, out string newestVersion))
+                    if (ContributionPackaging.TryParseOutdatedVersionResponse(result.ResponseBody, out string minimumVersion))
                     {
-                        string newestVersionText = string.IsNullOrWhiteSpace(newestVersion)
-                            ? "the newest version"
-                            : $"version {newestVersion}";
+                        // The server names the MINIMUM version it accepts, not necessarily the
+                        // newest release - any version at or above it is fine.
+                        string updateTargetText = string.IsNullOrWhiteSpace(minimumVersion)
+                            ? "a newer version"
+                            : $"version [{minimumVersion}] or newer";
 
-                        this.ShowStatus($"This version of Classic Repair Toolbox is too old to contribute data - please update to {newestVersionText} and try again", true);
+                        this.ShowStatus($"This application version [{AppConfig.AppDisplayVersionString}] is too old to contribute data - please update to {updateTargetText}", true);
                     }
                     else if (result.StatusCode == 404)
                     {
@@ -812,8 +1175,234 @@ namespace CRT
             }
             finally
             {
-                this.SubmitButton.IsEnabled = true;
+                this.ApplySubmissionOutcome(submissionAccepted);
             }
+        }
+
+        // ###########################################################################################
+        // Marks the mandatory comment box and brings it on screen. It is the last thing in the
+        // scrolling area, so on a contribution of any size it sits well below the fold - naming the
+        // problem in the status line alone leaves the user looking at the wrong part of the window.
+        // ###########################################################################################
+        private void RevealMandatoryComment()
+        {
+            SetErrorMark(this.MandatoryCommentTextBox, true);
+            this.MandatoryCommentTextBox.BringIntoView();
+            this.MandatoryCommentTextBox.Focus();
+        }
+
+        // ###########################################################################################
+        // Drops the mark the moment the user starts writing, so the box stops claiming to be empty
+        // while it is being filled in.
+        // ###########################################################################################
+        private void OnMandatoryCommentTextChanged(object? sender, TextChangedEventArgs e)
+        {
+            if (!string.IsNullOrWhiteSpace(this.MandatoryCommentTextBox.Text))
+            {
+                SetErrorMark(this.MandatoryCommentTextBox, false);
+            }
+        }
+
+        // ###########################################################################################
+        // Adds or removes the styling class that turns a required box red. Guarded because Classes
+        // is a plain list - adding twice would leave a duplicate that one removal cannot undo.
+        // ###########################################################################################
+        private static void SetErrorMark(Control control, bool hasError)
+        {
+            bool isMarked = control.Classes.Contains("HasError");
+
+            if (hasError && !isMarked)
+            {
+                control.Classes.Add("HasError");
+            }
+            else if (!hasError && isMarked)
+            {
+                control.Classes.Remove("HasError");
+            }
+        }
+
+        // ###########################################################################################
+        // Settles what the Send button does after an attempt. A contribution the server accepted
+        // cannot be sent from this window again: the same suggestion would be queued for review a
+        // second time, and for a new component that means the component itself proposed twice. The
+        // button says why it is disabled, since a greyed-out button on its own only looks broken.
+        //
+        // A failed attempt is the opposite case - the button comes straight back, because the whole
+        // point of a failure message is that the user can fix it and try again.
+        // ###########################################################################################
+        private void ApplySubmissionOutcome(bool submissionAccepted)
+        {
+            this.SubmitButton.IsEnabled = !submissionAccepted;
+
+            ToolTip.SetTip(
+                this.SubmitButton,
+                submissionAccepted
+                    ? "Already sent - close this window and open it again to send another contribution"
+                    : null);
+        }
+
+        // ###########################################################################################
+        // The line shown once the server has accepted the contribution. A new component is worth its
+        // own wording: a contribution is a suggestion for the online data and changes nothing on this
+        // machine, so the component the contributor has just described stays absent from every list
+        // here until the change has been reviewed and synced back down. Saying so is what stops it
+        // reading as a submission that quietly did nothing.
+        // ###########################################################################################
+        private string BuildSubmissionSuccessText()
+        {
+            const string SuccessText = "Contribution submitted successfully - thank you :-)";
+
+            if (!this.thisIsNewComponent)
+            {
+                return SuccessText;
+            }
+
+            string boardLabel = this.ResolveEffectiveBoardLabel();
+            string componentText = string.IsNullOrWhiteSpace(boardLabel)
+                ? "The new component"
+                : $"The new component [{boardLabel}]";
+
+            return $"{SuccessText} {componentText} will get added to the online source once the contribution has been reviewed and accepted.";
+        }
+
+        // ###########################################################################################
+        // Checks the two fields a NEW component cannot be submitted without, marks the one at fault
+        // and returns its row together with the message for the status line - or null when there is
+        // nothing to complain about. An existing component is never checked here: it was resolved
+        // from the board data and already carries what the board agrees with.
+        // ###########################################################################################
+        private (ContributionComponentRow Row, string Message)? ValidateNewComponentRow()
+        {
+            if (!this.thisIsNewComponent)
+            {
+                return null;
+            }
+
+            var row = this.thisComponentRows.FirstOrDefault();
+            if (row == null)
+            {
+                return null;
+            }
+
+            var problem = ContributionPackaging.ValidateNewComponent(
+                row.BoardLabel,
+                row.Category,
+                this.thisExistingBoardLabels);
+
+            row.BoardLabelErrorText = problem switch
+            {
+                ContributionPackaging.NewComponentProblem.BoardLabelMissing => "A board label is required",
+                ContributionPackaging.NewComponentProblem.BoardLabelAlreadyExists => "This board label is already taken",
+                _ => string.Empty
+            };
+
+            row.CategoryErrorText = problem == ContributionPackaging.NewComponentProblem.CategoryMissing
+                ? "A category is required"
+                : string.Empty;
+
+            row.HasBoardLabelError = !string.IsNullOrEmpty(row.BoardLabelErrorText);
+            row.HasCategoryError = !string.IsNullOrEmpty(row.CategoryErrorText);
+
+            string message = problem switch
+            {
+                ContributionPackaging.NewComponentProblem.BoardLabelMissing =>
+                    "The new component needs a board label - it is what names the component on the board",
+                ContributionPackaging.NewComponentProblem.BoardLabelAlreadyExists =>
+                    $"This board already has a component labelled [{row.BoardLabel?.Trim()}] - close this window and pick it from the component list to change it",
+                ContributionPackaging.NewComponentProblem.CategoryMissing =>
+                    "The new component needs a category - without one it never appears in the component list, whatever else it carries",
+                _ => string.Empty
+            };
+
+            return string.IsNullOrEmpty(message) ? null : (row, message);
+        }
+
+        // ###########################################################################################
+        // Brings a component row on screen so its red mark is actually seen - the same reasoning as
+        // RevealComponentImageRow below: the section can be collapsed, and the row can sit below the
+        // fold, so the scroll is posted once the expander has laid its content out.
+        // ###########################################################################################
+        private void RevealComponentRow(ContributionComponentRow row)
+        {
+            this.ComponentExpander.IsExpanded = true;
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                int index = this.thisComponentRows.IndexOf(row);
+                if (index < 0)
+                {
+                    return;
+                }
+
+                if (this.ComponentRowsItemsControl.ContainerFromIndex(index) is Control container)
+                {
+                    container.BringIntoView();
+                }
+            }, DispatcherPriority.Background);
+        }
+
+        // ###########################################################################################
+        // Marks every component image row that cannot be submitted and returns the first of them
+        // together with the message for the status line, or null when all rows are fine. Marking
+        // happens on every row, not just the first, so one pass shows the reviewer every problem;
+        // rows that are fine get their mark cleared here too.
+        // ###########################################################################################
+        private (ContributionComponentImageRow Row, string Message)? ValidateComponentImageRows()
+        {
+            (ContributionComponentImageRow Row, string Message)? firstProblem = null;
+
+            for (int index = 0; index < this.thisComponentImageRows.Count; index++)
+            {
+                var row = this.thisComponentImageRows[index];
+                var problem = ContributionPackaging.ValidateComponentImageFile(this.GetStoredFilePath(row));
+
+                row.FileErrorText = problem switch
+                {
+                    ContributionPackaging.ComponentImageFileProblem.NoFileSelected => "No image file selected",
+                    ContributionPackaging.ComponentImageFileProblem.NotDisplayable => "Not an image the application can display",
+                    _ => string.Empty
+                };
+
+                row.HasFileError = problem != ContributionPackaging.ComponentImageFileProblem.None;
+
+                if (row.HasFileError && firstProblem == null)
+                {
+                    string rowLabel = $"Component image #{index + 1}";
+
+                    string message = problem == ContributionPackaging.ComponentImageFileProblem.NoFileSelected
+                        ? $"{rowLabel} has no file selected"
+                        : $"{rowLabel} is not a format the application can display - use one of: " +
+                          string.Join(", ", ContributionPackaging.DisplayableImageExtensions);
+
+                    firstProblem = (row, message);
+                }
+            }
+
+            return firstProblem;
+        }
+
+        // ###########################################################################################
+        // Brings a component image row on screen so its red mark is actually seen: the section is
+        // collapsed by default, and the row can sit far below the fold. The scroll is posted because
+        // the row's container does not exist until the expander has laid its content out.
+        // ###########################################################################################
+        private void RevealComponentImageRow(ContributionComponentImageRow row)
+        {
+            this.ComponentImagesExpander.IsExpanded = true;
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                int index = this.thisComponentImageRows.IndexOf(row);
+                if (index < 0)
+                {
+                    return;
+                }
+
+                if (this.ComponentImageRowsItemsControl.ContainerFromIndex(index) is Control container)
+                {
+                    container.BringIntoView();
+                }
+            }, DispatcherPriority.Background);
         }
 
         // ###########################################################################################
@@ -875,6 +1464,8 @@ namespace CRT
         // ###########################################################################################
         private ComponentContributionPayload BuildPayload(string email, string comment)
         {
+            string effectiveBoardLabel = this.ResolveEffectiveBoardLabel();
+
             return new ComponentContributionPayload
             {
                 ApplicationVersion = AppConfig.AppDisplayVersionString,
@@ -883,8 +1474,8 @@ namespace CRT
                 BoardExcelFile = this.thisBoardExcelFile,
                 BoardRevisionDate = this.thisBoardRevisionDate,
                 Region = this.thisLocalRegion,
-                ComponentBoardLabel = this.thisBoardLabel,
-                ComponentDisplayText = this.thisComponentDisplayText,
+                ComponentBoardLabel = effectiveBoardLabel,
+                ComponentDisplayText = this.ResolveComponentDisplayText(),
                 ComponentUuidV4 = this.thisComponentUuidV4?.Trim() ?? string.Empty,
                 Email = email,
                 Comment = comment,
@@ -905,7 +1496,7 @@ namespace CRT
                 ComponentImages = this.thisComponentImageRows.Select(row => new ContributionComponentImageRow
                 {
                     UuidV4 = row.UuidV4?.Trim() ?? string.Empty,
-                    BoardLabel = row.BoardLabel?.Trim() ?? string.Empty,
+                    BoardLabel = ResolveRowBoardLabel(row.BoardLabel, effectiveBoardLabel),
                     Region = row.Region?.Trim() ?? string.Empty,
                     Pin = row.Pin?.Trim() ?? string.Empty,
                     Name = row.Name?.Trim() ?? string.Empty,
@@ -921,7 +1512,7 @@ namespace CRT
                 ComponentHighlights = this.thisComponentHighlightRows.Select(row => new ComponentHighlightEntry
                 {
                     SchematicName = row.SchematicName?.Trim() ?? string.Empty,
-                    BoardLabel = row.BoardLabel?.Trim() ?? string.Empty,
+                    BoardLabel = ResolveRowBoardLabel(row.BoardLabel, effectiveBoardLabel),
                     X = row.X?.Trim() ?? string.Empty,
                     Y = row.Y?.Trim() ?? string.Empty,
                     Width = row.Width?.Trim() ?? string.Empty,
@@ -931,7 +1522,7 @@ namespace CRT
                 ComponentLocalFiles = this.thisComponentLocalFileRows.Select(row => new ContributionComponentLocalFileRow
                 {
                     UuidV4 = row.UuidV4?.Trim() ?? string.Empty,
-                    BoardLabel = row.BoardLabel?.Trim() ?? string.Empty,
+                    BoardLabel = ResolveRowBoardLabel(row.BoardLabel, effectiveBoardLabel),
                     Name = row.Name?.Trim() ?? string.Empty,
                     FileLocation = row.FileLocation?.Trim() ?? string.Empty,
                     File = row.File?.Trim() ?? string.Empty
@@ -940,7 +1531,7 @@ namespace CRT
                 ComponentLinks = this.thisComponentLinkRows.Select(row => new ContributionComponentLinkRow
                 {
                     UuidV4 = row.UuidV4?.Trim() ?? string.Empty,
-                    BoardLabel = row.BoardLabel?.Trim() ?? string.Empty,
+                    BoardLabel = ResolveRowBoardLabel(row.BoardLabel, effectiveBoardLabel),
                     Name = row.Name?.Trim() ?? string.Empty,
                     Url = row.Url?.Trim() ?? string.Empty
                 }).ToList(),
@@ -972,7 +1563,7 @@ namespace CRT
             return ContributionPackaging.BuildFeedbackText(
                 this.thisHardwareName,
                 this.thisBoardName,
-                this.thisComponentDisplayText,
+                this.ResolveComponentDisplayText(),
                 this.thisComponentUuidV4,
                 this.thisLocalRegion,
                 comment);
@@ -1080,19 +1671,31 @@ namespace CRT
             {
                 this.StatusTextBlock.Text = message;
 
-                if (isError)
-                {
-                    this.StatusTextBlock.Classes.Add("error");
-                    this.StatusTextBlock.Classes.Remove("success");
-                }
-                else
-                {
-                    this.StatusTextBlock.Classes.Add("success");
-                    this.StatusTextBlock.Classes.Remove("error");
-                }
+                // The panel is coloured as well as the text, so which kind of message this is can be
+                // told at a glance from the whole box rather than only from the wording.
+                SetStateClass(this.StatusTextBlock, isError);
+                SetStateClass(this.StatusPanel, isError);
 
-                this.StatusTextBlock.IsVisible = true;
+                this.StatusPanel.IsVisible = true;
             });
+        }
+
+        // ###########################################################################################
+        // Puts a control into the success or error state, swapping the one class for the other.
+        // Guarded because Classes is a plain list - adding twice would leave a duplicate that one
+        // removal cannot undo.
+        // ###########################################################################################
+        private static void SetStateClass(Control control, bool isError)
+        {
+            string wanted = isError ? "error" : "success";
+            string unwanted = isError ? "success" : "error";
+
+            if (!control.Classes.Contains(wanted))
+            {
+                control.Classes.Add(wanted);
+            }
+
+            control.Classes.Remove(unwanted);
         }
 
         // ###########################################################################################
@@ -1148,17 +1751,6 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Refreshes an image preview when the edited file path box loses focus.
-        // ###########################################################################################
-        private void OnComponentImageFileTextBoxLostFocus(object? sender, RoutedEventArgs e)
-        {
-            if (sender is TextBox { Tag: ContributionComponentImageRow row })
-            {
-                this.RefreshComponentImagePreview(row);
-            }
-        }
-
-        // ###########################################################################################
         // Disposes loaded preview images when the contribution window closes.
         // ###########################################################################################
         private void OnWindowClosed(object? sender, EventArgs e)
@@ -1167,40 +1759,6 @@ namespace CRT
             {
                 this.DisposeComponentImagePreview(row);
             }
-        }
-
-        // ###########################################################################################
-        // Opens a file picker for any file-backed row and applies the selected path.
-        // ###########################################################################################
-        private async void OnFileTextBoxPointerPressed(object? sender, PointerPressedEventArgs e)
-        {
-            e.Handled = true;
-
-            if (sender is not TextBox textBox)
-            {
-                return;
-            }
-
-            var topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel == null)
-            {
-                return;
-            }
-
-            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "Select file",
-                AllowMultiple = false
-            });
-
-            if (files == null || files.Count == 0)
-            {
-                return;
-            }
-
-            string selectedPath = files[0].Path.LocalPath;
-            textBox.Text = selectedPath;
-            this.ApplySelectedFilePath(textBox.Tag, selectedPath);
         }
 
         // ###########################################################################################
@@ -1213,6 +1771,10 @@ namespace CRT
                 case ContributionComponentImageRow componentImageRow:
                     this.ApplySelectedFilePathToRow(componentImageRow, selectedPath);
                     this.RefreshComponentImagePreview(componentImageRow);
+
+                    // Only displayable images reach this point, so the row is fixed by definition.
+                    componentImageRow.HasFileError = false;
+                    componentImageRow.FileErrorText = string.Empty;
                     break;
 
                 case ContributionComponentLocalFileRow componentLocalFileRow:
@@ -1226,30 +1788,60 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Opens a file picker for any file-backed row and applies the selected path.
+        // Opens the file picker when a row's read-only file box is clicked.
         // ###########################################################################################
         private async void OnFileTextBoxPointerReleased(object? sender, PointerReleasedEventArgs e)
         {
             e.Handled = true;
 
-            if (sender is not TextBox textBox)
+            if (sender is TextBox { Tag: IContributionFileRow row })
             {
-                return;
+                await this.PickFileForRowAsync(row);
             }
+        }
 
+        // ###########################################################################################
+        // Opens the file picker from the browse button beside a row's file box.
+        // ###########################################################################################
+        private async void OnBrowseFileClick(object? sender, RoutedEventArgs e)
+        {
+            if (sender is Button { Tag: IContributionFileRow row })
+            {
+                await this.PickFileForRowAsync(row);
+            }
+        }
+
+        // The component image picker offers only the formats the application can draw, so an
+        // unviewable file cannot be picked by accident. See ContributionPackaging for the set.
+        private static readonly FilePickerFileType DisplayableImageFileType = new("Image files")
+        {
+            Patterns = ContributionPackaging.DisplayableImageExtensions.Select(extension => "*" + extension).ToArray(),
+            MimeTypes = new[] { "image/*" },
+            AppleUniformTypeIdentifiers = new[] { "public.image" }
+        };
+
+        // ###########################################################################################
+        // Opens a file picker for any file-backed row and applies the selected path. Component
+        // image rows are restricted to displayable image formats; the other sections take any file.
+        // ###########################################################################################
+        private async Task PickFileForRowAsync(IContributionFileRow row)
+        {
             var topLevel = TopLevel.GetTopLevel(this);
             if (topLevel == null)
             {
                 return;
             }
 
-            string? currentPath = this.GetCurrentFilePath(textBox.Tag);
+            bool imagesOnly = row is ContributionComponentImageRow;
+
+            string? currentPath = this.GetCurrentFilePath(row);
             string? suggestedStartLocation = this.GetSuggestedStartLocation(currentPath);
 
             var options = new FilePickerOpenOptions
             {
-                Title = "Select file",
-                AllowMultiple = false
+                Title = imagesOnly ? "Select image file" : "Select file",
+                AllowMultiple = false,
+                FileTypeFilter = imagesOnly ? new[] { DisplayableImageFileType } : null
             };
 
             if (!string.IsNullOrWhiteSpace(suggestedStartLocation) && Directory.Exists(suggestedStartLocation))
@@ -1271,16 +1863,20 @@ namespace CRT
 
             string selectedPath = files[0].Path.LocalPath;
 
-            if (textBox.Tag is IContributionFileRow)
+            // The dialog filter is only a suggestion - a name typed into the file box gets past it -
+            // so the format is verified here rather than trusted, and the row is left untouched.
+            if (imagesOnly && !ContributionPackaging.IsDisplayableImageFile(selectedPath))
             {
-                textBox.Text = Path.GetFileName(selectedPath);
-            }
-            else
-            {
-                textBox.Text = selectedPath;
+                this.ShowStatus(
+                    $"[{Path.GetFileName(selectedPath)}] is not an image the application can display - use one of: " +
+                    string.Join(", ", ContributionPackaging.DisplayableImageExtensions),
+                    true);
+                return;
             }
 
-            this.ApplySelectedFilePath(textBox.Tag, selectedPath);
+            // ApplySelectedFilePath writes row.File, and the two-way bound text box follows it,
+            // so the box shows the same value whether the picker was opened from it or the button.
+            this.ApplySelectedFilePath(row, selectedPath);
         }
 
         // ###########################################################################################

@@ -25,6 +25,13 @@
 		<Style Selector="Border.ContributeRow:pointerover">
 			<Setter Property="Background" Value="{DynamicResource Table_RowHover_Bg}" />
 		</Style>
+
+		<Style Selector="Button.AddNewComponentButton">
+			<Setter Property="Background" Value="{DynamicResource Button_Highlighted_Bg}" />
+			<Setter Property="Foreground" Value="{DynamicResource Button_Highlighted_Fg}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource Button_Highlighted_Border}" />
+			<Setter Property="Padding" Value="14,8" />
+		</Style>
 	</UserControl.Styles>
 
 	<Grid>
@@ -34,11 +41,29 @@
 			<RowDefinition Height="*"/>
 		</Grid.RowDefinitions>
 
-		<TextBlock Grid.Row="0"
-				   Margin="12,12,12,12"
-				   TextWrapping="Wrap" >
-			To contribute and enhance the data quality for this board, then you can select an existing component and give feedback where data is wrong or missing. Your contribution will be seen as a "suggestion for changes" and will be sent directly to the developer, who will incorporate it in to the backend data set.
-		</TextBlock>
+		<!-- The intro text, with the "add" button parked in the top-right corner of the tab. The
+		     text column is star-sized and wraps, so it gives way to the button instead of running
+		     underneath it however narrow the window gets. -->
+		<Grid Grid.Row="0"
+			  ColumnDefinitions="*,16,Auto"
+			  Margin="12,12,12,12">
+			<StackPanel Grid.Column="0" Spacing="6">
+				<TextBlock TextWrapping="Wrap" >
+					To contribute and enhance the data quality for this board, then you can select an existing component and give feedback where data is wrong or missing. Your contribution will be seen as a "suggestion for changes" and will be sent directly to the developer, who will incorporate it in to the backend data set.
+				</TextBlock>
+				<TextBlock Text="The list below holds the components the board data already has - use the button to the right for one that is missing from it."
+						   TextWrapping="Wrap" />
+			</StackPanel>
+
+			<Button Grid.Column="2"
+					x:Name="AddNewComponentButton"
+					Classes="AddNewComponentButton"
+					Content="Add new component"
+					IsEnabled="False"
+					VerticalAlignment="Top"
+					ToolTip.Tip="Suggest a component that is missing from this board entirely"
+					Click="OnAddNewComponentClick" />
+		</Grid>
 
 		<!-- Board revision date section -->
 		<StackPanel x:Name="RevisionDatePanel"

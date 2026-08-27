@@ -394,9 +394,12 @@ deployed by hand and never ships with the app (Assets are whitelisted per-file i
 is what `review_functions.php` parses, and the PHP deliberately mirrors the app's Excel-reading
 rules (case-insensitive headers, exact board-file resolution, `.json`-beside-the-Excel highlights,
 the `# Revision date:` marker). When you change either side, change the other in the same
-sitting, and run the PHP suite too: `php Assets/Webserver/app-contribution/api/tests/run-tests.php`
-(53 checks, ~1s, no webserver needed — PHP is installed on this machine). Full details, file
-inventory (including which files are legacy) and known caveats:
+sitting, and run the PHP suite too: `php Assets/Webserver/tests/run-tests.php`
+(~1s, no webserver needed — PHP is installed on this machine; the tests sit outside
+`app-contribution/` so that folder stays an exact mirror of what is deployed). **When the payload contract
+changes, also bump `$minimumContributionVersion` in `api/index.php`** to the first released
+version carrying the new contract — older apps are rejected at upload with an update-required
+message. Full details, file inventory (including which files are legacy) and known caveats:
 [Assets/Webserver/app-contribution/README.md](../Assets/Webserver/app-contribution/README.md).
 
 ## Release process

@@ -2107,18 +2107,44 @@ namespace CRT
                 return;
             }
 
-            var hardwareName = this.HardwareComboBox.SelectedItem as string ?? string.Empty;
-            var boardName = this.BoardComboBox.SelectedItem as string ?? string.Empty;
-
-            var window = new ComponentContributionWindow();
-            window.LoadComponent(
+            this.ShowComponentContributionWindow(window => window.LoadComponent(
                 this._currentBoardData,
                 DataManager.DataRoot,
-                hardwareName,
-                boardName,
+                this.HardwareComboBox.SelectedItem as string ?? string.Empty,
+                this.BoardComboBox.SelectedItem as string ?? string.Empty,
                 this._localRegion,
                 boardLabel,
-                this.GetCurrentBoardEntry()?.ExcelDataFile ?? string.Empty);
+                this.GetCurrentBoardEntry()?.ExcelDataFile ?? string.Empty));
+        }
+
+        // ###########################################################################################
+        // Opens the contribution editor on a component that does not exist in the board data yet,
+        // so a missing component can be suggested from scratch.
+        // ###########################################################################################
+        internal void OpenNewComponentContributionWindow()
+        {
+            if (this._currentBoardData == null)
+            {
+                return;
+            }
+
+            this.ShowComponentContributionWindow(window => window.LoadNewComponent(
+                this._currentBoardData,
+                DataManager.DataRoot,
+                this.HardwareComboBox.SelectedItem as string ?? string.Empty,
+                this.BoardComboBox.SelectedItem as string ?? string.Empty,
+                this._localRegion,
+                this.GetCurrentBoardEntry()?.ExcelDataFile ?? string.Empty));
+        }
+
+        // ###########################################################################################
+        // Creates the contribution editor, lets the caller load it, and shows it maximized on the
+        // screen the main window is on.
+        // ###########################################################################################
+        private void ShowComponentContributionWindow(Action<ComponentContributionWindow> loadContent)
+        {
+            var window = new ComponentContributionWindow();
+            loadContent(window);
 
             this.PositionFullscreenWindowOnSameScreen(window);
             window.WindowState = Avalonia.Controls.WindowState.Maximized;

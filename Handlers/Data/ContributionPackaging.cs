@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace Handlers.DataHandling
@@ -75,6 +76,141 @@ namespace Handlers.DataHandling
             }
 
             return true;
+        }
+
+        // ###########################################################################################
+        // The image formats the application can actually put on screen. Every component image is
+        // drawn through Avalonia's Bitmap (Skia), so this is the set Bitmap can decode. It is
+        // deliberately narrower than the ExternalTargetLauncher allowlist, which also permits ".svg"
+        // because those files are handed to the OS shell rather than drawn by the app. A component
+        // image outside this set uploads perfectly happily and then shows as an empty frame, so the
+        // contribution editor refuses one up front instead.
+        // ###########################################################################################
+        public static readonly IReadOnlyList<string> DisplayableImageExtensions = new[]
+        {
+            ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"
+        };
+
+        private static readonly HashSet<string> DisplayableImageExtensionSet =
+            new(DisplayableImageExtensions, StringComparer.OrdinalIgnoreCase);
+
+        // ###########################################################################################
+        // True when the given file name or path carries an extension the application can display as
+        // a component image. Blank input, a name with no extension at all, and every non-image type
+        // are false (fail closed) - the caller is deciding whether to accept a contributed file.
+        // ###########################################################################################
+        public static bool IsDisplayableImageFile(string? pathValue)
+        {
+            string trimmed = pathValue?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                return false;
+            }
+
+            try
+            {
+                return DisplayableImageExtensionSet.Contains(Path.GetExtension(trimmed));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // ###########################################################################################
+        // What is wrong with the file on a component image row, if anything. A row is allowed to sit
+        // there with no file while it is still being filled in, but by submission time every row must
+        // carry a file the application can display - otherwise the contribution ships a component
+        // image that renders as an empty frame for everybody who downloads the data.
+        // ###########################################################################################
+        public enum ComponentImageFileProblem
+        {
+            None,
+            NoFileSelected,
+            NotDisplayable
+        }
+
+        // ###########################################################################################
+        // Judges the file value held by one component image row. storedPath is the row's own file
+        // path as edited - absolute when it came from the file picker, relative to the data root when
+        // it came from existing board data - and is not required to exist on disk here; this decides
+        // whether the row is submittable at all, not whether the file resolves.
+        // ###########################################################################################
+        public static ComponentImageFileProblem ValidateComponentImageFile(string? storedPath)
+        {
+            if (string.IsNullOrWhiteSpace(storedPath))
+            {
+                return ComponentImageFileProblem.NoFileSelected;
+            }
+
+            return IsDisplayableImageFile(storedPath)
+                ? ComponentImageFileProblem.None
+                : ComponentImageFileProblem.NotDisplayable;
+        }
+
+        // ###########################################################################################
+        // What stops a brand-new component from being submitted, if anything. Two fields have to be
+        // right before a contributed component is of any use:
+        //
+        //   Board label - the component is identified by nothing else, and it must not name one the
+        //                 board already has (see ValidateNewComponent for why a duplicate is refused
+        //                 rather than merged).
+        //   Category .. - the main window builds its category filter from the categories present in
+        //                 the data and skips blank ones (ComponentListBuilder), so a component
+        //                 without one is merged into the board data and then never reachable in the
+        //                 UI at all. It is not an optional detail; it is what makes it visible.
+        // ###########################################################################################
+        public enum NewComponentProblem
+        {
+            None,
+            BoardLabelMissing,
+            BoardLabelAlreadyExists,
+            CategoryMissing
+        }
+
+        // ###########################################################################################
+        // Judges a new component against the board it is being added to. The board label is checked
+        // first, because it is what the whole contribution is resolved by.
+        //
+        // A duplicate label is refused rather than merged: the server resolves a contribution by its
+        // board label, so a submission reusing an existing one is diffed against that existing
+        // component - and every image, file and link the new component does not happen to repeat
+        // would come back as a proposed deletion of the existing one's data. Editing an existing
+        // component is what the component list is for; this path only creates one that is not there.
+        // Matching ignores case and surrounding whitespace, exactly as the board data is read.
+        // ###########################################################################################
+        public static NewComponentProblem ValidateNewComponent(
+            string? boardLabel,
+            string? category,
+            IEnumerable<string>? existingBoardLabels)
+        {
+            string trimmedLabel = boardLabel?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(trimmedLabel))
+            {
+                return NewComponentProblem.BoardLabelMissing;
+            }
+
+            foreach (var existing in existingBoardLabels ?? Enumerable.Empty<string>())
+            {
+                string existingTrimmed = existing?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(existingTrimmed))
+                {
+                    continue;
+                }
+
+                if (string.Equals(existingTrimmed, trimmedLabel, StringComparison.OrdinalIgnoreCase))
+                {
+                    return NewComponentProblem.BoardLabelAlreadyExists;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(category))
+            {
+                return NewComponentProblem.CategoryMissing;
+            }
+
+            return NewComponentProblem.None;
         }
 
         // ###########################################################################################

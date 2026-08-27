@@ -37,9 +37,58 @@
 			<Setter Property="Foreground" Value="{DynamicResource Button_Highlighted_Fg}" />
 			<Setter Property="Padding" Value="14,8" />
 		</Style>
+
+		<!-- A required box that validation found empty. This has to target the template part, not
+		     the TextBox: the Fluent theme repaints PART_BorderElement directly on :focus and
+		     :pointerover, which beats the TemplateBinding carrying the TextBox's own BorderBrush -
+		     and revealing the box focuses it, so a mark set on the TextBox would last one frame. -->
+		<Style Selector="TextBox.HasError /template/ Border#PART_BorderElement">
+			<Setter Property="BorderBrush" Value="{DynamicResource Text_Fail_Fg}" />
+			<Setter Property="BorderThickness" Value="3" />
+		</Style>
+
+		<!-- A component image row, and the same row once validation has marked it as unusable.
+		     Both borders are styles rather than local values, because a local BorderBrush on the
+		     element would outrank the style that has to override it. -->
+		<Style Selector="Border.ComponentImageRow">
+			<Setter Property="BorderBrush" Value="{DynamicResource Panel_Border}" />
+			<Setter Property="BorderThickness" Value="1" />
+		</Style>
+
+		<Style Selector="Border.ComponentImageRow.HasFileError">
+			<Setter Property="BorderBrush" Value="{DynamicResource Text_Fail_Fg}" />
+			<Setter Property="BorderThickness" Value="3" />
+		</Style>
+
+		<!-- The red frame a required field of the component row wears once validation has found it
+		     empty. It is a frame AROUND the control rather than the control's own border, because one
+		     of the two is an AutoCompleteBox whose visible border belongs to a TextBox nested inside
+		     its template - out of reach of a style - and because the Fluent theme repaints a TextBox
+		     border on focus, which would drop the mark the moment the user clicked in to fix it.
+		     The thickness is always 3, transparent when there is nothing wrong, so marking a field
+		     never moves the layout. -->
+		<Style Selector="Border.ErrorFrame">
+			<Setter Property="BorderBrush" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="3" />
+			<Setter Property="CornerRadius" Value="6" />
+			<Setter Property="Padding" Value="1" />
+		</Style>
+
+		<Style Selector="Border.ErrorFrame.HasError">
+			<Setter Property="BorderBrush" Value="{DynamicResource Text_Fail_Fg}" />
+		</Style>
+
+		<!-- Compact "browse" button sitting beside a read-only file box -->
+		<Style Selector="Button.BrowseFileButton">
+			<Setter Property="Padding" Value="10,0" />
+			<Setter Property="MinWidth" Value="0" />
+			<Setter Property="VerticalAlignment" Value="Stretch" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="HorizontalContentAlignment" Value="Center" />
+		</Style>
 	</Window.Styles>
 
-	<Grid RowDefinitions="Auto,*,Auto" Margin="16">
+	<Grid RowDefinitions="Auto,*,Auto,Auto" Margin="16">
 
 		<Border Grid.Row="0"
 		        BorderBrush="{DynamicResource Panel_Border}"
@@ -79,17 +128,33 @@
 				  AllowAutoHide="False">
 			<StackPanel Spacing="16">
 
+				<!-- Shown on every contribution, worded for the one being made. The two bodies are
+				     separate blocks rather than one with swapped text, because each is split into runs
+				     so that "suggestion" can be italic - which is the whole point of the notice:
+				     nothing done in this window changes the user's own data. -->
 				<Border BorderBrush="{DynamicResource Panel_Border}"
-				        BorderThickness="1"
+				        BorderThickness="2"
 				        CornerRadius="6"
 				        Padding="12">
 					<StackPanel Spacing="6">
-						<TextBlock Text="How this works"
+						<TextBlock x:Name="ContributionNoticeHeadingTextBlock"
 						           FontSize="15"
 						           FontWeight="Bold" />
-						<TextBlock TextWrapping="Wrap"
+
+						<TextBlock x:Name="NewComponentNoticeTextBlock"
+						           TextWrapping="Wrap"
 						           Foreground="{DynamicResource Fg}">
-							All data below is editable suggestions. The current values are preloaded from the board data. When submitted, the full payload is sent to the developer for review together with your comment.
+							<Run Text="Please note that the component you add is sent as a " />
+							<Run Text="suggestion" FontStyle="Italic" />
+							<Run Text=" to the online source - it will not appear in your local data here and now. Once it has been reviewed and accepted, it is added to the online source, after which you can download the updated data." />
+						</TextBlock>
+
+						<TextBlock x:Name="ExistingComponentNoticeTextBlock"
+						           TextWrapping="Wrap"
+						           Foreground="{DynamicResource Fg}">
+							<Run Text="Please note that the changes you make are sent as a " />
+							<Run Text="suggestion" FontStyle="Italic" />
+							<Run Text=" to the online source - they will not appear in your local data here and now. Once they have been reviewed and accepted, they are added to the online source, after which you can download the updated data." />
 						</TextBlock>
 					</StackPanel>
 				</Border>
@@ -98,7 +163,7 @@
 				        BorderThickness="1"
 				        CornerRadius="6"
 				        Padding="12">
-					<Expander IsExpanded="False">
+					<Expander x:Name="ComponentExpander" IsExpanded="False">
 						<Expander.Header>
 							<TextBlock Text='Component'
 							           FontSize="15"
@@ -124,10 +189,43 @@
 												  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
 												  HorizontalAlignment="Stretch">
 												<TextBlock Grid.Column="0" Grid.Row="0" Text="Board label" FontSize="11" />
-												<TextBox Grid.Column="0" Grid.Row="1" Text="{Binding BoardLabel}" />
+												<StackPanel Grid.Column="0" Grid.Row="1" Spacing="4">
+													<Border Classes="ErrorFrame"
+													        Classes.HasError="{Binding HasBoardLabelError}">
+														<TextBox Text="{Binding BoardLabel}" />
+													</Border>
+													<TextBlock Text="{Binding BoardLabelErrorText}"
+													           IsVisible="{Binding HasBoardLabelError}"
+													           Foreground="{DynamicResource Text_Fail_Fg}"
+													           FontSize="11"
+													           FontWeight="Bold"
+													           TextWrapping="Wrap" />
+												</StackPanel>
 
 												<TextBlock Grid.Column="2" Grid.Row="0" Text="Category" FontSize="11" />
-												<TextBox Grid.Column="2" Grid.Row="1" Text="{Binding Category}" />
+												<StackPanel Grid.Column="2" Grid.Row="1" Spacing="4">
+													<!-- Free text with suggestions: typing "cap" offers the board's
+													     "Capacitor", and anything the board has never used is still
+													     accepted as typed. MinimumPrefixLength 0 lists the whole set
+													     as soon as the field is used, which is the quickest way to
+													     see what the board's other components are filed under. -->
+													<Border Classes="ErrorFrame"
+													        Classes.HasError="{Binding HasCategoryError}">
+														<AutoCompleteBox Text="{Binding Category, Mode=TwoWay}"
+														                 ItemsSource="{Binding AvailableCategories}"
+														                 FilterMode="Contains"
+														                 MinimumPrefixLength="0"
+														                 IsTextCompletionEnabled="False"
+														                 PlaceholderText="Capacitor, IC, Resistor, ..."
+														                 HorizontalAlignment="Stretch" />
+													</Border>
+													<TextBlock Text="{Binding CategoryErrorText}"
+													           IsVisible="{Binding HasCategoryError}"
+													           Foreground="{DynamicResource Text_Fail_Fg}"
+													           FontSize="11"
+													           FontWeight="Bold"
+													           TextWrapping="Wrap" />
+												</StackPanel>
 
 												<TextBlock Grid.Column="0" Grid.Row="2" Text="Friendly name" FontSize="11" Margin="0,8,0,0" />
 												<TextBox Grid.Column="0" Grid.Row="3" Text="{Binding FriendlyName}" />
@@ -166,7 +264,7 @@
 						BorderThickness="1"
 						CornerRadius="6"
 						Padding="12">
-					<Expander IsExpanded="False">
+					<Expander x:Name="ComponentImagesExpander" IsExpanded="False">
 						<Expander.Header>
 							<StackPanel Orientation="Horizontal" Spacing="4">
 								<TextBlock Text="Component images"
@@ -198,8 +296,8 @@
 							<ItemsControl x:Name="ComponentImageRowsItemsControl">
 								<ItemsControl.ItemTemplate>
 									<DataTemplate x:DataType="local:ContributionComponentImageRow">
-										<Border BorderBrush="{DynamicResource Panel_Border}"
-										        BorderThickness="1"
+										<Border Classes="ComponentImageRow"
+										        Classes.HasFileError="{Binding HasFileError}"
 										        CornerRadius="4"
 										        Padding="8"
 										        Margin="0,0,0,8">
@@ -253,13 +351,22 @@
 																					  MinWidth="0" />
 
 													<TextBlock Grid.Column="6" Grid.Row="4" Text="File" FontSize="11" Margin="0,8,0,0" />
-													<TextBox Grid.Column="6" Grid.Row="5"
-																					 Text="{Binding File}"
-																					 Tag="{Binding}"
-																					 IsReadOnly="True"
-																					 Cursor="Hand"
-																					 MinWidth="0"
-																					 PointerReleased="OnFileTextBoxPointerReleased" />
+													<Grid Grid.Column="6" Grid.Row="5" ColumnDefinitions="*,4,Auto">
+														<TextBox Text="{Binding File}"
+														         Tag="{Binding}"
+														         IsReadOnly="True"
+														         Cursor="Hand"
+														         MinWidth="0"
+														         PlaceholderText="Click to select a file..."
+														         ToolTip.Tip="Click to select the file to contribute"
+														         PointerReleased="OnFileTextBoxPointerReleased" />
+														<Button Grid.Column="2"
+														        Classes="BrowseFileButton"
+														        Content="..."
+														        Tag="{Binding}"
+														        ToolTip.Tip="Select the file to contribute"
+														        Click="OnBrowseFileClick" />
+													</Grid>
 
 													<TextBlock Grid.Column="0" Grid.Row="6" Text="Name" FontSize="11" Margin="0,8,0,0" />
 													<TextBox Grid.Column="0"
@@ -276,6 +383,17 @@
 															 TextWrapping="Wrap"
 															 MinHeight="84"
 															 MinWidth="0" />
+
+													<TextBlock Grid.Column="0"
+															Grid.Row="8"
+															Text="{Binding FileErrorText}"
+															IsVisible="{Binding HasFileError}"
+															Foreground="{DynamicResource Text_Fail_Fg}"
+															FontSize="11"
+															FontWeight="Bold"
+															TextWrapping="Wrap"
+															VerticalAlignment="Center"
+															Margin="0,8,0,0" />
 
 													<Button Grid.Column="2"
 															Grid.Row="8"
@@ -355,13 +473,22 @@
 														  SelectedItem="{Binding FileLocation, Mode=TwoWay}"
 														  HorizontalAlignment="Stretch"
 														  MinWidth="0" />
-												<TextBox Grid.Column="6"
-														 Text="{Binding File}"
-														 Tag="{Binding}"
-														 IsReadOnly="True"
-														 Cursor="Hand"
-														 MinWidth="0"
-														 PointerReleased="OnFileTextBoxPointerReleased" />
+												<Grid Grid.Column="6" ColumnDefinitions="*,4,Auto">
+													<TextBox Text="{Binding File}"
+													         Tag="{Binding}"
+													         IsReadOnly="True"
+													         Cursor="Hand"
+													         MinWidth="0"
+													         PlaceholderText="Click to select a file..."
+													         ToolTip.Tip="Click to select the file to contribute"
+													         PointerReleased="OnFileTextBoxPointerReleased" />
+													<Button Grid.Column="2"
+													        Classes="BrowseFileButton"
+													        Content="..."
+													        Tag="{Binding}"
+													        ToolTip.Tip="Select the file to contribute"
+													        Click="OnBrowseFileClick" />
+												</Grid>
 												<Button Grid.Column="8"
 														Content="Remove"
 														Tag="{Binding}"
@@ -503,13 +630,22 @@
 														  SelectedItem="{Binding FileLocation, Mode=TwoWay}"
 														  HorizontalAlignment="Stretch"
 														  MinWidth="0" />
-												<TextBox Grid.Column="6"
-														 Text="{Binding File}"
-														 Tag="{Binding}"
-														 IsReadOnly="True"
-														 Cursor="Hand"
-														 MinWidth="0"
-														 PointerReleased="OnFileTextBoxPointerReleased" />
+												<Grid Grid.Column="6" ColumnDefinitions="*,4,Auto">
+													<TextBox Text="{Binding File}"
+													         Tag="{Binding}"
+													         IsReadOnly="True"
+													         Cursor="Hand"
+													         MinWidth="0"
+													         PlaceholderText="Click to select a file..."
+													         ToolTip.Tip="Click to select the file to contribute"
+													         PointerReleased="OnFileTextBoxPointerReleased" />
+													<Button Grid.Column="2"
+													        Classes="BrowseFileButton"
+													        Content="..."
+													        Tag="{Binding}"
+													        ToolTip.Tip="Select the file to contribute"
+													        Click="OnBrowseFileClick" />
+												</Grid>
 												<Button Grid.Column="8"
 														Content="Remove"
 														Tag="{Binding}"
@@ -613,6 +749,7 @@
 							           TextWrapping="Wrap" />
 							<TextBox Grid.Row="1"
 							         x:Name="MandatoryCommentTextBox"
+							         TextChanged="OnMandatoryCommentTextChanged"
 							         AcceptsReturn="True"
 							         TextWrapping="Wrap"
 							         MinHeight="180"
@@ -625,7 +762,42 @@
 			</StackPanel>
 		</ScrollViewer>
 
-		<Grid Grid.Row="2" ColumnDefinitions="Auto,320,16,*,Auto" Margin="0,12,0,0">
+		<!-- Everything the window has to say about a submission - progress, refusal, success -
+		     gets its own full-width row rather than what happens to be left between the email box
+		     and the buttons. The messages name the field at fault and say what happens next, so a
+		     line that is cut off in the middle is a line that has not been delivered. The row is
+		     Auto-sized and the text wraps, so it grows to as many lines as the message needs. -->
+		<Border x:Name="StatusPanel"
+		        Grid.Row="2"
+		        BorderThickness="2"
+		        CornerRadius="6"
+		        Padding="10,8"
+		        Margin="0,12,0,0"
+		        IsVisible="False">
+			<Border.Styles>
+				<Style Selector="Border.success">
+					<Setter Property="BorderBrush" Value="{DynamicResource Text_Success_Fg}" />
+				</Style>
+				<Style Selector="Border.error">
+					<Setter Property="BorderBrush" Value="{DynamicResource Text_Fail_Fg}" />
+				</Style>
+			</Border.Styles>
+
+			<TextBlock x:Name="StatusTextBlock"
+					   TextWrapping="Wrap"
+					   FontWeight="Bold">
+				<TextBlock.Styles>
+					<Style Selector="TextBlock.success">
+						<Setter Property="Foreground" Value="{DynamicResource Text_Success_Fg}" />
+					</Style>
+					<Style Selector="TextBlock.error">
+						<Setter Property="Foreground" Value="{DynamicResource Text_Fail_Fg}" />
+					</Style>
+				</TextBlock.Styles>
+			</TextBlock>
+		</Border>
+
+		<Grid Grid.Row="3" ColumnDefinitions="Auto,320,*,Auto" Margin="0,12,0,0">
 			<TextBlock Grid.Column="0"
 					   Text="Email address *:"
 					   VerticalAlignment="Center"
@@ -638,22 +810,7 @@
 					 VerticalAlignment="Center"
 					 LostFocus="OnEmailTextBoxLostFocus" />
 
-			<TextBlock x:Name="StatusTextBlock"
-					   Grid.Column="3"
-					   VerticalAlignment="Center"
-					   FontWeight="Bold"
-					   IsVisible="False">
-				<TextBlock.Styles>
-					<Style Selector="TextBlock.success">
-						<Setter Property="Foreground" Value="{DynamicResource Text_Success_Fg}" />
-					</Style>
-					<Style Selector="TextBlock.error">
-						<Setter Property="Foreground" Value="{DynamicResource Text_Fail_Fg}" />
-					</Style>
-				</TextBlock.Styles>
-			</TextBlock>
-
-			<StackPanel Grid.Column="4"
+			<StackPanel Grid.Column="3"
 						Orientation="Horizontal"
 						Spacing="8">
 				<Button Content="▲"

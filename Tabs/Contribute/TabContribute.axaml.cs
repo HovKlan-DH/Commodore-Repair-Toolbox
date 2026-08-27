@@ -29,6 +29,9 @@ namespace CRT
         // ###########################################################################################
         public void LoadData(BoardData? boardData, string region)
         {
+            // Nothing can be contributed - not even a new component - until a board is loaded.
+            this.AddNewComponentButton.IsEnabled = boardData != null;
+
             if (boardData == null)
             {
                 this.UpdateRevisionDate(null);
@@ -119,6 +122,16 @@ namespace CRT
             {
                 this.thisMainWindow?.OpenComponentContributionWindow(item.BoardLabel);
             }
+        }
+
+        // ###########################################################################################
+        // Opens the same contribution editor on a component that is not in the board data at all,
+        // so a contributor can suggest one the board is missing rather than only correcting the
+        // components already listed above.
+        // ###########################################################################################
+        private void OnAddNewComponentClick(object? sender, RoutedEventArgs e)
+        {
+            this.thisMainWindow?.OpenNewComponentContributionWindow();
         }
     }
 

@@ -170,7 +170,7 @@ public class ContributionPackagingTests
     public void The_outdated_version_rejection_is_recognized_and_names_the_newest_version()
     {
         bool recognized = ContributionPackaging.TryParseOutdatedVersionResponse(
-            "ERROR: OUTDATED_VERSION 2.5.0 - this Classic Repair Toolbox version (2.3.0) is too old to contribute data; please update first.",
+            "ERROR: OUTDATED_VERSION 2.5.0 - this application version [2.3.0] is too old to contribute data - please update to version [2.5.0] or newer.",
             out string newestVersion);
 
         Assert.True(recognized);
@@ -206,6 +206,229 @@ public class ContributionPackagingTests
     public void Other_responses_are_not_mistaken_for_the_outdated_version_rejection(string? responseBody)
     {
         Assert.False(ContributionPackaging.TryParseOutdatedVersionResponse(responseBody, out _));
+    }
+
+    // -------------------------------------------------------------- IsDisplayableImageFile
+
+    // The contribution editor uses this to decide whether a chosen component image can actually
+    // be shown. Every one of these formats is decodable by the Avalonia Bitmap the app draws
+    // component images with, and all of them except .webp appear in the shipped board data.
+    [Theory]
+    [InlineData("pin1.png")]
+    [InlineData("pin1.jpg")]
+    [InlineData("pin1.jpeg")]
+    [InlineData("pin1.gif")]
+    [InlineData("pin1.bmp")]
+    [InlineData("pin1.webp")]
+    public void Every_format_the_app_can_draw_is_accepted(string fileName)
+    {
+        Assert.True(ContributionPackaging.IsDisplayableImageFile(fileName));
+    }
+
+    // The case that started this: an .xlsx uploads perfectly happily and then shows as an empty
+    // frame. So does every other non-image, and so does a name carrying no extension at all.
+    [Theory]
+    [InlineData("baselines.xlsx")]
+    [InlineData("datasheet.pdf")]
+    [InlineData("notes.txt")]
+    [InlineData("board.kicad_pcb")]
+    [InlineData("README")]
+    [InlineData("archive.png.zip")]
+    public void A_file_the_app_cannot_draw_is_rejected(string fileName)
+    {
+        Assert.False(ContributionPackaging.IsDisplayableImageFile(fileName));
+    }
+
+    // .svg is in the ExternalTargetLauncher allowlist but deliberately NOT here: that allowlist
+    // guards files handed to the OS shell, which has an SVG viewer, whereas a component image is
+    // drawn by Avalonia Bitmap, which cannot decode SVG. Do not "fix" this by adding it.
+    [Fact]
+    public void An_svg_is_rejected_even_though_the_launcher_allowlist_permits_it()
+    {
+        Assert.False(ContributionPackaging.IsDisplayableImageFile("logo.svg"));
+    }
+
+    // Contributed file names are typed by hand, so extension case and stray whitespace are
+    // expected rather than exceptional, and neither should reject a perfectly good image.
+    [Theory]
+    [InlineData("PIN1.PNG")]
+    [InlineData("Pin1.JpG")]
+    [InlineData("  pin1.png  ")]
+    public void Extension_case_and_surrounding_whitespace_do_not_matter(string fileName)
+    {
+        Assert.True(ContributionPackaging.IsDisplayableImageFile(fileName));
+    }
+
+    // Full paths are what the file picker hands back, and relative ones are what a row loaded
+    // from board data holds - both must be judged on the file name at the end.
+    [Theory]
+    [InlineData("/data/Commodore/C64/250407/pin1.png")]
+    [InlineData("Commodore/C64/250407/pin1.png")]
+    public void The_extension_is_read_from_the_end_of_a_path(string pathValue)
+    {
+        Assert.True(ContributionPackaging.IsDisplayableImageFile(pathValue));
+    }
+
+    // Fail closed: no file chosen is not a displayable image. The caller treats a blank row as
+    // "nothing attached" separately, before it ever asks this question.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Blank_input_is_rejected(string? pathValue)
+    {
+        Assert.False(ContributionPackaging.IsDisplayableImageFile(pathValue));
+    }
+
+    // A directory name that happens to look like an image must not sneak through on the strength
+    // of a parent folder: only the final segment carries the extension.
+    [Fact]
+    public void A_folder_named_like_an_image_does_not_make_the_file_inside_it_an_image()
+    {
+        Assert.False(ContributionPackaging.IsDisplayableImageFile("/data/pin1.png/baselines.xlsx"));
+    }
+
+    // -------------------------------------------------------------- ValidateComponentImageFile
+
+    // "Add new component image" creates a row with every field blank, and it is perfectly normal
+    // for it to sit there while the rest of the row is filled in. What must not happen is that row
+    // being submitted: it would ship a component image entry pointing at nothing.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_row_that_never_had_a_file_chosen_reports_NoFileSelected(string? storedPath)
+    {
+        Assert.Equal(
+            ContributionPackaging.ComponentImageFileProblem.NoFileSelected,
+            ContributionPackaging.ValidateComponentImageFile(storedPath));
+    }
+
+    // A chosen file of the wrong type is a different problem from no file at all, and the editor
+    // says so differently - so the two must not collapse into one "row is bad" answer.
+    [Theory]
+    [InlineData("baselines.xlsx")]
+    [InlineData("datasheet.pdf")]
+    [InlineData("logo.svg")]
+    public void A_row_holding_a_file_the_app_cannot_draw_reports_NotDisplayable(string storedPath)
+    {
+        Assert.Equal(
+            ContributionPackaging.ComponentImageFileProblem.NotDisplayable,
+            ContributionPackaging.ValidateComponentImageFile(storedPath));
+    }
+
+    // Both shapes a row can hold: an absolute path from the file picker, and the relative path a
+    // row loaded from existing board data carries.
+    [Theory]
+    [InlineData("/pictures/scope/pin1.png")]
+    [InlineData("Commodore/C64/250407/pin1.jpg")]
+    public void A_row_holding_a_displayable_image_reports_None(string storedPath)
+    {
+        Assert.Equal(
+            ContributionPackaging.ComponentImageFileProblem.None,
+            ContributionPackaging.ValidateComponentImageFile(storedPath));
+    }
+
+    // The validation deliberately does NOT look at the disk. A row can name a file that has not
+    // been synced locally yet and still be a submittable row; whether the file resolves is
+    // ResolveExistingFilePath's job, and a missing file simply attaches nothing.
+    [Fact]
+    public void A_path_that_does_not_exist_on_disk_is_still_a_valid_row()
+    {
+        Assert.Equal(
+            ContributionPackaging.ComponentImageFileProblem.None,
+            ContributionPackaging.ValidateComponentImageFile("/no/such/folder/pin1.png"));
+    }
+
+    // -------------------------------------------------------------- ValidateNewComponent
+
+    // "Add new component" opens the editor on a component that exists nowhere yet, so the board
+    // label is the only thing identifying it - to the server, and to everybody reading the board
+    // data afterwards. A blank one cannot be submitted.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_new_component_without_a_board_label_reports_BoardLabelMissing(string? boardLabel)
+    {
+        Assert.Equal(
+            ContributionPackaging.NewComponentProblem.BoardLabelMissing,
+            ContributionPackaging.ValidateNewComponent(boardLabel, "IC", new[] { "U1", "U2" }));
+    }
+
+    // Reusing an existing label is refused rather than merged: the server resolves the whole
+    // contribution by board label, so it would diff this new component against the existing one
+    // and propose deleting every image, file and link the new one did not happen to repeat.
+    [Theory]
+    [InlineData("U1")]
+    [InlineData("u1")]
+    [InlineData("  U1  ")]
+    public void A_new_component_reusing_an_existing_board_label_reports_BoardLabelAlreadyExists(string boardLabel)
+    {
+        Assert.Equal(
+            ContributionPackaging.NewComponentProblem.BoardLabelAlreadyExists,
+            ContributionPackaging.ValidateNewComponent(boardLabel, "IC", new[] { "U1", "C12" }));
+    }
+
+    // The board data is read from Excel, where a label can arrive padded - the comparison has to
+    // see through that too, or "U1 " on the board lets "U1" through as a new component.
+    [Fact]
+    public void A_padded_existing_board_label_still_counts_as_taken()
+    {
+        Assert.Equal(
+            ContributionPackaging.NewComponentProblem.BoardLabelAlreadyExists,
+            ContributionPackaging.ValidateNewComponent("U1", "IC", new[] { " U1 " }));
+    }
+
+    // A component with no category is merged into the board data and is then unreachable: the main
+    // window builds its category filter from the categories present and skips blank ones
+    // (ComponentListBuilder), so nothing in the UI can ever select it. This is the case that was
+    // actually contributed - a component given a name and nothing else.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_new_component_without_a_category_reports_CategoryMissing(string? category)
+    {
+        Assert.Equal(
+            ContributionPackaging.NewComponentProblem.CategoryMissing,
+            ContributionPackaging.ValidateNewComponent("U99", category, new[] { "U1", "C12" }));
+    }
+
+    // The board label is judged first: a submission that is wrong in both places is told about the
+    // label, which is the one that decides what the whole contribution is even about.
+    [Fact]
+    public void A_missing_board_label_is_reported_before_a_missing_category()
+    {
+        Assert.Equal(
+            ContributionPackaging.NewComponentProblem.BoardLabelMissing,
+            ContributionPackaging.ValidateNewComponent("", "", new[] { "U1" }));
+    }
+
+    [Fact]
+    public void A_new_board_label_with_a_category_reports_None()
+    {
+        Assert.Equal(
+            ContributionPackaging.NewComponentProblem.None,
+            ContributionPackaging.ValidateNewComponent("U99", "IC", new[] { "U1", "C12" }));
+    }
+
+    // Blank rows in the board data are not labels, so they must not make a blank-looking
+    // comparison succeed - and an empty or absent list simply means nothing is taken yet.
+    [Fact]
+    public void Blank_entries_in_the_existing_labels_are_ignored()
+    {
+        Assert.Equal(
+            ContributionPackaging.NewComponentProblem.None,
+            ContributionPackaging.ValidateNewComponent("U99", "IC", new[] { "", "   ", "U1" }));
+
+        Assert.Equal(
+            ContributionPackaging.NewComponentProblem.None,
+            ContributionPackaging.ValidateNewComponent("U99", "IC", Array.Empty<string>()));
+
+        Assert.Equal(
+            ContributionPackaging.NewComponentProblem.None,
+            ContributionPackaging.ValidateNewComponent("U99", "IC", null));
     }
 
     // -------------------------------------------------------------- BuildFeedbackText

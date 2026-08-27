@@ -1,2 +1,8 @@
 - **Application**
-  - Fixed minor configuration for test cases, which should not be included when using `dotnet publish`
+  - Added option to add a new component in "Contribute" tab
+--------MISSING
+  - Added option to delete an existing component in "Contribute" tab (on the specific component)
+----------------
+  - Changed that a contribution via "Contribute" tab can only be done with version `2.5.0` or newer
+  - Fixed minor configuration for test cases, which should not be included when compiling using `dotnet publish`
+  - Refactored "Contribute" tab and its server review process
