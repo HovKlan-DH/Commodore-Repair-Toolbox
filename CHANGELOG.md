@@ -5,11 +5,13 @@
     - Added link to YouTube videos in "About" tab
     - Added help icon in various places, linking to GitHub Wiki page
     - Added KiCad data initializing indicator in "Schematics" tab
+    - Added commandline option for `--simulate-update`
     - Changed MiniPro IC test from experimental to an official feature
     - Changed MiniPro IC test is embedded in component info popup and has several UI changes
     - Changed mouse location is keeping logical position when zooming
     - Changed component info popup window opens in same position, if only a single window gets opened
     - Changed saving the user preference file now uses atomic-swap instead of direct-write
+    - Changed build strategy, so a `Debug` build no longer has special application behaviour
     - Fixed KiCad trace overlay was slow to zoom and to hover on boards with many components
     - Fixed KiCad rectangular and oval pads ignored their rotation
     - Fixed KiCad pads on bottom side components were placed mirrored
@@ -26,4 +28,4 @@
     - Fixed Linux proper maximizes the application window at launch, if this was its last state
     - Fixed delete routine of orphan/unused files could in rare cases wipe entire data-root folder (CRT data only at risk)
     - Fixed opening a file from application will not blindly _execute_ it and leave it for system to find appropriate means, but only _open_ whitelisted extensions
-    - Refactored several parts of project for more efficient AI development, including unit/UI test coverage (1045 cases and ~30% coverage total)
+    - Refactored several parts of project for more efficient AI development, including unit/UI test coverage (1071 cases and ~31% coverage total)

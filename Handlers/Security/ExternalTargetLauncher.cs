@@ -54,7 +54,10 @@ namespace CRT
                 return ExternalTargetLauncher.TryStart(localPath, $"local file [{localPath}]");
             }
 
-            Debug.WriteLine($"Rejected external target outside allowed scope: {target}");
+            // Logger, not Debug.WriteLine: the latter carries an implicit [Conditional("DEBUG")] and
+            // is erased from RELEASE builds, which is precisely where a refused link needs to leave a
+            // trace - a user reporting "the link does nothing" has only the log to send.
+            Logger.Warning($"Rejected external target outside allowed scope: [{target}]");
             return false;
         }
 
@@ -154,7 +157,7 @@ namespace CRT
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to open {description}: {ex.Message}");
+                Logger.Warning($"Failed to open {description} - [{ex.Message}]");
                 return false;
             }
         }

@@ -299,72 +299,64 @@ namespace Handlers.DataHandling
 
             ApplyMainExcelResolution(localResolution, "startup local scan");
 
-#if DEBUG
-            if (!AppConfig.DebugSimulateSync)
+            // Skipping the online sync during development is the "Check for new or updated data at
+            // application launch" setting - it short-circuits everything below, so there is nothing
+            // build-specific here.
+            if (UserSettings.CheckDataOnLaunch)
             {
-                Logger.Info("DEBUG build - skipping online sync");
+                RaiseStatus("Fetching online file manifest...");
+                _syncManifest = await OnlineServices.FetchManifestAsync(RaiseStatus);
+                _lastFetchedManifest = _syncManifest?.ToList();
+
+                if (_syncManifest != null)
+                {
+                    MainExcelResolution onlineResolution = ResolveMainExcelCandidate(
+                        _syncManifest.Select(entry => entry.File),
+                        allowSyntheticLegacyFallback: false,
+                        sourceDescription: "online manifest");
+
+                    Logger.Info(
+                        $"Main Excel candidates at startup: local=[{localResolution.FileName}] online=[{onlineResolution.FileName}]");
+
+                    MainExcelResolution selectedResolution = !string.IsNullOrWhiteSpace(onlineResolution.FileName)
+                        ? new MainExcelResolution
+                        {
+                            FileName = onlineResolution.FileName,
+                            RequiresAppUpdate = onlineResolution.RequiresAppUpdate || localResolution.RequiresAppUpdate,
+                            SourceDescription = "online manifest preferred"
+                        }
+                        : localResolution;
+
+                    ApplyMainExcelResolution(selectedResolution, "startup selected candidate");
+
+                    if (!string.IsNullOrWhiteSpace(ResolvedMainExcelFileName))
+                    {
+                        RaiseStatus("Checking main data file...");
+                        await OnlineServices.SyncFilesAsync(
+                            _syncManifest,
+                            _dataRoot,
+                            file => string.Equals(
+                                thisNormalizeRelativePath(file),
+                                thisNormalizeRelativePath(ResolvedMainExcelFileName),
+                                StringComparison.OrdinalIgnoreCase),
+                            RaiseStatus,
+                            RaiseFileDownload,
+                            label: "Main Excel data file");
+                    }
+
+                    selectedResolution = EnsureUsableMainExcelAfterSync(
+                        selectedResolution,
+                        localResolution,
+                        "startup",
+                        RaiseStatus);
+
+                    ApplyMainExcelResolution(selectedResolution, "startup final");
+                }
             }
             else
             {
-#endif
-                if (UserSettings.CheckDataOnLaunch)
-                {
-                    RaiseStatus("Fetching online file manifest...");
-                    _syncManifest = await OnlineServices.FetchManifestAsync(RaiseStatus);
-                    _lastFetchedManifest = _syncManifest?.ToList();
-
-                    if (_syncManifest != null)
-                    {
-                        MainExcelResolution onlineResolution = ResolveMainExcelCandidate(
-                            _syncManifest.Select(entry => entry.File),
-                            allowSyntheticLegacyFallback: false,
-                            sourceDescription: "online manifest");
-
-                        Logger.Info(
-                            $"Main Excel candidates at startup: local=[{localResolution.FileName}] online=[{onlineResolution.FileName}]");
-
-                        MainExcelResolution selectedResolution = !string.IsNullOrWhiteSpace(onlineResolution.FileName)
-                            ? new MainExcelResolution
-                            {
-                                FileName = onlineResolution.FileName,
-                                RequiresAppUpdate = onlineResolution.RequiresAppUpdate || localResolution.RequiresAppUpdate,
-                                SourceDescription = "online manifest preferred"
-                            }
-                            : localResolution;
-
-                        ApplyMainExcelResolution(selectedResolution, "startup selected candidate");
-
-                        if (!string.IsNullOrWhiteSpace(ResolvedMainExcelFileName))
-                        {
-                            RaiseStatus("Checking main data file...");
-                            await OnlineServices.SyncFilesAsync(
-                                _syncManifest,
-                                _dataRoot,
-                                file => string.Equals(
-                                    thisNormalizeRelativePath(file),
-                                    thisNormalizeRelativePath(ResolvedMainExcelFileName),
-                                    StringComparison.OrdinalIgnoreCase),
-                                RaiseStatus,
-                                RaiseFileDownload,
-                                label: "Main Excel data file");
-                        }
-
-                        selectedResolution = EnsureUsableMainExcelAfterSync(
-                            selectedResolution,
-                            localResolution,
-                            "startup",
-                            RaiseStatus);
-
-                        ApplyMainExcelResolution(selectedResolution, "startup final");
-                    }
-                }
-                else
-                {
-                    Logger.Info("Online data sync skipped - disabled in settings");
-                }
-#if DEBUG
+                Logger.Info("Online data sync skipped - disabled in settings");
             }
-#endif
 
             if (DataUpdateRequiresAppUpdate)
             {
@@ -377,34 +369,29 @@ namespace Handlers.DataHandling
             RaiseStatus("Loading hardware definitions...");
             await Task.Run(LoadMainExcel);
 
-#if DEBUG
-            if (AppConfig.DebugSimulateSync)
+            // No separate guard for a skipped sync: _syncManifest is only ever assigned above, so it
+            // is still null whenever the manifest fetch did not run.
+            if (_syncManifest != null && HardwareBoards.Count > 0)
             {
-#endif
-                if (_syncManifest != null && HardwareBoards.Count > 0)
-                {
-                    var boardExcelFiles = HardwareBoards
-                        .Select(entry => thisNormalizeRelativePath(entry.ExcelDataFile))
-                        .Where(path => !string.IsNullOrWhiteSpace(path))
-                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var boardExcelFiles = HardwareBoards
+                    .Select(entry => thisNormalizeRelativePath(entry.ExcelDataFile))
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-                    RaiseStatus("Checking board Excel data files...");
-                    await OnlineServices.SyncFilesAsync(
-                        _syncManifest,
-                        _dataRoot,
-                        file =>
-                        {
-                            string normalizedFile = thisNormalizeRelativePath(file);
-                            return boardExcelFiles.Contains(normalizedFile) &&
-                                   !thisIsProtectedContributionFile(normalizedFile);
-                        },
-                        RaiseStatus,
-                        RaiseFileDownload,
-                        label: "board Excel data files");
-                }
-#if DEBUG
+                RaiseStatus("Checking board Excel data files...");
+                await OnlineServices.SyncFilesAsync(
+                    _syncManifest,
+                    _dataRoot,
+                    file =>
+                    {
+                        string normalizedFile = thisNormalizeRelativePath(file);
+                        return boardExcelFiles.Contains(normalizedFile) &&
+                               !thisIsProtectedContributionFile(normalizedFile);
+                    },
+                    RaiseStatus,
+                    RaiseFileDownload,
+                    label: "board Excel data files");
             }
-#endif
         }
 
         // Returns true when a background sync manifest is queued and ready to process.

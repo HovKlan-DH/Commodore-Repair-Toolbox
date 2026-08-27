@@ -30,16 +30,12 @@ namespace Handlers.OnlineHandling
         {
             _lastCheckError = null;
 
-#if DEBUG
-            if (AppConfig.DebugSimulateUpdate)
+            if (SimulationOptions.Current.SimulateUpdate)
             {
+                Logger.Warning($"Simulated update - reporting version [{SimulationOptions.Current.SimulatedUpdateVersion}] as available");
                 return true;
             }
 
-            _lastCheckError = "Update check disabled in debug builds";
-            Logger.Debug("Update check skipped - debug build");
-            return null;
-#else
             try
             {
                 _manager = new UpdateManager(new GithubSource(
@@ -52,6 +48,8 @@ namespace Handlers.OnlineHandling
             }
             catch (Velopack.Exceptions.NotInstalledException)
             {
+                // The normal outcome when running from "dotnet run" or a plain build output rather
+                // than a Velopack install - not an error worth alarming anyone about.
                 _lastCheckError = "Not running as an installed application";
                 Logger.Warning("Update check skipped - not running as a Velopack-installed application");
                 return null;
@@ -62,7 +60,6 @@ namespace Handlers.OnlineHandling
                 Logger.Warning($"Update check failed - [{ex.Message}]");
                 return null;
             }
-#endif
         }
 
         // ###########################################################################################
@@ -72,19 +69,17 @@ namespace Handlers.OnlineHandling
         // ###########################################################################################
         public static async Task<bool> DownloadAndInstallAsync(Action<int>? onProgress = null)
         {
-#if DEBUG
-            if (AppConfig.DebugSimulateUpdate)
+            if (SimulationOptions.Current.SimulateUpdate)
             {
-                Logger.Info("Debug simulation - faking update download");
+                Logger.Warning("Simulated update - faking the download");
                 for (int i = 0; i <= 100; i += 5)
                 {
                     onProgress?.Invoke(i);
                     await Task.Delay(50);
                 }
-                Logger.Info("Debug simulation - download complete (restart skipped in debug)");
+                Logger.Warning("Simulated update - download complete (the restart is deliberately skipped)");
                 return true;
             }
-#endif
 
             if (_manager == null || _pendingUpdate == null)
             {
@@ -110,9 +105,8 @@ namespace Handlers.OnlineHandling
         // Returns the version string of the available update, or null if none was found.
         // ###########################################################################################
         public static string? PendingVersion =>
-#if DEBUG
-            AppConfig.DebugSimulateUpdate ? AppConfig.DebugSimulatedVersion :
-#endif
-            _pendingUpdate?.TargetFullRelease.Version.ToString();
+            SimulationOptions.Current.SimulateUpdate
+                ? SimulationOptions.Current.SimulatedUpdateVersion
+                : _pendingUpdate?.TargetFullRelease.Version.ToString();
     }
 }

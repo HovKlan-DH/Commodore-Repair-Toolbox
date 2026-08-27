@@ -33,7 +33,9 @@
 				"watch",
 				"run",
 				"--project",
-				"${workspaceFolder}/Classic-Repair-Toolbox.slnx"
+				"${workspaceFolder}/Classic-Repair-Toolbox.slnx",
+				"--",
+				"--simulate-update"
 			],
 			"problemMatcher": "$msCompile"
 		}

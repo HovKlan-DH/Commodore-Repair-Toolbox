@@ -45,7 +45,11 @@
 - Run application:
   - `bin/Release/net10.0/linux-x64/Classic-Repair-Toolbox`
 
-Note that it is recommened you always create a `RELEASE` version, as it otherwise will not check for a new version online. If this is a `DEBUG` build, it will always show-case a dummy update to visualize the UI for it.
+A `DEBUG` build and a `RELEASE` build behave identically — the update check, the data sync and the diagnostics are the same in both. `RELEASE` is still what you want for a build you intend to use or measure, since `DEBUG` is JIT-only and starts noticeably slower.
+
+To see the update banner without publishing a release, start the application with `--simulate-update` (or `--simulate-update=2.7.0` for a specific version). It offers a dummy update, fakes the download and does not restart. This works in both build configurations; the log says so in capitals and the banner itself is marked `(simulated)`.
+
+To skip the online data check while working offline, untick "Check for new or updated data at application launch" in the Configuration tab.
 
 
 ## macOS

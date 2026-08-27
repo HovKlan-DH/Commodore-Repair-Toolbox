@@ -266,7 +266,10 @@ namespace CRT
         // ###########################################################################################
         private void ShowApplicationUpdateAvailableBanner()
         {
-            this.UpdateBannerText.Text = $"Version [{UpdateService.PendingVersion}] is available";
+            // The "(simulated)" suffix is the only thing distinguishing a faked update from a real
+            // one on screen, and screenshots are what arrive in bug reports.
+            string simulatedSuffix = SimulationOptions.Current.SimulateUpdate ? " (simulated)" : string.Empty;
+            this.UpdateBannerText.Text = $"Version [{UpdateService.PendingVersion}] is available{simulatedSuffix}";
             this.UpdateBannerInstallButton.IsVisible = true;
             this.UpdateBannerViewNotesButton.IsVisible = true;
             this.UpdateBannerInstallButton.IsEnabled = true;

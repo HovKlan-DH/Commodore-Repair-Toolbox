@@ -39,13 +39,23 @@ per-OS instructions).
   VS Code (`.vscode/launch.json`), or open `Classic-Repair-Toolbox.slnx` in Visual Studio
 - Self-contained publish for a specific OS: `dotnet publish -c Release -f net10.0 -r <rid> --self-contained`
   where `<rid>` is one of `win-x64`, `linux-x64`, `osx-x64`, `osx-arm64`
-- **Always build/test as `RELEASE`, not `DEBUG`, when checking real update/sync behavior** — DEBUG builds
-  never check for a new version online and always show a simulated update banner instead
-  (`AppConfig.DebugSimulateUpdate`), and DEBUG builds by default do simulate the online data sync
-  (`AppConfig.DebugSimulateSync`) rather than skipping it — flip these constants in
-  [Main/App.axaml.cs](../Main/App.axaml.cs) if you need different debug behavior locally.
-- The app looks for its `Data` folder next to the executable by default; override with
-  `--data-root=<path>` on the command line.
+- **The build configuration does not change what the app does.** A DEBUG build and a RELEASE build
+  given the same arguments behave identically — same update check, same data sync, same diagnostics.
+  Nothing may be gated on `#if DEBUG`; the one remaining use is `AppConfig.IsDebugBuild`, which is
+  reported in the log and read by nothing else. RELEASE still matters for *timings* (DEBUG is
+  JIT-only) and for warnings-as-errors, not for behaviour.
+- **Command-line switches**, all parsed once at startup:
+  - `--data-root=<path>` — use a different `Data` folder (default: next to the executable).
+  - `--simulate-update[=<version>]` — offer a fake application update (default `99.0.0`), fake the
+    download and skip the restart, so the update banner can be exercised without a release. See
+    [Handlers/Data/SimulationOptions.cs](../Handlers/Data/SimulationOptions.cs). Active in RELEASE
+    builds too, on purpose; the startup log shouts about it and the banner says `(simulated)`.
+  - Both are set for F5 and the `watch` task in [.vscode/launch.json](../.vscode/launch.json) and
+    [.vscode/tasks.json](../.vscode/tasks.json).
+- **To skip the online data sync while iterating, untick "Check for new or updated data at
+  application launch" in the Configuration tab.** It is a normal user setting, not a build or
+  command-line concern — it short-circuits the manifest fetch, and with no manifest the board-Excel
+  sync and the background image sync skip themselves too.
 
 ## Tests
 
@@ -105,7 +115,7 @@ number formats.
 | Security | `ExternalTargetLauncher`, `OnlineServices`' manifest-validation predicates |
 | KiCad | `KiCadRawProjectLoader`, `KiCadProjectLoader`, the `KiCadProjectData` model |
 | Board data | `BoardDataReader`, `BoardDataWriter`, `BoardComponentHighlightStorage`, `ComponentListBuilder`, `ComponentImageQueries`, `OverviewHtmlBuilder`, `ContactLinkFormatter` |
-| Settings / startup | `UserSettings`, `DataManager` (data-root + master workbook), `DataValidator` (smoke only) |
+| Settings / startup | `UserSettings`, `DataManager` (data-root + master workbook), `DataValidator` (smoke only), `SimulationOptions` |
 | Headless UI (`Tests/.../Ui/`) | All eight tabs built headlessly, plus component highlight selection and schematics zoom - see [Headless UI tests](#headless-ui-tests) |
 | Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `KiCadPadGeometry`, `OverlayCullGeometry`, `KiCadOverlayCacheKeys`, `KiCadOverlayNetCache`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry` |
 

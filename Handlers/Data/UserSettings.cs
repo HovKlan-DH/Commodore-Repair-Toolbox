@@ -901,7 +901,7 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [EnableNetworkConnectedOscilloscopeTab] [{EnableNetworkConnectedOscilloscopeTab}]");
                     Logger.Info($"        [EnableMiniproExperimentalMode] [{EnableMiniproExperimentalMode}]");
                     Logger.Info($"        [CheckDataOnLaunch] [{CheckDataOnLaunch}]");
-                    Logger.Info($"        [DownloadDataFromTestSource] [{(AppConfig.IsDebugBuild ? DownloadDataFromTestSource.ToString() : "Release build - forced off")}]");
+                    Logger.Info($"        [DownloadDataFromTestSource] [{DownloadDataFromTestSource}]");
                     Logger.Info($"        [AllowDeletionOfOrphanAndNonUsedFiles] [{AllowDeletionOfOrphanAndNonUsedFiles}]");
                     Logger.Info($"        [CheckVersionOnLaunch] [{CheckVersionOnLaunch}]");
                     Logger.Info($"        [AllowBetaNotification] [{ShowDevelopmentVersionNotification}]");

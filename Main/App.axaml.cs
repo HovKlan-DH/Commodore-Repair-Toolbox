@@ -17,20 +17,14 @@ namespace CRT
     // ###########################################################################################
     public static class AppConfig
     {
-        // ===== Debug ===============================================================================
-        // Only referenced inside #if DEBUG blocks — ignored entirely in Release builds.
+        // ===== Simulation ==========================================================================
+        // The build configuration does NOT change what the application does. Simulations are runtime
+        // switches parsed from the command line — see SimulationOptions — so a DEBUG build and a
+        // RELEASE build given the same arguments behave identically.
 
-        // Enables online sync in DEBUG builds (normally skipped for faster development iteration).
-        // Used by: DataManager.InitializeAsync
-        public static readonly bool DebugSimulateSync = true;
-
-        // Simulates an available app update in DEBUG builds for UI testing.
-        // Used by: UpdateService.CheckForUpdateAsync, UpdateService.PendingVersion
-        public static readonly bool DebugSimulateUpdate = true;
-
-        // Fake version string shown in the update banner during debug update simulations.
-        // Used by: UpdateService.PendingVersion
-        public const string DebugSimulatedVersion = "99.0.0";
+        // Version the simulated update claims to be, unless "--simulate-update=<version>" overrides it.
+        // Used by: SimulationOptions.Parse, UpdateService.PendingVersion
+        public const string SimulatedUpdateVersion = "99.0.0";
 
         // ===== App Identity ========================================================================
 
@@ -170,6 +164,10 @@ namespace CRT
         // ###########################################################################################
         // Returns true when the application was compiled as a DEBUG build.
         // RELEASE builds always report false here.
+        //
+        // This is reported in the log and nothing else. No application behaviour may depend on it —
+        // anything that should differ between a normal run and a development run belongs in
+        // SimulationOptions as a command-line switch, so both builds can reach it.
         // ###########################################################################################
         public static bool IsDebugBuild
         {
@@ -300,9 +298,11 @@ namespace CRT
             this.SetupGlobalExceptionLogging();
 
             // The build configuration goes on this line because startup timings are meaningless
-            // without it: DEBUG builds are JIT-only and skip the online sync, and ReadyToRun applies
-            // only to a RID-targeted publish - so a timing from the wrong build is worse than none.
+            // without it: DEBUG builds are JIT-only, and ReadyToRun applies only to a RID-targeted
+            // publish - so a timing from the wrong build is worse than none. It says nothing about
+            // application behaviour, which is identical in both builds.
             Logger.Info($"Classic Repair Toolbox version [{AppConfig.AppDisplayVersionString}] [{(AppConfig.IsDebugBuild ? "DEBUG" : "RELEASE")} build] launched");
+
 
             // Startup timing. The first milestone covers everything that happened before the log
             // file even existed - Velopack, the Avalonia AppBuilder, platform detection and parsing
@@ -318,6 +318,22 @@ namespace CRT
             Logger.Info(startupTimeline.Record("Runtime and UI framework ready", DateTime.Now));
 
             UserSettings.Load();
+
+            // Loud on purpose. A simulated update looks exactly like a real one in a screenshot, so
+            // the log has to be the place where that is unambiguous when a bug report arrives.
+            //
+            // This sits after UserSettings.Load() rather than up beside the version line because it
+            // reports whether the launch version check is enabled, and before the load that setting
+            // would read as its default instead of the user's actual value.
+            if (SimulationOptions.Current.IsAnyActive)
+            {
+                Logger.Warning("Simulation mode active:");
+
+                foreach (var line in SimulationOptions.Current.DescribeForLog(UserSettings.CheckVersionOnLaunch))
+                {
+                    Logger.Warning($"    {line}");
+                }
+            }
 
             // Apply selected theme early
             this.ApplyConfiguredTheme();
