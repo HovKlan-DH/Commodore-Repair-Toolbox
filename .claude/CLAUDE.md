@@ -381,6 +381,24 @@ contribution, not a code change.
   OS shell, which would run a `.exe`/`.bat`/`.lnk` instead of displaying it), rejecting anything else.
   Use this rather than shelling out directly when opening user/data-supplied links or files.
 
+### Contribution webserver (`Assets/Webserver/`)
+
+A working copy of the PHP deployed at `classic-repair-toolbox.dk/app-contribution/` — the server
+side of the Contribute tab. `api/index.php` receives the uploads the app posts to
+`AppConfig.ContributionUploadUrl`; `api/review.php` + `api/review_functions.php` are the review
+queue that diffs each submission against the live server data and merges or rejects it. It is
+deployed by hand and never ships with the app (Assets are whitelisted per-file in the csproj).
+
+**The payload is a two-sided contract.** `ComponentContributionPayload` in
+[Tabs/Contribute/ComponentContribution.axaml.cs](../Tabs/Contribute/ComponentContribution.axaml.cs)
+is what `review_functions.php` parses, and the PHP deliberately mirrors the app's Excel-reading
+rules (case-insensitive headers, exact board-file resolution, `.json`-beside-the-Excel highlights,
+the `# Revision date:` marker). When you change either side, change the other in the same
+sitting, and run the PHP suite too: `php Assets/Webserver/app-contribution/api/tests/run-tests.php`
+(53 checks, ~1s, no webserver needed — PHP is installed on this machine). Full details, file
+inventory (including which files are legacy) and known caveats:
+[Assets/Webserver/app-contribution/README.md](../Assets/Webserver/app-contribution/README.md).
+
 ## Release process
 
 Versioning lives in [Classic-Repair-Toolbox.csproj](../Classic-Repair-Toolbox.csproj)

@@ -96,6 +96,10 @@ namespace CRT
 
         public string Note { get; set; } = string.Empty;
 
+        // Zip entry name of the attached file for this row, so the server can locate it exactly.
+        // Empty when the row's file could not be resolved and therefore was not attached.
+        public string ZipEntry { get; set; } = string.Empty;
+
         [JsonIgnore]
         public string? OriginalFilePath { get; set; }
 
@@ -162,6 +166,10 @@ namespace CRT
         [JsonIgnore]
         public ObservableCollection<string> AvailableFileLocations { get; } = new();
 
+        // Zip entry name of the attached file for this row, so the server can locate it exactly.
+        // Empty when the row's file could not be resolved and therefore was not attached.
+        public string ZipEntry { get; set; } = string.Empty;
+
         [JsonIgnore]
         public string? OriginalFilePath { get; set; }
     }
@@ -218,6 +226,10 @@ namespace CRT
         [JsonIgnore]
         public ObservableCollection<string> AvailableFileLocations { get; } = new();
 
+        // Zip entry name of the attached file for this row, so the server can locate it exactly.
+        // Empty when the row's file could not be resolved and therefore was not attached.
+        public string ZipEntry { get; set; } = string.Empty;
+
         [JsonIgnore]
         public string? OriginalFilePath { get; set; }
     }
@@ -232,9 +244,15 @@ namespace CRT
 
     public sealed class ComponentContributionPayload
     {
+        // Bumped whenever the payload schema changes, so the server review page can tell which
+        // contract a queued submission was produced with. Version 2 added BoardExcelFile,
+        // BoardRevisionDate and the per-row ZipEntry pointers.
+        public int PayloadFormat { get; set; } = 2;
         public string ApplicationVersion { get; set; } = string.Empty;
         public string HardwareName { get; set; } = string.Empty;
         public string BoardName { get; set; } = string.Empty;
+        public string BoardExcelFile { get; set; } = string.Empty;
+        public string BoardRevisionDate { get; set; } = string.Empty;
         public string Region { get; set; } = string.Empty;
         public string ComponentBoardLabel { get; set; } = string.Empty;
         public string ComponentDisplayText { get; set; } = string.Empty;
@@ -265,6 +283,8 @@ namespace CRT
 
         private string thisHardwareName = string.Empty;
         private string thisBoardName = string.Empty;
+        private string thisBoardExcelFile = string.Empty;
+        private string thisBoardRevisionDate = string.Empty;
         private string thisLocalRegion = string.Empty;
         private string thisBoardLabel = string.Empty;
         private string thisComponentDisplayText = string.Empty;
@@ -296,11 +316,13 @@ namespace CRT
         // ###########################################################################################
         // Loads the selected component context and all editable rows into the window.
         // ###########################################################################################
-        public void LoadComponent(BoardData boardData, string dataRoot, string hardwareName, string boardName, string region, string boardLabel)
+        public void LoadComponent(BoardData boardData, string dataRoot, string hardwareName, string boardName, string region, string boardLabel, string boardExcelFile)
         {
             this.thisDataRoot = dataRoot;
             this.thisHardwareName = hardwareName;
             this.thisBoardName = boardName;
+            this.thisBoardExcelFile = boardExcelFile?.Trim().Replace('\\', '/') ?? string.Empty;
+            this.thisBoardRevisionDate = boardData.RevisionDate?.Trim() ?? string.Empty;
             this.thisLocalRegion = region;
             this.thisBoardLabel = boardLabel;
             this.thisComponentUuidV4 = string.Empty;
@@ -765,7 +787,15 @@ namespace CRT
                 {
                     Logger.Warning($"Component contribution submission failed. HTTP {result.StatusCode}. Server responded with: {result.ResponseBody}");
 
-                    if (result.StatusCode == 404)
+                    if (ContributionPackaging.TryParseOutdatedVersionResponse(result.ResponseBody, out string newestVersion))
+                    {
+                        string newestVersionText = string.IsNullOrWhiteSpace(newestVersion)
+                            ? "the newest version"
+                            : $"version {newestVersion}";
+
+                        this.ShowStatus($"This version of Classic Repair Toolbox is too old to contribute data - please update to {newestVersionText} and try again", true);
+                    }
+                    else if (result.StatusCode == 404)
                     {
                         this.ShowStatus("Failed to send contribution: Server endpoint not found (HTTP 404)", true);
                     }
@@ -794,6 +824,7 @@ namespace CRT
             progress.Report("Preparing contribution payload...");
 
             var payload = this.BuildPayload(email, comment);
+            var attachments = this.AssignZipEntriesToPayload(payload);
             string payloadJson = JsonSerializer.Serialize(payload, thisContributionPayloadJsonOptions);
 
             using var memoryStream = new MemoryStream();
@@ -802,11 +833,10 @@ namespace CRT
             {
                 this.AddTextEntryToZip(archive, "ComponentContribution.json", payloadJson);
 
-                var referencedFiles = this.GatherExistingReferencedFiles();
-                for (int i = 0; i < referencedFiles.Count; i++)
+                for (int i = 0; i < attachments.Count; i++)
                 {
-                    progress.Report($"Packaging referenced files... {i + 1}/{referencedFiles.Count}");
-                    this.AddFileToZipSafe(archive, referencedFiles[i].Source, referencedFiles[i].ZipEntryName);
+                    progress.Report($"Packaging referenced files... {i + 1}/{attachments.Count}");
+                    this.AddFileToZipSafe(archive, attachments[i].SourcePath, attachments[i].ZipEntryName);
                 }
             }
 
@@ -832,7 +862,7 @@ namespace CRT
 
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(AppConfig.AppShortName + " " + AppConfig.AppDisplayVersionString);
 
-            var response = await httpClient.PostAsync("https://classic-repair-toolbox.dk/app-contribution/api/", progressContent);
+            var response = await httpClient.PostAsync(AppConfig.ContributionUploadUrl, progressContent);
             string responseBody = await response.Content.ReadAsStringAsync();
             bool isSuccess = response.IsSuccessStatusCode &&
                              responseBody.Trim().StartsWith("Success", StringComparison.OrdinalIgnoreCase);
@@ -850,6 +880,8 @@ namespace CRT
                 ApplicationVersion = AppConfig.AppDisplayVersionString,
                 HardwareName = this.thisHardwareName,
                 BoardName = this.thisBoardName,
+                BoardExcelFile = this.thisBoardExcelFile,
+                BoardRevisionDate = this.thisBoardRevisionDate,
                 Region = this.thisLocalRegion,
                 ComponentBoardLabel = this.thisBoardLabel,
                 ComponentDisplayText = this.thisComponentDisplayText,
@@ -937,68 +969,64 @@ namespace CRT
         // ###########################################################################################
         private string BuildContributionFeedbackText(string comment)
         {
-            var builder = new StringBuilder();
-//            builder.AppendLine("Component contribution submission");
-            builder.AppendLine($"Hardware: {this.thisHardwareName}");
-            builder.AppendLine($"Board: {this.thisBoardName}");
-            builder.AppendLine($"Component: {this.thisComponentDisplayText}");
-            builder.AppendLine($"Component UUID v4: {this.thisComponentUuidV4}");
-            builder.AppendLine($"Region context: {this.thisLocalRegion}");
-            builder.AppendLine();
-            builder.AppendLine("Mandatory change comment:");
-            builder.AppendLine(comment);
-
-            return builder.ToString();
+            return ContributionPackaging.BuildFeedbackText(
+                this.thisHardwareName,
+                this.thisBoardName,
+                this.thisComponentDisplayText,
+                this.thisComponentUuidV4,
+                this.thisLocalRegion,
+                comment);
         }
 
         // ###########################################################################################
-        // Resolves existing local files referenced by edited rows so they can be attached as context.
+        // Resolves the files referenced by the edited rows and stamps each payload row with the
+        // zip entry its file will be packed under, so the server can locate every submitted file
+        // exactly. Returns the distinct attachments to write into the zip.
         // ###########################################################################################
-        private List<(string Source, string ZipEntryName)> GatherExistingReferencedFiles()
+        private IReadOnlyList<ContributionAttachment> AssignZipEntriesToPayload(ComponentContributionPayload payload)
         {
-            var files = new List<(string Source, string ZipEntryName)>();
-            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var references = new List<ContributionFileReference>();
 
-            this.AddResolvedFilesFromPaths(
-                this.thisComponentImageRows.Select(r => this.GetStoredFilePath(r)),
-                "ReferencedFiles/ComponentImages",
-                files,
-                seenPaths);
-
-            this.AddResolvedFilesFromPaths(
-                this.thisComponentLocalFileRows.Select(r => this.GetStoredFilePath(r)),
-                "ReferencedFiles/ComponentLocalFiles",
-                files,
-                seenPaths);
-
-            this.AddResolvedFilesFromPaths(
-                this.thisBoardLocalFileRows.Select(r => this.GetStoredFilePath(r)),
-                "ReferencedFiles/BoardLocalFiles",
-                files,
-                seenPaths);
-
-            return files;
-        }
-
-        // ###########################################################################################
-        // Adds resolved file references from edited rows to the outgoing zip attachment list.
-        // ###########################################################################################
-        private void AddResolvedFilesFromPaths(IEnumerable<string> pathValues, string zipFolder, List<(string Source, string ZipEntryName)> files, HashSet<string> seenPaths)
-        {
-            int index = files.Count;
-
-            foreach (var pathValue in pathValues)
+            // The payload row lists were produced from these collections via 1:1 Select calls in
+            // BuildPayload, so index alignment between source rows and payload rows is guaranteed.
+            references.AddRange(this.thisComponentImageRows.Select(row => new ContributionFileReference
             {
-                var resolvedPath = this.ResolveExistingFilePath(pathValue);
-                if (string.IsNullOrWhiteSpace(resolvedPath) || !seenPaths.Add(resolvedPath))
-                {
-                    continue;
-                }
+                SectionFolder = "ComponentImages",
+                ResolvedSourcePath = this.ResolveExistingFilePath(this.GetStoredFilePath(row))
+            }));
 
-                index++;
-                string zipEntryName = $"{zipFolder}/{index:D3}_{Path.GetFileName(resolvedPath)}";
-                files.Add((resolvedPath, zipEntryName));
+            references.AddRange(this.thisComponentLocalFileRows.Select(row => new ContributionFileReference
+            {
+                SectionFolder = "ComponentLocalFiles",
+                ResolvedSourcePath = this.ResolveExistingFilePath(this.GetStoredFilePath(row))
+            }));
+
+            references.AddRange(this.thisBoardLocalFileRows.Select(row => new ContributionFileReference
+            {
+                SectionFolder = "BoardLocalFiles",
+                ResolvedSourcePath = this.ResolveExistingFilePath(this.GetStoredFilePath(row))
+            }));
+
+            var plan = ContributionPackaging.AssignZipEntries(references);
+
+            int entryIndex = 0;
+
+            foreach (var row in payload.ComponentImages)
+            {
+                row.ZipEntry = plan.EntryNames[entryIndex++];
             }
+
+            foreach (var row in payload.ComponentLocalFiles)
+            {
+                row.ZipEntry = plan.EntryNames[entryIndex++];
+            }
+
+            foreach (var row in payload.BoardLocalFiles)
+            {
+                row.ZipEntry = plan.EntryNames[entryIndex++];
+            }
+
+            return plan.Attachments;
         }
 
         // ###########################################################################################
@@ -1007,37 +1035,7 @@ namespace CRT
         // ###########################################################################################
         private string? ResolveExistingFilePath(string pathValue)
         {
-            string trimmed = pathValue?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(trimmed))
-            {
-                return null;
-            }
-
-            try
-            {
-                string normalizedInput = trimmed.Replace('/', Path.DirectorySeparatorChar);
-
-                // 1. If the user selected an absolute path via the file picker anywhere on their PC, allow it!
-                if (Path.IsPathRooted(normalizedInput))
-                {
-                    string fullPath = Path.GetFullPath(normalizedInput);
-                    return File.Exists(fullPath) ? fullPath : null;
-                }
-
-                // 2. If it's a relative path, assume it lives strictly inside the current data-root
-                if (!string.IsNullOrWhiteSpace(this.thisDataRoot))
-                {
-                    string normalizedDataRoot = Path.GetFullPath(this.thisDataRoot);
-                    string combinedPath = Path.GetFullPath(Path.Combine(normalizedDataRoot, normalizedInput));
-                    return File.Exists(combinedPath) ? combinedPath : null;
-                }
-
-                return null;
-            }
-            catch
-            {
-                return null;
-            }
+            return ContributionPackaging.ResolveExistingFilePath(this.thisDataRoot, pathValue);
         }
 
         // ###########################################################################################

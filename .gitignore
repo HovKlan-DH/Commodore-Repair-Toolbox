@@ -67,3 +67,6 @@ nunit-*.xml
 
 # Stop-hook marker: fingerprint of the last verified-green test run
 .claude/.tests-green
+
+# Webserver content
+Assets/Webserver/

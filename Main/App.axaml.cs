@@ -68,6 +68,10 @@ namespace CRT
         // Used by: OnlineServices.CheckInVersionAsync
         public const string CheckVersionUrl = "https://classic-repair-toolbox.dk/app-checkin/";
 
+        // URL receiving component contribution uploads (Assets/Webserver/app-contribution/api/index.php).
+        // Used by: ComponentContributionWindow.ProcessAndSendContributionAsync
+        public const string ContributionUploadUrl = "https://classic-repair-toolbox.dk/app-contribution/api/";
+
         // Timeout for lightweight API calls (manifest fetch, version check).
         // Used by: OnlineServices.FetchManifestAsync, OnlineServices.CheckInVersionAsync
         public static readonly TimeSpan ApiTimeout = TimeSpan.FromSeconds(5);

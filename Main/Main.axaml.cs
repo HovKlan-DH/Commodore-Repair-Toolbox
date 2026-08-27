@@ -2117,7 +2117,8 @@ namespace CRT
                 hardwareName,
                 boardName,
                 this._localRegion,
-                boardLabel);
+                boardLabel,
+                this.GetCurrentBoardEntry()?.ExcelDataFile ?? string.Empty);
 
             this.PositionFullscreenWindowOnSameScreen(window);
             window.WindowState = Avalonia.Controls.WindowState.Maximized;
