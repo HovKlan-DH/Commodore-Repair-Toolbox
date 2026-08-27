@@ -163,7 +163,8 @@ has an `internal` seam; the test project sees them via `InternalsVisibleTo` in t
 Use `TempWorkspace` for anything that touches the filesystem; it creates and deletes a temp folder.
 Tests that mutate `UserSettings` or `DataManager` static state live in the `"UserSettings"` and
 `"DataManager"` xUnit collections so they run sequentially. `BoardDataReader` has the same
-problem — its loaded boards sit in a static, non-thread-safe `Dictionary` — so `BoardDataReaderTests`
+problem — its loaded boards sit in a shared static cache (a `ConcurrentDictionary`, so thread-safe,
+but still one cache that tests clear and repopulate) — so `BoardDataReaderTests`
 and `BoardDataWriterTests` share the `"BoardData"` collection.
 **Any new test class that touches one of these statics must join its collection**, or it will
 pass alone and fail intermittently in the full run.

@@ -8,10 +8,11 @@ namespace ClassicRepairToolbox.Tests;
 // column headers are a public contract. These tests build a workbook in that exact shape
 // (see BoardWorkbookBuilder) and assert the reader maps it correctly; if a header constant is
 // renamed without a data migration, they fail.
-// BoardDataReader keeps its loaded boards in a static, non-thread-safe Dictionary. This class and
-// BoardDataWriterTests both add to and remove from it, so they share one collection and run
-// sequentially - the same treatment UserSettings and DataManager already get. Left in parallel,
-// concurrent writes to that dictionary drop entries and a cached board comes back as null.
+// BoardDataReader keeps its loaded boards in a static cache (a ConcurrentDictionary, because the
+// app itself loads boards from the UI thread and background tasks at once). Thread-safe or not,
+// the cache is still shared static state: this class and BoardDataWriterTests add to it, remove
+// from it, and one test wipes it entirely with ClearAllCache, so they share one collection and
+// run sequentially - the same treatment UserSettings and DataManager already get.
 [Collection("BoardData")]
 public sealed class BoardDataReaderTests : IDisposable
 {
@@ -48,6 +49,55 @@ public sealed class BoardDataReaderTests : IDisposable
     public async Task LoadAsync_returns_null_when_the_file_does_not_exist()
     {
         Assert.Null(await this.LoadAsync(this.thisWorkspace.Path_("missing.xlsx")));
+    }
+
+    [Fact]
+    public async Task Concurrent_loads_and_cache_clears_do_not_corrupt_the_cache()
+    {
+        // This concurrency is not hypothetical: at every contributor-mode startup,
+        // DataValidator.ValidateAllDataAsync walks EVERY board through LoadAsync from a
+        // Task.Run background task while the UI thread loads the selected board through the
+        // same static cache - and LoadAsync itself writes the cache from inside its own
+        // Task.Run. ClearAllCache lands on top from the manual-sync path. The cache must
+        // survive that; corruption shows up as a thrown "non-concurrent collections"
+        // exception, a board silently coming back null, or a hang in a corrupted bucket
+        // chain (which the timeout below converts into a plain failure).
+        string excel = this.CompleteBoard();
+
+        const int loadsPerRound = 16;
+        const int rounds = 8;
+
+        for (int round = 0; round < rounds; round++)
+        {
+            List<string> keys = Enumerable.Range(0, loadsPerRound)
+                .Select(_ => this.NewCacheKey())
+                .ToList();
+
+            Task<BoardData?>[] loads = keys
+                .Select(key => Task.Run(() => BoardDataReader.LoadAsync(excel, key)))
+                .ToArray();
+
+            Task<BoardData?[]> allLoads = Task.WhenAll(loads);
+            Task finished = await Task.WhenAny(allLoads, Task.Delay(TimeSpan.FromSeconds(30)));
+
+            Assert.True(finished == allLoads,
+                "concurrent loads did not complete - the cache likely corrupted into a cycle");
+
+            foreach (BoardData? data in await allLoads)
+            {
+                Assert.NotNull(data);
+                Assert.Single(data!.Schematics);
+            }
+
+            // Cached re-reads must also survive; then clear so the next round races the
+            // first-load inserts (and their resizes) again from an empty dictionary.
+            foreach (string key in keys)
+            {
+                Assert.NotNull(await BoardDataReader.LoadAsync(excel, key));
+            }
+
+            BoardDataReader.ClearAllCache();
+        }
     }
 
     [Fact]

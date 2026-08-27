@@ -1,5 +1,6 @@
 ﻿using OfficeOpenXml;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -80,7 +81,13 @@ namespace Handlers.DataHandling
         private static readonly string[] CreditsHeaders = new[] { ColCategory, ColNameOrHandle };
         private static readonly string[] KiCadImportantSignalsHeaders = new[] { ColDisplayName, ColKiCadNetName };
 
-        private static readonly Dictionary<string, BoardData> _cache = new(StringComparer.OrdinalIgnoreCase);
+        // Concurrent on purpose: LoadAsync writes this from inside Task.Run while the UI thread
+        // reads it, and DataValidator's startup walk loads every board from a background task in
+        // parallel with the UI loading the selected one. With a plain Dictionary those races
+        // corrupt the table, and the corruption surfaces as a board silently loading as null.
+        // Two concurrent first-loads of the same key may both parse the file; the last write wins,
+        // which is the same benign outcome the old code had on its lucky days.
+        private static readonly ConcurrentDictionary<string, BoardData> _cache = new(StringComparer.OrdinalIgnoreCase);
 
         // ###########################################################################################
         // Lazily loads and caches all sheets from a board-specific Excel file.
@@ -167,7 +174,7 @@ namespace Handlers.DataHandling
                 return;
             }
 
-            BoardDataReader._cache.Remove(cacheKey);
+            BoardDataReader._cache.TryRemove(cacheKey, out _);
         }
 
         // ###########################################################################################
