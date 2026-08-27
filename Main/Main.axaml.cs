@@ -1441,21 +1441,18 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Opens the configured URL in the system default browser.
+        // Opens a validated external target through the shared launcher.
+        //
+        // Routed through ExternalTargetLauncher rather than calling Process.Start here, so that every
+        // outward link in the app passes the same scheme check - ShellExecute runs whatever it is
+        // handed, and a single unguarded call is all it takes for that to matter later. The launcher
+        // already logs both a refusal and a failed start, so there is nothing to catch at this level.
         // ###########################################################################################
         private static void OpenUrl(string url)
         {
-            try
+            if (!ExternalTargetLauncher.TryOpen(url))
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                Logger.Warning($"Failed to open URL - [{url}] - [{ex.Message}]");
+                Logger.Warning($"Rejected external target from main window: [{url}]");
             }
         }
 

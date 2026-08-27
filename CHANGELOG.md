@@ -28,4 +28,5 @@
     - Fixed Linux proper maximizes the application window at launch, if this was its last state
     - Fixed delete routine of orphan/unused files could in rare cases wipe entire data-root folder (CRT data only at risk)
     - Fixed opening a file from application will not blindly _execute_ it and leave it for system to find appropriate means, but only _open_ whitelisted extensions
-    - Refactored several parts of project for more efficient AI development, including unit/UI test coverage (1071 cases and ~31% coverage total)
+    - Fixed an intermittent failure where a board could load empty at startup when data validation was enabled
+    - Refactored several parts of project for more efficient AI development, including unit/UI test coverage (1074 cases and ~31% coverage total)

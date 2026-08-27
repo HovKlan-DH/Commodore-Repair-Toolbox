@@ -414,26 +414,58 @@ jobs:
             release-assets/releases.*.json
             release-assets/assets.*.json
 
-      - name: Delete old pre-releases
-        if: ${{ steps.prerelease_check.outputs.is_prerelease == 'true' }}
+      # Leaves at most one pre-release standing, and none at all once a full release ships.
+      # Deliberately ungated so one step covers both kinds of run - the "keep the current tag"
+      # check is what lets a single rule do both jobs:
+      #
+      #   - A pre-release run: the tag just published IS in the pre-release list, so it is kept
+      #     and every older beta is removed. Exactly one beta remains.
+      #   - A full release run: the tag just published (e.g. "2.4.0") is NOT a pre-release, so
+      #     nothing matches and every beta is removed. No betas remain.
+      #
+      # A REAL RELEASE MUST NEVER BE DELETED HERE, so two independent conditions have to agree
+      # before anything is removed, and either one alone is already sufficient:
+      #
+      #   1. GitHub's own "isPrerelease" flag is true. This is jq-filtered before the loop, so a
+      #      full release never even reaches the delete. Note this is GitHub's flag and not a
+      #      guess from the tag text. A missing/null flag compares false, so it is skipped -
+      #      the fail-safe direction.
+      #   2. The tag is shaped "X.Y.Z-<suffix>" - the pre-release form this project produces.
+      #      Bare "2.3.0" fails it, and so do the legacy date tags such as "2026-March-7",
+      #      which contain hyphens but are real releases. This is the backstop for the one way
+      #      condition 1 could go wrong: a real release mis-flagged as Pre-release by hand in
+      #      the GitHub UI.
+      #
+      # This runs after "Create GitHub Release", so the replacement always exists before anything
+      # is deleted - a user still on a beta never sees a moment with nothing to update to.
+      # "--cleanup-tag" takes the git tag with the release, so a deleted beta leaves no trace.
+      - name: Delete superseded pre-releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CURRENT_TAG: ${{ steps.tag.outputs.tag }}
+          IS_PRERELEASE: ${{ steps.prerelease_check.outputs.is_prerelease }}
         run: |
-          echo "Fetching all pre-releases..."
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "Pre-release run - keeping [$CURRENT_TAG] and removing every older pre-release..."
+          else
+            echo "Full release [$CURRENT_TAG] - removing every pre-release..."
+          fi
+
           gh release list \
             --repo ${{ github.repository }} \
             --limit 100 \
             --json tagName,isPrerelease \
             | jq -r '.[] | select(.isPrerelease == true) | .tagName' \
             | while read tag; do
-                if [ "$tag" != "$CURRENT_TAG" ]; then
+                if [ "$tag" = "$CURRENT_TAG" ]; then
+                  echo "Keeping current pre-release: $tag"
+                elif ! echo "$tag" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-'; then
+                  echo "SKIPPING [$tag] - flagged as a pre-release, but not shaped like one. Refusing to delete it."
+                else
                   echo "Deleting pre-release: $tag"
                   gh release delete "$tag" \
                     --repo ${{ github.repository }} \
                     --yes \
                     --cleanup-tag
-                else
-                  echo "Keeping current pre-release: $tag"
                 fi
               done
