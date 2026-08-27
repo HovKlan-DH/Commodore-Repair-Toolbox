@@ -13,14 +13,17 @@ public class ContributionPackagingTests
 {
     // -------------------------------------------------------------- AssignZipEntries
 
+    // The source paths in these tests use forward slashes on purpose: both Windows and Linux
+    // parse them as path separators, while a literal @"C:\..." only parses on Windows - and the
+    // CI test run happens on ubuntu-latest.
     [Fact]
     public void Entries_are_numbered_globally_across_sections_and_carry_the_section_folder()
     {
         var plan = ContributionPackaging.AssignZipEntries(new[]
         {
-            new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = @"C:\data\pin1.png" },
-            new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = @"C:\data\pin2.png" },
-            new ContributionFileReference { SectionFolder = "BoardLocalFiles", ResolvedSourcePath = @"C:\data\schematic.pdf" },
+            new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = "/data/pin1.png" },
+            new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = "/data/pin2.png" },
+            new ContributionFileReference { SectionFolder = "BoardLocalFiles", ResolvedSourcePath = "/data/schematic.pdf" },
         });
 
         Assert.Equal(
@@ -33,7 +36,7 @@ public class ContributionPackagingTests
             plan.EntryNames);
 
         Assert.Equal(3, plan.Attachments.Count);
-        Assert.Equal(@"C:\data\pin1.png", plan.Attachments[0].SourcePath);
+        Assert.Equal("/data/pin1.png", plan.Attachments[0].SourcePath);
         Assert.Equal("ReferencedFiles/ComponentImages/001_pin1.png", plan.Attachments[0].ZipEntryName);
     }
 
@@ -45,8 +48,8 @@ public class ContributionPackagingTests
     {
         var plan = ContributionPackaging.AssignZipEntries(new[]
         {
-            new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = @"C:\data\shared.png" },
-            new ContributionFileReference { SectionFolder = "ComponentLocalFiles", ResolvedSourcePath = @"C:\DATA\SHARED.PNG" },
+            new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = "/data/shared.png" },
+            new ContributionFileReference { SectionFolder = "ComponentLocalFiles", ResolvedSourcePath = "/DATA/SHARED.PNG" },
         });
 
         Assert.Single(plan.Attachments);
@@ -62,8 +65,8 @@ public class ContributionPackagingTests
     {
         var plan = ContributionPackaging.AssignZipEntries(new[]
         {
-            new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = @"C:\data\U1\pin1.png" },
-            new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = @"C:\data\U5\pin1.png" },
+            new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = "/data/U1/pin1.png" },
+            new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = "/data/U5/pin1.png" },
         });
 
         Assert.Equal(2, plan.Attachments.Count);
@@ -80,7 +83,7 @@ public class ContributionPackagingTests
         {
             new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = null },
             new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = "   " },
-            new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = @"C:\data\pin1.png" },
+            new ContributionFileReference { SectionFolder = "ComponentImages", ResolvedSourcePath = "/data/pin1.png" },
         });
 
         Assert.Equal(new[] { "", "", "ReferencedFiles/ComponentImages/001_pin1.png" }, plan.EntryNames);
