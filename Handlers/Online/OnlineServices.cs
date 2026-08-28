@@ -3,6 +3,7 @@ using Handlers.DataHandling;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -89,7 +90,13 @@ namespace Handlers.OnlineHandling
         // ###########################################################################################
         internal static async Task<List<DataFileEntry>?> FetchManifestAsync(Action<string>? onStatus = null)
         {
-            using var http = new HttpClient { Timeout = AppConfig.ApiTimeout };
+            // AutomaticDecompression is what makes the client send an Accept-Encoding header and
+            // inflate the reply. Without it HttpClient advertises no encoding at all, the server has
+            // no reason to compress, and the manifest arrives as ~3.3 MB of raw JSON; gzipped it is
+            // ~520 KB. The server must also have DEFLATE enabled for application/json - if it is
+            // not, this still works, it just gains nothing.
+            var handler = new HttpClientHandler { AutomaticDecompression = DecompressionMethods.All };
+            using var http = new HttpClient(handler, disposeHandler: true) { Timeout = AppConfig.ManifestTimeout };
             http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", OnlineServices.UserAgent);
 
             Uri trustedManifestUri;

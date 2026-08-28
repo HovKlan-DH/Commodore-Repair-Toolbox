@@ -384,14 +384,16 @@ contribution, not a code change.
 ### Contribution webserver (`Assets/Webserver/`)
 
 A working copy of the PHP deployed at `classic-repair-toolbox.dk/app-contribution/` — the server
-side of the Contribute tab. `api/index.php` receives the uploads the app posts to
-`AppConfig.ContributionUploadUrl`; `api/review.php` + `api/review_functions.php` are the review
-queue that diffs each submission against the live server data and merges or rejects it. It is
-deployed by hand and never ships with the app (Assets are whitelisted per-file in the csproj).
+side of the Contribute tab, split into two entities: `api/index.php` receives the uploads the app
+posts to `AppConfig.ContributionUploadUrl`, and `review/index.php` + `review/functions.php` are the
+review queue (admin-only, IP-restricted via `review/.htaccess`) that diffs each submission against
+the live server data and merges or rejects it. `api/index.php` requires `review/functions.php` for
+its shared helpers. It is deployed by hand and never ships with the app (Assets are whitelisted
+per-file in the csproj).
 
 **The payload is a two-sided contract.** `ComponentContributionPayload` in
 [Tabs/Contribute/ComponentContribution.axaml.cs](../Tabs/Contribute/ComponentContribution.axaml.cs)
-is what `review_functions.php` parses, and the PHP deliberately mirrors the app's Excel-reading
+is what `review/functions.php` parses, and the PHP deliberately mirrors the app's Excel-reading
 rules (case-insensitive headers, exact board-file resolution, `.json`-beside-the-Excel highlights,
 the `# Revision date:` marker). When you change either side, change the other in the same
 sitting, and run the PHP suite too: `php Assets/Webserver/tests/run-tests.php`

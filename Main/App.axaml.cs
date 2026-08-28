@@ -72,9 +72,18 @@ namespace CRT
         // Used by: ComponentContributionWindow.ProcessAndSendContributionAsync
         public const string ContributionUploadUrl = "https://classic-repair-toolbox.dk/app-contribution/api/";
 
-        // Timeout for lightweight API calls (manifest fetch, version check).
-        // Used by: OnlineServices.FetchManifestAsync, OnlineServices.CheckInVersionAsync
+        // Timeout for genuinely small API calls - a short form POST and its short reply.
+        // Used by: OnlineServices.CheckInVersionAsync
         public static readonly TimeSpan ApiTimeout = TimeSpan.FromSeconds(5);
+
+        // Timeout for the checksum manifest fetch. This is NOT a lightweight call and must not go
+        // back to sharing ApiTimeout: the manifest lists every data file on the server (~11,000
+        // entries, ~3.3 MB uncompressed) and is the largest single transfer at startup.
+        // HttpClient.Timeout is a total budget covering DNS, connect, TLS and reading the whole
+        // body, so the old 5 seconds failed consistently - not intermittently - for every user on
+        // less than roughly 5.5 Mbit/s.
+        // Used by: OnlineServices.FetchManifestAsync
+        public static readonly TimeSpan ManifestTimeout = TimeSpan.FromSeconds(30);
 
         // Timeout per individual file download — files can be large on slow connections.
         // Used by: OnlineServices.SyncFilesAsync
