@@ -176,7 +176,9 @@ namespace Handlers.OnlineHandling
             // no file callback here, the splash only shows filenames during actual downloads in Phase 2
             var validEntries = new List<DataFileEntry>();
             var toDownload = new List<(DataFileEntry Entry, string LocalPath, Uri DownloadUri, string ExpectedChecksum, bool IsNew)>();
-            int invalidCount = 0;
+
+            // The file names behind the counts, kept so the summary in the log can name them
+            var invalidFiles = new List<string>();
 
             foreach (var entry in entries)
             {
@@ -188,7 +190,7 @@ namespace Handlers.OnlineHandling
                     out string expectedChecksum,
                     out string failureReason))
                 {
-                    invalidCount++;
+                    invalidFiles.Add(entry.File);
                     Logger.Warning($"[{entry.File}] [Rejected] [{failureReason}]");
                     continue;
                 }
@@ -239,7 +241,9 @@ namespace Handlers.OnlineHandling
             if (validEntries.Count > 1)
                 Logger.Info("Individual file sync status:");
 
-            int newCount = 0, updatedCount = 0, failedCount = 0;
+            var newFiles = new List<string>();
+            var updatedFiles = new List<string>();
+            var failedFiles = new List<string>();
             int downloadIndex = 0;
 
             foreach (var (entry, localPath, downloadUri, expectedChecksum, isNew) in toDownload)
@@ -251,15 +255,18 @@ namespace Handlers.OnlineHandling
                 if (await OnlineServices.DownloadFileAsync(http, entry, localPath, downloadUri, expectedChecksum, isNew))
                 {
                     if (isNew)
-                        newCount++;
+                        newFiles.Add(entry.File);
                     else
-                        updatedCount++;
+                        updatedFiles.Add(entry.File);
                 }
                 else
                 {
-                    failedCount++;
+                    failedFiles.Add(entry.File);
                 }
             }
+
+            int newCount = newFiles.Count, updatedCount = updatedFiles.Count;
+            int failedCount = failedFiles.Count, invalidCount = invalidFiles.Count;
 
             if (label != null && validEntries.Count == 1)
             {
@@ -271,6 +278,10 @@ namespace Handlers.OnlineHandling
             {
                 int upToDateCount = validEntries.Count - toDownload.Count;
                 Logger.Info($"Sync completed - [{newCount}] new, [{updatedCount}] updated, [{failedCount}] failed, [{invalidCount}] invalid, [{upToDateCount}] up-to-date");
+
+                // Name the files behind those counts - the counts alone never say WHICH ones changed
+                foreach (var line in SyncSummaryFormatter.BuildFileBreakdown(newFiles, updatedFiles, failedFiles, invalidFiles))
+                    Logger.Info(line);
             }
 
             onStatus?.Invoke($"Sync complete ({newCount} new, {updatedCount} updated, {failedCount} failed, {invalidCount} invalid)");

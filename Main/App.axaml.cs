@@ -195,6 +195,17 @@ namespace CRT
                 : ChecksumsUrl;
         }
 
+        // ###########################################################################################
+        // Returns the "online source" / "online BETA source" phrase used in data-sync status text,
+        // reflecting the current UserSettings.DownloadDataFromTestSource setting.
+        // ###########################################################################################
+        public static string GetOnlineSourceLabel()
+        {
+            return UserSettings.DownloadDataFromTestSource
+                ? "online BETA source"
+                : "online source";
+        }
+
     }
 
     public partial class App : Application

@@ -547,7 +547,7 @@ namespace Handlers.DataHandling
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            ReportStatus("Checking data from online source - please wait...");
+            ReportStatus($"Checking data from {AppConfig.GetOnlineSourceLabel()} - please wait...");
             int remainingChangedCount = await OnlineServices.SyncFilesAsync(
                 manifest,
                 _dataRoot,

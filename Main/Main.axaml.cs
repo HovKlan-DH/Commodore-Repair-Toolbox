@@ -312,7 +312,7 @@ namespace CRT
         {
             this._currentSyncFileRelativePath = string.Empty;
 
-            this.SetSyncBannerText("Checking data from online source - please wait...");
+            this.SetSyncBannerText($"Checking data from {AppConfig.GetOnlineSourceLabel()} - please wait...");
             this.SyncBannerRefreshButton.IsVisible = false;
             this.SyncBanner.IsVisible = true;
 
@@ -477,7 +477,7 @@ namespace CRT
                     return;
                 }
 
-                this.SyncBannerText.Text = "Checking data from online source - please wait...";
+                this.SyncBannerText.Text = $"Checking data from {AppConfig.GetOnlineSourceLabel()} - please wait...";
                 this.SyncBannerRefreshButton.IsVisible = false;
                 this.SyncBanner.IsVisible = true;
 
@@ -2426,7 +2426,7 @@ namespace CRT
             ToolTip.SetTip(
                 this.DataSyncStatusIconBorder,
                 isCheckingOnline
-                    ? "Checking data from online source..."
+                    ? $"Checking data from {AppConfig.GetOnlineSourceLabel()}..."
                     : isEnabled
                         ? "Data update is enabled. Click to refresh data now"
                         : this._isHoveringDataSyncStatusIcon
