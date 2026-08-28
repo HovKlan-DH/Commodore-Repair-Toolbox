@@ -446,11 +446,110 @@ public class ContributionPackagingTests
             "PAL",
             "Corrected the pin 5 baseline image");
 
+        Assert.Contains("Request type: Component update", text);
         Assert.Contains("Hardware: Commodore 64", text);
         Assert.Contains("Board: 250407", text);
         Assert.Contains("Component: U1 | VIC-II | 6569R5", text);
         Assert.Contains("Component UUID v4: 6b29fc40-ca47-1067-b31d-00dd010662da", text);
         Assert.Contains("Region context: PAL", text);
         Assert.Contains("Mandatory change comment:" + Environment.NewLine + "Corrected the pin 5 baseline image", text);
+    }
+
+    // The request type is stated on every submission, not only on a deletion - a line whose
+    // absence has to be noticed is a line that gets missed, and a deletion arriving as a mail that
+    // reads like an ordinary edit is exactly what this summary exists to prevent.
+    [Fact]
+    public void A_deletion_says_so_in_the_feedback_text()
+    {
+        string text = ContributionPackaging.BuildFeedbackText(
+            "Commodore 64",
+            "250407",
+            "U1 | VIC-II | 6569R5",
+            "6b29fc40-ca47-1067-b31d-00dd010662da",
+            "PAL",
+            "This component does not exist on this board revision",
+            isDeleteRequest: true);
+
+        Assert.Contains("Request type: DELETE COMPONENT", text);
+
+        // The marker the server formats the notification email around is unchanged.
+        Assert.Contains(
+            "Mandatory change comment:" + Environment.NewLine + "This component does not exist on this board revision",
+            text);
+    }
+
+    // -------------------------------------------------------------- BuildDeleteComponentSummary
+
+    // What the contributor is agreeing to lose. The sections are collapsed when the button is
+    // pressed, so this sentence is the only place the cost of the deletion is visible.
+    [Fact]
+    public void The_delete_summary_names_the_component_and_lists_everything_that_goes_with_it()
+    {
+        string text = ContributionPackaging.BuildDeleteComponentSummary("U1", 4, 2, 3, 1);
+
+        Assert.Equal(
+            "The component [U1] will be removed from the board data, together with its "
+            + "4 component images, 2 schematic highlights, 3 local files and 1 link.",
+            text);
+    }
+
+    // Each count carries its own singular, so the sentence never reads "1 component images".
+    [Fact]
+    public void The_delete_summary_uses_the_singular_for_a_single_row()
+    {
+        string text = ContributionPackaging.BuildDeleteComponentSummary("C7", 1, 1, 1, 1);
+
+        Assert.Equal(
+            "The component [C7] will be removed from the board data, together with its "
+            + "1 component image, 1 schematic highlight, 1 local file and 1 link.",
+            text);
+    }
+
+    // A section with nothing in it is left out rather than reported as "0 images": the list says
+    // what will be lost, and a zero is not a loss. With one item left there is no "and" either.
+    [Fact]
+    public void The_delete_summary_leaves_out_the_sections_that_are_empty()
+    {
+        Assert.Equal(
+            "The component [R3] will be removed from the board data, together with its 2 links.",
+            ContributionPackaging.BuildDeleteComponentSummary("R3", 0, 0, 0, 2));
+
+        Assert.Equal(
+            "The component [R3] will be removed from the board data, together with its "
+            + "5 component images and 1 link.",
+            ContributionPackaging.BuildDeleteComponentSummary("R3", 5, 0, 0, 1));
+    }
+
+    // A component carrying nothing else still has to produce a sentence, and one that says the
+    // deletion is small rather than trailing off after "together with its".
+    [Fact]
+    public void A_component_carrying_nothing_else_says_so()
+    {
+        Assert.Equal(
+            "The component [U9] will be removed from the board data. It carries no images, highlights, files or links.",
+            ContributionPackaging.BuildDeleteComponentSummary("U9", 0, 0, 0, 0));
+    }
+
+    // A blank label would otherwise produce "The component [] will be removed".
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_missing_board_label_falls_back_to_naming_no_label_at_all(string? boardLabel)
+    {
+        string text = ContributionPackaging.BuildDeleteComponentSummary(boardLabel, 1, 0, 0, 0);
+
+        Assert.StartsWith("This component will be removed from the board data,", text);
+        Assert.DoesNotContain("[", text);
+    }
+
+    // Counts arrive from collection sizes, so a negative is not expected - but treating one as
+    // "nothing here" is the only reading that cannot produce "-1 links".
+    [Fact]
+    public void A_negative_count_is_treated_as_nothing_rather_than_printed()
+    {
+        Assert.Equal(
+            "The component [U1] will be removed from the board data. It carries no images, highlights, files or links.",
+            ContributionPackaging.BuildDeleteComponentSummary("U1", -3, 0, 0, 0));
     }
 }

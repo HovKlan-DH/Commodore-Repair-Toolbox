@@ -38,6 +38,16 @@
 			<Setter Property="Padding" Value="14,8" />
 		</Style>
 
+		<!-- The same highlight the "Send contribution update" button wears, so the two controls
+		     that act on the whole contribution look like each other rather than like the green
+		     "add row" buttons. Button_Highlighted_* is the theme's red, in both light and dark. -->
+		<Style Selector="Button.DeleteComponentButton">
+			<Setter Property="Background" Value="{DynamicResource Button_Highlighted_Bg}" />
+			<Setter Property="Foreground" Value="{DynamicResource Button_Highlighted_Fg}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource Button_Highlighted_Border}" />
+			<Setter Property="Padding" Value="14,8" />
+		</Style>
+
 		<!-- A required box that validation found empty. This has to target the template part, not
 		     the TextBox: the Fluent theme repaints PART_BorderElement directly on :focus and
 		     :pointerover, which beats the TemplateBinding carrying the TextBox's own BorderBrush -
@@ -156,6 +166,21 @@
 							<Run Text="suggestion" FontStyle="Italic" />
 							<Run Text=" to the online source - they will not appear in your local data here and now. Once they have been reviewed and accepted, they are added to the online source, after which you can download the updated data." />
 						</TextBlock>
+
+						<!-- The delete button lives inside the "Component" section, which starts
+						     collapsed - so an existing component gets a line saying the option is
+						     there at all. Hidden for a new component, which has nothing to delete. -->
+						<TextBlock x:Name="DeleteComponentHintTextBlock"
+						           Text="If this component does not belong on the board at all, open the &quot;Component&quot; section below and use &quot;Delete this component&quot;."
+						           TextWrapping="Wrap"
+						           Foreground="{DynamicResource Fg}" />
+
+						<!-- Replaces both bodies above once delete mode is on. Its text is built at
+						     runtime, since it names the component and counts what goes with it. -->
+						<TextBlock x:Name="DeleteComponentNoticeTextBlock"
+						           TextWrapping="Wrap"
+						           IsVisible="False"
+						           Foreground="{DynamicResource Text_Fail_Fg}" />
 					</StackPanel>
 				</Border>
 
@@ -173,94 +198,108 @@
 						<StackPanel Spacing="10"
 						            Margin="0,10,0,0"
 						            HorizontalAlignment="Stretch">
-							<TextBlock Text="Component"
-							           FontSize="12"
-							           Foreground="{DynamicResource Fg}" />
 
-							<ItemsControl x:Name="ComponentRowsItemsControl">
-								<ItemsControl.ItemTemplate>
-									<DataTemplate x:DataType="local:ContributionComponentRow">
-										<Border BorderBrush="{DynamicResource Panel_Border}"
-										        BorderThickness="1"
-										        CornerRadius="4"
-										        Padding="8"
-										        Margin="0,0,0,8">
-											<Grid ColumnDefinitions="1*,12,1*"
-												  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
-												  HorizontalAlignment="Stretch">
-												<TextBlock Grid.Column="0" Grid.Row="0" Text="Board label" FontSize="11" />
-												<StackPanel Grid.Column="0" Grid.Row="1" Spacing="4">
-													<Border Classes="ErrorFrame"
-													        Classes.HasError="{Binding HasBoardLabelError}">
-														<TextBox Text="{Binding BoardLabel}" />
-													</Border>
-													<TextBlock Text="{Binding BoardLabelErrorText}"
-													           IsVisible="{Binding HasBoardLabelError}"
-													           Foreground="{DynamicResource Text_Fail_Fg}"
-													           FontSize="11"
-													           FontWeight="Bold"
-													           TextWrapping="Wrap" />
-												</StackPanel>
+							<!-- The button sits OUTSIDE ComponentSectionFields on purpose. Delete mode
+							     disables that container, and a disabled parent disables every child -
+							     a button inside it could not be clicked again to leave the mode. -->
+							<Button x:Name="DeleteComponentButton"
+							        Classes="DeleteComponentButton"
+							        Content="Delete this component"
+							        HorizontalAlignment="Right"
+							        IsVisible="False"
+							        ToolTip.Tip="Propose removing this component, and everything attached to it, from the board data"
+							        Click="OnToggleDeleteComponentClick" />
 
-												<TextBlock Grid.Column="2" Grid.Row="0" Text="Category" FontSize="11" />
-												<StackPanel Grid.Column="2" Grid.Row="1" Spacing="4">
-													<!-- Free text with suggestions: typing "cap" offers the board's
-													     "Capacitor", and anything the board has never used is still
-													     accepted as typed. MinimumPrefixLength 0 lists the whole set
-													     as soon as the field is used, which is the quickest way to
-													     see what the board's other components are filed under. -->
-													<Border Classes="ErrorFrame"
-													        Classes.HasError="{Binding HasCategoryError}">
-														<AutoCompleteBox Text="{Binding Category, Mode=TwoWay}"
-														                 ItemsSource="{Binding AvailableCategories}"
-														                 FilterMode="Contains"
-														                 MinimumPrefixLength="0"
-														                 IsTextCompletionEnabled="False"
-														                 PlaceholderText="Capacitor, IC, Resistor, ..."
-														                 HorizontalAlignment="Stretch" />
-													</Border>
-													<TextBlock Text="{Binding CategoryErrorText}"
-													           IsVisible="{Binding HasCategoryError}"
-													           Foreground="{DynamicResource Text_Fail_Fg}"
-													           FontSize="11"
-													           FontWeight="Bold"
-													           TextWrapping="Wrap" />
-												</StackPanel>
+							<StackPanel x:Name="ComponentSectionFields" Spacing="10">
+								<TextBlock Text="Component"
+								           FontSize="12"
+								           Foreground="{DynamicResource Fg}" />
 
-												<TextBlock Grid.Column="0" Grid.Row="2" Text="Friendly name" FontSize="11" Margin="0,8,0,0" />
-												<TextBox Grid.Column="0" Grid.Row="3" Text="{Binding FriendlyName}" />
+								<ItemsControl x:Name="ComponentRowsItemsControl">
+									<ItemsControl.ItemTemplate>
+										<DataTemplate x:DataType="local:ContributionComponentRow">
+											<Border BorderBrush="{DynamicResource Panel_Border}"
+											        BorderThickness="1"
+											        CornerRadius="4"
+											        Padding="8"
+											        Margin="0,0,0,8">
+												<Grid ColumnDefinitions="1*,12,1*"
+													  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+													  HorizontalAlignment="Stretch">
+													<TextBlock Grid.Column="0" Grid.Row="0" Text="Board label" FontSize="11" />
+													<StackPanel Grid.Column="0" Grid.Row="1" Spacing="4">
+														<Border Classes="ErrorFrame"
+														        Classes.HasError="{Binding HasBoardLabelError}">
+															<TextBox Text="{Binding BoardLabel}" />
+														</Border>
+														<TextBlock Text="{Binding BoardLabelErrorText}"
+														           IsVisible="{Binding HasBoardLabelError}"
+														           Foreground="{DynamicResource Text_Fail_Fg}"
+														           FontSize="11"
+														           FontWeight="Bold"
+														           TextWrapping="Wrap" />
+													</StackPanel>
 
-												<TextBlock Grid.Column="2" Grid.Row="2" Text="Region" FontSize="11" Margin="0,8,0,0" />
-												<TextBox Grid.Column="2" Grid.Row="3" Text="{Binding Region}" />
+													<TextBlock Grid.Column="2" Grid.Row="0" Text="Category" FontSize="11" />
+													<StackPanel Grid.Column="2" Grid.Row="1" Spacing="4">
+														<!-- Free text with suggestions: typing "cap" offers the board's
+														     "Capacitor", and anything the board has never used is still
+														     accepted as typed. MinimumPrefixLength 0 lists the whole set
+														     as soon as the field is used, which is the quickest way to
+														     see what the board's other components are filed under. -->
+														<Border Classes="ErrorFrame"
+														        Classes.HasError="{Binding HasCategoryError}">
+															<AutoCompleteBox Text="{Binding Category, Mode=TwoWay}"
+															                 ItemsSource="{Binding AvailableCategories}"
+															                 FilterMode="Contains"
+															                 MinimumPrefixLength="0"
+															                 IsTextCompletionEnabled="False"
+															                 PlaceholderText="Capacitor, IC, Resistor, ..."
+															                 HorizontalAlignment="Stretch" />
+														</Border>
+														<TextBlock Text="{Binding CategoryErrorText}"
+														           IsVisible="{Binding HasCategoryError}"
+														           Foreground="{DynamicResource Text_Fail_Fg}"
+														           FontSize="11"
+														           FontWeight="Bold"
+														           TextWrapping="Wrap" />
+													</StackPanel>
 
-												<TextBlock Grid.Column="0" Grid.Row="4" Text="Technical name or value" FontSize="11" Margin="0,8,0,0" />
-												<TextBox Grid.Column="0"
-														 Grid.Row="5"
-														 Text="{Binding TechnicalNameOrValue}"
-														 VerticalAlignment="Top" />
+													<TextBlock Grid.Column="0" Grid.Row="2" Text="Friendly name" FontSize="11" Margin="0,8,0,0" />
+													<TextBox Grid.Column="0" Grid.Row="3" Text="{Binding FriendlyName}" />
 
-												<TextBlock Grid.Column="2" Grid.Row="4" Text="Short description" FontSize="11" Margin="0,8,0,0" />
-												<TextBox Grid.Column="2"
-														 Grid.Row="5"
-														 Grid.RowSpan="3"
-														 Text="{Binding Description}"
-														 AcceptsReturn="True"
-														 TextWrapping="Wrap"
-														 MinHeight="84"
-														 VerticalAlignment="Top" />
+													<TextBlock Grid.Column="2" Grid.Row="2" Text="Region" FontSize="11" Margin="0,8,0,0" />
+													<TextBox Grid.Column="2" Grid.Row="3" Text="{Binding Region}" />
 
-												<TextBlock Grid.Column="0" Grid.Row="6" Text="Part-number" FontSize="11" Margin="0,8,0,0" />
-												<TextBox Grid.Column="0" Grid.Row="7" Text="{Binding PartNumber}" />
-											</Grid>
-										</Border>
-									</DataTemplate>
-								</ItemsControl.ItemTemplate>
-							</ItemsControl>
+													<TextBlock Grid.Column="0" Grid.Row="4" Text="Technical name or value" FontSize="11" Margin="0,8,0,0" />
+													<TextBox Grid.Column="0"
+															 Grid.Row="5"
+															 Text="{Binding TechnicalNameOrValue}"
+															 VerticalAlignment="Top" />
+
+													<TextBlock Grid.Column="2" Grid.Row="4" Text="Short description" FontSize="11" Margin="0,8,0,0" />
+													<TextBox Grid.Column="2"
+															 Grid.Row="5"
+															 Grid.RowSpan="3"
+															 Text="{Binding Description}"
+															 AcceptsReturn="True"
+															 TextWrapping="Wrap"
+															 MinHeight="84"
+															 VerticalAlignment="Top" />
+
+													<TextBlock Grid.Column="0" Grid.Row="6" Text="Part-number" FontSize="11" Margin="0,8,0,0" />
+													<TextBox Grid.Column="0" Grid.Row="7" Text="{Binding PartNumber}" />
+												</Grid>
+											</Border>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+							</StackPanel>
 						</StackPanel>
 					</Expander>
 				</Border>
 
-				<Border BorderBrush="{DynamicResource Panel_Border}"
+				<Border x:Name="ComponentImagesSection" BorderBrush="{DynamicResource Panel_Border}"
 						BorderThickness="1"
 						CornerRadius="6"
 						Padding="12">
@@ -413,7 +452,7 @@
 					</Expander>
 				</Border>
 
-				<Border BorderBrush="{DynamicResource Panel_Border}"
+				<Border x:Name="ComponentLocalFilesSection" BorderBrush="{DynamicResource Panel_Border}"
 		BorderThickness="1"
 		CornerRadius="6"
 		Padding="12">
@@ -502,7 +541,7 @@
 					</Expander>
 				</Border>
 
-				<Border BorderBrush="{DynamicResource Panel_Border}"
+				<Border x:Name="ComponentLinksSection" BorderBrush="{DynamicResource Panel_Border}"
 						BorderThickness="1"
 						CornerRadius="6"
 						Padding="12">
@@ -570,7 +609,7 @@
 					</Expander>
 				</Border>
 
-				<Border BorderBrush="{DynamicResource Panel_Border}"
+				<Border x:Name="BoardLocalFilesSection" BorderBrush="{DynamicResource Panel_Border}"
 		BorderThickness="1"
 		CornerRadius="6"
 		Padding="12">
@@ -659,7 +698,7 @@
 					</Expander>
 				</Border>
 
-				<Border BorderBrush="{DynamicResource Panel_Border}"
+				<Border x:Name="BoardLinksSection" BorderBrush="{DynamicResource Panel_Border}"
 						BorderThickness="1"
 						CornerRadius="6"
 						Padding="12">

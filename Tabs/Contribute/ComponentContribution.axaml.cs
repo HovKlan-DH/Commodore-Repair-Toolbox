@@ -414,6 +414,14 @@ namespace CRT
         public string Email { get; set; } = string.Empty;
         public string Comment { get; set; } = string.Empty;
         public DateTimeOffset SubmittedUtc { get; set; }
+
+        // True when this submission asks for the component to be REMOVED rather than changed. The
+        // component-scoped sections below are then sent present-but-empty, which the server's
+        // buildDiffSections already reads as "remove every server row in this section" - so the
+        // flag adds no new merge behaviour. What it adds is that the review page can say what it
+        // is looking at, instead of the reviewer inferring a deletion from five empty lists.
+        public bool DeleteComponent { get; set; }
+
         public List<ContributionComponentRow> Components { get; set; } = new();
         public List<ContributionComponentImageRow> ComponentImages { get; set; } = new();
         public List<ComponentHighlightEntry> ComponentHighlights { get; set; } = new();
@@ -450,6 +458,12 @@ namespace CRT
         // extra validation guards - see LoadNewComponent and ValidateNewComponentRow.
         private bool thisIsNewComponent;
 
+        // True once the contributor has switched the window into "remove this component" mode. The
+        // data sections are then disabled and dimmed rather than hidden - a deletion should be made
+        // with the thing being deleted still in front of you - and the payload sends the
+        // component-scoped sections empty, which is what the server reads as "remove these rows".
+        private bool thisIsDeleteComponent;
+
         // Every board label already on the board, so a new component cannot reuse one of them.
         private readonly HashSet<string> thisExistingBoardLabels = new(StringComparer.OrdinalIgnoreCase);
 
@@ -458,6 +472,11 @@ namespace CRT
 
         // Shown in place of the component summary while a new component has no label yet.
         private const string NewComponentTitleText = "New component - not yet part of the board data";
+
+        // How far the data sections fade once delete mode is on. Faint enough to read as inactive,
+        // solid enough that the rows can still be read - which is the whole point of dimming them
+        // rather than hiding them.
+        private const double DimmedSectionOpacity = 0.45;
 
         private static readonly JsonSerializerOptions thisContributionPayloadJsonOptions = new()
         {
@@ -489,9 +508,14 @@ namespace CRT
             this.ApplyBoardContext(boardData, dataRoot, hardwareName, boardName, region, boardExcelFile);
 
             this.thisIsNewComponent = false;
+            this.thisIsDeleteComponent = false;
             this.thisExistingBoardLabels.Clear();
             this.thisBoardLabel = boardLabel;
             this.thisComponentUuidV4 = string.Empty;
+
+            // Only a component the board actually has can be deleted.
+            this.DeleteComponentButton.IsVisible = true;
+            this.DeleteComponentHintTextBlock.IsVisible = true;
 
             var primaryComponent = boardData.Components.FirstOrDefault(c =>
                 string.Equals(c.BoardLabel, boardLabel, StringComparison.OrdinalIgnoreCase) &&
@@ -519,9 +543,14 @@ namespace CRT
             this.ApplyBoardContext(boardData, dataRoot, hardwareName, boardName, region, boardExcelFile);
 
             this.thisIsNewComponent = true;
+            this.thisIsDeleteComponent = false;
             this.thisBoardLabel = string.Empty;
             this.thisComponentUuidV4 = string.Empty;
             this.thisComponentDisplayText = NewComponentTitleText;
+
+            // Nothing to delete - the component does not exist anywhere yet.
+            this.DeleteComponentButton.IsVisible = false;
+            this.DeleteComponentHintTextBlock.IsVisible = false;
 
             // Every label on the board, whatever its region: the server resolves a contribution by
             // board label alone, so a label another region's component holds is taken here too.
@@ -661,7 +690,13 @@ namespace CRT
         // ###########################################################################################
         private void PopulateHeader()
         {
-            if (this.thisIsNewComponent)
+            if (this.thisIsDeleteComponent)
+            {
+                this.Title = string.IsNullOrWhiteSpace(this.thisBoardLabel)
+                    ? "Component contribution - delete component"
+                    : $"Component contribution - delete {this.thisBoardLabel}";
+            }
+            else if (this.thisIsNewComponent)
             {
                 this.Title = "Component contribution - new component";
             }
@@ -672,15 +707,32 @@ namespace CRT
                     : $"Component contribution - {this.thisBoardLabel}";
             }
 
-            // Both ways of opening the window carry the same warning - what is sent is a
+            // Every way of opening the window carries the same warning - what is sent is a
             // suggestion for the online data, not an edit of anything on this machine - so only the
             // wording changes with the mode.
-            this.ContributionNoticeHeadingTextBlock.Text = this.thisIsNewComponent
-                ? "You are adding a component this board does not have yet"
-                : "You are modifying an existing component";
+            this.ContributionNoticeHeadingTextBlock.Text = this.thisIsDeleteComponent
+                ? "You are proposing to DELETE this component"
+                : this.thisIsNewComponent
+                    ? "You are adding a component this board does not have yet"
+                    : "You are modifying an existing component";
 
-            this.NewComponentNoticeTextBlock.IsVisible = this.thisIsNewComponent;
-            this.ExistingComponentNoticeTextBlock.IsVisible = !this.thisIsNewComponent;
+            // The delete notice replaces both of the others rather than joining them: in delete
+            // mode nothing is being added or modified, so a line about the edits reaching the
+            // online source describes a submission that is not being made.
+            this.NewComponentNoticeTextBlock.IsVisible = !this.thisIsDeleteComponent && this.thisIsNewComponent;
+            this.ExistingComponentNoticeTextBlock.IsVisible = !this.thisIsDeleteComponent && !this.thisIsNewComponent;
+            this.DeleteComponentHintTextBlock.IsVisible = !this.thisIsDeleteComponent && !this.thisIsNewComponent;
+            this.DeleteComponentNoticeTextBlock.IsVisible = this.thisIsDeleteComponent;
+
+            if (this.thisIsDeleteComponent)
+            {
+                this.DeleteComponentNoticeTextBlock.Text = ContributionPackaging.BuildDeleteComponentSummary(
+                    this.thisBoardLabel,
+                    this.thisComponentImageRows.Count,
+                    this.thisComponentHighlightRows.Count,
+                    this.thisComponentLocalFileRows.Count,
+                    this.thisComponentLinkRows.Count);
+            }
 
             this.ComponentTitleTextBlock.Text = this.thisComponentDisplayText;
             this.HardwareContextTextBlock.Text = $"Hardware: {this.thisHardwareName}";
@@ -919,6 +971,73 @@ namespace CRT
             return string.IsNullOrWhiteSpace(trimmed) ? effectiveBoardLabel : trimmed;
         }
 
+        // ###########################################################################################
+        // Switches the window into - or back out of - "delete this component" mode.
+        //
+        // It is a toggle rather than a one-way door because the only thing standing between a
+        // mistaken click and a submitted deletion is the mandatory comment; being able to back out
+        // is what makes the button safe to press in order to see what it would remove.
+        // ###########################################################################################
+        private void OnToggleDeleteComponentClick(object? sender, RoutedEventArgs e)
+        {
+            this.thisIsDeleteComponent = !this.thisIsDeleteComponent;
+            this.ApplyDeleteComponentMode();
+        }
+
+        // ###########################################################################################
+        // Applies the current mode to the whole window.
+        //
+        // The data sections are DISABLED AND DIMMED rather than hidden. Hiding them would leave the
+        // contributor confirming a deletion with no way to look at what is about to go, and the
+        // counts in the section headers are exactly what makes the decision an informed one; a
+        // disabled expander can still be opened and read. Dimming is what says the rows are no
+        // longer part of what gets sent, since a deletion submits none of them.
+        // ###########################################################################################
+        private void ApplyDeleteComponentMode()
+        {
+            bool deleting = this.thisIsDeleteComponent;
+
+            foreach (var section in this.GetDataSectionControls())
+            {
+                section.IsEnabled = !deleting;
+                section.Opacity = deleting ? DimmedSectionOpacity : 1.0;
+            }
+
+            this.DeleteComponentButton.Content = deleting ? "Cancel deletion" : "Delete this component";
+            this.SubmitButton.Content = deleting ? "Send deletion request" : "Send contribution update";
+
+            this.PopulateHeader();
+
+            if (deleting)
+            {
+                // The section holding the button is where the mode is left again, so it must not be
+                // folded away behind the contributor while they are in it.
+                //
+                // Nothing else moves. Scrolling down to the comment box would take the contributor
+                // away from the very rows the notice has just told them are about to be deleted,
+                // at the moment they most need to look at them - and it moves the button they may
+                // have clicked by mistake off screen. The comment is checked on send, which is
+                // where being sent to it belongs (RevealMandatoryComment).
+                this.ComponentExpander.IsExpanded = true;
+            }
+        }
+
+        // ###########################################################################################
+        // The six containers holding contributable data. Note that DeleteComponentButton is
+        // deliberately NOT inside ComponentSectionFields: Avalonia gives no way for a child to
+        // re-enable itself under a disabled parent, so a button inside one of these could not be
+        // clicked again to leave delete mode.
+        // ###########################################################################################
+        private IEnumerable<Control> GetDataSectionControls()
+        {
+            yield return this.ComponentSectionFields;
+            yield return this.ComponentImagesSection;
+            yield return this.ComponentLocalFilesSection;
+            yield return this.ComponentLinksSection;
+            yield return this.BoardLocalFilesSection;
+            yield return this.BoardLinksSection;
+        }
+
 /*
         // ###########################################################################################
         // Adds a new editable row to the Components section.
@@ -1109,20 +1228,23 @@ namespace CRT
                 return;
             }
 
-            var newComponentProblem = this.ValidateNewComponentRow();
-            if (newComponentProblem != null)
+            if (this.ShouldValidateContributedRows())
             {
-                this.RevealComponentRow(newComponentProblem.Value.Row);
-                this.ShowStatus(newComponentProblem.Value.Message, true);
-                return;
-            }
+                var newComponentProblem = this.ValidateNewComponentRow();
+                if (newComponentProblem != null)
+                {
+                    this.RevealComponentRow(newComponentProblem.Value.Row);
+                    this.ShowStatus(newComponentProblem.Value.Message, true);
+                    return;
+                }
 
-            var componentImageProblem = this.ValidateComponentImageRows();
-            if (componentImageProblem != null)
-            {
-                this.RevealComponentImageRow(componentImageProblem.Value.Row);
-                this.ShowStatus(componentImageProblem.Value.Message, true);
-                return;
+                var componentImageProblem = this.ValidateComponentImageRows();
+                if (componentImageProblem != null)
+                {
+                    this.RevealComponentImageRow(componentImageProblem.Value.Row);
+                    this.ShowStatus(componentImageProblem.Value.Message, true);
+                    return;
+                }
             }
 
             UserSettings.ContactEmail = email;
@@ -1177,6 +1299,18 @@ namespace CRT
             {
                 this.ApplySubmissionOutcome(submissionAccepted);
             }
+        }
+
+        // ###########################################################################################
+        // Whether the edited rows are checked before sending. A deletion submits none of them, so
+        // neither row check applies to it. The component image check in particular MUST be skipped:
+        // a component whose image file has gone missing, or was never in a format the application
+        // can display, is a prime candidate for deletion - and refusing the deletion over the very
+        // row being deleted would make broken data impossible to remove.
+        // ###########################################################################################
+        private bool ShouldValidateContributedRows()
+        {
+            return !this.thisIsDeleteComponent;
         }
 
         // ###########################################################################################
@@ -1251,6 +1385,16 @@ namespace CRT
         private string BuildSubmissionSuccessText()
         {
             const string SuccessText = "Contribution submitted successfully - thank you :-)";
+
+            if (this.thisIsDeleteComponent)
+            {
+                string deletedLabel = this.ResolveEffectiveBoardLabel();
+                string deletedText = string.IsNullOrWhiteSpace(deletedLabel)
+                    ? "The component"
+                    : $"The component [{deletedLabel}]";
+
+                return $"{SuccessText} {deletedText} stays in your local data until the deletion has been reviewed and accepted, after which you can download the updated data.";
+            }
 
             if (!this.thisIsNewComponent)
             {
@@ -1413,7 +1557,13 @@ namespace CRT
             progress.Report("Preparing contribution payload...");
 
             var payload = this.BuildPayload(email, comment);
-            var attachments = this.AssignZipEntriesToPayload(payload);
+
+            // A deletion attaches no files. It also MUST NOT go through AssignZipEntriesToPayload:
+            // that walks the source row collections and the payload lists in lockstep by index, and
+            // a deletion has emptied the payload side while the source rows are all still there.
+            var attachments = this.thisIsDeleteComponent
+                ? Array.Empty<ContributionAttachment>()
+                : this.AssignZipEntriesToPayload(payload);
             string payloadJson = JsonSerializer.Serialize(payload, thisContributionPayloadJsonOptions);
 
             using var memoryStream = new MemoryStream();
@@ -1461,13 +1611,23 @@ namespace CRT
 
         // ###########################################################################################
         // Builds a structured payload representing the current edited state of the window.
+        //
+        // A deletion is expressed in the same shape rather than as a separate message: the five
+        // component-scoped sections go out present-but-EMPTY, which the server already reads as
+        // "remove every server row in this section", while the two board-wide sections go out
+        // unchanged so nothing outside the component is proposed for removal. The identity fields
+        // keep naming the component being removed - they must not be re-derived from the emptied
+        // rows, which is why ResolveEffectiveBoardLabel reads the loaded label for an existing
+        // component rather than the row.
         // ###########################################################################################
         private ComponentContributionPayload BuildPayload(string email, string comment)
         {
             string effectiveBoardLabel = this.ResolveEffectiveBoardLabel();
+            bool deleting = this.thisIsDeleteComponent;
 
             return new ComponentContributionPayload
             {
+                DeleteComponent = deleting,
                 ApplicationVersion = AppConfig.AppDisplayVersionString,
                 HardwareName = this.thisHardwareName,
                 BoardName = this.thisBoardName,
@@ -1481,7 +1641,7 @@ namespace CRT
                 Comment = comment,
                 SubmittedUtc = DateTimeOffset.UtcNow,
 
-                Components = this.thisComponentRows.Select(row => new ContributionComponentRow
+                Components = deleting ? new() : this.thisComponentRows.Select(row => new ContributionComponentRow
                 {
                     UuidV4 = row.UuidV4?.Trim() ?? string.Empty,
                     BoardLabel = row.BoardLabel?.Trim() ?? string.Empty,
@@ -1493,7 +1653,7 @@ namespace CRT
                     Description = row.Description?.Trim() ?? string.Empty
                 }).ToList(),
 
-                ComponentImages = this.thisComponentImageRows.Select(row => new ContributionComponentImageRow
+                ComponentImages = deleting ? new() : this.thisComponentImageRows.Select(row => new ContributionComponentImageRow
                 {
                     UuidV4 = row.UuidV4?.Trim() ?? string.Empty,
                     BoardLabel = ResolveRowBoardLabel(row.BoardLabel, effectiveBoardLabel),
@@ -1509,7 +1669,7 @@ namespace CRT
                     Note = row.Note?.Trim() ?? string.Empty
                 }).ToList(),
 
-                ComponentHighlights = this.thisComponentHighlightRows.Select(row => new ComponentHighlightEntry
+                ComponentHighlights = deleting ? new() : this.thisComponentHighlightRows.Select(row => new ComponentHighlightEntry
                 {
                     SchematicName = row.SchematicName?.Trim() ?? string.Empty,
                     BoardLabel = ResolveRowBoardLabel(row.BoardLabel, effectiveBoardLabel),
@@ -1519,7 +1679,7 @@ namespace CRT
                     Height = row.Height?.Trim() ?? string.Empty
                 }).ToList(),
 
-                ComponentLocalFiles = this.thisComponentLocalFileRows.Select(row => new ContributionComponentLocalFileRow
+                ComponentLocalFiles = deleting ? new() : this.thisComponentLocalFileRows.Select(row => new ContributionComponentLocalFileRow
                 {
                     UuidV4 = row.UuidV4?.Trim() ?? string.Empty,
                     BoardLabel = ResolveRowBoardLabel(row.BoardLabel, effectiveBoardLabel),
@@ -1528,7 +1688,7 @@ namespace CRT
                     File = row.File?.Trim() ?? string.Empty
                 }).ToList(),
 
-                ComponentLinks = this.thisComponentLinkRows.Select(row => new ContributionComponentLinkRow
+                ComponentLinks = deleting ? new() : this.thisComponentLinkRows.Select(row => new ContributionComponentLinkRow
                 {
                     UuidV4 = row.UuidV4?.Trim() ?? string.Empty,
                     BoardLabel = ResolveRowBoardLabel(row.BoardLabel, effectiveBoardLabel),
@@ -1566,7 +1726,8 @@ namespace CRT
                 this.ResolveComponentDisplayText(),
                 this.thisComponentUuidV4,
                 this.thisLocalRegion,
-                comment);
+                comment,
+                this.thisIsDeleteComponent);
         }
 
         // ###########################################################################################

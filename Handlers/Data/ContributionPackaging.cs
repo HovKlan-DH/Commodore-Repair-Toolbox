@@ -214,6 +214,72 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
+        // The sentence shown once the contributor asks to delete a component: what goes with it.
+        //
+        // A component is not one row. Its images, schematic highlights, local files and links are
+        // all resolved by its board label, so removing the component removes every one of them too -
+        // and the contributor cannot see that while the sections are collapsed. Counting them out
+        // loud is what turns "delete this component" from a guess into an informed decision.
+        //
+        // Sections with nothing in them are left out entirely rather than reported as "0 images":
+        // the list exists to say what will be lost, and a zero is not a loss.
+        // ###########################################################################################
+        public static string BuildDeleteComponentSummary(
+            string? boardLabel,
+            int componentImages,
+            int componentHighlights,
+            int componentLocalFiles,
+            int componentLinks)
+        {
+            string trimmedLabel = boardLabel?.Trim() ?? string.Empty;
+            string subject = string.IsNullOrWhiteSpace(trimmedLabel)
+                ? "This component"
+                : $"The component [{trimmedLabel}]";
+
+            var parts = new List<string>();
+            AppendCount(parts, componentImages, "component image", "component images");
+            AppendCount(parts, componentHighlights, "schematic highlight", "schematic highlights");
+            AppendCount(parts, componentLocalFiles, "local file", "local files");
+            AppendCount(parts, componentLinks, "link", "links");
+
+            if (parts.Count == 0)
+            {
+                return $"{subject} will be removed from the board data. It carries no images, highlights, files or links.";
+            }
+
+            return $"{subject} will be removed from the board data, together with its {JoinWithAnd(parts)}.";
+        }
+
+        // ###########################################################################################
+        // Adds "<n> <thing>" to the list, or nothing at all when the count is zero or negative.
+        // ###########################################################################################
+        private static void AppendCount(List<string> parts, int count, string singular, string plural)
+        {
+            if (count <= 0)
+            {
+                return;
+            }
+
+            parts.Add($"{count} {(count == 1 ? singular : plural)}");
+        }
+
+        // ###########################################################################################
+        // "a", "a and b", "a, b and c" - the last separator is "and" rather than a comma, because
+        // this is read as a sentence rather than scanned as a list.
+        // ###########################################################################################
+        private static string JoinWithAnd(IReadOnlyList<string> parts)
+        {
+            if (parts.Count <= 1)
+            {
+                return parts.Count == 0 ? string.Empty : parts[0];
+            }
+
+            string head = string.Join(", ", parts.Take(parts.Count - 1));
+
+            return $"{head} and {parts[parts.Count - 1]}";
+        }
+
+        // ###########################################################################################
         // Assigns a zip entry name to every reference that has a resolved source file.
         // Entry names are "ReferencedFiles/<SectionFolder>/<NNN>_<filename>" with a single global
         // running number, and references to the same source path (case-insensitive) reuse the
@@ -304,16 +370,26 @@ namespace Handlers.DataHandling
         // Builds the plain-text summary sent alongside the zipped JSON payload. The server relies
         // on the "Mandatory change comment:" marker line when formatting the notification email,
         // so that exact wording is part of the upload contract.
+        //
+        // The request type is stated on EVERY submission rather than only on a deletion. A line
+        // that appears only in the dangerous case is a line whose absence has to be noticed, and a
+        // deletion arriving as a mail that reads exactly like an ordinary edit is the one mistake
+        // this summary exists to prevent.
         // ###########################################################################################
+        public const string DeleteRequestTypeText = "DELETE COMPONENT";
+        public const string UpdateRequestTypeText = "Component update";
+
         public static string BuildFeedbackText(
             string hardwareName,
             string boardName,
             string componentDisplayText,
             string componentUuidV4,
             string region,
-            string comment)
+            string comment,
+            bool isDeleteRequest = false)
         {
             var builder = new StringBuilder();
+            builder.AppendLine($"Request type: {(isDeleteRequest ? DeleteRequestTypeText : UpdateRequestTypeText)}");
             builder.AppendLine($"Hardware: {hardwareName}");
             builder.AppendLine($"Board: {boardName}");
             builder.AppendLine($"Component: {componentDisplayText}");

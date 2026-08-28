@@ -15,7 +15,7 @@
   "modes": [
     {
       "name": "quick",
-      "label": "Quick (25 vectors)",
+      "label": "Quick (25)",
       "coverage": "sample",
       "vectorCount": 25,
       "vectorsFile": "Vectors/906114-01-quick.logicic.xml",
@@ -23,10 +23,18 @@
     },
     {
       "name": "standard",
-      "label": "Standard (512 vectors)",
+      "label": "Standard (512)",
       "coverage": "sample",
       "vectorCount": 512,
       "vectorsFile": "Vectors/906114-01-standard.logicic.xml",
+      "vectorsCompressed": false
+    },
+    {
+      "name": "full",
+      "label": "Full (65536)",
+      "coverage": "exhaustive",
+      "vectorCount": 65536,
+      "vectorsFile": "Vectors/906114-01-full.logicic.xml",
       "vectorsCompressed": false
     }
   ]
