@@ -275,23 +275,127 @@
 
 					<StackPanel Spacing="6">
 						<Grid ColumnDefinitions="*,Auto">
-							<TextBlock Grid.Column="0" Text="Photos/images" FontWeight="SemiBold" VerticalAlignment="Center" />
+							<TextBlock Grid.Column="0" Text="Photos" FontWeight="SemiBold" VerticalAlignment="Center" />
 							<Button Grid.Column="1" Content="Add photo" FontSize="11" Padding="8,3" Click="OnAddPhotoClick" />
 						</Grid>
 						<ItemsControl x:Name="EditorPhotosList">
 							<ItemsControl.ItemTemplate>
 								<DataTemplate x:DataType="local:WorklogAttachmentRow">
-									<Border Background="{DynamicResource Form_Bg}" BorderBrush="{DynamicResource Form_Border}" BorderThickness="1" CornerRadius="3" Padding="8,6" Margin="0,0,0,4">
-										<Grid ColumnDefinitions="*,Auto,Auto,Auto">
-											<StackPanel Grid.Column="0" Spacing="1">
-												<TextBlock Text="{Binding FileName}" FontWeight="SemiBold" FontSize="11" TextTrimming="CharacterEllipsis" />
-												<TextBlock Text="{Binding Comment}" FontSize="11" Opacity="0.8" TextWrapping="Wrap" />
-											</StackPanel>
-											<Button Grid.Column="1" Content="&#8593;" FontSize="10" Padding="6,2" Margin="4,0,0,0" Click="OnMovePhotoUpClick" Tag="{Binding Id}" />
-											<Button Grid.Column="2" Content="&#8595;" FontSize="10" Padding="6,2" Margin="4,0,0,0" Click="OnMovePhotoDownClick" Tag="{Binding Id}" />
-											<Button Grid.Column="3" Content="Delete" FontSize="10" Padding="6,2" Margin="4,0,0,0" Click="OnDeletePhotoClick" Tag="{Binding Id}" />
+									<Grid>
+
+										<!-- Shown in place of the row while it is being dragged: an empty outlined
+										     slot the height of the row, marking exactly where a drop will land.
+										     The dragged row itself moves through the list, so the surrounding
+										     rows already sit in the order the drop will produce. -->
+										<!-- A Rectangle rather than a Border: only shapes carry StrokeDashArray,
+										     Border has no dashed-edge option at all. RadiusX/Y keep the rounded
+										     corners the real rows have. -->
+										<Panel IsVisible="{Binding IsDropPlaceholder}"
+											   Height="{Binding PlaceholderHeight}"
+											   Margin="0,0,0,4">
+											<Rectangle Stroke="{DynamicResource Text_Fail_Fg}"
+													   StrokeThickness="2"
+													   StrokeDashArray="4,3"
+													   RadiusX="3"
+													   RadiusY="3"
+													   Fill="{DynamicResource Bg}" />
+											<TextBlock Text="Move the image up/down and release mouse button for new location"
+													   FontSize="11"
+													   Opacity="0.7"
+													   TextWrapping="Wrap"
+													   TextAlignment="Center"
+													   Margin="14,0"
+													   HorizontalAlignment="Center"
+													   VerticalAlignment="Center" />
+										</Panel>
+
+									<Border IsVisible="{Binding IsNotDropPlaceholder}" Background="{DynamicResource Form_Bg}" BorderBrush="{DynamicResource Form_Border}" BorderThickness="1" CornerRadius="3" Padding="8,6" Margin="0,0,0,4">
+										<Grid ColumnDefinitions="Auto,*">
+
+											<!-- The thumbnail is the click target for the full-size viewer: the big
+											     obvious target views, while the small explicit button edits.
+											     No fixed box and no frame: the image is sized by its own aspect
+											     ratio (MaxHeight caps it, width follows), so a wide screenshot
+											     no longer sits in a tall square padded with empty space. -->
+											<Panel Grid.Column="0"
+												   Margin="0,0,8,0"
+												   Cursor="Hand"
+												   Background="Transparent"
+												   Tag="{Binding Id}"
+												   PointerPressed="OnPhotoThumbnailPointerPressed"
+												   ToolTip.Tip="Click to view">
+												<Image Source="{Binding Thumbnail}"
+													   Stretch="Uniform"
+													   MaxWidth="200"
+													   MaxHeight="144"
+													   VerticalAlignment="Center"
+													   IsVisible="{Binding HasThumbnail}" />
+
+												<!-- The missing-file marker has no image to size it, so it keeps a
+												     box - otherwise the row would collapse to the icon's height. -->
+												<Border Width="96"
+														Height="96"
+														Background="{DynamicResource Bg}"
+														BorderBrush="{DynamicResource Form_Border}"
+														BorderThickness="1"
+														CornerRadius="2"
+														IsVisible="{Binding HasNoThumbnail}">
+													<TextBlock Text="&#xf127;"
+															   FontFamily="{DynamicResource FontAwesomeSolid}"
+															   FontSize="26"
+															   Opacity="0.5"
+															   HorizontalAlignment="Center"
+															   VerticalAlignment="Center"
+															   ToolTip.Tip="This photo's file is missing" />
+												</Border>
+											</Panel>
+
+											<!-- The comment takes the whole remaining width, with the Edit/Delete
+											     icons floated over its top-right corner rather than given their own
+											     columns - at this width a reserved icon column costs the text more
+											     room than the icons need. The text is padded on the right so a long
+											     comment wraps clear of them instead of running underneath.
+
+											     This panel is also the drag handle for reordering, which is why it
+											     carries the north/south cursor and fills the column even when the
+											     comment is short or absent. Background must be set (not left null)
+											     or the blank area is not hit-testable and the drag never starts.
+
+											     Deliberately no tooltip: the panel spans the whole row, so a tooltip
+											     here pops up over the comment text and the rows below it. The
+											     north/south cursor already says the row can be dragged. -->
+											<Panel Grid.Column="1"
+												   Background="Transparent"
+												   Cursor="SizeNorthSouth"
+												   Tag="{Binding Id}"
+												   PointerPressed="OnPhotoRowDragHandlePointerPressed">
+												<TextBlock Text="{Binding Comment}"
+														   FontSize="11"
+														   Opacity="0.8"
+														   TextWrapping="Wrap"
+														   VerticalAlignment="Center"
+														   Margin="0,20,0,0"
+														   IsVisible="{Binding HasComment}" />
+
+												<!-- Same edit icon as the Links rows (FontAwesomeRegular f044), with a
+												     gap before Delete so a mis-aimed click on Edit cannot hit the
+												     destructive action next to it. -->
+												<StackPanel Orientation="Horizontal"
+															Spacing="6"
+															HorizontalAlignment="Right"
+															VerticalAlignment="Top">
+													<Button Classes="WorklogRowIconButton" Click="OnEditPhotoClick" Tag="{Binding Id}" ToolTip.Tip="Edit photo">
+														<TextBlock Text="&#xf044;" FontFamily="{DynamicResource FontAwesomeRegular}" FontSize="13" Foreground="{DynamicResource Schematics_Panels_Fg}" />
+													</Button>
+													<Button Classes="WorklogRowIconButton" Click="OnDeletePhotoClick" Tag="{Binding Id}" ToolTip.Tip="Delete photo">
+														<TextBlock Text="&#xf2ed;" FontFamily="{DynamicResource FontAwesomeSolid}" FontSize="13" Foreground="{DynamicResource Text_Fail_Fg}" />
+													</Button>
+												</StackPanel>
+											</Panel>
 										</Grid>
 									</Border>
+
+									</Grid>
 								</DataTemplate>
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>

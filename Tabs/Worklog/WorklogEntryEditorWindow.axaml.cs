@@ -6,9 +6,12 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Handlers.DataHandling;
 using Handlers.Geometry;
 
@@ -69,6 +72,30 @@ namespace CRT
             this.SizeChanged += (_, _) => this.RefreshLocationPreviewOverlay();
 
             this.AddHandler(KeyDownEvent, this.OnWindowPreviewKeyDown, RoutingStrategies.Tunnel);
+
+            // The photo drag's move/release live on the LIST, not on the row that started it: the
+            // dragged row is re-rendered as an empty placeholder the moment the drag begins, which
+            // takes its own handlers out of the tree, and the row also moves out from under the
+            // pointer as the list reorders. The list stays put for the whole gesture.
+            // Tunnel so a release over a row's buttons still ends the drag rather than being eaten.
+            this.EditorPhotosList.AddHandler(PointerMovedEvent, this.OnPhotoRowDragHandlePointerMoved, RoutingStrategies.Tunnel);
+            this.EditorPhotosList.AddHandler(PointerReleasedEvent, this.OnPhotoRowDragHandlePointerReleased, RoutingStrategies.Tunnel);
+
+            // A release outside the list (dragged past the window edge, say) never reaches the
+            // handler above, which would strand the placeholder as a permanent empty slot. The
+            // window-level handler commits the drop at wherever the placeholder currently sits.
+            this.AddHandler(PointerReleasedEvent, this.OnPhotoRowDragHandlePointerReleased, RoutingStrategies.Tunnel);
+
+            // The thumbnails this window decoded hold unmanaged surfaces; without this the last set
+            // survives the window itself. thisSchematicBitmap belongs to the caller and is not
+            // touched here.
+            this.Closed += (_, _) =>
+            {
+                foreach (var row in this.thisPhotoRows)
+                {
+                    row.Thumbnail?.Dispose();
+                }
+            };
         }
 
         // ###########################################################################################
@@ -132,6 +159,12 @@ namespace CRT
             this.UpdateCategoryChipVisuals();
             this.UpdateStatePillVisuals();
 
+            // Heals duplicate/gapped DisplayOrder values left by older builds before anything is
+            // rendered, so the list cannot show two rows in an arbitrary order. Working-copy only -
+            // it reaches disk with the next save rather than writing on open.
+            WorklogAttachmentStorage.NormalizeDisplayOrder(this.thisEntry.Photos);
+            WorklogAttachmentStorage.NormalizeDisplayOrder(this.thisEntry.Files);
+
             this.RefreshLinkRows();
             this.RefreshCommentRows();
             this.RefreshWorkDoneRows();
@@ -192,7 +225,10 @@ namespace CRT
         // longer discard them. That is deliberate - it matches what is on screen, and Cancel already
         // could not undo an instant-saved sub-list change.
         // ###########################################################################################
-        private void PersistEntrySilently()
+        // Returns whether THIS save reached disk. thisHasPersistedChange cannot answer that - it is
+        // sticky for the window's lifetime so Cancel can still report WasSaved - so a caller that
+        // must not act on a failed save (deleting an attachment's bytes, say) reads this instead.
+        private bool PersistEntrySilently()
         {
             this.SyncDirectFieldsToEntry();
 
@@ -200,11 +236,25 @@ namespace CRT
             {
                 this.thisHasPersistedChange = true;
                 this.EditorSaveFailedText.IsVisible = false;
-                return;
+                return true;
             }
 
             // "Silently" covers not closing the window and not touching WasSaved - not hiding a
             // failure. The sub-list change the user just made is only in the working copy.
+            this.ShowSaveFailed(DefaultSaveFailedMessage);
+            return false;
+        }
+
+        private const string DefaultSaveFailedMessage = "Could not save - see the log for details.";
+
+        // ###########################################################################################
+        // Shows a failure in the footer's status line. Always sets the text rather than only the
+        // visibility, because the line is shared: an attachment failure writes its own wording, and
+        // without rewriting it a later ordinary save failure would report the attachment's problem.
+        // ###########################################################################################
+        private void ShowSaveFailed(string message)
+        {
+            this.EditorSaveFailedText.Text = message;
             this.EditorSaveFailedText.IsVisible = true;
         }
 
@@ -669,53 +719,605 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Photos/images - Add has no functionality yet (no file picker wired up); delete and
-        // drag-reorder (via the up/down buttons) work against the working copy so they are ready
-        // for whenever Add is implemented.
+        // Photos/images. The metadata (file name, comment, order) lives in entries.json with the
+        // entry; the bytes live in the entry's own "entry-<id>-files" folder, resolved through
+        // WorklogManager.GetEntryAttachmentsFolder. Adding copies the chosen file in there under a
+        // name that cannot collide with an existing one - see WorklogAttachmentStorage.
         // ###########################################################################################
         private void RefreshPhotoRows()
         {
+            // Each thumbnail is a decoded Bitmap holding an unmanaged surface. This method runs on
+            // every add/edit/delete/reorder and re-decodes the lot, so without disposing the old
+            // ones each refresh orphaned a full set until a finalizer eventually ran.
+            //
+            // Collected before Clear() but disposed after it: an Image is still bound to the bitmap
+            // until the row leaves the collection, and disposing one out from under a live binding
+            // risks a render against a freed surface.
+            var discardedThumbnails = this.thisPhotoRows.Select(row => row.Thumbnail).Where(bitmap => bitmap != null).ToList();
+
             this.thisPhotoRows.Clear();
+
+            foreach (var bitmap in discardedThumbnails)
+            {
+                bitmap!.Dispose();
+            }
             foreach (var photo in this.thisEntry.Photos.OrderBy(p => p.DisplayOrder))
             {
-                this.thisPhotoRows.Add(new WorklogAttachmentRow { Id = photo.Id, FileName = photo.FileName, Comment = photo.Comment });
+                this.thisPhotoRows.Add(new WorklogAttachmentRow
+                {
+                    Id = photo.Id,
+                    FileName = photo.FileName,
+                    Comment = photo.Comment,
+                    Thumbnail = this.TryLoadPhotoThumbnail(photo.FileName)
+                });
             }
             this.EditorNoPhotosText.IsVisible = this.thisPhotoRows.Count == 0;
         }
 
-        private void OnAddPhotoClick(object? sender, RoutedEventArgs e)
+        // ###########################################################################################
+        // Resolves the on-disk path of one of this entry's attachments, or null when the workbook
+        // folder cannot be resolved or the file is not there.
+        // ###########################################################################################
+        private string? ResolveAttachmentPath(string fileName)
         {
-            // Not implemented yet - uploading real photo files is a follow-up piece of work.
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                return null;
+            }
+
+            string? attachmentsFolder = WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id);
+            if (attachmentsFolder == null)
+            {
+                return null;
+            }
+
+            // Fully qualified: this file also uses Avalonia.Controls.Shapes, which has its own Path.
+            string path = System.IO.Path.Combine(attachmentsFolder, fileName);
+            return File.Exists(path) ? path : null;
         }
 
+        // ###########################################################################################
+        // Decodes a row thumbnail, scaled down on load rather than at full resolution - a phone
+        // photo is several thousand pixels wide and the row shows it at 64, so decoding the full
+        // image would spend memory the list never uses. Failure is not fatal: the row renders with
+        // a "missing" marker instead, since a photo file can be deleted or corrupted outside the app.
+        // ###########################################################################################
+        private Bitmap? TryLoadPhotoThumbnail(string fileName)
+        {
+            string? path = this.ResolveAttachmentPath(fileName);
+            if (path == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                using var stream = File.OpenRead(path);
+                return Bitmap.DecodeToWidth(stream, 256);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to load worklog photo thumbnail [{fileName}]: {ex.Message}");
+                return null;
+            }
+        }
+
+        // ###########################################################################################
+        // Adds one photo: collect the file and comment, copy the bytes into the entry's attachments
+        // folder, then record the metadata. The record is only added once the copy has succeeded -
+        // a row pointing at a file that never landed would show as permanently broken.
+        // ###########################################################################################
+        private async void OnAddPhotoClick(object? sender, RoutedEventArgs e)
+        {
+            // async void cannot be awaited, so anything thrown after the first await reaches the
+            // global handler instead of this window. GetEntryAttachmentsFolder calls
+            // Directory.CreateDirectory, which throws on a read-only or disconnected folder - a
+            // reportable condition, not a crash.
+            try
+            {
+                await this.AddPhotoAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to add worklog photo: {ex.Message}");
+                this.ShowSaveFailed("The photo could not be added - see the log for details.");
+            }
+        }
+
+        private async Task AddPhotoAsync()
+        {
+            var dialog = new WorklogAddPhotoWindow();
+            var result = await dialog.ShowDialog<WorklogAddPhotoWindow.PhotoResult?>(this);
+            if (result == null || string.IsNullOrWhiteSpace(result.SourcePath))
+            {
+                return;
+            }
+
+            string? attachmentsFolder = WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id);
+            if (attachmentsFolder == null)
+            {
+                this.ShowSaveFailed("Could not resolve where to store the photo.");
+                return;
+            }
+
+            // The id is settled before the name, because the stored name is built from it.
+            int nextId = this.thisEntry.Photos.Count == 0 ? 1 : this.thisEntry.Photos.Max(p => p.Id) + 1;
+
+            // Ordering is 0-based to match ReorderAttachment, which renumbers densely from 0. When
+            // this started at 1, the first photo added after any drag-reorder took the same
+            // DisplayOrder as an existing row, and two rows sharing an order sort arbitrarily.
+            int nextOrder = this.thisEntry.Photos.Count == 0 ? 0 : this.thisEntry.Photos.Max(p => p.DisplayOrder) + 1;
+
+            string storedFileName = WorklogAttachmentStorage.BuildStoredFileName(
+                result.SourcePath, WorklogAttachmentStorage.PhotoFilePrefix, nextId);
+
+            if (!WorklogAttachmentStorage.CopyAttachmentIntoFolder(result.SourcePath, attachmentsFolder, storedFileName))
+            {
+                this.ShowSaveFailed("The photo could not be copied into the worklog.");
+                return;
+            }
+
+            this.thisEntry.Photos.Add(new WorklogAttachmentRecord
+            {
+                Id = nextId,
+                FileName = storedFileName,
+                Comment = result.Comment,
+                DisplayOrder = nextOrder
+            });
+
+            this.RefreshPhotoRows();
+
+            // A failed save means entries.json will never mention this photo, so the bytes just
+            // copied in would sit in the attachments folder forever with nothing referencing them.
+            // Undoing the copy keeps the folder consistent with what was actually recorded.
+            if (!this.PersistEntrySilently())
+            {
+                this.thisEntry.Photos.RemoveAll(p => p.Id == nextId);
+                WorklogAttachmentStorage.DeleteAttachmentFile(attachmentsFolder, storedFileName);
+                this.RefreshPhotoRows();
+            }
+        }
+
+        // ###########################################################################################
+        // Clicking a photo row's thumbnail opens the full-size viewer. Separate from the row's Edit
+        // button on purpose: viewing is the common action and editing is the deliberate one, so the
+        // large target views and the small explicit one edits.
+        // ###########################################################################################
+        private void OnPhotoThumbnailPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (sender is not Control { Tag: int id })
+            {
+                return;
+            }
+
+            var photo = this.thisEntry.Photos.FirstOrDefault(p => p.Id == id);
+            if (photo == null)
+            {
+                return;
+            }
+
+            // Stops the click also reaching the row, which would open the editor behind the viewer.
+            e.Handled = true;
+
+            var viewer = new WorklogPhotoViewerWindow();
+            viewer.Initialize(photo.FileName, photo.Comment, this.ResolveAttachmentPath(photo.FileName));
+            viewer.ShowDialog(this);
+        }
+
+        // ###########################################################################################
+        // Editing a photo reopens the same modal pre-filled, matching the comment and work-done
+        // rows. A replacement image is copied in alongside the old one and the record repointed;
+        // the previous file is deliberately left on disk rather than deleted, because an entry that
+        // has not been saved yet can still be cancelled, and deleting here would take the original
+        // with it. See the note on Delete below - the same reasoning applies.
+        // ###########################################################################################
+        private async void OnEditPhotoClick(object? sender, RoutedEventArgs e)
+        {
+            // See OnAddPhotoClick for why the body is wrapped.
+            try
+            {
+                await this.EditPhotoAsync(sender);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to edit worklog photo: {ex.Message}");
+                this.ShowSaveFailed("The photo could not be updated - see the log for details.");
+            }
+        }
+
+        private async Task EditPhotoAsync(object? sender)
+        {
+            if (sender is not Button { Tag: int id })
+            {
+                return;
+            }
+
+            var photo = this.thisEntry.Photos.FirstOrDefault(p => p.Id == id);
+            if (photo == null)
+            {
+                return;
+            }
+
+            var dialog = new WorklogAddPhotoWindow();
+            dialog.InitializeForEdit(photo.FileName, photo.Comment, this.ResolveAttachmentPath(photo.FileName));
+
+            var result = await dialog.ShowDialog<WorklogAddPhotoWindow.PhotoResult?>(this);
+            if (result == null)
+            {
+                return;
+            }
+
+            string previousFileName = photo.FileName;
+            string previousComment = photo.Comment;
+
+            string? attachmentsFolder = null;
+            string newStoredFileName = string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(result.SourcePath))
+            {
+                attachmentsFolder = WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id);
+                if (attachmentsFolder == null)
+                {
+                    this.ShowSaveFailed("Could not resolve where to store the photo.");
+                    return;
+                }
+
+                newStoredFileName = WorklogAttachmentStorage.BuildStoredFileName(
+                    result.SourcePath, WorklogAttachmentStorage.PhotoFilePrefix, photo.Id);
+
+                photo.FileName = newStoredFileName;
+            }
+
+            photo.Comment = result.Comment;
+
+            // The record is saved BEFORE the file is swapped, because the swap deletes the image it
+            // replaces. Doing it the other way round meant a failed save left entries.json naming a
+            // file that had already been deleted - and Cancel then discarded the working copy, so
+            // the row was permanently broken with no way back to the original.
+            if (!this.PersistEntrySilently())
+            {
+                photo.FileName = previousFileName;
+                photo.Comment = previousComment;
+                this.RefreshPhotoRows();
+                return;
+            }
+
+            if (attachmentsFolder != null)
+            {
+                // Copies the new file in and removes the one it replaces, leaving exactly one file
+                // behind whether or not the stored name changed - see TryReplaceAttachmentFile.
+                if (!WorklogAttachmentStorage.TryReplaceAttachmentFile(
+                        result.SourcePath!,
+                        attachmentsFolder,
+                        previousFileName,
+                        newStoredFileName,
+                        out _))
+                {
+                    // The record already names the new file, so put it back and re-save rather than
+                    // leaving entries.json pointing at bytes that were never written.
+                    photo.FileName = previousFileName;
+                    this.ShowSaveFailed("The photo could not be copied into the worklog.");
+                    this.PersistEntrySilently();
+                }
+            }
+
+            this.RefreshPhotoRows();
+        }
+
+        // ###########################################################################################
+        // Removes the photo, metadata and bytes both. Deleting the file is safe because the stored
+        // name carries the photo's own id (see BuildStoredFileName), so it can only ever belong to
+        // the record being removed - the app copied it in and nothing else points at it.
+        //
+        // The file goes only after the metadata change has been persisted: if the save fails the
+        // row is still listed, and deleting first would leave it pointing at nothing.
+        // ###########################################################################################
         private void OnDeletePhotoClick(object? sender, RoutedEventArgs e)
         {
-            if (sender is Button { Tag: int id })
+            if (sender is not Button { Tag: int id })
             {
-                this.thisEntry.Photos.RemoveAll(p => p.Id == id);
-                this.RefreshPhotoRows();
-                this.PersistEntrySilently();
+                return;
+            }
+
+            var photo = this.thisEntry.Photos.FirstOrDefault(p => p.Id == id);
+            if (photo == null)
+            {
+                return;
+            }
+
+            string fileName = photo.FileName;
+
+            this.thisEntry.Photos.RemoveAll(p => p.Id == id);
+            this.RefreshPhotoRows();
+
+            if (this.PersistEntrySilently())
+            {
+                WorklogAttachmentStorage.DeleteAttachmentFile(
+                    WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id),
+                    fileName);
             }
         }
 
-        private void OnMovePhotoUpClick(object? sender, RoutedEventArgs e)
+        // ###########################################################################################
+        // Drag-to-reorder for photo rows, replacing the old up/down buttons.
+        //
+        // Only the row's empty space starts a drag: the thumbnail and the two icon buttons handle
+        // their own pointer events and mark them handled, so pressing those never begins a drag.
+        // That is also why the row shows the north/south cursor only over that empty space - the
+        // cursor is set on the panel that carries the drag, not on the whole row.
+        //
+        // A press alone does not start the drag; it only arms it. The drag begins once the pointer
+        // has actually moved a few pixels, so a plain click on a row cannot reorder anything by
+        // accident.
+        // ###########################################################################################
+        private int thisDraggedPhotoId = -1;
+
+        private Point thisPhotoDragStartPoint;
+
+        private bool thisIsDraggingPhoto;
+
+        // Far enough that a click with a shaky hand is not a drag, small enough to feel immediate.
+        private const double PhotoDragThreshold = 4.0;
+
+        private void OnPhotoRowDragHandlePointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            if (sender is Button { Tag: int id })
+            if (sender is not Control { Tag: int id })
             {
-                MoveAttachment(this.thisEntry.Photos, id, -1);
-                this.RefreshPhotoRows();
-                this.PersistEntrySilently();
+                return;
+            }
+
+            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            this.thisDraggedPhotoId = id;
+            this.thisPhotoDragStartPoint = e.GetPosition(this.EditorPhotosList);
+            this.thisIsDraggingPhoto = false;
+        }
+
+        private void OnPhotoRowDragHandlePointerMoved(object? sender, PointerEventArgs e)
+        {
+            if (this.thisDraggedPhotoId < 0)
+            {
+                return;
+            }
+
+            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            {
+                // The button was released somewhere that did not reach the release handler (outside
+                // the window, say); without this the next move would resume a drag the user ended.
+                this.ResetPhotoDragState();
+                return;
+            }
+
+            var current = e.GetPosition(this.EditorPhotosList);
+
+            if (!this.thisIsDraggingPhoto &&
+                Math.Abs(current.Y - this.thisPhotoDragStartPoint.Y) < PhotoDragThreshold &&
+                Math.Abs(current.X - this.thisPhotoDragStartPoint.X) < PhotoDragThreshold)
+            {
+                return;
+            }
+
+            if (!this.thisIsDraggingPhoto)
+            {
+                this.BeginPhotoDragPlaceholder();
+            }
+
+            this.thisIsDraggingPhoto = true;
+
+            // Move the dragged row to wherever the pointer now is, so the gap follows the pointer
+            // and the surrounding rows shift into the order the drop will produce. The row is drawn
+            // as an outlined slot while it is the placeholder, so what the user sees is the space
+            // it will occupy rather than the row itself trailing the cursor.
+            //
+            // Guarded against re-entry: Move() reorders the collection, which makes Avalonia recycle
+            // the row containers, which changes the element under the cursor and raises further
+            // pointer events synchronously. Those re-enter this handler and move again, and the list
+            // flickers between orders for as long as the pointer is held there. The flag makes the
+            // nested calls no-ops so one physical mouse move produces exactly one reorder.
+            if (this.thisIsApplyingPhotoPlaceholderMove)
+            {
+                return;
+            }
+
+            this.thisIsApplyingPhotoPlaceholderMove = true;
+            try
+            {
+                this.MovePhotoPlaceholderTo(this.ResolvePhotoDropIndex(current));
+            }
+            finally
+            {
+                this.thisIsApplyingPhotoPlaceholderMove = false;
             }
         }
 
-        private void OnMovePhotoDownClick(object? sender, RoutedEventArgs e)
+        private bool thisIsApplyingPhotoPlaceholderMove;
+
+        private void OnPhotoRowDragHandlePointerReleased(object? sender, PointerReleasedEventArgs e)
         {
-            if (sender is Button { Tag: int id })
+            if (this.thisDraggedPhotoId < 0 || !this.thisIsDraggingPhoto)
             {
-                MoveAttachment(this.thisEntry.Photos, id, 1);
-                this.RefreshPhotoRows();
-                this.PersistEntrySilently();
+                this.ResetPhotoDragState();
+                return;
             }
+
+            int draggedId = this.thisDraggedPhotoId;
+
+            // The placeholder is already sitting at the drop position, so its index in the row list
+            // IS the target - no need to re-measure against the pointer, which would disagree with
+            // what the user was just shown if the pointer sat between two rows.
+            int targetIndex = this.IndexOfPhotoRow(draggedId);
+
+            this.ResetPhotoDragState();
+
+            if (targetIndex < 0)
+            {
+                this.RefreshPhotoRows();
+                return;
+            }
+
+            WorklogAttachmentStorage.ReorderAttachment(this.thisEntry.Photos, draggedId, targetIndex);
+            this.RefreshPhotoRows();
+            this.PersistEntrySilently();
+        }
+
+        // ###########################################################################################
+        // Turns the dragged row into the placeholder, sized to the height it currently occupies so
+        // the gap does not jump when its content is swapped for the empty outline.
+        // ###########################################################################################
+        private void BeginPhotoDragPlaceholder()
+        {
+            int index = this.IndexOfPhotoRow(this.thisDraggedPhotoId);
+            if (index < 0)
+            {
+                return;
+            }
+
+            var row = this.thisPhotoRows[index];
+
+            var container = this.EditorPhotosList.ContainerFromIndex(index);
+            if (container != null && container.Bounds.Height > 0)
+            {
+                row.PlaceholderHeight = container.Bounds.Height;
+            }
+
+            this.CapturePhotoRowBoundaries();
+
+            row.IsDropPlaceholder = true;
+        }
+
+        // ###########################################################################################
+        // The Y positions of the row boundaries as they are at the moment the drag starts, used to
+        // decide which slot the pointer is over for the rest of the gesture.
+        //
+        // A snapshot rather than live measurement, because measuring live feeds the swap back into
+        // its own input: moving the placeholder re-lays out the list, which moves the very rows the
+        // next measurement reads, which can select a different slot, which moves them back - the
+        // rows oscillate every frame. That feedback is unavoidable once rows differ in height (they
+        // do now that each image is sized by its own aspect ratio), because a swap shifts the
+        // layout by the difference between two row heights rather than leaving it unchanged.
+        //
+        // Against a frozen frame the pointer position alone decides the slot, so the same pointer
+        // position always gives the same answer and there is nothing to oscillate.
+        // ###########################################################################################
+        private readonly List<double> thisPhotoRowDragBoundaries = new();
+
+        private void CapturePhotoRowBoundaries()
+        {
+            this.thisPhotoRowDragBoundaries.Clear();
+
+            // One entry per row, always - index i in this list means row i. Skipping a row whose
+            // container is not realized would shorten the list and shift every later boundary's
+            // meaning by one, so an unmeasurable row gets an interpolated midpoint instead and the
+            // two lists stay aligned. ResolvePhotoDropIndex relies on that 1:1 correspondence to
+            // return an index into thisPhotoRows.
+            double runningY = 0;
+
+            for (int i = 0; i < this.thisPhotoRows.Count; i++)
+            {
+                var container = this.EditorPhotosList.ContainerFromIndex(i);
+                Point? topLeft = container?.TranslatePoint(new Point(0, 0), this.EditorPhotosList);
+
+                double height = container != null && container.Bounds.Height > 0
+                    ? container.Bounds.Height
+                    : this.thisPhotoRows[i].PlaceholderHeight;
+
+                double top = topLeft?.Y ?? runningY;
+
+                // The midpoint of each row as laid out before anything moved. The pointer being
+                // past a midpoint means the drop belongs after that row.
+                this.thisPhotoRowDragBoundaries.Add(top + (height / 2.0));
+
+                runningY = top + height;
+            }
+        }
+
+        // ###########################################################################################
+        // Moves the placeholder row to the given index, leaving the collection untouched when it is
+        // already there - a Move on every pointer frame would rebuild containers continuously and
+        // make the list flicker.
+        // ###########################################################################################
+        private void MovePhotoPlaceholderTo(int targetIndex)
+        {
+            if (targetIndex < 0)
+            {
+                return;
+            }
+
+            int currentIndex = this.IndexOfPhotoRow(this.thisDraggedPhotoId);
+            if (currentIndex < 0)
+            {
+                return;
+            }
+
+            targetIndex = Math.Clamp(targetIndex, 0, this.thisPhotoRows.Count - 1);
+            if (targetIndex == currentIndex)
+            {
+                return;
+            }
+
+            this.thisPhotoRows.Move(currentIndex, targetIndex);
+        }
+
+        private int IndexOfPhotoRow(int id)
+        {
+            for (int i = 0; i < this.thisPhotoRows.Count; i++)
+            {
+                if (this.thisPhotoRows[i].Id == id)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        // ###########################################################################################
+        // Ends the drag and returns every row to its normal appearance. Clearing the flag on all
+        // rows rather than just the dragged one means an interrupted drag (the window closing, a
+        // refresh landing mid-drag) cannot stitch a row permanently as a placeholder.
+        // ###########################################################################################
+        private void ResetPhotoDragState()
+        {
+            foreach (var row in this.thisPhotoRows)
+            {
+                row.IsDropPlaceholder = false;
+            }
+
+            // Cleared so the next drag cannot resolve against the previous drag's layout.
+            this.thisPhotoRowDragBoundaries.Clear();
+
+            this.thisDraggedPhotoId = -1;
+            this.thisIsDraggingPhoto = false;
+        }
+
+        // ###########################################################################################
+        // Which slot the pointer is over, measured against the boundaries captured when the drag
+        // started (see CapturePhotoRowBoundaries for why a live measurement oscillates).
+        //
+        // Above the first boundary gives 0 and past the last gives the final index, so a drag flung
+        // past either end lands at that end instead of being discarded.
+        // ###########################################################################################
+        private int ResolvePhotoDropIndex(Point pointerInList)
+        {
+            if (this.thisPhotoRows.Count == 0 || this.thisPhotoRowDragBoundaries.Count == 0)
+            {
+                return -1;
+            }
+
+            for (int i = 0; i < this.thisPhotoRowDragBoundaries.Count; i++)
+            {
+                if (pointerInList.Y < this.thisPhotoRowDragBoundaries[i])
+                {
+                    // Also covers a pointer dragged above the list entirely.
+                    return i;
+                }
+            }
+
+            // Past the last midpoint - the drop belongs at the end.
+            return this.thisPhotoRowDragBoundaries.Count - 1;
         }
 
         // ###########################################################################################
@@ -750,7 +1352,7 @@ namespace CRT
         {
             if (sender is Button { Tag: int id })
             {
-                MoveAttachment(this.thisEntry.Files, id, -1);
+                WorklogAttachmentStorage.StepAttachment(this.thisEntry.Files, id, -1);
                 this.RefreshFileRows();
                 this.PersistEntrySilently();
             }
@@ -760,31 +1362,9 @@ namespace CRT
         {
             if (sender is Button { Tag: int id })
             {
-                MoveAttachment(this.thisEntry.Files, id, 1);
+                WorklogAttachmentStorage.StepAttachment(this.thisEntry.Files, id, 1);
                 this.RefreshFileRows();
                 this.PersistEntrySilently();
-            }
-        }
-
-        // ###########################################################################################
-        // Swaps the DisplayOrder of the id'd attachment with its neighbour in the given direction
-        // (-1 = up/earlier, +1 = down/later), then renumbers every row 0..N-1 so DisplayOrder always
-        // stays a dense, gap-free ordering regardless of how many swaps have happened.
-        // ###########################################################################################
-        private static void MoveAttachment(System.Collections.Generic.List<WorklogAttachmentRecord> attachments, int id, int direction)
-        {
-            var ordered = attachments.OrderBy(a => a.DisplayOrder).ToList();
-            int index = ordered.FindIndex(a => a.Id == id);
-            int targetIndex = index + direction;
-
-            if (index < 0 || targetIndex < 0 || targetIndex >= ordered.Count)
-                return;
-
-            (ordered[index], ordered[targetIndex]) = (ordered[targetIndex], ordered[index]);
-
-            for (int i = 0; i < ordered.Count; i++)
-            {
-                ordered[i].DisplayOrder = i;
             }
         }
 
@@ -817,7 +1397,7 @@ namespace CRT
                 // Nothing reached disk. Closing here would report success and the user would watch
                 // their edits revert on the next refresh, so keep the window open with what they
                 // typed still in it and say so. The log carries the underlying reason.
-                this.EditorSaveFailedText.IsVisible = true;
+                this.ShowSaveFailed(DefaultSaveFailedMessage);
                 return;
             }
 
@@ -853,10 +1433,70 @@ namespace CRT
         public string SummaryText { get; set; } = string.Empty;
     }
 
-    public sealed class WorklogAttachmentRow
+    public sealed class WorklogAttachmentRow : System.ComponentModel.INotifyPropertyChanged
     {
         public int Id { get; set; }
         public string FileName { get; set; } = string.Empty;
         public string Comment { get; set; } = string.Empty;
+
+        // ###########################################################################################
+        // Thumbnail for a photo row, decoded once when the row is built rather than by a binding
+        // converter, so a file that has gone missing or will not decode simply leaves this null and
+        // the row still lists its name and comment. Always null for file rows, which show no image.
+        // ###########################################################################################
+        public Avalonia.Media.Imaging.Bitmap? Thumbnail { get; set; }
+
+        public bool HasThumbnail => this.Thumbnail != null;
+
+        // ###########################################################################################
+        // Shown in place of the thumbnail when the image is unavailable, so a broken photo row reads
+        // as broken instead of as a blank square.
+        // ###########################################################################################
+        public bool HasNoThumbnail => this.Thumbnail == null;
+
+        // ###########################################################################################
+        // Hides the comment line entirely when there is none, keeping rows compact - a photo is
+        // allowed to carry no comment.
+        // ###########################################################################################
+        public bool HasComment => !string.IsNullOrWhiteSpace(this.Comment);
+
+        // ###########################################################################################
+        // True while this row is the one being dragged, which draws it as an empty outlined slot
+        // showing where a drop would land. Following SchematicThumbnail's IsDropPlaceholder: the
+        // template swaps between the placeholder box and the real content on this flag.
+        //
+        // Unlike the thumbnail list, no separate placeholder object is inserted - the dragged row
+        // moves within the collection and renders as the placeholder itself, so the gap is exactly
+        // the height of the row being moved and the list shows the order it will end up in.
+        // ###########################################################################################
+        public bool IsDropPlaceholder
+        {
+            get => this.thisIsDropPlaceholder;
+            set
+            {
+                if (this.thisIsDropPlaceholder == value)
+                {
+                    return;
+                }
+
+                this.thisIsDropPlaceholder = value;
+                this.PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(this.IsDropPlaceholder)));
+                this.PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(this.IsNotDropPlaceholder)));
+            }
+        }
+
+        public bool IsNotDropPlaceholder => !this.thisIsDropPlaceholder;
+
+        private bool thisIsDropPlaceholder;
+
+        // ###########################################################################################
+        // The row's own height while it is the placeholder, so the gap matches the row being
+        // dragged rather than collapsing to the empty box's natural size.
+        // ###########################################################################################
+        // Only used if the row's container has not been measured yet; BeginPhotoDragPlaceholder
+        // replaces it with the row's real height. Roughly a 144px thumbnail plus the row padding.
+        public double PlaceholderHeight { get; set; } = 162.0;
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     }
 }
