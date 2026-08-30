@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
@@ -37,6 +37,17 @@ namespace CRT
 
         private bool thisIsEditMode;
 
+        // ###########################################################################################
+        // Which list the attachment is destined for. Photos are restricted to what the app can draw
+        // and get a thumbnail preview; Files take the wider openable-document set and show no
+        // preview, since there is nothing to render for a PDF. Everything else about the dialog -
+        // the drop target, the comment box, the keyboard contract - is identical, which is why one
+        // window serves both rather than a near-copy existing for each.
+        // ###########################################################################################
+        private WorklogAttachmentStorage.AttachmentKind thisKind = WorklogAttachmentStorage.AttachmentKind.Photo;
+
+        private bool IsFileKind => this.thisKind == WorklogAttachmentStorage.AttachmentKind.File;
+
         public WorklogAddPhotoWindow()
         {
             this.InitializeComponent();
@@ -55,24 +66,66 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Switches the dialog into "edit" mode: shows the photo already attached and its comment,
-        // and relabels the title/submit button, so the same modal serves both "Add photo" and the
-        // photo row's click-to-edit behavior - matching the comment and work-done dialogs.
+        // Switches the dialog to collecting a File rather than a Photo: wider accepted types, no
+        // image preview, and wording that says "file" throughout. Call before showing.
         //
-        // existingImagePath is only for the preview; leaving the picker untouched returns a null
-        // SourcePath, meaning the stored image stays as it is.
+        // InitializeForEdit takes the kind itself and assigns it unconditionally, rather than
+        // relying on this having been called first - the two used to be order-dependent, and
+        // calling them the other way round produced a dialog worded for photos that nonetheless
+        // accepted PDFs.
         // ###########################################################################################
-        public void InitializeForEdit(string fileName, string comment, string? existingImagePath)
+        public void InitializeForFileKind()
+        {
+            this.thisKind = WorklogAttachmentStorage.AttachmentKind.File;
+
+            this.Title = "Add file";
+            this.HeaderText.Text = "Add file";
+            this.AddButton.Content = "Add file";
+            this.SectionLabelText.Text = "File";
+            this.AcceptedTypesText.Text = "Documents, images and data files - not programs, scripts or shortcuts";
+            this.SelectedFileText.Text = "Drag a file here, or use Browse";
+        }
+
+        // ###########################################################################################
+        // Switches the dialog into "edit" mode: shows the attachment already there and its comment,
+        // and relabels the title/submit button, so the same modal serves both Add and the row's
+        // click-to-edit behavior - matching the comment and work-done dialogs.
+        //
+        // existingImagePath is only for the preview (Photos only); leaving the picker untouched
+        // returns a null SourcePath, meaning the stored file stays as it is.
+        // ###########################################################################################
+        public void InitializeForEdit(
+            string fileName,
+            string comment,
+            string? existingImagePath,
+            WorklogAttachmentStorage.AttachmentKind kind = WorklogAttachmentStorage.AttachmentKind.Photo)
         {
             this.thisIsEditMode = true;
 
-            this.Title = "Edit photo";
-            this.HeaderText.Text = "Edit photo";
-            this.AddButton.Content = "Update photo";
+            // The kind is set from the ARGUMENT in both directions, never inferred from whatever a
+            // previous call left behind. Applying it only for File made the claim below true one
+            // way round and false the other: an instance switched to File and then edited as a
+            // Photo kept File's wider validation while being worded for photos, accepting a PDF
+            // where the caller asked for an image. Assigning unconditionally is what actually makes
+            // this method own the whole appearance regardless of what the caller called before.
+            this.thisKind = kind;
+
+            if (kind == WorklogAttachmentStorage.AttachmentKind.File)
+            {
+                this.InitializeForFileKind();
+            }
+
+            bool isFile = this.IsFileKind;
+
+            this.Title = isFile ? "Edit file" : "Edit photo";
+            this.HeaderText.Text = this.Title;
+            this.AddButton.Content = isFile ? "Update file" : "Update photo";
             this.CommentTextBox.Text = comment;
 
             this.SelectedFileText.Text = fileName;
-            this.SelectedFilePathText.Text = "Drop or browse to replace this image";
+            this.SelectedFilePathText.Text = isFile
+                ? "Drop or browse to replace this file"
+                : "Drop or browse to replace this image";
             this.SelectedFilePathText.IsVisible = true;
 
             this.TryShowPreview(existingImagePath);
@@ -158,18 +211,26 @@ namespace CRT
                 return;
             }
 
-            var imageFileType = new FilePickerFileType("Image files")
-            {
-                Patterns = ContributionPackaging.DisplayableImageExtensions.Select(extension => "*" + extension).ToArray(),
-                MimeTypes = new[] { "image/*" },
-                AppleUniformTypeIdentifiers = new[] { "public.image" }
-            };
+            // The Files filter is built from the launcher's own openable set, so the picker can only
+            // offer what the app will later be able to open. ApplySelectedFile re-checks regardless,
+            // since a filter is only a suggestion a typed name can get past.
+            var fileType = this.IsFileKind
+                ? new FilePickerFileType("Documents, images and data")
+                {
+                    Patterns = ExternalTargetLauncher.OpenableFileExtensions.Select(extension => "*" + extension).ToArray()
+                }
+                : new FilePickerFileType("Image files")
+                {
+                    Patterns = ContributionPackaging.DisplayableImageExtensions.Select(extension => "*" + extension).ToArray(),
+                    MimeTypes = new[] { "image/*" },
+                    AppleUniformTypeIdentifiers = new[] { "public.image" }
+                };
 
             var files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                Title = "Select image",
+                Title = this.IsFileKind ? "Select file" : "Select image",
                 AllowMultiple = false,
-                FileTypeFilter = new[] { imageFileType }
+                FileTypeFilter = new[] { fileType }
             });
 
             if (files == null || files.Count == 0)
@@ -191,7 +252,7 @@ namespace CRT
         // ###########################################################################################
         private void ApplySelectedFile(string path)
         {
-            var problem = WorklogAttachmentStorage.ValidateSourceFile(path, requireDisplayableImage: true);
+            var problem = WorklogAttachmentStorage.ValidateSourceFile(path, this.thisKind);
             if (problem != WorklogAttachmentStorage.AttachmentProblem.None)
             {
                 this.ShowValidationMessage(WorklogAttachmentStorage.DescribeProblem(problem));
@@ -225,9 +286,13 @@ namespace CRT
             this.ImagePreview.IsVisible = false;
             previous?.Dispose();
 
-            this.SelectedFileText.Text = this.thisIsEditMode
-                ? "Keeping the current image"
-                : "Drag an image here, or use Browse";
+            this.SelectedFileText.Text = (this.thisIsEditMode, this.IsFileKind) switch
+            {
+                (true, true) => "Keeping the current file",
+                (true, false) => "Keeping the current image",
+                (false, true) => "Drag a file here, or use Browse",
+                (false, false) => "Drag an image here, or use Browse"
+            };
             this.SelectedFilePathText.IsVisible = false;
         }
 
@@ -238,10 +303,21 @@ namespace CRT
         // ###########################################################################################
         private void TryShowPreview(string? path)
         {
+            // Files show no preview - a PDF or CSV has nothing to render, and an image attached as a
+            // File is still being treated as a document. Falls through to the clearing branch rather
+            // than returning outright, so switching to File kind after a preview was shown still
+            // releases that bitmap instead of leaving it on screen and undisposed.
+            if (this.IsFileKind)
+            {
+                path = null;
+            }
+
             if (string.IsNullOrWhiteSpace(path))
             {
+                var discarded = this.ImagePreview.Source as IDisposable;
                 this.ImagePreview.Source = null;
                 this.ImagePreview.IsVisible = false;
+                discarded?.Dispose();
                 return;
             }
 
@@ -297,7 +373,7 @@ namespace CRT
             // open for a while and the file can be moved or deleted in the meantime.
             if (!string.IsNullOrWhiteSpace(this.thisSelectedFilePath))
             {
-                var problem = WorklogAttachmentStorage.ValidateSourceFile(this.thisSelectedFilePath, requireDisplayableImage: true);
+                var problem = WorklogAttachmentStorage.ValidateSourceFile(this.thisSelectedFilePath, this.thisKind);
                 if (problem != WorklogAttachmentStorage.AttachmentProblem.None)
                 {
                     this.ShowValidationMessage(WorklogAttachmentStorage.DescribeProblem(problem));

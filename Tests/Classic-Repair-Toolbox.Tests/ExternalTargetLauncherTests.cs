@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using CRT;
 
 namespace ClassicRepairToolbox.Tests;
@@ -303,5 +303,74 @@ public sealed class ExternalTargetLauncherTests : IDisposable
     {
         string absolute = Path.Combine(this.thisOutsideRoot, "secrets.txt");
         Assert.False(ExternalTargetLauncher.TryOpen(absolute, this.thisDataRoot));
+    }
+
+    // ------------------------------------------------------------- OpenableFileExtensions
+
+    // The allowlist is exposed so attach-time validation can share it, but it must be a COPY:
+    // IReadOnlyCollection is only a compile-time promise, and the backing store is a HashSet, so
+    // handing back the live instance would let any caller in the assembly cast it and Add(".exe"),
+    // permanently defeating the executable rejection this class exists to enforce.
+    [Fact]
+    public void The_exposed_extension_list_cannot_be_mutated_through_a_cast()
+    {
+        var exposed = ExternalTargetLauncher.OpenableFileExtensions;
+
+        if (exposed is HashSet<string> writable)
+        {
+            writable.Add(".exe");
+        }
+        else if (exposed is ICollection<string> collection && !collection.IsReadOnly)
+        {
+            collection.Add(".exe");
+        }
+
+        // Whatever the caller managed to do to their copy, the launcher still refuses executables.
+        Assert.False(ExternalTargetLauncher.IsOpenableFile("installer.exe"));
+        Assert.DoesNotContain(".exe", ExternalTargetLauncher.OpenableFileExtensions);
+    }
+
+    // The set still has to be usable for what it exists for - building a picker filter.
+    [Fact]
+    public void The_exposed_extension_list_carries_the_openable_types()
+    {
+        var extensions = ExternalTargetLauncher.OpenableFileExtensions;
+
+        Assert.Contains(".pdf", extensions);
+        Assert.Contains(".json", extensions);
+        Assert.Contains(".png", extensions);
+        Assert.DoesNotContain(".exe", extensions);
+        Assert.DoesNotContain(".bat", extensions);
+    }
+
+    // IsOpenableFile decides whether a file may be ATTACHED; the private HasAllowedFileExtension
+    // decides whether it may be OPENED. They are documented as the same set, so they must not
+    // disagree about the same string - otherwise a file can be accepted at attach time and refused
+    // (or resolved differently) at open time.
+    //
+    // The forms that used to split them are the Windows ones a raw Path.GetExtension cannot see
+    // through: a trailing dot, and an alternate data stream suffix. Reading the extension from the
+    // normalized full path collapses both.
+    [Theory]
+    [InlineData("payload.exe")]
+    [InlineData("payload.exe.")]
+    [InlineData("notes.txt:evil.exe")]
+    [InlineData("script.bat")]
+    [InlineData("shortcut.lnk")]
+    [InlineData("noextension")]
+    public void An_unopenable_file_is_refused_for_attaching_too(string name)
+    {
+        Assert.False(ExternalTargetLauncher.IsOpenableFile(name));
+    }
+
+    // The ordinary documents the worklog's Files section exists to carry still pass.
+    [Theory]
+    [InlineData("manual.pdf")]
+    [InlineData("data.json")]
+    [InlineData("sheet.xlsx")]
+    [InlineData("photo.png")]
+    public void An_openable_document_is_accepted_for_attaching(string name)
+    {
+        Assert.True(ExternalTargetLauncher.IsOpenableFile(name));
     }
 }

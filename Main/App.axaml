@@ -1,4 +1,4 @@
-<Application xmlns="https://github.com/avaloniaui"
+﻿<Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="CRT.App"
              RequestedThemeVariant="Default">
@@ -95,9 +95,8 @@
 					<SolidColorBrush x:Key="Worklog_Category_Note">#2F6FB5</SolidColorBrush>
 					<SolidColorBrush x:Key="Worklog_Category_Cosmetic">#C8880E</SolidColorBrush>
 					<SolidColorBrush x:Key="Worklog_Category_Issue">IndianRed</SolidColorBrush>
-					<SolidColorBrush x:Key="Worklog_State_Fixed">#4C8C31</SolidColorBrush>
-					<SolidColorBrush x:Key="Worklog_Status_Open">Green</SolidColorBrush>
-					<SolidColorBrush x:Key="Worklog_Status_Closed">DarkGray</SolidColorBrush>
+					<SolidColorBrush x:Key="Worklog_Status_Open">IndianRed</SolidColorBrush>
+					<SolidColorBrush x:Key="Worklog_Status_Closed">#4C8C31</SolidColorBrush>
 
 					<!-- Light, Thumbnail -->
 					<SolidColorBrush x:Key="Thumbnail_Border">Black</SolidColorBrush>
@@ -213,9 +212,8 @@
 				<SolidColorBrush x:Key="Worklog_Category_Note">#2F6FB5</SolidColorBrush>
 				<SolidColorBrush x:Key="Worklog_Category_Cosmetic">#C8880E</SolidColorBrush>
 				<SolidColorBrush x:Key="Worklog_Category_Issue">IndianRed</SolidColorBrush>
-				<SolidColorBrush x:Key="Worklog_State_Fixed">#4C8C31</SolidColorBrush>
-				<SolidColorBrush x:Key="Worklog_Status_Open">Green</SolidColorBrush>
-				<SolidColorBrush x:Key="Worklog_Status_Closed">DarkGray</SolidColorBrush>
+				<SolidColorBrush x:Key="Worklog_Status_Open">IndianRed</SolidColorBrush>
+				<SolidColorBrush x:Key="Worklog_Status_Closed">#4C8C31</SolidColorBrush>
 
 				<!-- Dark, Thumbnail -->
 				<SolidColorBrush x:Key="Thumbnail_Border">LightGray</SolidColorBrush>

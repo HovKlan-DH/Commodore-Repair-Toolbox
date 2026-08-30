@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
@@ -72,17 +72,16 @@ public partial class TabSchematics
     // ###########################################################################################
     private string thisWorklogEntrySelectedCategory = WorklogCategoryNote;
 
-    private const string WorklogStatePending = "Pending";
-    private const string WorklogStateRuledOut = "RuledOut";
-    private const string WorklogStateFixed = "Fixed";
+    private const string WorklogStateOpen = "Open";
+    private const string WorklogStateClosed = "Closed";
 
     // ###########################################################################################
     // The state chosen for the entry currently being drawn/edited. Drives the selected state
-    // pill's outline/color - resets to WorklogStatePending every time a new entry card is opened.
-    // Pending reuses the "Issue" category color, Ruled out reuses "Note" - these are unrelated
-    // axes (fault category vs. resolution state) that happen to share a palette on purpose.
+    // pill's outline/color - resets to WorklogStateOpen every time a new entry card is opened.
+    // Open reuses the "Issue" category color - category and state are unrelated axes (fault kind
+    // vs. resolution state) that happen to share a palette on purpose.
     // ###########################################################################################
-    private string thisWorklogEntrySelectedState = WorklogStatePending;
+    private string thisWorklogEntrySelectedState = WorklogStateOpen;
 
     // ###########################################################################################
     // Whether the top-bar "Show worklogs" checkbox is currently checked. Mirrors the checkbox
@@ -376,7 +375,7 @@ public partial class TabSchematics
         this.WorklogEntryDescriptionTextBox.Text = string.Empty;
         this.thisWorklogEntrySelectedCategory = WorklogCategoryNote;
         this.UpdateWorklogEntryCategoryChipVisuals();
-        this.thisWorklogEntrySelectedState = WorklogStatePending;
+        this.thisWorklogEntrySelectedState = WorklogStateOpen;
         this.UpdateWorklogEntryStatePillVisuals();
         this.RefreshWorklogEntryComponentList();
 
@@ -465,19 +464,23 @@ public partial class TabSchematics
     // ###########################################################################################
     // Restyles all three category chips to reflect thisWorklogEntrySelectedCategory: the selected
     // chip gets a filled background/border in its category color with white text, the rest show
-    // their usual outline look with a category-colored dot. Also recolors the "#N" pill in the
-    // card header to match, the same way the on-board badge does.
+    // their usual neutral outline. Also recolors the "#N" pill in the card header to match, the
+    // same way the on-board badge does.
+    //
+    // Text only - the chips carry no colour dot. The selected chip is filled with its category
+    // colour, which is what identifies the category; a dot would repeat that on the selected chip
+    // and be the only colour on the unselected ones.
     // ###########################################################################################
     private void UpdateWorklogEntryCategoryChipVisuals()
     {
-        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryNoteChip, this.WorklogCategoryNoteDot, this.WorklogCategoryNoteText, WorklogCategoryNote);
-        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryCosmeticChip, this.WorklogCategoryCosmeticDot, this.WorklogCategoryCosmeticText, WorklogCategoryCosmetic);
-        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryIssueChip, this.WorklogCategoryIssueDot, this.WorklogCategoryIssueText, WorklogCategoryIssue);
+        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryNoteChip, this.WorklogCategoryNoteText, WorklogCategoryNote);
+        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryCosmeticChip, this.WorklogCategoryCosmeticText, WorklogCategoryCosmetic);
+        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryIssueChip, this.WorklogCategoryIssueText, WorklogCategoryIssue);
 
         this.WorklogEntryIdBadge.Background = new SolidColorBrush(this.GetSelectedWorklogEntryCategoryColor());
     }
 
-    private void ApplyWorklogCategoryChipVisualState(Border chip, Ellipse dot, TextBlock label, string category)
+    private void ApplyWorklogCategoryChipVisualState(Border chip, TextBlock label, string category)
     {
         var categoryBrush = this.ResolveThemeBrush($"Worklog_Category_{category}", new SolidColorBrush(Colors.IndianRed));
 
@@ -487,7 +490,6 @@ public partial class TabSchematics
             chip.BorderBrush = categoryBrush;
             chip.BorderThickness = new Thickness(2);
             chip.Opacity = 0.9;
-            dot.Fill = Brushes.White;
             label.Foreground = Brushes.White;
             label.FontWeight = FontWeight.SemiBold;
         }
@@ -497,7 +499,6 @@ public partial class TabSchematics
             chip.BorderBrush = this.ResolveThemeBrush("Form_Border", new SolidColorBrush(Color.Parse("#CCCCCC")));
             chip.BorderThickness = new Thickness(1);
             chip.Opacity = 1.0;
-            dot.Fill = categoryBrush;
             label.Foreground = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
             label.FontWeight = FontWeight.Normal;
         }
@@ -517,19 +518,22 @@ public partial class TabSchematics
     }
 
     // ###########################################################################################
-    // Restyles all three state pills to reflect thisWorklogEntrySelectedState: the selected pill
-    // gets an outline and icon/text in its state color, the rest show the usual neutral outline.
+    // Restyles both state pills to reflect thisWorklogEntrySelectedState: the selected pill
+    // gets an outline and text in its state color, the other shows the usual neutral outline.
     // Unlike the category chips, the selected pill stays outline-only (no filled background) -
     // that is the visual distinction the maintainer asked for between category and state.
+    //
+    // The dot keeps its state color in BOTH pills, exactly as the category chips' dots do - it is
+    // the state's identity, not a selection cue, so dimming it when unselected would read as a
+    // different state rather than an unselected one.
     // ###########################################################################################
     private void UpdateWorklogEntryStatePillVisuals()
     {
-        this.ApplyWorklogEntryStatePillVisualState(this.WorklogStatePendingPill, this.WorklogStatePendingIcon, this.WorklogStatePendingText, WorklogStatePending, "Worklog_Category_Issue");
-        this.ApplyWorklogEntryStatePillVisualState(this.WorklogStateRuledOutPill, this.WorklogStateRuledOutIcon, this.WorklogStateRuledOutText, WorklogStateRuledOut, "Worklog_Category_Note");
-        this.ApplyWorklogEntryStatePillVisualState(this.WorklogStateFixedPill, this.WorklogStateFixedIcon, this.WorklogStateFixedText, WorklogStateFixed, "Worklog_State_Fixed");
+        this.ApplyWorklogEntryStatePillVisualState(this.WorklogStateOpenPill, this.WorklogStateOpenText, WorklogStateOpen, "Worklog_Status_Open");
+        this.ApplyWorklogEntryStatePillVisualState(this.WorklogStateClosedPill, this.WorklogStateClosedText, WorklogStateClosed, "Worklog_Status_Closed");
     }
 
-    private void ApplyWorklogEntryStatePillVisualState(Border pill, TextBlock icon, TextBlock label, string state, string colorResourceKey)
+    private void ApplyWorklogEntryStatePillVisualState(Border pill, TextBlock label, string state, string colorResourceKey)
     {
         var stateBrush = this.ResolveThemeBrush(colorResourceKey, new SolidColorBrush(Colors.IndianRed));
 
@@ -538,7 +542,6 @@ public partial class TabSchematics
             pill.Background = this.ResolveThemeBrush("Schematics_Panels_Bg", new SolidColorBrush(Color.Parse("#F5F5F5")));
             pill.BorderBrush = stateBrush;
             pill.BorderThickness = new Thickness(2);
-            icon.Foreground = stateBrush;
             label.Foreground = stateBrush;
             label.FontWeight = FontWeight.SemiBold;
         }
@@ -547,7 +550,6 @@ public partial class TabSchematics
             pill.Background = this.ResolveThemeBrush("Form_Bg", new SolidColorBrush(Color.Parse("#F5F5F5")));
             pill.BorderBrush = this.ResolveThemeBrush("Form_Border", new SolidColorBrush(Color.Parse("#CCCCCC")));
             pill.BorderThickness = new Thickness(1);
-            icon.Foreground = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
             label.Foreground = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
             label.FontWeight = FontWeight.Normal;
         }
@@ -587,6 +589,37 @@ public partial class TabSchematics
 
         this.WorklogEntryComponentCountText.Text = $"{this.thisWorklogEntryComponentRows.Count} found";
         this.WorklogEntryNoComponentsText.IsVisible = this.thisWorklogEntryComponentRows.Count == 0;
+    }
+
+    // ###########################################################################################
+    // Builds the component scope for a SAVED entry, for the full editor's copy of the checklist.
+    //
+    // Returns null when the scope cannot be determined - no board data, or no highlight rectangles
+    // loaded for that entry's schematic. Null and empty mean different things to the caller: empty
+    // is "this area genuinely touches nothing", null is "unknown", and only the latter leaves the
+    // entry's saved ComponentLabels untouched. Returning an empty list for an unknown scope would
+    // wipe the user's selection the first time they saved.
+    // ###########################################################################################
+    private List<(string BoardLabel, string DisplayName)>? BuildWorklogEntryComponentScope(WorklogEntryRecord entry)
+    {
+        var boardData = this.MainWindow?.CurrentBoardData;
+        if (boardData == null)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(entry.SchematicName) ||
+            !this.highlightRectsBySchematicAndLabel.TryGetValue(entry.SchematicName, out var rectsByLabel))
+        {
+            return null;
+        }
+
+        var area = new Rect(entry.AreaX, entry.AreaY, entry.AreaWidth, entry.AreaHeight);
+        var touchedLabels = RectGeometry.FindKeysWithRectsIntersecting(rectsByLabel, area);
+
+        return ComponentListBuilder.BuildComponentsInScope(boardData, touchedLabels)
+            .Select(c => (c.BoardLabel, c.DisplayName))
+            .ToList();
     }
 
     // ###########################################################################################
@@ -870,36 +903,26 @@ public partial class TabSchematics
     }
 
     // ###########################################################################################
-    // Resolves a saved entry's state pill color - the same Worklog_Category_*/Worklog_State_Fixed
-    // theme resources CreateWorklogEntriesListBadge's pill and ThumbnailWorklogPillsOverlay's
-    // thumbnail pill both use, so the two always match. RuledOut deliberately reuses the "Note"
-    // category color and Pending the "Issue" category color - see CreateWorklogEntriesListBadge's
-    // history for why there is no separate Pending/RuledOut palette.
+    // Resolves a saved entry's state pill color - the same Worklog_Status_Open/
+    // Worklog_Status_Closed theme resources the worklog bar's own workbook-status pill uses, so an
+    // entry's Open/Closed and a workbook's Open/Closed always render identically. They are two
+    // different axes wearing one palette on purpose: both read "Open"/"Closed" to the user, and
+    // showing them in different colours would imply a distinction that does not exist.
+    //
+    // Anything unrecognised falls through to Open: state is a free-form string in entries.json, so
+    // a hand-edited or future value must still render rather than throw.
     // ###########################################################################################
     private Color ResolveWorklogStateColor(string state)
     {
         string stateColorResourceKey = state switch
         {
-            WorklogStateRuledOut => "Worklog_Category_Note",
-            WorklogStateFixed => "Worklog_State_Fixed",
-            _ => "Worklog_Category_Issue",
+            WorklogStateClosed => "Worklog_Status_Closed",
+            _ => "Worklog_Status_Open",
         };
 
         var brush = this.ResolveThemeBrush(stateColorResourceKey, new SolidColorBrush(Colors.IndianRed));
         return brush is ISolidColorBrush solidBrush ? solidBrush.Color : Colors.IndianRed;
     }
-
-    // ###########################################################################################
-    // Resolves a saved entry's state glyph - the same FontAwesome codepoints
-    // CreateWorklogEntriesListBadge's state pill uses, shared with the hover-label state icon in
-    // UpdateSchematicsHoverUi so the two never drift apart.
-    // ###########################################################################################
-    private static string ResolveWorklogStateIconGlyph(string state) => state switch
-    {
-        WorklogStateRuledOut => "\uf00d",
-        WorklogStateFixed => "\uf00c",
-        _ => "\uf128",
-    };
 
     // ###########################################################################################
     // Builds one "#N" badge + state pill for the "Show worklogs" list view, anchored at the top-
@@ -918,10 +941,12 @@ public partial class TabSchematics
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
         };
 
-        string stateIconGlyph = ResolveWorklogStateIconGlyph(entry.State);
-
         var stateBrush = new SolidColorBrush(this.ResolveWorklogStateColor(entry.State));
 
+        // A solid disc of the state colour inside a white ring - no glyph. It used to carry a white
+        // FontAwesome circle, which filled the interior white and left only a thin rim of the state
+        // colour showing, so the dot read as white-on-colour rather than as the state's own colour.
+        // The state is conveyed by the fill alone, exactly as the dots in the state pills are.
         var statePill = new Border
         {
             Width = 16,
@@ -930,17 +955,7 @@ public partial class TabSchematics
             Background = stateBrush,
             BorderBrush = Brushes.White,
             BorderThickness = new Thickness(1),
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-            Child = new TextBlock
-            {
-                Text = stateIconGlyph,
-                FontFamily = (FontFamily)this.FindResource("FontAwesomeSolid")!,
-                FontWeight = FontWeight.Black,
-                FontSize = 9,
-                Foreground = Brushes.White,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
-            }
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
         };
 
         var content = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 4 };
@@ -1121,6 +1136,17 @@ public partial class TabSchematics
         // change underneath it (the thumbnail load path refreshes on its own), and re-reading the
         // field afterwards would point the editor at a different workbook than the badge came from.
         editor.Initialize(workbookId, entry, this.currentFullResBitmap);
+
+        // The editor cannot work this out for itself - it has neither the board data nor the
+        // highlight rectangles - so the scope is computed here and handed over. Resolved against
+        // the entry's OWN schematic rather than whichever one is on screen: the "Show worklogs"
+        // list can put a badge for another schematic in view, and using the visible one would
+        // offer components from a different board image entirely.
+        var componentsInScope = this.BuildWorklogEntryComponentScope(entry);
+        if (componentsInScope != null)
+        {
+            editor.InitializeComponentScope(componentsInScope);
+        }
 
         await editor.ShowDialog(ownerWindow);
 

@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
@@ -659,7 +659,6 @@ public partial class TabSchematics
                 this.SchematicsHoverLabelIdText.Text = $"#{hoveredWorklogEntry.Id}";
                 this.SchematicsHoverLabelIdText.Foreground = Brushes.White;
                 this.SchematicsHoverLabelIdText.IsVisible = true;
-                this.SchematicsHoverLabelIcon.Text = ResolveWorklogStateIconGlyph(hoveredWorklogEntry.State);
                 this.SchematicsHoverLabelIconBorder.Background = new SolidColorBrush(this.ResolveWorklogStateColor(hoveredWorklogEntry.State));
                 this.SchematicsHoverLabelIconBorder.IsVisible = true;
                 this.SchematicsHoverLabelText.Text = hoveredWorklogEntry.Title;

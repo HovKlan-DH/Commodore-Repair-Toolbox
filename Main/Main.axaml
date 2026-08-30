@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -454,7 +454,27 @@
 										Spacing="5"
 										IsVisible="False"
 										VerticalAlignment="Center">
-								<Ellipse x:Name="WorklogJobStatusDot" Width="8" Height="8" VerticalAlignment="Center" />
+								<!-- The workbook's Open/Closed status uses the SAME pill as a worklog entry's
+								     own state (see TabSchematics.axaml and WorklogEntryEditorWindow.axaml):
+								     one dot-plus-label pill, 10px corner radius, coloured by the shared
+								     Worklog_Status_Open/Worklog_Status_Closed brushes. Both axes read
+								     "Open"/"Closed", so they must look the same wherever they appear -
+								     a different shape here would suggest a different kind of thing. -->
+								<Border x:Name="WorklogJobStatusPill"
+										VerticalAlignment="Center"
+										Background="{DynamicResource Form_Bg}"
+										BorderBrush="{DynamicResource Form_Border}"
+										BorderThickness="1"
+										CornerRadius="10"
+										Padding="10,1">
+									<StackPanel Orientation="Horizontal" Spacing="5">
+										<Ellipse x:Name="WorklogJobStatusDot" Width="8" Height="8" VerticalAlignment="Center" />
+										<TextBlock x:Name="WorklogJobStatusPillText"
+												   FontSize="12"
+												   Foreground="{DynamicResource Schematics_Panels_Fg}"
+												   VerticalAlignment="Center" />
+									</StackPanel>
+								</Border>
 								<TextBlock x:Name="WorklogJobStatusText"
 										   FontSize="12"
 										   Foreground="{DynamicResource Schematics_Panels_Fg}"
@@ -494,7 +514,7 @@
 									Padding="10,4"
 									Click="OnWorklogCancelEntryClick" />
 							<Button x:Name="WorklogAddEntryButton"
-									Content="Add entry"
+									Content="Add worklog"
 									IsVisible="False"
 									Foreground="{DynamicResource Button_Ok_Fg}"
 									Background="{DynamicResource Button_Ok_Bg}"

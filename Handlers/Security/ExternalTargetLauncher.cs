@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace CRT
@@ -29,6 +30,55 @@ namespace CRT
             // Domain-specific files shipped with board data (scope captures, CAD schematics)
             ".fsc", ".sch", ".kicad_pcb", ".kicad_sch"
         };
+
+        // ###########################################################################################
+        // The same set, exposed so callers that ATTACH a file can refuse an unopenable one up front
+        // rather than storing it and failing at open time - the worklog's Files section builds its
+        // picker filter and its validation from this.
+        //
+        // Deliberately derived from the launcher's own set rather than a second hand-kept list: a
+        // caller keeping its own would drift, and the drift would show up as a file that attaches
+        // happily and then cannot be opened. Extending AllowedFileExtensions extends this too.
+        //
+        // Returns a COPY. IReadOnlyCollection is only a compile-time promise - the backing HashSet
+        // implements it, so handing back the instance itself would let any caller cast it and
+        // Add(".exe"), permanently defeating the executable/script/shortcut rejection this class
+        // exists to enforce. The set is tiny and callers use it once to build a picker filter, so
+        // copying costs nothing next to leaving a security allowlist writable.
+        // ###########################################################################################
+        public static IReadOnlyCollection<string> OpenableFileExtensions => AllowedFileExtensions.ToArray();
+
+        // ###########################################################################################
+        // True when the file's extension is one the launcher will hand to the OS shell. Blank input
+        // and a name with no extension are false (fail closed), matching TryOpen's own behaviour.
+        //
+        // The extension is read from the NORMALIZED full path, exactly as HasAllowedFileExtension
+        // does for the open path. Reading it from the raw string instead lets the two disagree
+        // about the same file: Windows quirks like a trailing dot or an alternate data stream
+        // ("notes.txt:evil.exe") change what the OS finally resolves, so a file could pass the
+        // attach-time check here and be refused - or worse, resolve differently - at open time.
+        // Since the whole point of exposing this is that the two checks cannot drift, they have to
+        // examine the same string.
+        // ###########################################################################################
+        public static bool IsOpenableFile(string? pathValue)
+        {
+            string trimmed = pathValue?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                return false;
+            }
+
+            try
+            {
+                // GetFullPath resolves the trailing-dot and ADS forms the raw string hides. It
+                // throws on genuinely malformed input, which the catch below turns into a refusal.
+                return ExternalTargetLauncher.HasAllowedFileExtension(Path.GetFullPath(trimmed));
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         // ###########################################################################################
         // Opens a validated external target. Allowed URI schemes are HTTP/HTTPS/mailto, and local

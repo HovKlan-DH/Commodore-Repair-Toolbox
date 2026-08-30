@@ -1,6 +1,5 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -35,13 +34,24 @@ namespace CRT
         private Bitmap? thisSchematicBitmap;
 
         private string thisSelectedCategory = "Note";
-        private string thisSelectedState = "Pending";
+        private string thisSelectedState = "Open";
 
         private readonly ObservableCollection<WorklogLinkRow> thisLinkRows = new();
         private readonly ObservableCollection<WorklogCommentRow> thisCommentRows = new();
         private readonly ObservableCollection<WorklogWorkDoneRow> thisWorkDoneRows = new();
         private readonly ObservableCollection<WorklogAttachmentRow> thisPhotoRows = new();
         private readonly ObservableCollection<WorklogAttachmentRow> thisFileRows = new();
+
+        // "Mark components in scope". Populated only when the caller supplies the components -
+        // this window has no board data and no highlight rectangles of its own, so it cannot work
+        // out which components an area touches; see InitializeComponentScope.
+        private readonly ObservableCollection<WorklogEntryComponentRow> thisComponentRows = new();
+
+        // Whether the caller supplied a scope at all. Distinct from "the list is empty": an area
+        // that genuinely touches nothing shows "No components in this area", whereas an unknown
+        // scope hides the section and, crucially, leaves the entry's saved ComponentLabels alone
+        // rather than overwriting them with an empty list.
+        private bool thisHasComponentScope;
 
         // Newest-first is the default sort for both lists - persisted globally via UserSettings so it
         // carries over between entries and app restarts, rather than resetting every time this window
@@ -68,8 +78,15 @@ namespace CRT
             this.EditorWorkDoneList.ItemsSource = this.thisWorkDoneRows;
             this.EditorPhotosList.ItemsSource = this.thisPhotoRows;
             this.EditorFilesList.ItemsSource = this.thisFileRows;
+            this.EditorComponentList.ItemsSource = this.thisComponentRows;
 
-            this.SizeChanged += (_, _) => this.RefreshLocationPreviewOverlay();
+            // The marker's position is computed from EditorLocationPreviewGrid's OWN size, so the
+            // redraw has to be driven by that grid rather than by the window. Dragging the
+            // GridSplitter re-widths the preview column while the window's size never changes, so
+            // a window-level SizeChanged does not fire and the marker kept coordinates computed
+            // for the previous width - it drifted away from the area it is meant to mark, and only
+            // snapped back when the window itself was resized.
+            this.EditorLocationPreviewGrid.SizeChanged += (_, _) => this.RefreshLocationPreviewOverlay();
 
             this.AddHandler(KeyDownEvent, this.OnWindowPreviewKeyDown, RoutingStrategies.Tunnel);
 
@@ -81,10 +98,21 @@ namespace CRT
             this.EditorPhotosList.AddHandler(PointerMovedEvent, this.OnPhotoRowDragHandlePointerMoved, RoutingStrategies.Tunnel);
             this.EditorPhotosList.AddHandler(PointerReleasedEvent, this.OnPhotoRowDragHandlePointerReleased, RoutingStrategies.Tunnel);
 
+            // The Files list drags through the same handlers - which list is being reordered comes
+            // from the DragContext captured on press, not from which control raised the event.
+            this.EditorFilesList.AddHandler(PointerMovedEvent, this.OnPhotoRowDragHandlePointerMoved, RoutingStrategies.Tunnel);
+            this.EditorFilesList.AddHandler(PointerReleasedEvent, this.OnPhotoRowDragHandlePointerReleased, RoutingStrategies.Tunnel);
+
             // A release outside the list (dragged past the window edge, say) never reaches the
-            // handler above, which would strand the placeholder as a permanent empty slot. The
+            // handlers above, which would strand the placeholder as a permanent empty slot. The
             // window-level handler commits the drop at wherever the placeholder currently sits.
-            this.AddHandler(PointerReleasedEvent, this.OnPhotoRowDragHandlePointerReleased, RoutingStrategies.Tunnel);
+            //
+            // BUBBLE, not Tunnel. The window is the root, so on the tunnelling route it would fire
+            // BEFORE the lists and commit every in-list drop itself - making the lists' own handlers
+            // dead code and this "fallback" the actual primary path. Bubbling runs it last, so it
+            // only ever sees a release the lists did not already handle, which is what the comment
+            // above describes and what the release handler's early-return assumes.
+            this.AddHandler(PointerReleasedEvent, this.OnPhotoRowDragHandlePointerReleased, RoutingStrategies.Bubble);
 
             // The thumbnails this window decoded hold unmanaged surfaces; without this the last set
             // survives the window itself. thisSchematicBitmap belongs to the caller and is not
@@ -95,6 +123,19 @@ namespace CRT
                 {
                     row.Thumbnail?.Dispose();
                 }
+
+                // Teardown matches construction. A gesture still in flight when the window closes
+                // (released outside it, so no release handler ever ran) leaves thisActiveDragContext
+                // holding the entry's live lists and two bound delegates; clearing the collections
+                // and the drag state drops those references with the window instead of after it.
+                this.ResetPhotoDragState();
+
+                this.thisPhotoRows.Clear();
+                this.thisFileRows.Clear();
+                this.thisLinkRows.Clear();
+                this.thisCommentRows.Clear();
+                this.thisWorkDoneRows.Clear();
+                this.thisComponentRows.Clear();
             };
         }
 
@@ -155,7 +196,7 @@ namespace CRT
             this.EditorLocationSchematicNameText.Text = this.thisEntry.SchematicName;
 
             this.thisSelectedCategory = string.IsNullOrWhiteSpace(this.thisEntry.Category) ? "Note" : this.thisEntry.Category;
-            this.thisSelectedState = string.IsNullOrWhiteSpace(this.thisEntry.State) ? "Pending" : this.thisEntry.State;
+            this.thisSelectedState = string.IsNullOrWhiteSpace(this.thisEntry.State) ? "Open" : this.thisEntry.State;
             this.UpdateCategoryChipVisuals();
             this.UpdateStatePillVisuals();
 
@@ -209,6 +250,126 @@ namespace CRT
             this.thisEntry.Description = this.EditorDescriptionTextBox.Text?.Trim() ?? string.Empty;
             this.thisEntry.Category = this.thisSelectedCategory;
             this.thisEntry.State = this.thisSelectedState;
+
+            // Only when a scope was actually supplied. If the caller could not determine it, the
+            // checklist was never shown and the rows are empty - writing that back would silently
+            // clear a component list the user never saw, let alone chose to empty.
+            //
+            // Labels the checklist never offered are CARRIED OVER rather than dropped. The rows
+            // come from the highlight rectangles as they are right now, so a label saved earlier
+            // whose component has since been renamed or removed from the board data has no row to
+            // tick - and this method runs on every instant-save (adding a photo, deleting a file,
+            // any drag reorder), not just on Save. Without this the user would lose that label the
+            // moment they touched anything unrelated, with no Save click and nothing to notice.
+            if (this.thisHasComponentScope)
+            {
+                var offered = new HashSet<string>(
+                    this.thisComponentRows.Select(r => r.BoardLabel),
+                    StringComparer.OrdinalIgnoreCase);
+
+                var keptFromBeforeOpening = (this.thisEntry.ComponentLabels ?? new List<string>())
+                    .Where(label => !offered.Contains(label))
+                    .ToList();
+
+                this.thisEntry.ComponentLabels = this.thisComponentRows
+                    .Where(r => r.IsChecked)
+                    .Select(r => r.BoardLabel)
+                    .Concat(keptFromBeforeOpening)
+                    .ToList();
+            }
+        }
+
+        // ###########################################################################################
+        // Supplies the "Mark components in scope" checklist. Called by the opener straight after
+        // Initialize, because working out which components an entry's area touches needs the board
+        // data and the per-schematic highlight rectangles - both of which live in TabSchematics,
+        // not here. This window just renders what it is given and reports back the ticked rows.
+        //
+        // Each row starts ticked if its label is already in the entry's saved ComponentLabels, so
+        // reopening an entry shows the choice the user made last time rather than re-ticking
+        // everything. That is the one behavioural difference from the quick "New fault" card,
+        // where every row starts ticked because the entry has no saved selection yet.
+        // ###########################################################################################
+        public void InitializeComponentScope(IReadOnlyList<(string BoardLabel, string DisplayName)> componentsInScope)
+        {
+            // Populating the checklist is not an edit. The flag is re-raised because Initialize has
+            // already cleared it by the time this runs, and building the rows drives the CheckBox
+            // bindings - without this the window opened with Save already enabled, making every
+            // entry look modified before the user had touched anything.
+            this.thisIsInitializing = true;
+
+            try
+            {
+                this.PopulateComponentScope(componentsInScope);
+            }
+            finally
+            {
+                this.thisIsInitializing = false;
+            }
+
+            // Set last and outside the guard: Save must be disabled on open regardless of what the
+            // binding traffic above did.
+            this.EditorSaveButton.IsEnabled = false;
+        }
+
+        private void PopulateComponentScope(IReadOnlyList<(string BoardLabel, string DisplayName)> componentsInScope)
+        {
+            this.thisHasComponentScope = true;
+            this.thisComponentRows.Clear();
+
+            var alreadySelected = new HashSet<string>(
+                this.thisEntry.ComponentLabels ?? new List<string>(),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var component in componentsInScope)
+            {
+                this.thisComponentRows.Add(new WorklogEntryComponentRow
+                {
+                    BoardLabel = component.BoardLabel,
+                    DisplayName = component.DisplayName,
+                    IsChecked = alreadySelected.Contains(component.BoardLabel)
+                });
+            }
+
+            this.EditorComponentScopePanel.IsVisible = true;
+            this.EditorComponentCountText.Text = $"{this.thisComponentRows.Count} found";
+            this.EditorNoComponentsText.IsVisible = this.thisComponentRows.Count == 0;
+        }
+
+        // ###########################################################################################
+        // "All" / "None" bulk links, and whole-row click-to-toggle - the same interactions the quick
+        // card's checklist offers. Each marks the window dirty so the Save button enables, since
+        // changing the scope is a real edit to the entry.
+        // ###########################################################################################
+        private void OnEditorSelectAllComponentsClick(object? sender, RoutedEventArgs e)
+        {
+            foreach (var row in this.thisComponentRows)
+            {
+                row.IsChecked = true;
+            }
+
+            this.MarkDirty();
+        }
+
+        private void OnEditorSelectNoneComponentsClick(object? sender, RoutedEventArgs e)
+        {
+            foreach (var row in this.thisComponentRows)
+            {
+                row.IsChecked = false;
+            }
+
+            this.MarkDirty();
+        }
+
+        // The checkbox and both labels are IsHitTestVisible="False", so this Border handler is the
+        // only thing that sees the click - which is what makes the whole row a hit target.
+        private void OnEditorComponentRowPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (sender is Control control && control.DataContext is WorklogEntryComponentRow row)
+            {
+                row.IsChecked = !row.IsChecked;
+                this.MarkDirty();
+            }
         }
 
         // ###########################################################################################
@@ -295,7 +456,7 @@ namespace CRT
         // ###########################################################################################
         // Resolves a theme brush by key, falling back when the resource cannot be found - same idiom
         // TabSchematics.ResolveThemeBrush uses, including its Application.Current fallback: this
-        // window's ThemeVariant-keyed resources (Worklog_Category_*, Worklog_State_Fixed, etc.) live
+        // window's ThemeVariant-keyed resources (Worklog_Category_*, Worklog_Status_Closed, etc.) live
         // in App.axaml's ResourceDictionary.ThemeDictionaries, and plain TryFindResource does not
         // always resolve a themed key by itself - without this second lookup every category chip and
         // state pill silently fell back to the caller's fallback color instead of its real one.
@@ -375,14 +536,16 @@ namespace CRT
 
         private void UpdateCategoryChipVisuals()
         {
-            this.ApplyCategoryChipVisualState(this.EditorCategoryNoteChip, this.EditorCategoryNoteDot, this.EditorCategoryNoteText, "Note");
-            this.ApplyCategoryChipVisualState(this.EditorCategoryCosmeticChip, this.EditorCategoryCosmeticDot, this.EditorCategoryCosmeticText, "Cosmetic");
-            this.ApplyCategoryChipVisualState(this.EditorCategoryIssueChip, this.EditorCategoryIssueDot, this.EditorCategoryIssueText, "Issue");
+            this.ApplyCategoryChipVisualState(this.EditorCategoryNoteChip, this.EditorCategoryNoteText, "Note");
+            this.ApplyCategoryChipVisualState(this.EditorCategoryCosmeticChip, this.EditorCategoryCosmeticText, "Cosmetic");
+            this.ApplyCategoryChipVisualState(this.EditorCategoryIssueChip, this.EditorCategoryIssueText, "Issue");
 
             this.EditorIdBadge.Background = new SolidColorBrush(this.ResolveCategoryColor(this.thisSelectedCategory));
         }
 
-        private void ApplyCategoryChipVisualState(Border chip, Ellipse dot, TextBlock label, string category)
+        // Text only - see UpdateWorklogEntryCategoryChipVisuals in TabSchematics.Worklog.cs for why
+        // the chips carry no colour dot.
+        private void ApplyCategoryChipVisualState(Border chip, TextBlock label, string category)
         {
             var categoryBrush = this.ResolveThemeBrush($"Worklog_Category_{category}", new SolidColorBrush(Colors.IndianRed));
 
@@ -392,7 +555,6 @@ namespace CRT
                 chip.BorderBrush = categoryBrush;
                 chip.BorderThickness = new Thickness(2);
                 chip.Opacity = 0.9;
-                dot.Fill = Brushes.White;
                 label.Foreground = Brushes.White;
                 label.FontWeight = FontWeight.SemiBold;
             }
@@ -402,7 +564,6 @@ namespace CRT
                 chip.BorderBrush = this.ResolveThemeBrush("Form_Border", new SolidColorBrush(Color.Parse("#CCCCCC")));
                 chip.BorderThickness = new Thickness(1);
                 chip.Opacity = 1.0;
-                dot.Fill = categoryBrush;
                 label.Foreground = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
                 label.FontWeight = FontWeight.Normal;
             }
@@ -420,12 +581,14 @@ namespace CRT
 
         private void UpdateStatePillVisuals()
         {
-            this.ApplyStatePillVisualState(this.EditorStatePendingPill, this.EditorStatePendingIcon, this.EditorStatePendingText, "Pending", "Worklog_Category_Issue");
-            this.ApplyStatePillVisualState(this.EditorStateRuledOutPill, this.EditorStateRuledOutIcon, this.EditorStateRuledOutText, "RuledOut", "Worklog_Category_Note");
-            this.ApplyStatePillVisualState(this.EditorStateFixedPill, this.EditorStateFixedIcon, this.EditorStateFixedText, "Fixed", "Worklog_State_Fixed");
+            this.ApplyStatePillVisualState(this.EditorStateOpenPill, this.EditorStateOpenText, "Open", "Worklog_Status_Open");
+            this.ApplyStatePillVisualState(this.EditorStateClosedPill, this.EditorStateClosedText, "Closed", "Worklog_Status_Closed");
         }
 
-        private void ApplyStatePillVisualState(Border pill, TextBlock icon, TextBlock label, string state, string colorResourceKey)
+        // The dot is left at its state colour in both pills (it is the state's identity, not a
+        // selection cue) - only the outline and label weight mark which one is selected, matching
+        // the category chips directly above.
+        private void ApplyStatePillVisualState(Border pill, TextBlock label, string state, string colorResourceKey)
         {
             var stateBrush = this.ResolveThemeBrush(colorResourceKey, new SolidColorBrush(Colors.IndianRed));
 
@@ -434,7 +597,6 @@ namespace CRT
                 pill.Background = this.ResolveThemeBrush("Schematics_Panels_Bg", new SolidColorBrush(Color.Parse("#F5F5F5")));
                 pill.BorderBrush = stateBrush;
                 pill.BorderThickness = new Thickness(2);
-                icon.Foreground = stateBrush;
                 label.Foreground = stateBrush;
                 label.FontWeight = FontWeight.SemiBold;
             }
@@ -443,7 +605,6 @@ namespace CRT
                 pill.Background = this.ResolveThemeBrush("Form_Bg", new SolidColorBrush(Color.Parse("#F5F5F5")));
                 pill.BorderBrush = this.ResolveThemeBrush("Form_Border", new SolidColorBrush(Color.Parse("#CCCCCC")));
                 pill.BorderThickness = new Thickness(1);
-                icon.Foreground = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
                 label.Foreground = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
                 label.FontWeight = FontWeight.Normal;
             }
@@ -747,6 +908,7 @@ namespace CRT
                 {
                     Id = photo.Id,
                     FileName = photo.FileName,
+                    DisplayFileName = WorklogAttachmentStorage.GetDisplayFileName(photo.FileName, WorklogAttachmentStorage.PhotoFilePrefix, photo.Id),
                     Comment = photo.Comment,
                     Thumbnail = this.TryLoadPhotoThumbnail(photo.FileName)
                 });
@@ -840,8 +1002,13 @@ namespace CRT
                 return;
             }
 
-            // The id is settled before the name, because the stored name is built from it.
-            int nextId = this.thisEntry.Photos.Count == 0 ? 1 : this.thisEntry.Photos.Max(p => p.Id) + 1;
+            // The id is settled before the name, because the stored name is built from it. It also
+            // skips any id whose file is already in the folder - see AllocateAttachmentId for why
+            // plain Max(Id) + 1 can silently overwrite an orphaned attachment.
+            int nextId = WorklogAttachmentStorage.AllocateAttachmentId(
+                this.thisEntry.Photos,
+                WorklogAttachmentStorage.PhotoFilePrefix,
+                WorklogAttachmentStorage.ListAttachmentFileNames(attachmentsFolder));
 
             // Ordering is 0-based to match ReorderAttachment, which renumbers densely from 0. When
             // this started at 1, the first photo added after any drag-reorder took the same
@@ -890,6 +1057,12 @@ namespace CRT
                 return;
             }
 
+            // Left button only, so a right-click does not open the viewer.
+            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
             var photo = this.thisEntry.Photos.FirstOrDefault(p => p.Id == id);
             if (photo == null)
             {
@@ -899,8 +1072,12 @@ namespace CRT
             // Stops the click also reaching the row, which would open the editor behind the viewer.
             e.Handled = true;
 
+            // The display name, not the stored one - the user never chose the "photo3_" prefix.
             var viewer = new WorklogPhotoViewerWindow();
-            viewer.Initialize(photo.FileName, photo.Comment, this.ResolveAttachmentPath(photo.FileName));
+            viewer.Initialize(
+                WorklogAttachmentStorage.GetDisplayFileName(photo.FileName, WorklogAttachmentStorage.PhotoFilePrefix, photo.Id),
+                photo.Comment,
+                this.ResolveAttachmentPath(photo.FileName));
             viewer.ShowDialog(this);
         }
 
@@ -939,7 +1116,10 @@ namespace CRT
             }
 
             var dialog = new WorklogAddPhotoWindow();
-            dialog.InitializeForEdit(photo.FileName, photo.Comment, this.ResolveAttachmentPath(photo.FileName));
+            dialog.InitializeForEdit(
+                WorklogAttachmentStorage.GetDisplayFileName(photo.FileName, WorklogAttachmentStorage.PhotoFilePrefix, photo.Id),
+                photo.Comment,
+                this.ResolveAttachmentPath(photo.FileName));
 
             var result = await dialog.ShowDialog<WorklogAddPhotoWindow.PhotoResult?>(this);
             if (result == null)
@@ -986,19 +1166,13 @@ namespace CRT
             {
                 // Copies the new file in and removes the one it replaces, leaving exactly one file
                 // behind whether or not the stored name changed - see TryReplaceAttachmentFile.
-                if (!WorklogAttachmentStorage.TryReplaceAttachmentFile(
-                        result.SourcePath!,
-                        attachmentsFolder,
-                        previousFileName,
-                        newStoredFileName,
-                        out _))
-                {
-                    // The record already names the new file, so put it back and re-save rather than
-                    // leaving entries.json pointing at bytes that were never written.
-                    photo.FileName = previousFileName;
-                    this.ShowSaveFailed("The photo could not be copied into the worklog.");
-                    this.PersistEntrySilently();
-                }
+                this.RollBackAttachmentFileNameIfSwapFailed(
+                    photo,
+                    previousFileName,
+                    newStoredFileName,
+                    result.SourcePath!,
+                    attachmentsFolder,
+                    "The photo could not be copied into the worklog.");
             }
 
             this.RefreshPhotoRows();
@@ -1039,17 +1213,47 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Drag-to-reorder for photo rows, replacing the old up/down buttons.
+        // Drag-to-reorder for the Photos and Files rows, replacing up/down buttons in both.
         //
-        // Only the row's empty space starts a drag: the thumbnail and the two icon buttons handle
-        // their own pointer events and mark them handled, so pressing those never begins a drag.
-        // That is also why the row shows the north/south cursor only over that empty space - the
-        // cursor is set on the panel that carries the drag, not on the whole row.
+        // Only the row's empty space starts a drag: the thumbnail, the file link and the icon
+        // buttons handle their own pointer events and mark them handled, so pressing those never
+        // begins a drag. That is also why the row shows the north/south cursor only over that empty
+        // space - the cursor is set on the panel that carries the drag, not on the whole row.
         //
         // A press alone does not start the drag; it only arms it. The drag begins once the pointer
         // has actually moved a few pixels, so a plain click on a row cannot reorder anything by
         // accident.
+        //
+        // One implementation serves both lists, parameterised by the DragContext below. The logic
+        // here is subtle in three places (the frozen boundary snapshot, the re-entrancy guard, the
+        // placeholder-index-as-target rule), and a second copy would be a second place for those to
+        // be got wrong.
         // ###########################################################################################
+        // Records is a lookup, not a captured list: see CreatePhotoDragContext for why holding the
+        // list itself across a gesture can go stale.
+        private sealed record DragContext(
+            ItemsControl List,
+            ObservableCollection<WorklogAttachmentRow> Rows,
+            Func<List<WorklogAttachmentRecord>> Records,
+            Action Refresh);
+
+        // Built once per gesture rather than on every press.
+        //
+        // These were properties allocating a fresh record plus a bound delegate on every pointer
+        // press, including presses that immediately bailed. More importantly, Records held a direct
+        // reference to thisEntry's list captured at press time, and the context survives the whole
+        // gesture - so anything replacing the thisEntry record mid-drag (rather than mutating its
+        // lists in place) left the release handler reordering a detached list and persisting
+        // nothing the user could see. Reading the list through thisEntry at use time cannot go
+        // stale that way.
+        private DragContext CreatePhotoDragContext() => new(
+            this.EditorPhotosList, this.thisPhotoRows, () => this.thisEntry.Photos, this.RefreshPhotoRows);
+
+        private DragContext CreateFileDragContext() => new(
+            this.EditorFilesList, this.thisFileRows, () => this.thisEntry.Files, this.RefreshFileRows);
+
+        private DragContext? thisActiveDragContext;
+
         private int thisDraggedPhotoId = -1;
 
         private Point thisPhotoDragStartPoint;
@@ -1061,6 +1265,16 @@ namespace CRT
 
         private void OnPhotoRowDragHandlePointerPressed(object? sender, PointerPressedEventArgs e)
         {
+            this.BeginRowDrag(sender, e, this.CreatePhotoDragContext());
+        }
+
+        private void OnFileRowDragHandlePointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            this.BeginRowDrag(sender, e, this.CreateFileDragContext());
+        }
+
+        private void BeginRowDrag(object? sender, PointerPressedEventArgs e, DragContext context)
+        {
             if (sender is not Control { Tag: int id })
             {
                 return;
@@ -1071,17 +1285,20 @@ namespace CRT
                 return;
             }
 
+            this.thisActiveDragContext = context;
             this.thisDraggedPhotoId = id;
-            this.thisPhotoDragStartPoint = e.GetPosition(this.EditorPhotosList);
+            this.thisPhotoDragStartPoint = e.GetPosition(context.List);
             this.thisIsDraggingPhoto = false;
         }
 
         private void OnPhotoRowDragHandlePointerMoved(object? sender, PointerEventArgs e)
         {
-            if (this.thisDraggedPhotoId < 0)
+            if (this.thisDraggedPhotoId < 0 || this.thisActiveDragContext == null)
             {
                 return;
             }
+
+            var context = this.thisActiveDragContext;
 
             if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             {
@@ -1091,7 +1308,7 @@ namespace CRT
                 return;
             }
 
-            var current = e.GetPosition(this.EditorPhotosList);
+            var current = e.GetPosition(context.List);
 
             if (!this.thisIsDraggingPhoto &&
                 Math.Abs(current.Y - this.thisPhotoDragStartPoint.Y) < PhotoDragThreshold &&
@@ -1102,7 +1319,16 @@ namespace CRT
 
             if (!this.thisIsDraggingPhoto)
             {
-                this.BeginPhotoDragPlaceholder();
+                // Only a placeholder that was actually established starts the drag. If the row has
+                // gone (a refresh landed between press and first move), the boundaries are empty
+                // and every later step is a no-op that still LOOKS like a drag: no visual feedback
+                // while dragging, and on release a full Refresh that re-decodes every thumbnail
+                // from disk for a gesture that changed nothing. Better to end it here.
+                if (!this.BeginPhotoDragPlaceholder())
+                {
+                    this.ResetPhotoDragState();
+                    return;
+                }
             }
 
             this.thisIsDraggingPhoto = true;
@@ -1125,7 +1351,7 @@ namespace CRT
             this.thisIsApplyingPhotoPlaceholderMove = true;
             try
             {
-                this.MovePhotoPlaceholderTo(this.ResolvePhotoDropIndex(current));
+                this.MovePhotoPlaceholderTo(context, this.ResolvePhotoDropIndex(context, current));
             }
             finally
             {
@@ -1137,29 +1363,30 @@ namespace CRT
 
         private void OnPhotoRowDragHandlePointerReleased(object? sender, PointerReleasedEventArgs e)
         {
-            if (this.thisDraggedPhotoId < 0 || !this.thisIsDraggingPhoto)
+            if (this.thisDraggedPhotoId < 0 || !this.thisIsDraggingPhoto || this.thisActiveDragContext == null)
             {
                 this.ResetPhotoDragState();
                 return;
             }
 
+            var context = this.thisActiveDragContext;
             int draggedId = this.thisDraggedPhotoId;
 
             // The placeholder is already sitting at the drop position, so its index in the row list
             // IS the target - no need to re-measure against the pointer, which would disagree with
             // what the user was just shown if the pointer sat between two rows.
-            int targetIndex = this.IndexOfPhotoRow(draggedId);
+            int targetIndex = this.IndexOfPhotoRow(context, draggedId);
 
             this.ResetPhotoDragState();
 
             if (targetIndex < 0)
             {
-                this.RefreshPhotoRows();
+                context.Refresh();
                 return;
             }
 
-            WorklogAttachmentStorage.ReorderAttachment(this.thisEntry.Photos, draggedId, targetIndex);
-            this.RefreshPhotoRows();
+            WorklogAttachmentStorage.ReorderAttachment(context.Records(), draggedId, targetIndex);
+            context.Refresh();
             this.PersistEntrySilently();
         }
 
@@ -1167,25 +1394,40 @@ namespace CRT
         // Turns the dragged row into the placeholder, sized to the height it currently occupies so
         // the gap does not jump when its content is swapped for the empty outline.
         // ###########################################################################################
-        private void BeginPhotoDragPlaceholder()
+        // Returns false when no placeholder could be established, so the caller can abandon the
+        // gesture instead of running a drag with no boundaries and no visible row.
+        private bool BeginPhotoDragPlaceholder()
         {
-            int index = this.IndexOfPhotoRow(this.thisDraggedPhotoId);
-            if (index < 0)
+            var context = this.thisActiveDragContext;
+            if (context == null)
             {
-                return;
+                return false;
             }
 
-            var row = this.thisPhotoRows[index];
+            // Cleared up front so an early return below cannot leave the PREVIOUS drag's boundaries
+            // in place - ResolvePhotoDropIndex would then measure this drag against the other list's
+            // geometry, and with photo rows several times taller than file rows the drop lands at a
+            // wildly wrong index and is persisted immediately.
+            this.thisPhotoRowDragBoundaries.Clear();
 
-            var container = this.EditorPhotosList.ContainerFromIndex(index);
+            int index = this.IndexOfPhotoRow(context, this.thisDraggedPhotoId);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            var row = context.Rows[index];
+
+            var container = context.List.ContainerFromIndex(index);
             if (container != null && container.Bounds.Height > 0)
             {
                 row.PlaceholderHeight = container.Bounds.Height;
             }
 
-            this.CapturePhotoRowBoundaries();
+            this.CapturePhotoRowBoundaries(context);
 
             row.IsDropPlaceholder = true;
+            return true;
         }
 
         // ###########################################################################################
@@ -1204,7 +1446,7 @@ namespace CRT
         // ###########################################################################################
         private readonly List<double> thisPhotoRowDragBoundaries = new();
 
-        private void CapturePhotoRowBoundaries()
+        private void CapturePhotoRowBoundaries(DragContext context)
         {
             this.thisPhotoRowDragBoundaries.Clear();
 
@@ -1212,17 +1454,17 @@ namespace CRT
             // container is not realized would shorten the list and shift every later boundary's
             // meaning by one, so an unmeasurable row gets an interpolated midpoint instead and the
             // two lists stay aligned. ResolvePhotoDropIndex relies on that 1:1 correspondence to
-            // return an index into thisPhotoRows.
+            // return an index into the row collection.
             double runningY = 0;
 
-            for (int i = 0; i < this.thisPhotoRows.Count; i++)
+            for (int i = 0; i < context.Rows.Count; i++)
             {
-                var container = this.EditorPhotosList.ContainerFromIndex(i);
-                Point? topLeft = container?.TranslatePoint(new Point(0, 0), this.EditorPhotosList);
+                var container = context.List.ContainerFromIndex(i);
+                Point? topLeft = container?.TranslatePoint(new Point(0, 0), context.List);
 
                 double height = container != null && container.Bounds.Height > 0
                     ? container.Bounds.Height
-                    : this.thisPhotoRows[i].PlaceholderHeight;
+                    : context.Rows[i].PlaceholderHeight;
 
                 double top = topLeft?.Y ?? runningY;
 
@@ -1239,33 +1481,33 @@ namespace CRT
         // already there - a Move on every pointer frame would rebuild containers continuously and
         // make the list flicker.
         // ###########################################################################################
-        private void MovePhotoPlaceholderTo(int targetIndex)
+        private void MovePhotoPlaceholderTo(DragContext context, int targetIndex)
         {
             if (targetIndex < 0)
             {
                 return;
             }
 
-            int currentIndex = this.IndexOfPhotoRow(this.thisDraggedPhotoId);
+            int currentIndex = this.IndexOfPhotoRow(context, this.thisDraggedPhotoId);
             if (currentIndex < 0)
             {
                 return;
             }
 
-            targetIndex = Math.Clamp(targetIndex, 0, this.thisPhotoRows.Count - 1);
+            targetIndex = Math.Clamp(targetIndex, 0, context.Rows.Count - 1);
             if (targetIndex == currentIndex)
             {
                 return;
             }
 
-            this.thisPhotoRows.Move(currentIndex, targetIndex);
+            context.Rows.Move(currentIndex, targetIndex);
         }
 
-        private int IndexOfPhotoRow(int id)
+        private int IndexOfPhotoRow(DragContext context, int id)
         {
-            for (int i = 0; i < this.thisPhotoRows.Count; i++)
+            for (int i = 0; i < context.Rows.Count; i++)
             {
-                if (this.thisPhotoRows[i].Id == id)
+                if (context.Rows[i].Id == id)
                 {
                     return i;
                 }
@@ -1281,7 +1523,14 @@ namespace CRT
         // ###########################################################################################
         private void ResetPhotoDragState()
         {
+            // Both lists are cleared, not just the active one: the flag must never survive a drag,
+            // and an interrupted gesture can leave the context null while a row still carries it.
             foreach (var row in this.thisPhotoRows)
+            {
+                row.IsDropPlaceholder = false;
+            }
+
+            foreach (var row in this.thisFileRows)
             {
                 row.IsDropPlaceholder = false;
             }
@@ -1289,6 +1538,7 @@ namespace CRT
             // Cleared so the next drag cannot resolve against the previous drag's layout.
             this.thisPhotoRowDragBoundaries.Clear();
 
+            this.thisActiveDragContext = null;
             this.thisDraggedPhotoId = -1;
             this.thisIsDraggingPhoto = false;
         }
@@ -1300,9 +1550,9 @@ namespace CRT
         // Above the first boundary gives 0 and past the last gives the final index, so a drag flung
         // past either end lands at that end instead of being discarded.
         // ###########################################################################################
-        private int ResolvePhotoDropIndex(Point pointerInList)
+        private int ResolvePhotoDropIndex(DragContext context, Point pointerInList)
         {
-            if (this.thisPhotoRows.Count == 0 || this.thisPhotoRowDragBoundaries.Count == 0)
+            if (context.Rows.Count == 0 || this.thisPhotoRowDragBoundaries.Count == 0)
             {
                 return -1;
             }
@@ -1321,59 +1571,324 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Files - same "Add is a no-op, delete/reorder work" shape as Photos above.
+        // Files - the same storage shape as Photos (bytes in the entry's "entry-<id>-files" folder,
+        // metadata in entries.json), differing in what is accepted and how a row is presented:
+        //
+        //  - accepted types come from ExternalTargetLauncher's openable set rather than the narrower
+        //    drawable-image one, so a PDF or CSV is fine and an executable/script/shortcut is not;
+        //  - nothing is rendered for the file, just its name as a link, since there is no useful
+        //    preview for a document;
+        //  - clicking the link opens it through ExternalTargetLauncher, scoped to the attachments
+        //    folder, so the same containment and extension rules apply as anywhere else in the app.
         // ###########################################################################################
         private void RefreshFileRows()
         {
             this.thisFileRows.Clear();
             foreach (var file in this.thisEntry.Files.OrderBy(f => f.DisplayOrder))
             {
-                this.thisFileRows.Add(new WorklogAttachmentRow { Id = file.Id, FileName = file.FileName, Comment = file.Comment });
+                this.thisFileRows.Add(new WorklogAttachmentRow
+                {
+                    Id = file.Id,
+                    FileName = file.FileName,
+                    DisplayFileName = WorklogAttachmentStorage.GetDisplayFileName(file.FileName, WorklogAttachmentStorage.FileFilePrefix, file.Id),
+                    Comment = file.Comment
+                });
             }
             this.EditorNoFilesText.IsVisible = this.thisFileRows.Count == 0;
         }
 
-        private void OnAddFileClick(object? sender, RoutedEventArgs e)
+        private async void OnAddFileClick(object? sender, RoutedEventArgs e)
         {
-            // Not implemented yet - uploading real files is a follow-up piece of work.
+            // See OnAddPhotoClick for why the body is wrapped.
+            try
+            {
+                await this.AddFileAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to add worklog file: {ex.Message}");
+                this.ShowSaveFailed("The file could not be added - see the log for details.");
+            }
         }
 
+        private async Task AddFileAsync()
+        {
+            var dialog = new WorklogAddPhotoWindow();
+            dialog.InitializeForFileKind();
+
+            var result = await dialog.ShowDialog<WorklogAddPhotoWindow.PhotoResult?>(this);
+            if (result == null || string.IsNullOrWhiteSpace(result.SourcePath))
+            {
+                return;
+            }
+
+            string? attachmentsFolder = WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id);
+            if (attachmentsFolder == null)
+            {
+                this.ShowSaveFailed("Could not resolve where to store the file.");
+                return;
+            }
+
+            // See AddPhotoAsync - the same id/orphan reasoning applies to files.
+            int nextId = WorklogAttachmentStorage.AllocateAttachmentId(
+                this.thisEntry.Files,
+                WorklogAttachmentStorage.FileFilePrefix,
+                WorklogAttachmentStorage.ListAttachmentFileNames(attachmentsFolder));
+            int nextOrder = this.thisEntry.Files.Count == 0 ? 0 : this.thisEntry.Files.Max(f => f.DisplayOrder) + 1;
+
+            string storedFileName = WorklogAttachmentStorage.BuildStoredFileName(
+                result.SourcePath, WorklogAttachmentStorage.FileFilePrefix, nextId);
+
+            if (!WorklogAttachmentStorage.CopyAttachmentIntoFolder(result.SourcePath, attachmentsFolder, storedFileName))
+            {
+                this.ShowSaveFailed("The file could not be copied into the worklog.");
+                return;
+            }
+
+            this.thisEntry.Files.Add(new WorklogAttachmentRecord
+            {
+                Id = nextId,
+                FileName = storedFileName,
+                Comment = result.Comment,
+                DisplayOrder = nextOrder
+            });
+
+            this.RefreshFileRows();
+
+            // Undo the copy when the save fails, so the folder never holds bytes that entries.json
+            // does not mention - same reasoning as the photo add path.
+            if (!this.PersistEntrySilently())
+            {
+                this.thisEntry.Files.RemoveAll(f => f.Id == nextId);
+                WorklogAttachmentStorage.DeleteAttachmentFile(attachmentsFolder, storedFileName);
+                this.RefreshFileRows();
+            }
+        }
+
+        private async void OnEditFileClick(object? sender, RoutedEventArgs e)
+        {
+            // See OnAddPhotoClick for why the body is wrapped.
+            try
+            {
+                await this.EditFileAsync(sender);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to edit worklog file: {ex.Message}");
+                this.ShowSaveFailed("The file could not be updated - see the log for details.");
+            }
+        }
+
+        private async Task EditFileAsync(object? sender)
+        {
+            if (sender is not Button { Tag: int id })
+            {
+                return;
+            }
+
+            var file = this.thisEntry.Files.FirstOrDefault(f => f.Id == id);
+            if (file == null)
+            {
+                return;
+            }
+
+            var dialog = new WorklogAddPhotoWindow();
+            dialog.InitializeForEdit(
+                WorklogAttachmentStorage.GetDisplayFileName(file.FileName, WorklogAttachmentStorage.FileFilePrefix, file.Id),
+                file.Comment,
+                existingImagePath: null,
+                WorklogAttachmentStorage.AttachmentKind.File);
+
+            var result = await dialog.ShowDialog<WorklogAddPhotoWindow.PhotoResult?>(this);
+            if (result == null)
+            {
+                return;
+            }
+
+            string previousFileName = file.FileName;
+            string previousComment = file.Comment;
+
+            string? attachmentsFolder = null;
+            string newStoredFileName = string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(result.SourcePath))
+            {
+                attachmentsFolder = WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id);
+                if (attachmentsFolder == null)
+                {
+                    this.ShowSaveFailed("Could not resolve where to store the file.");
+                    return;
+                }
+
+                newStoredFileName = WorklogAttachmentStorage.BuildStoredFileName(
+                    result.SourcePath, WorklogAttachmentStorage.FileFilePrefix, file.Id);
+
+                file.FileName = newStoredFileName;
+            }
+
+            file.Comment = result.Comment;
+
+            // Saved before the swap, because the swap deletes what it replaces - see the photo edit
+            // path for why the other order strands a record pointing at a deleted file.
+            if (!this.PersistEntrySilently())
+            {
+                file.FileName = previousFileName;
+                file.Comment = previousComment;
+                this.RefreshFileRows();
+                return;
+            }
+
+            if (attachmentsFolder != null)
+            {
+                // Same swap-and-roll-back as the photo path - see RollBackAttachmentFileNameIfSwapFailed.
+                this.RollBackAttachmentFileNameIfSwapFailed(
+                    file,
+                    previousFileName,
+                    newStoredFileName,
+                    result.SourcePath!,
+                    attachmentsFolder,
+                    "The file could not be copied into the worklog.");
+            }
+
+            this.RefreshFileRows();
+        }
+
+        // ###########################################################################################
+        // Swaps an attachment's bytes for a newly picked file and, if that fails, puts the record's
+        // stored name back so entries.json never names bytes that were never written.
+        //
+        // Shared by the photo and file edit paths, which had the same flaw independently: the
+        // roll-back save's result was ignored, so if THAT save failed too the record was left
+        // naming the new file while only the old bytes existed. The row then resolved to null
+        // forever - "That file could no longer be found" - with no way back to the original.
+        //
+        // When the roll-back cannot be persisted the record is still restored in memory, so what
+        // the user sees matches the bytes on disk, and the message says the entry needs saving.
+        // That is the best available outcome: the alternative is leaving a name on screen that
+        // nothing on disk backs.
+        // ###########################################################################################
+        private void RollBackAttachmentFileNameIfSwapFailed(
+            WorklogAttachmentRecord record,
+            string previousFileName,
+            string newStoredFileName,
+            string sourcePath,
+            string attachmentsFolder,
+            string failureMessage)
+        {
+            if (WorklogAttachmentStorage.TryReplaceAttachmentFile(
+                    sourcePath,
+                    attachmentsFolder,
+                    previousFileName,
+                    newStoredFileName,
+                    out _))
+            {
+                return;
+            }
+
+            // The record already names the new file, so put it back before re-saving.
+            record.FileName = previousFileName;
+
+            if (this.PersistEntrySilently())
+            {
+                this.ShowSaveFailed(failureMessage);
+                return;
+            }
+
+            this.ShowSaveFailed(failureMessage + " The entry could not be saved either - use Save to retry.");
+        }
+
+        // ###########################################################################################
+        // Opens the clicked file through ExternalTargetLauncher, scoped to the entry's attachments
+        // folder rather than the data root: worklog workbooks live in AppData, outside the data root
+        // the launcher defaults to, so without the override every attachment would be refused as
+        // "outside allowed scope". The containment check still applies - just against this folder.
+        // ###########################################################################################
+        private void OnFileRowPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (sender is not Control { Tag: int id })
+            {
+                return;
+            }
+
+            // Marked handled IMMEDIATELY, before any other guard can return.
+            //
+            // This link sits inside the row's drag Panel, whose PointerPressed arms a reorder. The
+            // Panel is skipped only when this handler marks the event handled - so every early
+            // return below that happens BEFORE this line lets the press fall through and arm a drag
+            // the user never started. The next few pixels of movement then cross the drag threshold,
+            // turn the row into a placeholder, and on release commit a reorder and save it.
+            //
+            // That was the intermittent "clicking a file link does nothing" fault: a right-click, or
+            // a click on a row whose record had just been replaced, silently armed a phantom drag
+            // instead of opening anything. It is why the guards below now run after this line, and
+            // why this must stay first.
+            e.Handled = true;
+
+            // Left button only. This launches an external application through the OS shell, so a
+            // right-click reaching for a context menu must not open the document - unlike the photo
+            // thumbnail, whose press opens a modal the user can simply close.
+            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            var file = this.thisEntry.Files.FirstOrDefault(f => f.Id == id);
+            if (file == null)
+            {
+                return;
+            }
+
+            string? path = this.ResolveAttachmentPath(file.FileName);
+            if (path == null)
+            {
+                this.ShowSaveFailed("That file could no longer be found.");
+                return;
+            }
+
+            string? attachmentsFolder = WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id);
+            bool opened = attachmentsFolder != null && ExternalTargetLauncher.TryOpen(path, attachmentsFolder);
+            if (!opened)
+            {
+                this.ShowSaveFailed("That file could not be opened.");
+            }
+        }
+
+        // ###########################################################################################
+        // Removes the file, metadata and bytes both - the stored name carries the record's own id,
+        // so it can only belong to the row being removed. The bytes go only after the metadata
+        // change reached disk, matching OnDeletePhotoClick.
+        // ###########################################################################################
         private void OnDeleteFileClick(object? sender, RoutedEventArgs e)
         {
-            if (sender is Button { Tag: int id })
+            if (sender is not Button { Tag: int id })
             {
-                this.thisEntry.Files.RemoveAll(f => f.Id == id);
-                this.RefreshFileRows();
-                this.PersistEntrySilently();
+                return;
+            }
+
+            var file = this.thisEntry.Files.FirstOrDefault(f => f.Id == id);
+            if (file == null)
+            {
+                return;
+            }
+
+            string fileName = file.FileName;
+
+            this.thisEntry.Files.RemoveAll(f => f.Id == id);
+            this.RefreshFileRows();
+
+            if (this.PersistEntrySilently())
+            {
+                WorklogAttachmentStorage.DeleteAttachmentFile(
+                    WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id),
+                    fileName);
             }
         }
-
-        private void OnMoveFileUpClick(object? sender, RoutedEventArgs e)
-        {
-            if (sender is Button { Tag: int id })
-            {
-                WorklogAttachmentStorage.StepAttachment(this.thisEntry.Files, id, -1);
-                this.RefreshFileRows();
-                this.PersistEntrySilently();
-            }
-        }
-
-        private void OnMoveFileDownClick(object? sender, RoutedEventArgs e)
-        {
-            if (sender is Button { Tag: int id })
-            {
-                WorklogAttachmentStorage.StepAttachment(this.thisEntry.Files, id, 1);
-                this.RefreshFileRows();
-                this.PersistEntrySilently();
-            }
-        }
-
         // ###########################################################################################
         // Cancel/Escape discards pending edits to the direct fields (Title/Description/category/
         // state), but still reports WasSaved when a Links/Comments/Work-done/Photos/Files change
         // already made it to disk via PersistEntrySilently, so the caller knows to refresh.
         //
-        // "Pending" is the limit of what Cancel can undo: an instant-save commits the direct fields
+        // "Open" is the limit of what Cancel can undo: an instant-save commits the direct fields
         // along with the sub-list change (see PersistEntrySilently), so once one has run, the
         // direct-field values at that moment are already on disk and Cancel cannot take them back.
         // ###########################################################################################
@@ -1385,8 +1900,8 @@ namespace CRT
 
         // ###########################################################################################
         // Commits the working copy back via WorklogManager.UpdateEntry, which also recomputes the
-        // workbook's Open/Closed status - editing State to Fixed/RuledOut here is exactly how the
-        // user resolves an entry from the full editor, same rule as the quick "New fault" card.
+        // workbook's Open/Closed status - editing State to Closed here is exactly how the user
+        // resolves an entry from the full editor, same rule as the quick "New fault" card.
         // ###########################################################################################
         private void OnSaveClick(object? sender, RoutedEventArgs e)
         {
@@ -1440,6 +1955,12 @@ namespace CRT
         public string Comment { get; set; } = string.Empty;
 
         // ###########################################################################################
+        // The file name without the "{id}_" storage prefix - what the Files list shows as its link
+        // text. The prefix keeps names unique on disk and means nothing to the user.
+        // ###########################################################################################
+        public string DisplayFileName { get; set; } = string.Empty;
+
+        // ###########################################################################################
         // Thumbnail for a photo row, decoded once when the row is built rather than by a binding
         // converter, so a file that has gone missing or will not decode simply leaves this null and
         // the row still lists its name and comment. Always null for file rows, which show no image.
@@ -1490,12 +2011,41 @@ namespace CRT
         private bool thisIsDropPlaceholder;
 
         // ###########################################################################################
-        // The row's own height while it is the placeholder, so the gap matches the row being
-        // dragged rather than collapsing to the empty box's natural size.
+        // The row's own height while it is the placeholder, so the gap matches the row being dragged
+        // rather than collapsing to the empty box's natural size.
+        //
+        // MUST raise PropertyChanged: BeginPhotoDragPlaceholder measures the row and assigns this
+        // immediately before setting IsDropPlaceholder, and without notification the Height binding
+        // kept whatever value it first read. The placeholder then drew at a fixed size regardless of
+        // the row - unnoticeable for photo rows, which happen to be about that tall, and obvious in
+        // the Files list, where a ~50px row left a gap three times its height.
+        //
+        // The starting value is only used if a drag somehow begins before the row has been measured.
+        // It is deliberately small: too short is a brief visual glitch, too tall is the bug above.
         // ###########################################################################################
-        // Only used if the row's container has not been measured yet; BeginPhotoDragPlaceholder
-        // replaces it with the row's real height. Roughly a 144px thumbnail plus the row padding.
-        public double PlaceholderHeight { get; set; } = 162.0;
+        public double PlaceholderHeight
+        {
+            get => this.thisPlaceholderHeight;
+            set
+            {
+                // The value is ALWAYS stored; only the notification is gated. Returning early
+                // without assigning kept the previous row's height in the field, so the property
+                // and the row it describes disagreed - and a row that genuinely measured within
+                // half a pixel of the seed value was indistinguishable from one never measured at
+                // all. Storing first keeps the state honest; the threshold still suppresses the
+                // sub-pixel churn that made the list flicker mid-drag.
+                bool isMeaningfulChange = Math.Abs(this.thisPlaceholderHeight - value) >= 0.5;
+
+                this.thisPlaceholderHeight = value;
+
+                if (isMeaningfulChange)
+                {
+                    this.PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(this.PlaceholderHeight)));
+                }
+            }
+        }
+
+        private double thisPlaceholderHeight = 48.0;
 
         public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     }

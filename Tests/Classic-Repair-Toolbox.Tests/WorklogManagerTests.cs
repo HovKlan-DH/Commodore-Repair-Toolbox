@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Avalonia;
 using Handlers.DataHandling;
 
@@ -270,7 +270,7 @@ public sealed class WorklogManagerTests : IDisposable
     {
         string root = this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job");
-        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Pending", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Open", Array.Empty<string>());
 
         string entriesPath = Path.Combine(root, workbook.Id.ToString(), "entries.json");
         File.WriteAllText(entriesPath, """
@@ -280,7 +280,7 @@ public sealed class WorklogManagerTests : IDisposable
             "schematicName": "Sch",
             "title": "Bad cap",
             "category": "Issue",
-            "state": "Pending",
+            "state": "Open",
             "componentLabels": null,
             "links": null,
             "comments": null,
@@ -339,7 +339,7 @@ public sealed class WorklogManagerTests : IDisposable
             "  Bad cap  ",
             "  Leaking electrolyte  ",
             "Issue",
-            "Pending",
+            "Open",
             new[] { "C12", "R4" });
 
         Assert.NotNull(entry);
@@ -367,9 +367,9 @@ public sealed class WorklogManagerTests : IDisposable
         var first = CreateWorkbook("Commodore 64|250469", "First job", "");
         var second = CreateWorkbook("Amiga 500|A500", "Second job", "");
 
-        WorklogManager.AddEntry(first.Id, "Sch", new Rect(0, 0, 1, 1), "A", "", "Note", "Pending", Array.Empty<string>());
-        var secondEntryInFirst = WorklogManager.AddEntry(first.Id, "Sch", new Rect(0, 0, 1, 1), "B", "", "Note", "Pending", Array.Empty<string>());
-        var firstEntryInSecond = WorklogManager.AddEntry(second.Id, "Sch", new Rect(0, 0, 1, 1), "C", "", "Note", "Pending", Array.Empty<string>());
+        WorklogManager.AddEntry(first.Id, "Sch", new Rect(0, 0, 1, 1), "A", "", "Note", "Open", Array.Empty<string>());
+        var secondEntryInFirst = WorklogManager.AddEntry(first.Id, "Sch", new Rect(0, 0, 1, 1), "B", "", "Note", "Open", Array.Empty<string>());
+        var firstEntryInSecond = WorklogManager.AddEntry(second.Id, "Sch", new Rect(0, 0, 1, 1), "C", "", "Note", "Open", Array.Empty<string>());
 
         Assert.Equal(2, secondEntryInFirst!.Id);
         Assert.Equal(1, firstEntryInSecond!.Id);
@@ -391,10 +391,10 @@ public sealed class WorklogManagerTests : IDisposable
     {
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
-        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "First", "", "Note", "Pending", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "First", "", "Note", "Open", Array.Empty<string>());
 
         int previewed = WorklogManager.PeekNextEntryId(workbook.Id);
-        var secondEntry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Second", "", "Note", "Pending", Array.Empty<string>());
+        var secondEntry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Second", "", "Note", "Open", Array.Empty<string>());
 
         Assert.Equal(2, previewed);
         Assert.Equal(previewed, secondEntry!.Id);
@@ -406,7 +406,7 @@ public sealed class WorklogManagerTests : IDisposable
         this.LoadWorklog();
         var first = CreateWorkbook("Commodore 64|250469", "First job", "");
         var second = CreateWorkbook("Amiga 500|A500", "Second job", "");
-        WorklogManager.AddEntry(first.Id, "Sch", new Rect(0, 0, 1, 1), "A", "", "Note", "Pending", Array.Empty<string>());
+        WorklogManager.AddEntry(first.Id, "Sch", new Rect(0, 0, 1, 1), "A", "", "Note", "Open", Array.Empty<string>());
 
         // Regression: the "New fault" card's badge used to display the workbook's own id instead of
         // the entry's, so every entry added to workbook #1 previewed as "#1" no matter how many
@@ -424,12 +424,12 @@ public sealed class WorklogManagerTests : IDisposable
     }
 
     [Fact]
-    public void Adding_a_pending_entry_keeps_the_workbook_open()
+    public void Adding_an_open_entry_keeps_the_workbook_open()
     {
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
 
-        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Desc", "", "Issue", "Pending", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Desc", "", "Issue", "Open", Array.Empty<string>());
 
         var active = WorklogManager.GetActiveWorkbookForBoard("Commodore 64|250469");
         Assert.NotNull(active);
@@ -438,12 +438,12 @@ public sealed class WorklogManagerTests : IDisposable
     }
 
     [Fact]
-    public void A_workbook_auto_closes_once_its_only_entry_is_fixed()
+    public void A_workbook_auto_closes_once_its_only_entry_is_closed()
     {
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
 
-        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Desc", "", "Issue", "Fixed", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Desc", "", "Issue", "Closed", Array.Empty<string>());
 
         // A Closed workbook is no longer "active" - GetActiveWorkbookForBoard only returns Open ones.
         Assert.Null(WorklogManager.GetActiveWorkbookForBoard("Commodore 64|250469"));
@@ -452,27 +452,97 @@ public sealed class WorklogManagerTests : IDisposable
         Assert.Single(entries);
     }
 
-    [Fact]
-    public void A_workbook_auto_closes_once_its_only_entry_is_ruled_out()
+    // An entry state the app never writes and cannot migrate must not silently count as resolved:
+    // closing a workbook the user still considers open is the one direction of this rule that
+    // loses information. The retired states are NOT in this list - they have a defined mapping and
+    // are covered by the migration tests below.
+    [Theory]
+    [InlineData("Whatever")]
+    [InlineData("half-done")]
+    public void An_unrecognised_entry_state_does_not_close_a_workbook(string state)
     {
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
 
-        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Desc", "", "Note", "RuledOut", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Desc", "", "Issue", state, Array.Empty<string>());
 
+        var active = WorklogManager.GetActiveWorkbookForBoard("Commodore 64|250469");
+        Assert.NotNull(active);
+        Assert.Equal("Open", active!.Status);
+    }
+
+    // ---------------------------------------------------------------- retired state migration
+
+    // Entries written by an older build carry Pending/RuledOut/Fixed. They are mapped on read, so
+    // an upgraded user sees the state they left behind rather than a blank pill and a workbook
+    // that silently reopened.
+    //
+    // RuledOut maps to Closed, not Open: it counted as resolved under the old rule, so any other
+    // mapping would CHANGE a workbook's status instead of preserving it.
+    [Theory]
+    [InlineData("Pending", "Open")]
+    [InlineData("Fixed", "Closed")]
+    [InlineData("RuledOut", "Closed")]
+    [InlineData("pending", "Open")]
+    [InlineData("ruledout", "Closed")]
+    public void A_retired_entry_state_is_migrated_to_its_replacement(string stored, string expected)
+    {
+        Assert.Equal(expected, WorklogManager.MigrateEntryState(stored));
+    }
+
+    // The current values and anything unknown pass through untouched - the migration must not
+    // rewrite a state it does not own.
+    [Theory]
+    [InlineData("Open")]
+    [InlineData("Closed")]
+    [InlineData("Whatever")]
+    public void A_current_or_unknown_entry_state_is_left_alone(string state)
+    {
+        Assert.Equal(state, WorklogManager.MigrateEntryState(state));
+    }
+
+    // A blank state has always meant Open (AddEntry defaults it), so the migration agrees.
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void A_blank_entry_state_migrates_to_open(string? state)
+    {
+        Assert.Equal("Open", WorklogManager.MigrateEntryState(state));
+    }
+
+    // The end-to-end promise: a workbook closed under the old vocabulary stays closed after the
+    // upgrade. This is what the migration exists for - without it RecomputeWorkbookStatus reopens
+    // it the next time anything in that workbook is saved.
+    [Fact]
+    public void A_workbook_whose_entries_were_all_fixed_stays_closed_after_upgrading()
+    {
+        string root = this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Closed", Array.Empty<string>());
+
+        // Rewrite entries.json the way the previous build would have left it.
+        string entriesPath = Path.Combine(root, workbook.Id.ToString(), "entries.json");
+        File.WriteAllText(entriesPath, File.ReadAllText(entriesPath).Replace("\"Closed\"", "\"Fixed\""));
+
+        var migrated = WorklogManager.GetEntries(workbook.Id);
+        Assert.Equal("Closed", Assert.Single(migrated).State);
+
+        // And the recomputed status still reports the workbook as finished.
+        WorklogManager.UpdateEntry(workbook.Id, migrated[0]);
         Assert.Null(WorklogManager.GetActiveWorkbookForBoard("Commodore 64|250469"));
     }
 
     [Fact]
-    public void A_workbook_stays_open_while_any_entry_is_still_pending()
+    public void A_workbook_stays_open_while_any_entry_is_still_open()
     {
-        // Two entries: one resolved, one still pending - the workbook must not close just because
-        // *an* entry was resolved, only once *every* entry is.
+        // Two entries: one closed, one still open - the workbook must not close just because
+        // *an* entry was closed, only once *every* entry is.
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
 
-        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Fixed one", "", "Issue", "Fixed", Array.Empty<string>());
-        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Still open", "", "Issue", "Pending", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Closed one", "", "Issue", "Closed", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Still open", "", "Issue", "Open", Array.Empty<string>());
 
         var active = WorklogManager.GetActiveWorkbookForBoard("Commodore 64|250469");
         Assert.NotNull(active);
@@ -483,13 +553,13 @@ public sealed class WorklogManagerTests : IDisposable
     [Fact]
     public void A_workbook_closes_once_its_last_outstanding_entry_is_resolved()
     {
-        // Resolving the first entry alone must not close the workbook (a second is still pending);
-        // resolving the second one too must close it.
+        // Closing the first entry alone must not close the workbook (a second is still open);
+        // closing the second one too must close it.
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
 
-        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "First", "", "Issue", "Fixed", Array.Empty<string>());
-        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Second", "", "Issue", "RuledOut", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "First", "", "Issue", "Closed", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Second", "", "Issue", "Closed", Array.Empty<string>());
 
         Assert.Null(WorklogManager.GetActiveWorkbookForBoard("Commodore 64|250469"));
     }
@@ -506,7 +576,7 @@ public sealed class WorklogManagerTests : IDisposable
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
 
-        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Desc", "", "Note", "RuledOut", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Desc", "", "Note", "Closed", Array.Empty<string>());
 
         Assert.Null(WorklogManager.GetActiveWorkbookForBoard("Commodore 64|250469"));
 
@@ -526,26 +596,26 @@ public sealed class WorklogManagerTests : IDisposable
         var older = CreateWorkbook("Commodore 64|250469", "Older job", "");
         var newer = CreateWorkbook("Commodore 64|250469", "Newer job", "");
 
-        WorklogManager.AddEntry(older.Id, "Sch", new Rect(0, 0, 1, 1), "Still open", "", "Issue", "Pending", Array.Empty<string>());
-        WorklogManager.AddEntry(newer.Id, "Sch", new Rect(0, 0, 1, 1), "Done", "", "Issue", "Fixed", Array.Empty<string>());
+        WorklogManager.AddEntry(older.Id, "Sch", new Rect(0, 0, 1, 1), "Still open", "", "Issue", "Open", Array.Empty<string>());
+        WorklogManager.AddEntry(newer.Id, "Sch", new Rect(0, 0, 1, 1), "Done", "", "Issue", "Closed", Array.Empty<string>());
 
         Assert.Equal(older.Id, WorklogManager.GetActiveWorkbookForBoard("Commodore 64|250469")!.Id);
         Assert.Equal(newer.Id, WorklogManager.GetLatestWorkbookForBoard("Commodore 64|250469")!.Id);
     }
 
     [Fact]
-    public void Adding_a_pending_entry_to_a_closed_workbook_reopens_it()
+    public void Adding_an_open_entry_to_a_closed_workbook_reopens_it()
     {
-        // Why the worklog bar needs no separate "Reopen" affordance: "Add entry" stays available on
-        // a closed workbook, and the entry it adds is Pending, which RecomputeWorkbookStatus turns
+        // Why the worklog bar needs no separate "Reopen" affordance: "Add worklog" stays available
+        // on a closed workbook, and the entry it adds is Open, which RecomputeWorkbookStatus turns
         // straight back into Open.
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
 
-        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Done", "", "Issue", "Fixed", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Done", "", "Issue", "Closed", Array.Empty<string>());
         Assert.Equal("Closed", WorklogManager.GetLatestWorkbookForBoard("Commodore 64|250469")!.Status);
 
-        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "New fault", "", "Issue", "Pending", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "New fault", "", "Issue", "Open", Array.Empty<string>());
 
         var reopened = WorklogManager.GetLatestWorkbookForBoard("Commodore 64|250469");
         Assert.Equal("Open", reopened!.Status);
@@ -571,7 +641,7 @@ public sealed class WorklogManagerTests : IDisposable
 
         Exception? thrown = Record.Exception(() =>
         {
-            var result = WorklogManager.AddEntry(999, "Sch", new Rect(0, 0, 1, 1), "Desc", "", "Note", "Pending", Array.Empty<string>());
+            var result = WorklogManager.AddEntry(999, "Sch", new Rect(0, 0, 1, 1), "Desc", "", "Note", "Open", Array.Empty<string>());
             Assert.Null(result);
         });
 
@@ -594,7 +664,7 @@ public sealed class WorklogManagerTests : IDisposable
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
 
-        var entry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Pending", Array.Empty<string>());
+        var entry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Open", Array.Empty<string>());
 
         Assert.Equal("Bad cap", entry!.Title);
         Assert.Empty(entry.Comments);
@@ -605,10 +675,10 @@ public sealed class WorklogManagerTests : IDisposable
     {
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
-        var entry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Pending", Array.Empty<string>())!;
+        var entry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Open", Array.Empty<string>())!;
 
         entry.Title = "Bad cap - replaced";
-        entry.State = "Fixed";
+        entry.State = "Closed";
         entry.Links.Add(new WorklogLinkRecord { Id = 1, Headline = "Datasheet", Url = "https://example.com" });
 
         bool updated = WorklogManager.UpdateEntry(workbook.Id, entry);
@@ -618,27 +688,27 @@ public sealed class WorklogManagerTests : IDisposable
         var storedEntries = WorklogManager.GetEntries(workbook.Id);
         Assert.Single(storedEntries);
         Assert.Equal("Bad cap - replaced", storedEntries[0].Title);
-        Assert.Equal("Fixed", storedEntries[0].State);
+        Assert.Equal("Closed", storedEntries[0].State);
         Assert.Single(storedEntries[0].Links);
 
-        // Editing State to Fixed is how the full editor resolves an entry - the workbook must
+        // Editing State to Closed is how the full editor resolves an entry - the workbook must
         // auto-close exactly as it would from the quick-card flow.
         Assert.Null(WorklogManager.GetActiveWorkbookForBoard("Commodore 64|250469"));
     }
 
     [Fact]
-    public void Editing_a_resolved_entry_back_to_pending_reopens_an_already_closed_workbook()
+    public void Editing_a_resolved_entry_back_to_open_reopens_an_already_closed_workbook()
     {
-        // RecomputeWorkbookStatus's doc comment promises a still-Pending entry "keeps (or
+        // RecomputeWorkbookStatus's doc comment promises a still-Open entry "keeps (or
         // reopens) the workbook" - this pins down the reopen half specifically, via the full
         // editor's UpdateEntry path rather than AddEntry.
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
-        var entry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Fixed", Array.Empty<string>())!;
+        var entry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Closed", Array.Empty<string>())!;
 
         Assert.Null(WorklogManager.GetActiveWorkbookForBoard("Commodore 64|250469"));
 
-        entry.State = "Pending";
+        entry.State = "Open";
         WorklogManager.UpdateEntry(workbook.Id, entry);
 
         var active = WorklogManager.GetActiveWorkbookForBoard("Commodore 64|250469");
@@ -657,23 +727,23 @@ public sealed class WorklogManagerTests : IDisposable
     {
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
-        var entry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "Leaking", "Issue", "Pending", Array.Empty<string>())!;
+        var entry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "Leaking", "Issue", "Open", Array.Empty<string>())!;
 
         // The user retypes the headline and resolves the entry, and it reaches disk.
         entry.Title = "Bad cap - replaced";
-        entry.State = "Fixed";
+        entry.State = "Closed";
         Assert.True(WorklogManager.UpdateEntry(workbook.Id, entry));
 
         // A later write built from a copy that never saw those edits takes the record back.
         var staleCopy = WorklogManager.GetEntries(workbook.Id).Single();
         staleCopy.Title = "Bad cap";
-        staleCopy.State = "Pending";
+        staleCopy.State = "Open";
         staleCopy.Comments.Add(new WorklogCommentRecord { Id = 1, Text = "Added a note", Date = DateTime.Now });
         Assert.True(WorklogManager.UpdateEntry(workbook.Id, staleCopy));
 
         var stored = WorklogManager.GetEntries(workbook.Id).Single();
         Assert.Equal("Bad cap", stored.Title);
-        Assert.Equal("Pending", stored.State);
+        Assert.Equal("Open", stored.State);
         Assert.Single(stored.Comments);
 
         // And the reverted state feeds straight back into the workbook's Open/Closed status.
@@ -689,14 +759,14 @@ public sealed class WorklogManagerTests : IDisposable
     {
         string root = this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job");
-        var entry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Pending", Array.Empty<string>())!;
+        var entry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Open", Array.Empty<string>())!;
 
         Directory.CreateDirectory(Path.Combine(root, workbook.Id.ToString(), "entries.json.tmp"));
 
         entry.Title = "Bad cap - replaced";
 
         Assert.False(WorklogManager.UpdateEntry(workbook.Id, entry));
-        Assert.False(WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Another", "", "Note", "Pending", Array.Empty<string>()) is not null);
+        Assert.False(WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Another", "", "Note", "Open", Array.Empty<string>()) is not null);
 
         // The entry on disk is untouched, which is the point: the caller must not report success.
         Assert.Equal("Bad cap", WorklogManager.GetEntries(workbook.Id).Single().Title);

@@ -1,4 +1,4 @@
-using Handlers.DataHandling;
+﻿using Handlers.DataHandling;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,7 +22,7 @@ public class WorklogAttachmentStorageTests
         string path = workspace.Path_("photo.png");
         File.WriteAllText(path, "not really a png, but the extension and existence are what is checked");
 
-        var problem = WorklogAttachmentStorage.ValidateSourceFile(path, requireDisplayableImage: true);
+        var problem = WorklogAttachmentStorage.ValidateSourceFile(path, WorklogAttachmentStorage.AttachmentKind.Photo);
 
         Assert.Equal(WorklogAttachmentStorage.AttachmentProblem.None, problem);
     }
@@ -33,7 +33,7 @@ public class WorklogAttachmentStorageTests
     [InlineData(null)]
     public void A_blank_path_reports_that_nothing_was_selected(string? path)
     {
-        var problem = WorklogAttachmentStorage.ValidateSourceFile(path, requireDisplayableImage: true);
+        var problem = WorklogAttachmentStorage.ValidateSourceFile(path, WorklogAttachmentStorage.AttachmentKind.Photo);
 
         Assert.Equal(WorklogAttachmentStorage.AttachmentProblem.NoFileSelected, problem);
     }
@@ -44,7 +44,7 @@ public class WorklogAttachmentStorageTests
     {
         using var workspace = new TempWorkspace();
 
-        var problem = WorklogAttachmentStorage.ValidateSourceFile(workspace.Path_("gone.png"), requireDisplayableImage: true);
+        var problem = WorklogAttachmentStorage.ValidateSourceFile(workspace.Path_("gone.png"), WorklogAttachmentStorage.AttachmentKind.Photo);
 
         Assert.Equal(WorklogAttachmentStorage.AttachmentProblem.FileNotFound, problem);
     }
@@ -64,20 +64,21 @@ public class WorklogAttachmentStorageTests
         string path = workspace.Path_(fileName);
         File.WriteAllText(path, "x");
 
-        var problem = WorklogAttachmentStorage.ValidateSourceFile(path, requireDisplayableImage: true);
+        var problem = WorklogAttachmentStorage.ValidateSourceFile(path, WorklogAttachmentStorage.AttachmentKind.Photo);
 
         Assert.Equal(WorklogAttachmentStorage.AttachmentProblem.NotDisplayableImage, problem);
     }
 
-    // The same file is fine for the Files section, which never tries to draw it.
+    // The same file is fine for the Files section, which never tries to draw it - it is handed to
+    // the OS shell instead, so the wider openable-document set applies.
     [Fact]
-    public void A_non_image_is_accepted_when_a_displayable_image_is_not_required()
+    public void A_document_is_accepted_as_a_file()
     {
         using var workspace = new TempWorkspace();
         string path = workspace.Path_("datasheet.pdf");
         File.WriteAllText(path, "x");
 
-        var problem = WorklogAttachmentStorage.ValidateSourceFile(path, requireDisplayableImage: false);
+        var problem = WorklogAttachmentStorage.ValidateSourceFile(path, WorklogAttachmentStorage.AttachmentKind.File);
 
         Assert.Equal(WorklogAttachmentStorage.AttachmentProblem.None, problem);
     }
@@ -89,7 +90,7 @@ public class WorklogAttachmentStorageTests
     {
         using var workspace = new TempWorkspace();
 
-        var problem = WorklogAttachmentStorage.ValidateSourceFile(workspace.Path_("missing.txt"), requireDisplayableImage: true);
+        var problem = WorklogAttachmentStorage.ValidateSourceFile(workspace.Path_("missing.txt"), WorklogAttachmentStorage.AttachmentKind.Photo);
 
         Assert.Equal(WorklogAttachmentStorage.AttachmentProblem.NotDisplayableImage, problem);
     }
@@ -113,6 +114,189 @@ public class WorklogAttachmentStorageTests
     public void An_accepted_file_has_no_message()
     {
         Assert.Equal(string.Empty, WorklogAttachmentStorage.DescribeProblem(WorklogAttachmentStorage.AttachmentProblem.None));
+    }
+
+    // The Files section hands its attachments to the OS shell, which RUNS these rather than
+    // displaying them - so an attachment that would become code execution on click is refused at
+    // the point of attaching, not left to fail (or worse, succeed) at open time.
+    [Theory]
+    [InlineData("installer.exe")]
+    [InlineData("script.bat")]
+    [InlineData("shortcut.lnk")]
+    [InlineData("macro.vbs")]
+    [InlineData("shell.ps1")]
+    [InlineData("no-extension")]
+    public void An_executable_or_script_is_refused_as_a_file(string fileName)
+    {
+        using var workspace = new TempWorkspace();
+        string path = workspace.Path_(fileName);
+        File.WriteAllText(path, "x");
+
+        var problem = WorklogAttachmentStorage.ValidateSourceFile(path, WorklogAttachmentStorage.AttachmentKind.File);
+
+        Assert.Equal(WorklogAttachmentStorage.AttachmentProblem.NotOpenableFile, problem);
+    }
+
+    // An image is legitimate as a File too - the user may prefer to attach it as a document rather
+    // than as a photo, and the launcher opens it happily.
+    [Theory]
+    [InlineData("board.png")]
+    [InlineData("manual.pdf")]
+    [InlineData("readings.csv")]
+    [InlineData("notes.txt")]
+    [InlineData("diagram.svg")]
+    public void A_document_or_image_is_accepted_as_a_file(string fileName)
+    {
+        using var workspace = new TempWorkspace();
+        string path = workspace.Path_(fileName);
+        File.WriteAllText(path, "x");
+
+        var problem = WorklogAttachmentStorage.ValidateSourceFile(path, WorklogAttachmentStorage.AttachmentKind.File);
+
+        Assert.Equal(WorklogAttachmentStorage.AttachmentProblem.None, problem);
+    }
+
+    [Fact]
+    public void The_unopenable_file_refusal_carries_a_message()
+    {
+        Assert.False(string.IsNullOrWhiteSpace(
+            WorklogAttachmentStorage.DescribeProblem(WorklogAttachmentStorage.AttachmentProblem.NotOpenableFile)));
+    }
+
+    // ------------------------------------------------------------------ GetDisplayFileName
+
+    [Fact]
+    public void A_photo_display_name_drops_the_prefix_and_id()
+    {
+        Assert.Equal("board.png", WorklogAttachmentStorage.GetDisplayFileName("photo3_board.png", WorklogAttachmentStorage.PhotoFilePrefix, 3));
+    }
+
+    [Fact]
+    public void A_file_display_name_drops_the_prefix_and_id()
+    {
+        Assert.Equal("manual.pdf", WorklogAttachmentStorage.GetDisplayFileName("file2_manual.pdf", WorklogAttachmentStorage.FileFilePrefix, 2));
+    }
+
+    // The prefix is stripped once, not repeatedly: a source file the user had already named
+    // "2_schematic.png" becomes "photo1_2_schematic.png" when stored as photo #1, and must read
+    // back as the name they chose rather than losing another segment.
+    [Fact]
+    public void Only_one_id_segment_is_stripped()
+    {
+        Assert.Equal("2_schematic.png", WorklogAttachmentStorage.GetDisplayFileName("photo1_2_schematic.png", WorklogAttachmentStorage.PhotoFilePrefix, 1));
+    }
+
+    // An attachment recorded before this naming scheme has no prefix to strip and must still show
+    // something sensible rather than losing its first segment.
+    [Theory]
+    [InlineData("board.png")]
+    [InlineData("my_notes.txt")]
+    [InlineData("_leading.png")]
+    public void A_name_without_an_id_prefix_is_returned_unchanged(string storedName)
+    {
+        Assert.Equal(storedName, WorklogAttachmentStorage.GetDisplayFileName(storedName, WorklogAttachmentStorage.PhotoFilePrefix, 3));
+    }
+
+    // Photos stored by the build where PhotoFilePrefix was "" are named bare, as "3_board.png".
+    // Those files are still on disk and still named in entries.json, so the bare form has to be
+    // recognised too - otherwise every photo attached before the prefix was introduced shows its
+    // raw storage name permanently, which is exactly the noise this method removes.
+    [Fact]
+    public void A_photo_stored_with_the_legacy_bare_id_prefix_still_has_it_stripped()
+    {
+        Assert.Equal("board.png", WorklogAttachmentStorage.GetDisplayFileName("3_board.png", WorklogAttachmentStorage.PhotoFilePrefix, 3));
+    }
+
+    // The id still has to be the owning record's. A user's own file that happens to start with
+    // some OTHER number is left alone, so the legacy allowance above does not become a blanket
+    // "strip any digits then underscore" rule.
+    [Fact]
+    public void A_legacy_bare_prefix_belonging_to_another_id_is_left_alone()
+    {
+        Assert.Equal("3_board.png", WorklogAttachmentStorage.GetDisplayFileName("3_board.png", WorklogAttachmentStorage.PhotoFilePrefix, 7));
+    }
+
+    // Files never had a bare-id era - they were introduced with the "file" prefix already in
+    // place - but the same allowance applies to them for consistency, keyed to their own id.
+    [Fact]
+    public void A_name_that_is_only_a_prefix_keeps_its_raw_form()
+    {
+        // Stripping would leave an empty display name, which shows a row with no filename at all.
+        Assert.Equal("photo3_", WorklogAttachmentStorage.GetDisplayFileName("photo3_", WorklogAttachmentStorage.PhotoFilePrefix, 3));
+    }
+
+    // A File's name must not have a bare id stripped as though it were a Photo's, and vice versa.
+    [Fact]
+    public void A_mismatched_prefix_leaves_the_name_alone()
+    {
+        Assert.Equal("file2_manual.pdf", WorklogAttachmentStorage.GetDisplayFileName("file2_manual.pdf", WorklogAttachmentStorage.PhotoFilePrefix, 2));
+    }
+
+    // The mangling this guards against: "file2_backup.pdf" is BOTH a name a user may legitimately
+    // choose and exactly what file #2 is stored as - nothing in the text tells them apart. Matching
+    // the owning record's own id is what resolves it: read as file #7, this is a user-chosen name
+    // and is left whole. (Read as file #2, the test below shows it strips.)
+    [Fact]
+    public void A_user_file_whose_own_name_starts_with_the_prefix_is_not_mangled()
+    {
+        Assert.Equal(
+            "file2_backup.pdf",
+            WorklogAttachmentStorage.GetDisplayFileName("file2_backup.pdf", WorklogAttachmentStorage.FileFilePrefix, 7));
+    }
+
+    // The same file once actually stored: its real name carries this record's id, so it strips back
+    // to exactly the name the user chose - one segment removed, not two.
+    [Fact]
+    public void That_same_name_stored_properly_strips_back_to_the_users_name()
+    {
+        string stored = WorklogAttachmentStorage.BuildStoredFileName("file2_backup.pdf", WorklogAttachmentStorage.FileFilePrefix, 7);
+
+        Assert.Equal("file7_file2_backup.pdf", stored);
+        Assert.Equal("file2_backup.pdf", WorklogAttachmentStorage.GetDisplayFileName(stored, WorklogAttachmentStorage.FileFilePrefix, 7));
+    }
+
+    // The other half of the ambiguity: read as the record it actually names, the prefix IS this
+    // record's own and is removed.
+    [Fact]
+    public void The_same_name_read_as_its_own_record_is_stripped()
+    {
+        Assert.Equal(
+            "backup.pdf",
+            WorklogAttachmentStorage.GetDisplayFileName("file2_backup.pdf", WorklogAttachmentStorage.FileFilePrefix, 2));
+    }
+
+    // A stored name belonging to a DIFFERENT record is never stripped, so a mismatched id cannot
+    // silently shorten another row's name.
+    [Fact]
+    public void Another_records_stored_name_is_left_alone()
+    {
+        Assert.Equal(
+            "photo3_board.png",
+            WorklogAttachmentStorage.GetDisplayFileName("photo3_board.png", WorklogAttachmentStorage.PhotoFilePrefix, 4));
+    }
+
+    // A prefix followed immediately by an underscore has no id, so it is not a name this class
+    // built and nothing is stripped.
+    [Fact]
+    public void A_prefix_with_no_id_is_left_alone()
+    {
+        Assert.Equal("photo_board.png", WorklogAttachmentStorage.GetDisplayFileName("photo_board.png", WorklogAttachmentStorage.PhotoFilePrefix, 1));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public void A_blank_stored_name_displays_as_blank(string? storedName)
+    {
+        Assert.Equal(string.Empty, WorklogAttachmentStorage.GetDisplayFileName(storedName, WorklogAttachmentStorage.PhotoFilePrefix, 1));
+    }
+
+    // Nothing left after the prefix means the prefix was the whole name; showing an empty link
+    // would give the user nothing to click, so the stored name is kept.
+    [Fact]
+    public void A_name_that_is_only_a_prefix_is_kept_whole()
+    {
+        Assert.Equal("photo3_", WorklogAttachmentStorage.GetDisplayFileName("photo3_", WorklogAttachmentStorage.PhotoFilePrefix, 3));
     }
 
     // ------------------------------------------------------------- CopyAttachmentIntoFolder
@@ -303,7 +487,7 @@ public class WorklogAttachmentStorageTests
             WorklogAttachmentStorage.PhotoFilePrefix,
             3);
 
-        Assert.Equal("3_IMG_1234.jpg", name);
+        Assert.Equal("photo3_IMG_1234.jpg", name);
     }
 
     // The bug this prevents: two photos picked from different folders that are both "IMG_1234.jpg"
@@ -347,7 +531,7 @@ public class WorklogAttachmentStorageTests
     {
         string name = WorklogAttachmentStorage.BuildStoredFileName(path, WorklogAttachmentStorage.PhotoFilePrefix, 1);
 
-        Assert.Equal("1_attachment", name);
+        Assert.Equal("photo1_attachment", name);
     }
 
     // A dropped file's name comes from wherever it was dragged from, so it is not assumed to be a
@@ -525,59 +709,6 @@ public class WorklogAttachmentStorageTests
         Assert.Equal("1", OrderOf(attachments));
     }
 
-    // ------------------------------------------------------------------- StepAttachment
-
-    [Fact]
-    public void Stepping_up_swaps_with_the_row_above()
-    {
-        var attachments = BuildAttachments(3);
-
-        WorklogAttachmentStorage.StepAttachment(attachments, id: 3, direction: -1);
-
-        Assert.Equal("1,3,2", OrderOf(attachments));
-    }
-
-    [Fact]
-    public void Stepping_down_swaps_with_the_row_below()
-    {
-        var attachments = BuildAttachments(3);
-
-        WorklogAttachmentStorage.StepAttachment(attachments, id: 1, direction: 1);
-
-        Assert.Equal("2,1,3", OrderOf(attachments));
-    }
-
-    // At the ends the button is inert rather than wrapping around or clamping onto itself.
-    [Fact]
-    public void Stepping_up_from_the_top_does_nothing()
-    {
-        var attachments = BuildAttachments(3);
-
-        WorklogAttachmentStorage.StepAttachment(attachments, id: 1, direction: -1);
-
-        Assert.Equal("1,2,3", OrderOf(attachments));
-    }
-
-    [Fact]
-    public void Stepping_down_from_the_bottom_does_nothing()
-    {
-        var attachments = BuildAttachments(3);
-
-        WorklogAttachmentStorage.StepAttachment(attachments, id: 3, direction: 1);
-
-        Assert.Equal("1,2,3", OrderOf(attachments));
-    }
-
-    [Fact]
-    public void Stepping_an_unknown_id_changes_nothing()
-    {
-        var attachments = BuildAttachments(3);
-
-        WorklogAttachmentStorage.StepAttachment(attachments, id: 99, direction: 1);
-
-        Assert.Equal("1,2,3", OrderOf(attachments));
-    }
-
     // ---------------------------------------------------------------- NormalizeDisplayOrder
 
     // The state an older build could leave behind: its add path started DisplayOrder at 1 while its
@@ -644,5 +775,65 @@ public class WorklogAttachmentStorageTests
     public void Normalizing_an_empty_list_reports_no_change()
     {
         Assert.False(WorklogAttachmentStorage.NormalizeDisplayOrder(new List<WorklogAttachmentRecord>()));
+    }
+
+    // ------------------------------------------------------------------ AllocateAttachmentId
+
+    private static List<WorklogAttachmentRecord> Records(params int[] ids) =>
+        ids.Select(id => new WorklogAttachmentRecord { Id = id, FileName = $"photo{id}_x.png" }).ToList();
+
+    [Fact]
+    public void The_first_attachment_takes_id_one()
+    {
+        Assert.Equal(1, WorklogAttachmentStorage.AllocateAttachmentId(
+            new List<WorklogAttachmentRecord>(), WorklogAttachmentStorage.PhotoFilePrefix, Array.Empty<string>()));
+    }
+
+    [Fact]
+    public void A_new_attachment_takes_one_past_the_highest_id()
+    {
+        Assert.Equal(4, WorklogAttachmentStorage.AllocateAttachmentId(
+            Records(1, 3), WorklogAttachmentStorage.PhotoFilePrefix, Array.Empty<string>()));
+    }
+
+    // The reason this is not just Max(Id) + 1. Deleting the highest-numbered attachment frees its
+    // id, so the next add reuses it - and the stored name is BUILT from the id. If the delete's
+    // metadata save failed, the old bytes are still in the folder under exactly the name the new
+    // attachment is about to claim, and the copy overwrites them silently.
+    [Fact]
+    public void An_id_whose_file_is_still_in_the_folder_is_skipped()
+    {
+        // Attachment #2 was removed from the list, but "photo2_old.png" never made it off disk.
+        var id = WorklogAttachmentStorage.AllocateAttachmentId(
+            Records(1),
+            WorklogAttachmentStorage.PhotoFilePrefix,
+            new[] { "photo1_a.png", "photo2_old.png" });
+
+        Assert.Equal(3, id);
+    }
+
+    // Several orphans in a row must all be stepped over, not just the first.
+    [Fact]
+    public void Consecutive_orphaned_ids_are_all_skipped()
+    {
+        var id = WorklogAttachmentStorage.AllocateAttachmentId(
+            Records(1),
+            WorklogAttachmentStorage.PhotoFilePrefix,
+            new[] { "photo2_a.png", "photo3_b.png", "photo4_c.png" });
+
+        Assert.Equal(5, id);
+    }
+
+    // The two lists share a folder, so a photo's orphan must not push a file's id along - the
+    // prefix is what keeps them independent.
+    [Fact]
+    public void An_orphan_of_the_other_kind_does_not_affect_the_id()
+    {
+        var id = WorklogAttachmentStorage.AllocateAttachmentId(
+            Records(1),
+            WorklogAttachmentStorage.FileFilePrefix,
+            new[] { "photo2_orphan.png" });
+
+        Assert.Equal(2, id);
     }
 }

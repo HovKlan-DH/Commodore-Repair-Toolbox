@@ -1,4 +1,4 @@
-using Handlers.DataHandling;
+﻿using Handlers.DataHandling;
 
 namespace ClassicRepairToolbox.Tests;
 
@@ -367,6 +367,83 @@ public class ComponentListBuilderTests
             board, new HashSet<string> { "C1", "C2", "C3" });
 
         Assert.Equal(new[] { "C3", "C1", "C2" }, rows.Select(row => row.BoardLabel));
+    }
+
+    // A regionalized component occupies several rows in the board Excel - one per region - all
+    // sharing a board label. The checklist is a list of PHYSICAL components to mark in scope, and
+    // there is only one physical U1 on the board, so it must appear once however many rows
+    // describe it. Before this, marking an area around a regionalized part listed it two or three
+    // times with no way to tell the entries apart.
+    [Fact]
+    public void A_component_with_one_row_per_region_is_listed_only_once()
+    {
+        var board = Board(
+            Component(boardLabel: "U1", friendly: "VIC-II", technical: "6569", region: "PAL"),
+            Component(boardLabel: "U1", friendly: "VIC-II", technical: "6567", region: "NTSC"));
+
+        var rows = ComponentListBuilder.BuildComponentsInScope(board, new HashSet<string> { "U1" });
+
+        Assert.Equal("U1", Assert.Single(rows).BoardLabel);
+    }
+
+    // The first row wins, matching how BuildDistinctCategories already resolves a collision - and
+    // the scope set itself is keyed by board label alone, so no row is more "correct" than another.
+    [Fact]
+    public void The_first_row_supplies_the_display_name_for_a_regionalized_component()
+    {
+        var board = Board(
+            Component(boardLabel: "U1", friendly: "VIC-II", technical: "6569", region: "PAL"),
+            Component(boardLabel: "U1", friendly: "VIC-II", technical: "6567", region: "NTSC"));
+
+        var rows = ComponentListBuilder.BuildComponentsInScope(board, new HashSet<string> { "U1" });
+
+        Assert.Equal("VIC-II | 6569", Assert.Single(rows).DisplayName);
+    }
+
+    // De-duplication uses the same case-insensitive comparison the rest of the board-label
+    // handling uses, so "u1" and "U1" are one component rather than two.
+    [Fact]
+    public void Rows_whose_labels_differ_only_in_case_collapse_to_one_component()
+    {
+        var board = Board(
+            Component(boardLabel: "U1", friendly: "VIC-II"),
+            Component(boardLabel: "u1", friendly: "VIC-II"));
+
+        var rows = ComponentListBuilder.BuildComponentsInScope(board, new HashSet<string> { "U1" });
+
+        Assert.Equal("U1", Assert.Single(rows).BoardLabel);
+    }
+
+    // Distinct components must still all appear - the de-duplication is per label, not a blanket
+    // "one row per call".
+    [Fact]
+    public void De_duplication_does_not_drop_genuinely_different_components()
+    {
+        var board = Board(
+            Component(boardLabel: "U1", friendly: "VIC-II", region: "PAL"),
+            Component(boardLabel: "U1", friendly: "VIC-II", region: "NTSC"),
+            Component(boardLabel: "C1", friendly: "Ceramic"));
+
+        var rows = ComponentListBuilder.BuildComponentsInScope(board, new HashSet<string> { "U1", "C1" });
+
+        Assert.Equal(new[] { "U1", "C1" }, rows.Select(row => row.BoardLabel));
+    }
+
+    // A blank board label identifies no component. Before the de-duplication was added these were
+    // listed (as blank rows); with it they would have collapsed into ONE blank row, silently
+    // hiding the rest. Neither is useful, so they are skipped entirely.
+    [Fact]
+    public void Components_with_a_blank_board_label_are_skipped_entirely()
+    {
+        var board = Board(
+            Component(boardLabel: "", friendly: "Mystery one"),
+            Component(boardLabel: "  ", friendly: "Mystery two"),
+            Component(boardLabel: "C1", friendly: "Ceramic"));
+
+        var rows = ComponentListBuilder.BuildComponentsInScope(
+            board, new HashSet<string> { "", "C1" });
+
+        Assert.Equal("C1", Assert.Single(rows).BoardLabel);
     }
 
     [Fact]

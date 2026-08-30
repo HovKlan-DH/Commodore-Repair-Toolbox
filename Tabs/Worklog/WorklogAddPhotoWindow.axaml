@@ -14,7 +14,7 @@
 	<StackPanel Margin="18" Spacing="4">
 		<TextBlock x:Name="HeaderText" Text="Add photo" FontSize="16" FontWeight="Bold" Margin="0,0,0,10" />
 
-		<TextBlock Text="Image" />
+		<TextBlock x:Name="SectionLabelText" Text="Image" />
 
 		<!-- Drop target and picker in one. The border is the drop surface; DragOver/Drop are wired
 		     in code-behind so an unsupported file shows the same refusal a picked one would. -->
@@ -67,7 +67,7 @@
 			</Grid>
 		</Border>
 
-		<TextBlock Text="PNG, JPG, GIF, BMP or WEBP" FontSize="10" Opacity="0.6" Margin="0,2,0,0" />
+		<TextBlock x:Name="AcceptedTypesText" Text="PNG, JPG, GIF, BMP or WEBP" FontSize="10" Opacity="0.6" Margin="0,2,0,0" />
 
 		<TextBlock x:Name="ImageValidationText"
 				   Foreground="{DynamicResource Text_Fail_Fg}"

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -125,6 +125,17 @@ namespace Handlers.DataHandling
         // in boardLabelsInScope, kept in boardData.Components order (the same order Overview and the
         // main Component list use - neither re-sorts) rather than the order boardLabelsInScope was
         // built in.
+        //
+        // Each board label yields at most ONE row. A regionalized component occupies several rows in
+        // the board Excel - one per region, all sharing a label - and listing it once per row showed
+        // the same physical part two or three times with nothing to tell the duplicates apart. The
+        // checklist marks physical components, and there is only one U1 on the board.
+        //
+        // The first row seen supplies the display name, the same way BuildDistinctCategories keeps
+        // the first spelling of a category. No row is more correct than the others here: the scope
+        // is decided by highlight rectangles, which are keyed by board label with no region of their
+        // own, so this list has no region to filter by in the first place. (BuildComponentItems
+        // above CAN filter, because the main list is explicitly showing one region at a time.)
         // ###########################################################################################
         public static List<ComponentInScope> BuildComponentsInScope(BoardData boardData, IReadOnlyCollection<string> boardLabelsInScope)
         {
@@ -135,11 +146,24 @@ namespace Handlers.DataHandling
             var scope = new HashSet<string>(boardLabelsInScope, StringComparer.OrdinalIgnoreCase);
             var results = new List<ComponentInScope>();
 
+            // Case-insensitive to match `scope` and every other board-label comparison in the app,
+            // so rows spelled "U1" and "u1" are recognised as the one component they describe.
+            var alreadyListed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var component in boardData.Components)
             {
                 string boardLabel = component.BoardLabel?.Trim() ?? string.Empty;
 
+                // A blank label identifies nothing, so it can neither be matched against the scope
+                // nor de-duplicated meaningfully - several unrelated components would collapse into
+                // one row showing an empty label. Skipped outright rather than listed.
+                if (boardLabel.Length == 0)
+                    continue;
+
                 if (!scope.Contains(boardLabel))
+                    continue;
+
+                if (!alreadyListed.Add(boardLabel))
                     continue;
 
                 var parts = new List<string>(2);

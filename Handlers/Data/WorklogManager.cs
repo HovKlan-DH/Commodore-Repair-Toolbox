@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using CRT;
 using System;
 using System.Collections.Generic;
@@ -29,7 +29,7 @@ namespace Handlers.DataHandling
 
     // ###########################################################################################
     // One "New fault" card save: the drawn area on a schematic, its headline/comment, category
-    // (Note/Cosmetic/Issue), resolution state (Pending/RuledOut/Fixed) and the board labels of the
+    // (Note/Cosmetic/Issue), resolution state (Open/Closed) and the board labels of the
     // components marked in scope. Persisted as one entry inside its workbook's own entries.json -
     // see the WorklogManager class header for why entries live beside their workbook's index.json
     // rather than in any central file.
@@ -52,7 +52,7 @@ namespace Handlers.DataHandling
         [JsonPropertyName("title")] public string Title { get; set; } = string.Empty;
         [JsonPropertyName("description")] public string Description { get; set; } = string.Empty;
         [JsonPropertyName("category")] public string Category { get; set; } = "Note";
-        [JsonPropertyName("state")] public string State { get; set; } = "Pending";
+        [JsonPropertyName("state")] public string State { get; set; } = "Open";
         [JsonPropertyName("componentLabels")] public List<string> ComponentLabels { get; set; } = new();
         [JsonPropertyName("createdDate")] public DateTime CreatedDate { get; set; }
 
@@ -293,7 +293,7 @@ namespace Handlers.DataHandling
         // workbook's last outstanding entry closes it, and when the bar only ever asked for an open
         // workbook that made the whole workbook vanish from the UI the moment it was finished - it
         // looked like data loss even though everything was still on disk. The bar now shows a closed
-        // workbook too, with its Closed status dot; adding a still-Pending entry to it reopens it
+        // workbook too, with its Closed status dot; adding a still-Open entry to it reopens it
         // through the normal RecomputeWorkbookStatus rule.
         // ###########################################################################################
         public static WorkbookRecord? GetLatestWorkbookForBoard(string boardKey)
@@ -365,8 +365,12 @@ namespace Handlers.DataHandling
         // ###########################################################################################
         // Resolution states that count as "closed" for a single entry. A workbook auto-closes once
         // every one of its entries is in one of these states - see RecomputeWorkbookStatus.
+        //
+        // An entry has just two states now, Open and Closed, matching the workbook's own vocabulary.
+        // A set (rather than a plain equality check) is kept because the auto-close rule is about
+        // "which states mean finished", which is the thing likeliest to grow again.
         // ###########################################################################################
-        private static readonly HashSet<string> ResolvedEntryStates = new(StringComparer.Ordinal) { "RuledOut", "Fixed" };
+        private static readonly HashSet<string> ResolvedEntryStates = new(StringComparer.Ordinal) { "Closed" };
 
         // ###########################################################################################
         // Reads the given workbook's entries.json (empty list when the workbook has none yet, or its
@@ -399,6 +403,7 @@ namespace Handlers.DataHandling
                 foreach (var entry in entries)
                 {
                     NormalizeEntryCollections(entry);
+                    entry.State = MigrateEntryState(entry.State);
                 }
 
                 return entries;
@@ -408,6 +413,46 @@ namespace Handlers.DataHandling
                 Logger.Warning($"Failed to load worklog entries: [{folder}] [{ex.Message}] - skipped");
                 return new List<WorklogEntryRecord>();
             }
+        }
+
+        // ###########################################################################################
+        // Maps the retired entry states onto the two that replaced them.
+        //
+        // Entries used to carry Pending/RuledOut/Fixed; they now carry Open/Closed, matching the
+        // vocabulary a workbook already used. Without this mapping every entry saved by an older
+        // build would be silently misreported: "Fixed" and "RuledOut" both counted as resolved, so
+        // dropping them from ResolvedEntryStates reopens workbooks the user had finished, the
+        // editor renders NEITHER state pill as selected (it only knows the new two), and saving
+        // writes the retired value straight back.
+        //
+        // Ruled out maps to Closed rather than Open on purpose: it counted as resolved under the
+        // old rule, so mapping it anywhere else would change every affected workbook's status
+        // rather than preserve it. The mapping runs on read, so it costs nothing once the value has
+        // been written back by any later save, and an unrecognised value is left alone for
+        // RecomputeWorkbookStatus to treat as unresolved (the safe direction - a workbook stays
+        // open rather than silently closing).
+        // ###########################################################################################
+        internal static string MigrateEntryState(string? state)
+        {
+            string trimmed = state?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrEmpty(trimmed))
+            {
+                return "Open";
+            }
+
+            if (string.Equals(trimmed, "Pending", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Open";
+            }
+
+            if (string.Equals(trimmed, "Fixed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "RuledOut", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Closed";
+            }
+
+            return trimmed;
         }
 
         // ###########################################################################################
@@ -485,7 +530,7 @@ namespace Handlers.DataHandling
                 Title = title?.Trim() ?? string.Empty,
                 Description = description?.Trim() ?? string.Empty,
                 Category = string.IsNullOrWhiteSpace(category) ? "Note" : category,
-                State = string.IsNullOrWhiteSpace(state) ? "Pending" : state,
+                State = string.IsNullOrWhiteSpace(state) ? "Open" : state,
                 ComponentLabels = componentLabels?.ToList() ?? new List<string>(),
                 CreatedDate = DateTime.Now
             };
@@ -567,10 +612,10 @@ namespace Handlers.DataHandling
 
         // ###########################################################################################
         // Recomputes and saves a workbook's entryCount and Open/Closed status from its current
-        // entries: Closed once there is at least one entry and every one of them is Ruled out or
-        // Fixed, Open otherwise (including the no-entries case). Called after every entry is added,
-        // so a still-Pending entry keeps (or reopens) the workbook, and resolving the last
-        // outstanding entry closes it.
+        // entries: Closed once there is at least one entry and every one of them is Closed, Open
+        // otherwise (including the no-entries case). Called after every entry is added, so a still
+        // Open entry keeps (or reopens) the workbook, and closing the last outstanding entry closes
+        // it.
         // ###########################################################################################
         private static void RecomputeWorkbookStatus(string folder, int workbookId, List<WorklogEntryRecord> entries)
         {

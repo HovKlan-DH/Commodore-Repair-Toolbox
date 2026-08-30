@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using CRT;
 
 namespace Handlers.DataHandling
 {
@@ -25,21 +26,41 @@ namespace Handlers.DataHandling
             None,
             NoFileSelected,
             FileNotFound,
-            NotDisplayableImage
+            NotDisplayableImage,
+            NotOpenableFile
         }
 
         // ###########################################################################################
-        // Vets a path the user picked or dropped, before anything is copied. requireDisplayableImage
-        // is set for the Photos section, which draws its attachments with Avalonia's Bitmap and so
-        // cannot accept a format Bitmap will not decode - reusing ContributionPackaging's set rather
-        // than keeping a second copy of it (see IsDisplayableImageFile for why it is narrower than
-        // the ExternalTargetLauncher allowlist).
+        // Which list an attachment is destined for, which decides what file types it may be.
+        //
+        // Photos are drawn in-app with Avalonia's Bitmap, so they are limited to what Bitmap can
+        // decode. Files are handed to the OS shell instead, so they are limited to what
+        // ExternalTargetLauncher will open - a wider set that still excludes executables, scripts
+        // and shortcuts, because the shell would RUN those rather than display them. An image is
+        // valid as either; a PDF only as a File.
+        // ###########################################################################################
+        public enum AttachmentKind
+        {
+            Photo,
+            File
+        }
+
+        // ###########################################################################################
+        // Vets a path the user picked or dropped, before anything is copied. What counts as valid
+        // depends on the kind:
+        //
+        //  - Photo: only what Avalonia's Bitmap can decode, since the app draws these itself
+        //    (ContributionPackaging's set, reused rather than copied).
+        //  - File: only what ExternalTargetLauncher will open, since these are handed to the OS
+        //    shell - which RUNS an executable, script or shortcut rather than displaying it. That
+        //    set is wider than the Photo one (a PDF is fine) and is the launcher's own, so the two
+        //    cannot drift into a file that attaches but will not open.
         //
         // The file picker's own filter is only a suggestion - a name typed into its file box gets
         // straight past it, and a drag-and-drop never consults it at all - so the format is checked
         // here rather than trusted, exactly as ComponentContribution's picker does.
         // ###########################################################################################
-        public static AttachmentProblem ValidateSourceFile(string? sourcePath, bool requireDisplayableImage)
+        public static AttachmentProblem ValidateSourceFile(string? sourcePath, AttachmentKind kind)
         {
             string trimmed = sourcePath?.Trim() ?? string.Empty;
 
@@ -48,9 +69,14 @@ namespace Handlers.DataHandling
                 return AttachmentProblem.NoFileSelected;
             }
 
-            if (requireDisplayableImage && !ContributionPackaging.IsDisplayableImageFile(trimmed))
+            if (kind == AttachmentKind.Photo && !ContributionPackaging.IsDisplayableImageFile(trimmed))
             {
                 return AttachmentProblem.NotDisplayableImage;
+            }
+
+            if (kind == AttachmentKind.File && !ExternalTargetLauncher.IsOpenableFile(trimmed))
+            {
+                return AttachmentProblem.NotOpenableFile;
             }
 
             try
@@ -80,12 +106,14 @@ namespace Handlers.DataHandling
             AttachmentProblem.FileNotFound => "That file could no longer be found.",
             AttachmentProblem.NotDisplayableImage =>
                 "That file is not an image the application can display. Use PNG, JPG, GIF, BMP or WEBP.",
+            AttachmentProblem.NotOpenableFile =>
+                "That file type cannot be opened from the application. Use a document, image or data file - not a program, script or shortcut.",
             _ => string.Empty
         };
 
         // ###########################################################################################
-        // The name an attachment is stored under: its owning record's id, an underscore, then the
-        // original file name - "3_IMG_1234.jpg" for photo #3.
+        // The name an attachment is stored under: its list's prefix, the owning record's id, an
+        // underscore, then the original file name - "photo3_IMG_1234.jpg" for photo #3.
         //
         // Attachments share one folder per entry, so two photos picked from different folders that
         // are both "IMG_1234.jpg" would otherwise collide and the second would overwrite the first
@@ -124,15 +152,170 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
+        // The stored name with its owner prefix and id stripped back off - "photo3_board.png" reads
+        // as "board.png", "file2_manual.pdf" as "manual.pdf". The prefix exists to keep names unique
+        // on disk and is noise to the user, so lists show this instead.
+        //
+        // Only the prefix built for THIS record is removed, which is why the record's id is a
+        // parameter. A file the user named "2_schematic.png" that became photo #1 is stored as
+        // "photo1_2_schematic.png" and correctly reads back as "2_schematic.png" - one segment
+        // dropped, not two.
+        //
+        // A name that does not carry this record's exact prefix is returned unchanged. That covers
+        // attachments recorded before the scheme existed, photos stored by the brief build whose
+        // prefix was empty ("3_board.png"), and the genuinely ambiguous case: "file2_backup.pdf" is
+        // both a plausible user-chosen name and exactly what file #2 would be stored as, so only
+        // the record actually numbered 2 has it stripped.
+        // ###########################################################################################
+        public static string GetDisplayFileName(string? storedFileName, string ownerPrefix, int recordId)
+        {
+            string trimmed = storedFileName?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                return string.Empty;
+            }
+
+            // Strips only the exact prefix THIS record's name would have been built with, rather
+            // than any prefix-plus-digits that happens to look right.
+            //
+            // Guessing from the string alone cannot work: "file2_backup.pdf" is both a name a user
+            // may legitimately have chosen and exactly what file #2 is stored as, and nothing in the
+            // text distinguishes them. Matching the owning record's own id does: file #7 strips
+            // "file7_" and leaves "file2_backup.pdf" untouched, so the only name ever removed is one
+            // this class demonstrably created for that record.
+            string id = recordId.ToString(CultureInfo.InvariantCulture);
+            string expected = $"{ownerPrefix}{id}_";
+
+            if (TryStrip(trimmed, expected, out string displayName))
+            {
+                return displayName;
+            }
+
+            // Photos attached by the build where PhotoFilePrefix was "" are stored bare, as
+            // "3_board.png". Those names are still on disk and in entries.json, and without this
+            // they would show their raw storage form forever - the exact prefix noise this method
+            // exists to hide. The id still has to match the owning record, so the guarantee above
+            // is unchanged: a user's own "3_notes.png" on photo #7 is left alone.
+            if (ownerPrefix.Length > 0 && TryStrip(trimmed, $"{id}_", out displayName))
+            {
+                return displayName;
+            }
+
+            return trimmed;
+        }
+
+        // ###########################################################################################
+        // Picks the id for a new attachment: one past the highest currently in the list, but never
+        // one whose stored file is already sitting in the folder.
+        //
+        // Max(Id) + 1 alone is not safe, because it REUSES an id as soon as the highest-numbered
+        // attachment is removed. Deleting attachment #2 and adding another gives #2 again, and the
+        // stored name is built from the id - so the new file is named exactly what the old one was.
+        // That matters when the old bytes are still there, which happens whenever the metadata save
+        // that accompanied the delete failed: the record is gone from the list but the file is not,
+        // and CopyAttachmentIntoFolder overwrites with overwrite: true. The user's new attachment
+        // silently replaces an orphan, or two records end up sharing a prefix.
+        //
+        // Skipping ids whose file already exists closes that, and keeps BuildStoredFileName's
+        // "unique by construction" claim actually true. existingFileNames is what the folder holds
+        // right now; passing an empty set degrades to plain Max(Id) + 1.
+        // ###########################################################################################
+        public static int AllocateAttachmentId(
+            IReadOnlyCollection<WorklogAttachmentRecord> attachments,
+            string ownerPrefix,
+            IReadOnlyCollection<string> existingFileNames)
+        {
+            int candidate = 1;
+            if (attachments != null && attachments.Count > 0)
+            {
+                foreach (var attachment in attachments)
+                {
+                    if (attachment.Id >= candidate)
+                    {
+                        candidate = attachment.Id + 1;
+                    }
+                }
+            }
+
+            if (existingFileNames == null || existingFileNames.Count == 0)
+            {
+                return candidate;
+            }
+
+            // Compared on the "<prefix><id>_" stem rather than a whole filename, since the rest of
+            // the name comes from whatever file the user is attaching and is not known here.
+            var taken = new HashSet<string>(existingFileNames, StringComparer.OrdinalIgnoreCase);
+
+            while (taken.Any(name => name.StartsWith(
+                       $"{ownerPrefix}{candidate.ToString(CultureInfo.InvariantCulture)}_",
+                       StringComparison.OrdinalIgnoreCase)))
+            {
+                candidate++;
+            }
+
+            return candidate;
+        }
+
+        // ###########################################################################################
+        // The file names currently in an attachments folder, or an empty list when the folder does
+        // not exist or cannot be read. Feeds AllocateAttachmentId above; a folder that cannot be
+        // listed simply degrades that to Max(Id) + 1 rather than failing the attach.
+        // ###########################################################################################
+        public static IReadOnlyCollection<string> ListAttachmentFileNames(string? folder)
+        {
+            if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+            {
+                return Array.Empty<string>();
+            }
+
+            try
+            {
+                return Directory.GetFiles(folder).Select(Path.GetFileName).Where(n => n != null).Select(n => n!).ToArray();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to list worklog attachments folder [{folder}]: {ex.Message}");
+                return Array.Empty<string>();
+            }
+        }
+
+        // ###########################################################################################
+        // Removes prefix from name when it is present and something is left afterwards. A name that
+        // is nothing BUT the prefix is refused, since an empty display name is worse than the raw
+        // one - the row would show no filename at all.
+        // ###########################################################################################
+        private static bool TryStrip(string name, string prefix, out string stripped)
+        {
+            stripped = string.Empty;
+
+            if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string candidate = name.Substring(prefix.Length);
+            if (string.IsNullOrWhiteSpace(candidate))
+            {
+                return false;
+            }
+
+            stripped = candidate;
+            return true;
+        }
+
+        // ###########################################################################################
         // Prefixes keeping the two attachment lists' ids from colliding in the folder they share.
         //
-        // Photos take no prefix - "3_board.png" - since they are the common case and the bare id
-        // reads cleanly. Files keep one, because the two lists number their ids independently: photo
-        // #3 and file #3 both exist, and without something to tell them apart both would want
-        // "3_board.png" and one would overwrite the other. Nothing writes a file attachment yet
-        // (the Files section's Add is still a no-op), so this only matters when that is implemented.
+        // Both lists carry one, so a folder holding attachments of both kinds says which is which:
+        // "photo3_board.png" beside "file2_manual.pdf". The prefix is what makes the name unique -
+        // the two lists number their ids independently, so photo #3 and file #3 both exist and
+        // would otherwise both want "3_board.png", one overwriting the other.
+        //
+        // Photos briefly used an empty prefix, when Files could not yet store anything and a bare
+        // id read more cleanly. Now that both write into the folder, naming them symmetrically is
+        // worth more than the shorter name.
         // ###########################################################################################
-        public const string PhotoFilePrefix = "";
+        public const string PhotoFilePrefix = "photo";
         public const string FileFilePrefix = "file";
 
         // ###########################################################################################
@@ -153,38 +336,6 @@ namespace Handlers.DataHandling
 
             string sanitized = builder.ToString().Trim();
             return string.IsNullOrWhiteSpace(sanitized) ? "attachment" : sanitized;
-        }
-
-        // ###########################################################################################
-        // Moves one attachment a single step through the display order - the Files section's up/down
-        // buttons. A step that would fall off either end is ignored rather than clamped, so the
-        // button is simply inert at the ends.
-        //
-        // Shares ReorderAttachment's dense renumbering rather than repeating it; this used to be a
-        // private copy inside WorklogEntryEditorWindow, where no test could reach it.
-        // ###########################################################################################
-        public static void StepAttachment(List<WorklogAttachmentRecord> attachments, int id, int direction)
-        {
-            if (attachments == null || attachments.Count < 2)
-            {
-                return;
-            }
-
-            var ordered = attachments.OrderBy(a => a.DisplayOrder).ToList();
-
-            int index = ordered.FindIndex(a => a.Id == id);
-            if (index < 0)
-            {
-                return;
-            }
-
-            int targetIndex = index + direction;
-            if (targetIndex < 0 || targetIndex >= ordered.Count)
-            {
-                return;
-            }
-
-            ReorderAttachment(attachments, id, targetIndex);
         }
 
         // ###########################################################################################

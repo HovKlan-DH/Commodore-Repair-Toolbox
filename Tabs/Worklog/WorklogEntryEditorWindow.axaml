@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:CRT"
         x:Class="CRT.WorklogEntryEditorWindow"
@@ -62,7 +62,6 @@
 								Tag="Note"
 								PointerPressed="OnEditorCategoryChipPointerPressed">
 							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-								<Ellipse x:Name="EditorCategoryNoteDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Category_Note}" VerticalAlignment="Center" />
 								<TextBlock x:Name="EditorCategoryNoteText" Text="Note" FontSize="11" Foreground="{DynamicResource Fg}" />
 							</StackPanel>
 						</Border>
@@ -77,7 +76,6 @@
 								Tag="Cosmetic"
 								PointerPressed="OnEditorCategoryChipPointerPressed">
 							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-								<Ellipse x:Name="EditorCategoryCosmeticDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Category_Cosmetic}" VerticalAlignment="Center" />
 								<TextBlock x:Name="EditorCategoryCosmeticText" Text="Cosmetic" FontSize="11" Foreground="{DynamicResource Fg}" />
 							</StackPanel>
 						</Border>
@@ -92,14 +90,13 @@
 								Tag="Issue"
 								PointerPressed="OnEditorCategoryChipPointerPressed">
 							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-								<Ellipse x:Name="EditorCategoryIssueDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Category_Issue}" VerticalAlignment="Center" />
 								<TextBlock x:Name="EditorCategoryIssueText" Text="Issue" FontSize="11" Foreground="{DynamicResource Fg}" />
 							</StackPanel>
 						</Border>
 					</StackPanel>
 
 					<StackPanel Orientation="Horizontal" Spacing="6">
-						<Border x:Name="EditorStatePendingPill"
+						<Border x:Name="EditorStateOpenPill"
 								VerticalAlignment="Center"
 								Background="{DynamicResource Form_Bg}"
 								BorderBrush="{DynamicResource Form_Border}"
@@ -107,14 +104,14 @@
 								CornerRadius="10"
 								Padding="10,2"
 								Cursor="Hand"
-								Tag="Pending"
+								Tag="Open"
 								PointerPressed="OnEditorStatePillPointerPressed">
 							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-								<TextBlock x:Name="EditorStatePendingIcon" Text="&#xf128;" FontFamily="{StaticResource FontAwesomeSolid}" FontWeight="Black" FontSize="11" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
-								<TextBlock x:Name="EditorStatePendingText" Text="Pending" FontSize="11" Foreground="{DynamicResource Fg}" />
+								<Ellipse x:Name="EditorStateOpenDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Status_Open}" VerticalAlignment="Center" />
+								<TextBlock x:Name="EditorStateOpenText" Text="Open" FontSize="11" Foreground="{DynamicResource Fg}" />
 							</StackPanel>
 						</Border>
-						<Border x:Name="EditorStateRuledOutPill"
+						<Border x:Name="EditorStateClosedPill"
 								VerticalAlignment="Center"
 								Background="{DynamicResource Form_Bg}"
 								BorderBrush="{DynamicResource Form_Border}"
@@ -122,26 +119,11 @@
 								CornerRadius="10"
 								Padding="10,2"
 								Cursor="Hand"
-								Tag="RuledOut"
+								Tag="Closed"
 								PointerPressed="OnEditorStatePillPointerPressed">
 							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-								<TextBlock x:Name="EditorStateRuledOutIcon" Text="&#xf00d;" FontFamily="{StaticResource FontAwesomeSolid}" FontWeight="Black" FontSize="11" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
-								<TextBlock x:Name="EditorStateRuledOutText" Text="Ruled out" FontSize="11" Foreground="{DynamicResource Fg}" />
-							</StackPanel>
-						</Border>
-						<Border x:Name="EditorStateFixedPill"
-								VerticalAlignment="Center"
-								Background="{DynamicResource Form_Bg}"
-								BorderBrush="{DynamicResource Form_Border}"
-								BorderThickness="1"
-								CornerRadius="10"
-								Padding="10,2"
-								Cursor="Hand"
-								Tag="Fixed"
-								PointerPressed="OnEditorStatePillPointerPressed">
-							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-								<TextBlock x:Name="EditorStateFixedIcon" Text="&#xf00c;" FontFamily="{StaticResource FontAwesomeSolid}" FontWeight="Black" FontSize="11" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
-								<TextBlock x:Name="EditorStateFixedText" Text="Fixed" FontSize="11" Foreground="{DynamicResource Fg}" />
+								<Ellipse x:Name="EditorStateClosedDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Status_Closed}" VerticalAlignment="Center" />
+								<TextBlock x:Name="EditorStateClosedText" Text="Closed" FontSize="11" Foreground="{DynamicResource Fg}" />
 							</StackPanel>
 						</Border>
 					</StackPanel>
@@ -271,6 +253,84 @@
 							</Grid>
 						</Border>
 						<TextBlock x:Name="EditorLocationSchematicNameText" FontSize="11" Opacity="0.7" />
+					</StackPanel>
+
+					<!-- "Mark components in scope", the same checklist the quick "New fault" card
+					     shows (see TabSchematics.axaml). The rows are supplied by the caller, which
+					     owns the board data and the highlight rectangles; this window only renders
+					     them and reports back which are ticked. Hidden entirely when the caller
+					     could not work out the scope, rather than showing an empty box that looks
+					     like "no components here". -->
+					<StackPanel x:Name="EditorComponentScopePanel" Spacing="4" IsVisible="False">
+						<StackPanel Orientation="Horizontal" Spacing="10">
+							<TextBlock Text="Mark components in scope" FontWeight="SemiBold" VerticalAlignment="Center" />
+							<TextBlock x:Name="EditorComponentCountText" Text="0 found" FontSize="11" Opacity="0.7" VerticalAlignment="Center" />
+							<Button Content="All"
+									FontSize="11"
+									Padding="0"
+									Background="Transparent"
+									BorderThickness="0"
+									Foreground="{DynamicResource Link_Fg}"
+									Cursor="Hand"
+									Click="OnEditorSelectAllComponentsClick" />
+							<Button Content="None"
+									FontSize="11"
+									Padding="0"
+									Background="Transparent"
+									BorderThickness="0"
+									Foreground="{DynamicResource Link_Fg}"
+									Cursor="Hand"
+									Click="OnEditorSelectNoneComponentsClick" />
+						</StackPanel>
+
+						<Border Background="{DynamicResource Form_Bg}" BorderBrush="{DynamicResource Form_Border}" BorderThickness="1" CornerRadius="3" MinHeight="40">
+							<Grid>
+								<TextBlock x:Name="EditorNoComponentsText"
+										   Text="No components in this area"
+										   FontSize="11"
+										   Opacity="0.7"
+										   HorizontalAlignment="Center"
+										   Margin="8,10"
+										   IsVisible="False" />
+
+								<ScrollViewer MaxHeight="160"
+											  VerticalScrollBarVisibility="Auto"
+											  HorizontalScrollBarVisibility="Disabled">
+									<ItemsControl x:Name="EditorComponentList">
+										<ItemsControl.ItemTemplate>
+											<DataTemplate x:DataType="local:WorklogEntryComponentRow">
+												<Border Background="Transparent"
+														Cursor="Hand"
+														PointerPressed="OnEditorComponentRowPointerPressed">
+													<StackPanel Orientation="Horizontal" Spacing="6" Margin="8,0">
+														<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+															<CheckBox IsChecked="{Binding IsChecked}"
+																	  MinWidth="0"
+																	  MinHeight="0"
+																	  Margin="0"
+																	  Padding="0"
+																	  CornerRadius="2"
+																	  IsHitTestVisible="False"
+																	  VerticalAlignment="Center" />
+														</Viewbox>
+														<TextBlock Text="{Binding BoardLabel}"
+																   FontSize="11"
+																   FontWeight="Bold"
+																   VerticalAlignment="Center"
+																   IsHitTestVisible="False" />
+														<TextBlock Text="{Binding DisplayName}"
+																   FontSize="11"
+																   VerticalAlignment="Center"
+																   TextTrimming="CharacterEllipsis"
+																   IsHitTestVisible="False" />
+													</StackPanel>
+												</Border>
+											</DataTemplate>
+										</ItemsControl.ItemTemplate>
+									</ItemsControl>
+								</ScrollViewer>
+							</Grid>
+						</Border>
 					</StackPanel>
 
 					<StackPanel Spacing="6">
@@ -410,17 +470,79 @@
 						<ItemsControl x:Name="EditorFilesList">
 							<ItemsControl.ItemTemplate>
 								<DataTemplate x:DataType="local:WorklogAttachmentRow">
-									<Border Background="{DynamicResource Form_Bg}" BorderBrush="{DynamicResource Form_Border}" BorderThickness="1" CornerRadius="3" Padding="8,6" Margin="0,0,0,4">
-										<Grid ColumnDefinitions="*,Auto,Auto,Auto">
-											<StackPanel Grid.Column="0" Spacing="1">
-												<TextBlock Text="{Binding FileName}" FontWeight="SemiBold" FontSize="11" TextTrimming="CharacterEllipsis" />
-												<TextBlock Text="{Binding Comment}" FontSize="11" Opacity="0.8" TextWrapping="Wrap" />
-											</StackPanel>
-											<Button Grid.Column="1" Content="&#8593;" FontSize="10" Padding="6,2" Margin="4,0,0,0" Click="OnMoveFileUpClick" Tag="{Binding Id}" />
-											<Button Grid.Column="2" Content="&#8595;" FontSize="10" Padding="6,2" Margin="4,0,0,0" Click="OnMoveFileDownClick" Tag="{Binding Id}" />
-											<Button Grid.Column="3" Content="Delete" FontSize="10" Padding="6,2" Margin="4,0,0,0" Click="OnDeleteFileClick" Tag="{Binding Id}" />
+									<Grid>
+
+										<!-- Same drag placeholder as the Photos rows: an outlined slot marking
+										     where the drop will land. See the Photos template above. -->
+										<Panel IsVisible="{Binding IsDropPlaceholder}"
+											   Height="{Binding PlaceholderHeight}"
+											   Margin="0,0,0,4">
+											<Rectangle Stroke="{DynamicResource Text_Fail_Fg}"
+													   StrokeThickness="2"
+													   StrokeDashArray="4,3"
+													   RadiusX="3"
+													   RadiusY="3"
+													   Fill="{DynamicResource Bg}" />
+											<TextBlock Text="Move the file up/down and release mouse button for new location"
+													   FontSize="11"
+													   Opacity="0.7"
+													   TextWrapping="Wrap"
+													   TextAlignment="Center"
+													   Margin="14,0"
+													   HorizontalAlignment="Center"
+													   VerticalAlignment="Center" />
+										</Panel>
+
+									<Border IsVisible="{Binding IsNotDropPlaceholder}" Background="{DynamicResource Form_Bg}" BorderBrush="{DynamicResource Form_Border}" BorderThickness="1" CornerRadius="3" Padding="8,6" Margin="0,0,0,4">
+										<Grid ColumnDefinitions="*,Auto,Auto">
+
+											<!-- Empty space doubles as the drag handle, exactly as in the Photos
+											     rows. The link sits INSIDE this panel, so its handler marks the
+											     press handled - otherwise clicking it would open the file and arm
+											     a reorder at the same time. The icon buttons are outside the panel
+											     and handle their own presses. -->
+											<Panel Grid.Column="0"
+												   Background="Transparent"
+												   Cursor="SizeNorthSouth"
+												   Tag="{Binding Id}"
+												   PointerPressed="OnFileRowDragHandlePointerPressed">
+												<StackPanel Spacing="1" VerticalAlignment="Center">
+													<!-- The file name is the link: clicking it opens the file through
+													     ExternalTargetLauncher. Shown without its storage prefix.
+
+													     The handler sits on a Border carrying a Background, not on the
+													     TextBlock: a control with no background is not hit-testable in
+													     Avalonia, so a PointerPressed on the bare TextBlock never fired
+													     and the link did nothing. Transparent still counts as a
+													     background for hit-testing - null does not. The Links rows
+													     above put their handler on a Border for the same reason. -->
+													<Border Background="Transparent"
+															Cursor="Hand"
+															HorizontalAlignment="Left"
+															Tag="{Binding Id}"
+															PointerPressed="OnFileRowPointerPressed"
+															ToolTip.Tip="Open this file">
+														<TextBlock Text="{Binding DisplayFileName}"
+																   FontWeight="SemiBold"
+																   FontSize="11"
+																   TextTrimming="CharacterEllipsis"
+																   Foreground="{DynamicResource Link_Fg}"
+																   TextDecorations="Underline" />
+													</Border>
+													<TextBlock Text="{Binding Comment}" FontSize="11" Opacity="0.8" TextWrapping="Wrap" IsVisible="{Binding HasComment}" />
+												</StackPanel>
+											</Panel>
+
+											<Button Grid.Column="1" Classes="WorklogRowIconButton" Margin="4,0,0,0" VerticalAlignment="Top" Click="OnEditFileClick" Tag="{Binding Id}" ToolTip.Tip="Edit file">
+												<TextBlock Text="&#xf044;" FontFamily="{DynamicResource FontAwesomeRegular}" FontSize="13" Foreground="{DynamicResource Schematics_Panels_Fg}" />
+											</Button>
+											<Button Grid.Column="2" Classes="WorklogRowIconButton" Margin="6,0,0,0" VerticalAlignment="Top" Click="OnDeleteFileClick" Tag="{Binding Id}" ToolTip.Tip="Delete file">
+												<TextBlock Text="&#xf2ed;" FontFamily="{DynamicResource FontAwesomeSolid}" FontSize="13" Foreground="{DynamicResource Text_Fail_Fg}" />
+											</Button>
 										</Grid>
 									</Border>
+
+									</Grid>
 								</DataTemplate>
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>

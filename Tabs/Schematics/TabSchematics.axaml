@@ -195,6 +195,10 @@
 								FontWeight="Bold"
 								VerticalAlignment="Center"
 								Foreground="White" />
+							<!-- The hovered entry's state: a solid disc of the state colour inside a
+							     white ring, matching CreateWorklogEntriesListBadge's on-board badge.
+							     No glyph inside - the fill IS the state, and a white glyph would
+							     cover the colour it is meant to show. -->
 							<Border x:Name="SchematicsHoverLabelIconBorder"
 								IsVisible="False"
 								Width="16"
@@ -202,15 +206,7 @@
 								CornerRadius="8"
 								BorderBrush="White"
 								BorderThickness="1"
-								VerticalAlignment="Center">
-								<TextBlock x:Name="SchematicsHoverLabelIcon"
-									FontFamily="{StaticResource FontAwesomeSolid}"
-									FontWeight="Black"
-									FontSize="9"
-									Foreground="White"
-									HorizontalAlignment="Center"
-									VerticalAlignment="Center" />
-							</Border>
+								VerticalAlignment="Center" />
 							<TextBlock x:Name="SchematicsHoverLabelText"
 								FontSize="11"
 										FontWeight="Bold"
@@ -1133,7 +1129,6 @@
 								Tag="Note"
 								PointerPressed="OnWorklogEntryCategoryChipPointerPressed">
 							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-								<Ellipse x:Name="WorklogCategoryNoteDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Category_Note}" VerticalAlignment="Center" />
 								<TextBlock x:Name="WorklogCategoryNoteText" Text="Note" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
 							</StackPanel>
 						</Border>
@@ -1148,7 +1143,6 @@
 								Tag="Cosmetic"
 								PointerPressed="OnWorklogEntryCategoryChipPointerPressed">
 							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-								<Ellipse x:Name="WorklogCategoryCosmeticDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Category_Cosmetic}" VerticalAlignment="Center" />
 								<TextBlock x:Name="WorklogCategoryCosmeticText" Text="Cosmetic" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
 							</StackPanel>
 						</Border>
@@ -1163,14 +1157,13 @@
 								Tag="Issue"
 								PointerPressed="OnWorklogEntryCategoryChipPointerPressed">
 							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-								<Ellipse x:Name="WorklogCategoryIssueDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Category_Issue}" VerticalAlignment="Center" />
 								<TextBlock x:Name="WorklogCategoryIssueText" Text="Issue" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
 							</StackPanel>
 						</Border>
 					</StackPanel>
 
 					<StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-						<Border x:Name="WorklogStatePendingPill"
+						<Border x:Name="WorklogStateOpenPill"
 								VerticalAlignment="Center"
 								Background="{DynamicResource Form_Bg}"
 								BorderBrush="{DynamicResource Form_Border}"
@@ -1178,14 +1171,14 @@
 								CornerRadius="10"
 								Padding="10,1"
 								Cursor="Hand"
-								Tag="Pending"
+								Tag="Open"
 								PointerPressed="OnWorklogEntryStatePillPointerPressed">
 							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-								<TextBlock x:Name="WorklogStatePendingIcon" Text="&#xf128;" FontFamily="{StaticResource FontAwesomeSolid}" FontWeight="Black" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" VerticalAlignment="Center" />
-								<TextBlock x:Name="WorklogStatePendingText" Text="Pending" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
+								<Ellipse x:Name="WorklogStateOpenDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Status_Open}" VerticalAlignment="Center" />
+								<TextBlock x:Name="WorklogStateOpenText" Text="Open" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
 							</StackPanel>
 						</Border>
-						<Border x:Name="WorklogStateRuledOutPill"
+						<Border x:Name="WorklogStateClosedPill"
 								VerticalAlignment="Center"
 								Background="{DynamicResource Form_Bg}"
 								BorderBrush="{DynamicResource Form_Border}"
@@ -1193,26 +1186,11 @@
 								CornerRadius="10"
 								Padding="10,1"
 								Cursor="Hand"
-								Tag="RuledOut"
+								Tag="Closed"
 								PointerPressed="OnWorklogEntryStatePillPointerPressed">
 							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-								<TextBlock x:Name="WorklogStateRuledOutIcon" Text="&#xf00d;" FontFamily="{StaticResource FontAwesomeSolid}" FontWeight="Black" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" VerticalAlignment="Center" />
-								<TextBlock x:Name="WorklogStateRuledOutText" Text="Ruled out" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
-							</StackPanel>
-						</Border>
-						<Border x:Name="WorklogStateFixedPill"
-								VerticalAlignment="Center"
-								Background="{DynamicResource Form_Bg}"
-								BorderBrush="{DynamicResource Form_Border}"
-								BorderThickness="1"
-								CornerRadius="10"
-								Padding="10,1"
-								Cursor="Hand"
-								Tag="Fixed"
-								PointerPressed="OnWorklogEntryStatePillPointerPressed">
-							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-								<TextBlock x:Name="WorklogStateFixedIcon" Text="&#xf00c;" FontFamily="{StaticResource FontAwesomeSolid}" FontWeight="Black" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" VerticalAlignment="Center" />
-								<TextBlock x:Name="WorklogStateFixedText" Text="Fixed" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
+								<Ellipse x:Name="WorklogStateClosedDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Status_Closed}" VerticalAlignment="Center" />
+								<TextBlock x:Name="WorklogStateClosedText" Text="Closed" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
 							</StackPanel>
 						</Border>
 					</StackPanel>

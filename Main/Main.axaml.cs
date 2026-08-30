@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
@@ -1335,8 +1335,8 @@ namespace CRT
         // workbook's last outstanding entry closes it automatically, and showing only open workbooks
         // meant a finished workbook disappeared from the UI entirely - indistinguishable from having
         // been deleted. Status is presentation only: it picks the status dot's color and appears in
-        // the label, and changes nothing about what the bar's buttons offer. "Add entry" still works
-        // on a closed workbook (adding a still-Pending entry reopens it through the normal
+        // the label, and changes nothing about what the bar's buttons offer. "Add worklog" still works
+        // on a closed workbook (adding a still-Open entry reopens it through the normal
         // RecomputeWorkbookStatus rule), as does the "Show worklogs" toggle.
         // ###########################################################################################
         public void RefreshWorklogBar()
@@ -1387,7 +1387,22 @@ namespace CRT
                 return;
 
             this.WorklogJobBoxText.Text = $"#{latestWorkbook.Id} | {latestWorkbook.Title}";
-            this.WorklogJobStatusDot.Fill = this.ResolveWorklogStatusDotBrush(isOpen);
+
+            // Dot, label AND border all take the state colour, which is what an entry's own state
+            // pill does for the selected state (see ApplyStatePillVisualState). Colouring only the
+            // dot left a green dot with grey text in a grey outline sitting beside an entry pill
+            // with green text in a green outline - the two claiming to be "the same pill" while
+            // visibly differing, which is the whole thing this pill was added to avoid.
+            var statusBrush = this.ResolveWorklogStatusDotBrush(isOpen);
+            this.WorklogJobStatusDot.Fill = statusBrush;
+            this.WorklogJobStatusPillText.Foreground = statusBrush;
+            this.WorklogJobStatusPillText.FontWeight = Avalonia.Media.FontWeight.SemiBold;
+            this.WorklogJobStatusPill.BorderBrush = statusBrush;
+            this.WorklogJobStatusPill.BorderThickness = new Thickness(2);
+
+            // The status word lives in the pill now, so the trailing text carries only the counts
+            // and the start date - otherwise "Open" would read twice, once in each.
+            this.WorklogJobStatusPillText.Text = latestWorkbook.Status;
 
             string startDate = latestWorkbook.StartDate.ToString("yyyy-MMMM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
@@ -1399,22 +1414,41 @@ namespace CRT
 
             string entryWord = latestWorkbook.EntryCount == 1 ? "worklog entry" : "worklog entries";
             this.WorklogJobStatusText.Text =
-                $"{latestWorkbook.Status} · {latestWorkbook.EntryCount} {entryWord} · started {startDate}";
+                $"{latestWorkbook.EntryCount} {entryWord} · started {startDate}";
         }
 
         // ###########################################################################################
-        // Resolves the worklog bar's status dot color: green for an open workbook, dark gray for a
-        // closed one - the same dot-plus-label look the "New fault" card uses for its category
-        // chips, just with the Open/Closed axis instead of Note/Cosmetic/Issue.
+        // Resolves the worklog bar's status dot color: red for an open workbook, green for a
+        // closed one - outstanding work reads as red, finished work as green. These same two
+        // brushes colour a worklog ENTRY's Open/Closed pill (see
+        // TabSchematics.Worklog.ResolveWorklogStateColor), so the two axes stay visually identical
+        // wherever either appears - deliberately, since both read "Open"/"Closed" to the user.
+        //
+        // The second lookup through Application.Current is what makes that true, and is NOT
+        // redundant: these keys live in App.axaml's ResourceDictionary.ThemeDictionaries, and a
+        // plain TryFindResource on this window does not resolve a theme-variant-keyed brush. With
+        // only the first lookup this method always returned the hardcoded fallback below, so the
+        // bar's dot stayed green no matter what the theme said - the entry pills picked up their
+        // real colour and the bar did not. WorklogEntryEditorWindow.ResolveThemeBrush and
+        // TabSchematics.ResolveThemeBrush carry the same two-step idiom for the same reason.
+        //
+        // The fallbacks are last-resort only, and must track the theme values above.
         // ###########################################################################################
         private IBrush ResolveWorklogStatusDotBrush(bool isOpen)
         {
             string resourceKey = isOpen ? "Worklog_Status_Open" : "Worklog_Status_Closed";
-            IBrush fallbackBrush = isOpen ? Brushes.Green : Brushes.DarkGray;
 
-            return this.TryFindResource(resourceKey, out var brushResource) && brushResource is IBrush brush
-                ? brush
-                : fallbackBrush;
+            if (this.TryFindResource(resourceKey, out var localResource) && localResource is IBrush localBrush)
+                return localBrush;
+
+            if (Application.Current != null)
+            {
+                var theme = Application.Current.ActualThemeVariant;
+                if (Application.Current.TryGetResource(resourceKey, theme, out var appResource) && appResource is IBrush appBrush)
+                    return appBrush;
+            }
+
+            return isOpen ? Brushes.IndianRed : new SolidColorBrush(Color.Parse("#4C8C31"));
         }
 
         // ###########################################################################################
@@ -1441,7 +1475,7 @@ namespace CRT
         // Switches to the Schematics tab and enters worklog entry-drawing mode for the workbook the
         // bar is showing, so the user can drag out the area a new fault applies to. Uses the same
         // latest-workbook lookup the bar does rather than the Open-only one, so this keeps working
-        // on a closed workbook - the entry it adds is Pending, which reopens the workbook anyway.
+        // on a closed workbook - the entry it adds is Open, which reopens the workbook anyway.
         // ###########################################################################################
         private void OnWorklogAddEntryClick(object? sender, RoutedEventArgs e)
         {
@@ -1507,7 +1541,7 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Restores the worklog bar's "Add entry" / "Cancel entry" buttons to their idle state.
+        // Restores the worklog bar's "Add worklog" / "Cancel entry" buttons to their idle state.
         // Called by TabSchematics whenever worklog entry-drawing mode ends, regardless of trigger.
         // ###########################################################################################
         public void ResetWorklogEntryModeButtons()
