@@ -124,7 +124,8 @@ public partial class TabSchematics
             return;
         }
 
-        if (this.IsPointerInsideLabelEditorMenu(point) || this.IsPointerInsideNewLabelPrompt(point))
+        if (this.IsPointerInsideLabelEditorMenu(point) || this.IsPointerInsideNewLabelPrompt(point) ||
+            this.IsPointerInsideWorklogEntryCard(point))
         {
             e.Handled = true;
             return;
@@ -256,6 +257,34 @@ public partial class TabSchematics
                 e.Handled = true;
                 return;
             }
+        }
+
+        if (this.thisIsWorklogEntryMode)
+        {
+            if (pointer.Properties.IsRightButtonPressed)
+            {
+                this.isPanning = true;
+                this.panStartPoint = point;
+                this.panStartMatrix = this.schematicsMatrix;
+
+                this.HideSchematicsHoverUi();
+                this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.SizeAll);
+
+                e.Pointer.Capture(this.SchematicsContainer);
+                e.Handled = true;
+                return;
+            }
+
+            if (pointer.Properties.IsLeftButtonPressed && !this.SchematicsNewWorklogEntryCardBorder.IsVisible)
+            {
+                if (this.TryGetSchematicsImagePixelPoint(point, out var worklogPixelPoint))
+                {
+                    this.StartDrawingWorklogEntryRectangle(worklogPixelPoint);
+                }
+            }
+
+            e.Handled = true;
+            return;
         }
 
         bool hoveringComponent = this.TryGetHoveredBoardLabel(point, out var boardLabel, out var displayText);
@@ -396,7 +425,18 @@ public partial class TabSchematics
             return;
         }
 
-        if (!this.thisIsLabelEditorMode && !this.thisIsKiCadTraceCalibrationMode && RectGeometry.TryInvert(this.schematicsMatrix, out var inv))
+        if (this.thisIsWorklogEntryMode && this.thisIsDrawingWorklogEntryRectangle)
+        {
+            if (this.TryGetSchematicsImagePixelPoint(point, out var worklogPixelPoint))
+            {
+                this.UpdateDrawingWorklogEntryRectangle(worklogPixelPoint);
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        if (!this.thisIsLabelEditorMode && !this.thisIsKiCadTraceCalibrationMode && !this.thisIsWorklogEntryMode && RectGeometry.TryInvert(this.schematicsMatrix, out var inv))
         {
             var localPoint = new Point(
                 (point.X * inv.M11) + (point.Y * inv.M21) + inv.M31,
@@ -414,6 +454,12 @@ public partial class TabSchematics
             var delta = point - this.panStartPoint;
             this.schematicsMatrix = this.panStartMatrix * Matrix.CreateTranslation(delta.X, delta.Y);
             this.ClampSchematicsMatrix();
+            e.Handled = true;
+            return;
+        }
+
+        if (this.thisIsWorklogEntryMode)
+        {
             e.Handled = true;
             return;
         }
@@ -515,7 +561,35 @@ public partial class TabSchematics
             return;
         }
 
-        if (!this.thisIsLabelEditorMode && !this.thisIsKiCadTraceCalibrationMode && RectGeometry.TryInvert(this.schematicsMatrix, out var inv))
+        if (this.thisIsWorklogEntryMode && this.thisIsDrawingWorklogEntryRectangle)
+        {
+            if (this.TryGetSchematicsImagePixelPoint(point, out var worklogPixelPoint))
+            {
+                this.CompleteDrawingWorklogEntryRectangle(worklogPixelPoint);
+            }
+            else
+            {
+                this.thisIsDrawingWorklogEntryRectangle = false;
+                this.thisWorklogEntryDraftRectangle = null;
+                this.RefreshWorklogEntryOverlay();
+            }
+
+            // This branch returns before the isPanning teardown below, so it must do that teardown
+            // itself. Pressing the right button while already drag-drawing an area starts a pan;
+            // leaving it armed here left the pointer captured and every later move panning the
+            // board with no button held, recoverable only by switching board.
+            if (this.isPanning)
+            {
+                this.isPanning = false;
+                e.Pointer.Capture(null);
+                this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.Cross);
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        if (!this.thisIsLabelEditorMode && !this.thisIsKiCadTraceCalibrationMode && !this.thisIsWorklogEntryMode && RectGeometry.TryInvert(this.schematicsMatrix, out var inv))
         {
             var localPoint = new Point(
                 (point.X * inv.M11) + (point.Y * inv.M21) + inv.M31,
@@ -548,7 +622,11 @@ public partial class TabSchematics
 
         if (isStationaryRightClick)
         {
-            if (this.thisIsKiCadTraceCalibrationMode)
+            if (this.thisIsWorklogEntryMode)
+            {
+                // Right-click while marking a worklog entry area only pans - no context menu.
+            }
+            else if (this.thisIsKiCadTraceCalibrationMode)
             {
                 this.ShowLabelEditorMenu(point);
             }
@@ -598,6 +676,17 @@ public partial class TabSchematics
             this.Focus();
         }
 
+        if (this.thisIsWorklogEntryMode)
+        {
+            // UpdateSchematicsHoverUi has no worklog branch, so letting it run here undid the mode:
+            // it hit-tests components, shows the hover label, leaves MainWindow.isHoveringComponent
+            // set, and replaces the Cross cursor with Hand/Default. Restore the mode's own cursor
+            // and leave the hover UI alone instead.
+            this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.Cross);
+            e.Handled = true;
+            return;
+        }
+
         this.UpdateSchematicsHoverUi(e.GetPosition(this.SchematicsContainer));
         e.Handled = true;
     }
@@ -629,6 +718,21 @@ public partial class TabSchematics
     private void OnSchematicsKeyDown(object? sender, KeyEventArgs e)
     {
         this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
+
+        if (this.thisIsWorklogEntryMode)
+        {
+            // The card's own text boxes live inside SchematicsContainer, so their key events bubble
+            // here. Escape while the card is open would otherwise throw away the drawn area and
+            // everything typed into it, with no confirmation - the same trap the label editor's
+            // new-label prompt guards against below. The card's Cancel button is the way out.
+            if (e.Key == Key.Escape && !this.SchematicsNewWorklogEntryCardBorder.IsVisible)
+            {
+                this.CancelWorklogEntryMode();
+                e.Handled = true;
+            }
+
+            return;
+        }
 
         if (this.thisIsKiCadTraceCalibrationMode)
         {

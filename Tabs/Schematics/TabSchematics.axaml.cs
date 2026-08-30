@@ -23,6 +23,7 @@
 //   TabSchematics.KiCad.Geometry.cs           KiCad world/screen mapping and zone geometry
 //   TabSchematics.KiCad.HitTest.cs            Hover hit-testing over the KiCad overlay
 //   TabSchematics.KiCad.Calibration.cs        Interactive KiCad trace calibration mode
+//   TabSchematics.Worklog.cs                  Worklog "Add entry" area-drawing mode and its card
 //   TabSchematics.Settings.cs                 Board-level and global setting rows
 //
 // They are one partial class, so state is shared; each field is declared in the part
@@ -127,6 +128,11 @@ public partial class TabSchematics : UserControl
     public void Initialize(Main mainWindow)
     {
         this.MainWindow = mainWindow;
+
+        // Only this overlay instance draws worklog entry areas, so its dashed-border mode is set
+        // once here rather than threaded through every ApplyState call.
+        this.SchematicsWorklogEntryOverlay.UseDashedBorder = true;
+        this.WorklogEntryComponentList.ItemsSource = this.thisWorklogEntryComponentRows;
 
         var thisPinchGestureRecognizer = new PinchGestureRecognizer();
         this.SchematicsContainer.GestureRecognizers.Add(thisPinchGestureRecognizer);
@@ -652,7 +658,8 @@ public partial class TabSchematics : UserControl
                IsInsideVisibleOverlay(this.KiCadNetConnectionsPanel) ||
                IsInsideVisibleOverlay(this.TraceFloatingPalette) ||
                IsInsideVisibleOverlay(this.SchematicsLabelEditorMenuBorder) ||
-               IsInsideVisibleOverlay(this.SchematicsNewLabelPromptBorder);
+               IsInsideVisibleOverlay(this.SchematicsNewLabelPromptBorder) ||
+               IsInsideVisibleOverlay(this.SchematicsNewWorklogEntryCardBorder);
     }
 
     // ###########################################################################################
@@ -751,6 +758,7 @@ public partial class TabSchematics : UserControl
         this.polylineManager?.Reset();
         this.SchematicsLabelsCanvas.Children.Clear();
         this.ResetComponentLabelVisualCaches();
+        this.ResetWorklogOverlays();
 
         this.SetTraceColorPickerColor(Colors.White);
         this.CustomColorButton.Background = Brushes.White;
@@ -914,9 +922,18 @@ public partial class TabSchematics : UserControl
     // Returns true when the schematics actions menu is allowed to be shown.
     // Contributor mode enables menu entry from empty-space right click, and active editor or KiCad
     // calibration workflows keep the same shared floating menu available.
+    //
+    // Never during worklog entry mode: on a contributor-mode board the first clause is true, so the
+    // menu could still open while an area was being marked out - and it offers "Enable label editor"
+    // and the calibration mode, which is exactly how two modes ended up active at once.
     // ###########################################################################################
     private bool CanShowSchematicsActionsMenu()
     {
+        if (this.thisIsWorklogEntryMode)
+        {
+            return false;
+        }
+
         return this.IsBoardContributorModeEnabled() ||
                this.thisIsLabelEditorMode ||
                this.thisIsKiCadTraceCalibrationMode;

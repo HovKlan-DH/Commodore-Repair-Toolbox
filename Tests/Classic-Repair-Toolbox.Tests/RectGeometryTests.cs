@@ -130,6 +130,77 @@ public class RectGeometryTests
         Assert.Equal(0, content.Height);
     }
 
+    // ------------------------------------------------- GetCenteredImageContentRect
+
+    [Fact]
+    public void A_wide_image_is_width_constrained_and_centered_vertically()
+    {
+        // Unlike GetImageContentRect, the thumbnail gallery's Image is Stretch-aligned, so its
+        // content is centered in the control box rather than anchored at the origin.
+        Rect content = RectGeometry.GetCenteredImageContentRect(new Size(200, 200), new PixelSize(400, 100));
+
+        Assert.Equal(0, content.X);
+        Assert.Equal(75, content.Y);
+        Assert.Equal(200, content.Width);
+        Assert.Equal(50, content.Height);
+    }
+
+    [Fact]
+    public void A_tall_image_is_height_constrained_and_centered_horizontally()
+    {
+        Rect content = RectGeometry.GetCenteredImageContentRect(new Size(200, 200), new PixelSize(100, 400));
+
+        Assert.Equal(75, content.X);
+        Assert.Equal(0, content.Y);
+        Assert.Equal(50, content.Width);
+        Assert.Equal(200, content.Height);
+    }
+
+    [Fact]
+    public void A_matching_aspect_ratio_fills_the_control_with_no_centering_offset()
+    {
+        Rect content = RectGeometry.GetCenteredImageContentRect(new Size(200, 100), new PixelSize(400, 200));
+
+        Assert.Equal(0, content.X);
+        Assert.Equal(0, content.Y);
+        Assert.Equal(200, content.Width);
+        Assert.Equal(100, content.Height);
+    }
+
+    [Fact]
+    public void A_degenerate_control_size_falls_back_to_the_control_rect_when_centering()
+    {
+        Rect content = RectGeometry.GetCenteredImageContentRect(new Size(0, 0), new PixelSize(400, 200));
+
+        Assert.Equal(0, content.Width);
+        Assert.Equal(0, content.Height);
+    }
+
+    // A zero bitmap dimension is reachable, not theoretical: a thumbnail whose image failed to load
+    // keeps OriginalPixelSize at 0x0. Unguarded, the aspect division gives Infinity or NaN, and the
+    // NaN case returns a rect with NaN X/Width that poisons any layout it reaches.
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(400, 0)]
+    [InlineData(0, 200)]
+    public void A_degenerate_bitmap_size_never_produces_a_NaN_or_infinite_rect(int pixelWidth, int pixelHeight)
+    {
+        var controlSize = new Size(200, 100);
+        var bitmapPixelSize = new PixelSize(pixelWidth, pixelHeight);
+
+        foreach (Rect content in new[]
+        {
+            RectGeometry.GetImageContentRect(controlSize, bitmapPixelSize),
+            RectGeometry.GetCenteredImageContentRect(controlSize, bitmapPixelSize),
+        })
+        {
+            Assert.False(double.IsNaN(content.X) || double.IsInfinity(content.X));
+            Assert.False(double.IsNaN(content.Y) || double.IsInfinity(content.Y));
+            Assert.False(double.IsNaN(content.Width) || double.IsInfinity(content.Width));
+            Assert.False(double.IsNaN(content.Height) || double.IsInfinity(content.Height));
+        }
+    }
+
     // ------------------------------------------------- Local <-> pixel conversions
 
     [Fact]
@@ -351,5 +422,138 @@ public class RectGeometryTests
 
         Assert.Equal(0.0, inset.Width, precision: 9);
         Assert.Equal(0.0, inset.Height, precision: 9);
+    }
+
+    // ------------------------------------------------- FindKeysWithRectsIntersecting
+
+    [Fact]
+    public void A_key_whose_rect_overlaps_the_target_is_returned()
+    {
+        var rectsByKey = new Dictionary<string, List<Rect>>
+        {
+            ["C1"] = new List<Rect> { new Rect(0, 0, 10, 10) }
+        };
+
+        var matches = RectGeometry.FindKeysWithRectsIntersecting(rectsByKey, new Rect(5, 5, 10, 10));
+
+        Assert.Contains("C1", matches);
+    }
+
+    [Fact]
+    public void A_key_whose_rect_does_not_overlap_the_target_is_excluded()
+    {
+        var rectsByKey = new Dictionary<string, List<Rect>>
+        {
+            ["C1"] = new List<Rect> { new Rect(0, 0, 10, 10) }
+        };
+
+        var matches = RectGeometry.FindKeysWithRectsIntersecting(rectsByKey, new Rect(100, 100, 10, 10));
+
+        Assert.Empty(matches);
+    }
+
+    [Fact]
+    public void A_key_with_multiple_rects_matches_if_any_one_of_them_touches()
+    {
+        // A component can have more than one highlight rectangle - only one needs to touch.
+        var rectsByKey = new Dictionary<string, List<Rect>>
+        {
+            ["U1"] = new List<Rect> { new Rect(0, 0, 5, 5), new Rect(200, 200, 5, 5) }
+        };
+
+        var matches = RectGeometry.FindKeysWithRectsIntersecting(rectsByKey, new Rect(1, 1, 2, 2));
+
+        Assert.Contains("U1", matches);
+    }
+
+    [Fact]
+    public void Multiple_touched_keys_are_all_returned()
+    {
+        var rectsByKey = new Dictionary<string, List<Rect>>
+        {
+            ["C1"] = new List<Rect> { new Rect(0, 0, 10, 10) },
+            ["C2"] = new List<Rect> { new Rect(5, 5, 10, 10) },
+            ["C3"] = new List<Rect> { new Rect(500, 500, 10, 10) }
+        };
+
+        var matches = RectGeometry.FindKeysWithRectsIntersecting(rectsByKey, new Rect(0, 0, 20, 20));
+
+        Assert.Equal(new HashSet<string> { "C1", "C2" }, matches);
+    }
+
+    [Fact]
+    public void An_empty_rect_dictionary_yields_no_matches()
+    {
+        var matches = RectGeometry.FindKeysWithRectsIntersecting(new Dictionary<string, List<Rect>>(), new Rect(0, 0, 10, 10));
+
+        Assert.Empty(matches);
+    }
+
+    // ------------------------------------------------------- GetCenterScaledControlRect
+
+    // At scale 1 the control occupies exactly its layout box - the case where every wrong
+    // formula still looks right, which is why the scaled cases below matter.
+    [Fact]
+    public void An_unscaled_control_occupies_its_layout_rect()
+    {
+        var rect = RectGeometry.GetCenterScaledControlRect(new Point(120, 80), new Size(40, 20), 1.0);
+
+        Assert.Equal(new Rect(120, 80, 40, 20), rect);
+    }
+
+    // The whole point of the helper: a centered scale moves the TOP-LEFT as well as the size.
+    // Halving a 40x20 box at (120,80) leaves 20x10 centered on (140,90) - so (130,85), not the
+    // (120,80) that "position plus scaled size" would give. That difference is what put the
+    // worklog pill hover rect off the pill at every zoom other than 100%.
+    [Fact]
+    public void A_shrunk_control_stays_centered_on_its_layout_box()
+    {
+        var rect = RectGeometry.GetCenterScaledControlRect(new Point(120, 80), new Size(40, 20), 0.5);
+
+        Assert.Equal(new Rect(130, 85, 20, 10), rect);
+    }
+
+    [Fact]
+    public void A_grown_control_expands_around_its_center()
+    {
+        var rect = RectGeometry.GetCenterScaledControlRect(new Point(100, 100), new Size(10, 10), 2.0);
+
+        Assert.Equal(new Rect(95, 95, 20, 20), rect);
+    }
+
+    // The center is the one point a centered scale cannot move, at any scale.
+    [Theory]
+    [InlineData(0.25)]
+    [InlineData(1.0)]
+    [InlineData(3.5)]
+    public void The_center_is_unchanged_by_any_scale(double scale)
+    {
+        var rect = RectGeometry.GetCenterScaledControlRect(new Point(120, 80), new Size(40, 20), scale);
+
+        Assert.Equal(140, rect.Center.X, 6);
+        Assert.Equal(90, rect.Center.Y, 6);
+    }
+
+    // A pill whose bitmap never loaded measures zero; it must collapse to a point rather than
+    // produce a NaN or negative rect that Contains() would answer unpredictably.
+    [Theory]
+    [InlineData(0, 20)]
+    [InlineData(40, 0)]
+    [InlineData(0, 0)]
+    public void A_degenerate_layout_size_collapses_to_a_point(double width, double height)
+    {
+        var rect = RectGeometry.GetCenterScaledControlRect(new Point(120, 80), new Size(width, height), 0.5);
+
+        Assert.Equal(new Rect(120, 80, 0, 0), rect);
+    }
+
+    // A negative scale would mirror the control and yield a rect with negative extents; clamping
+    // keeps Contains() meaningful for a caller that computed its scale from a bad view matrix.
+    [Fact]
+    public void A_negative_scale_is_clamped_rather_than_mirroring_the_rect()
+    {
+        var rect = RectGeometry.GetCenterScaledControlRect(new Point(120, 80), new Size(40, 20), -2.0);
+
+        Assert.Equal(new Rect(140, 90, 0, 0), rect);
     }
 }

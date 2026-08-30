@@ -36,6 +36,7 @@ namespace CRT
             this.EnableMiniproExperimentalModeCheckBox.IsChecked = UserSettings.EnableMiniproExperimentalMode;
             this.EnableMiniproExperimentalDemoModeCheckBox.IsChecked = UserSettings.EnableMiniproExperimentalDemoMode;
             this.UpdateEnableMiniproExperimentalDemoModeCheckBoxState();
+            this.EnableWorklogCheckBox.IsChecked = UserSettings.EnableWorklog;
 
             this.EnableMiniproExperimentalDemoModeCheckBox.IsCheckedChanged += this.OnEnableMiniproExperimentalDemoModeChanged;
 
@@ -54,6 +55,7 @@ namespace CRT
             this.MultipleInstancesForComponentPopupCheckBox.IsCheckedChanged += this.OnMultipleInstancesForComponentPopupChanged;
             this.EnableNetworkConnectedOscilloscopeTabCheckBox.IsCheckedChanged += this.OnEnableNetworkConnectedOscilloscopeTabChanged;
             this.EnableMiniproExperimentalModeCheckBox.IsCheckedChanged += this.OnEnableMiniproExperimentalModeChanged;
+            this.EnableWorklogCheckBox.IsCheckedChanged += this.OnEnableWorklogChanged;
         }
 
         // ###########################################################################################
@@ -238,6 +240,20 @@ namespace CRT
             }
 
             this.UpdateEnableMiniproExperimentalDemoModeCheckBoxState();
+        }
+
+        // ###########################################################################################
+        // Persists the "Enable Worklog" preference and shows or hides the worklog bar above the
+        // tabs in the main window to match it.
+        // ###########################################################################################
+        private void OnEnableWorklogChanged(object? sender, RoutedEventArgs e)
+        {
+            UserSettings.EnableWorklog = this.EnableWorklogCheckBox.IsChecked == true;
+
+            if (TopLevel.GetTopLevel(this) is Main mainWindow)
+            {
+                mainWindow.ApplyWorklogBarVisibility();
+            }
         }
 
         // ###########################################################################################

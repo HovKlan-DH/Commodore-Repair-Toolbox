@@ -54,6 +54,7 @@ public sealed class UserSettingsTests : IDisposable
         Assert.True(UserSettings.EnableNetworkConnectedOscilloscopeTab);
         Assert.True(UserSettings.EnableMiniproExperimentalMode);
         Assert.False(UserSettings.EnableMiniproExperimentalDemoMode);
+        Assert.True(UserSettings.EnableWorklog);
     }
 
     [Fact]
@@ -74,6 +75,17 @@ public sealed class UserSettingsTests : IDisposable
     }
 
     [Fact]
+    public void The_worklog_toggle_is_opt_out_like_the_other_feature_gates()
+    {
+        // Same reasoning as the two "External tooling availability" toggles above: this gates
+        // whether the worklog bar is offered at all, so an existing user upgrading into this
+        // setting - no key in their file yet - must see the feature already turned on.
+        this.LoadSettings("{}");
+
+        Assert.True(UserSettings.EnableWorklog);
+    }
+
+    [Fact]
     public void An_explicit_false_beats_an_opt_out_default()
     {
         // The whole point of a default-true setting is that the stored false must win, otherwise
@@ -81,12 +93,14 @@ public sealed class UserSettingsTests : IDisposable
         this.LoadSettings("""
         {
           "enableNetworkConnectedOscilloscopeTab": false,
-          "enableMiniproExperimentalMode": false
+          "enableMiniproExperimentalMode": false,
+          "enableWorklog": false
         }
         """);
 
         Assert.False(UserSettings.EnableNetworkConnectedOscilloscopeTab);
         Assert.False(UserSettings.EnableMiniproExperimentalMode);
+        Assert.False(UserSettings.EnableWorklog);
     }
 
     [Fact]
@@ -102,6 +116,91 @@ public sealed class UserSettingsTests : IDisposable
 
         UserSettings.LoadFrom(path);
         Assert.False(UserSettings.EnableNetworkConnectedOscilloscopeTab);
+    }
+
+    [Fact]
+    public void Turning_the_worklog_bar_off_persists_and_survives_a_reload()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.EnableWorklog = false;
+
+        Assert.False(ReadJson(path)["enableWorklog"]!.GetValue<bool>());
+
+        UserSettings.LoadFrom(path);
+        Assert.False(UserSettings.EnableWorklog);
+    }
+
+    [Fact]
+    public void Worklog_comments_and_work_done_sort_order_default_to_newest_first()
+    {
+        // Matches the worklog entry editor's own in-memory default from before this was persisted,
+        // so an existing user upgrading into this setting sees no change in behaviour.
+        this.LoadSettings("{}");
+
+        Assert.True(UserSettings.WorklogCommentsSortNewestFirst);
+        Assert.True(UserSettings.WorklogWorkDoneSortNewestFirst);
+    }
+
+    [Fact]
+    public void Switching_the_worklog_comments_sort_order_persists_and_survives_a_reload()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.WorklogCommentsSortNewestFirst = false;
+
+        Assert.False(ReadJson(path)["worklogCommentsSortNewestFirst"]!.GetValue<bool>());
+
+        UserSettings.LoadFrom(path);
+        Assert.False(UserSettings.WorklogCommentsSortNewestFirst);
+    }
+
+    [Fact]
+    public void Switching_the_worklog_work_done_sort_order_persists_and_survives_a_reload()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.WorklogWorkDoneSortNewestFirst = false;
+
+        Assert.False(ReadJson(path)["worklogWorkDoneSortNewestFirst"]!.GetValue<bool>());
+
+        UserSettings.LoadFrom(path);
+        Assert.False(UserSettings.WorklogWorkDoneSortNewestFirst);
+    }
+
+    [Fact]
+    public void The_two_worklog_sort_orders_are_independent()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.WorklogCommentsSortNewestFirst = false;
+
+        Assert.True(UserSettings.WorklogWorkDoneSortNewestFirst);
+
+        UserSettings.LoadFrom(path);
+        Assert.False(UserSettings.WorklogCommentsSortNewestFirst);
+        Assert.True(UserSettings.WorklogWorkDoneSortNewestFirst);
+    }
+
+    [Fact]
+    public void Worklog_show_entries_checkbox_defaults_to_checked()
+    {
+        this.LoadSettings("{}");
+
+        Assert.True(UserSettings.WorklogShowEntriesChecked);
+    }
+
+    [Fact]
+    public void Unchecking_the_worklog_show_entries_checkbox_persists_and_survives_a_reload()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.WorklogShowEntriesChecked = false;
+
+        Assert.False(ReadJson(path)["worklogShowEntriesChecked"]!.GetValue<bool>());
+
+        UserSettings.LoadFrom(path);
+        Assert.False(UserSettings.WorklogShowEntriesChecked);
     }
 
     [Fact]

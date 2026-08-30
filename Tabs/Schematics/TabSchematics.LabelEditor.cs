@@ -212,6 +212,12 @@ public partial class TabSchematics
     // ###########################################################################################
     private void BeginLabelEditorMode()
     {
+        // Worklog entry mode intercepts the pointer handlers ahead of this one, so leaving it
+        // active would make the label editor appear frozen - it would be on, but unable to receive
+        // any input. BeginWorklogEntryMode refuses to start over this mode; this is the other half
+        // of that exclusion.
+        this.CancelWorklogEntryMode();
+
         this.thisIsLabelEditorMode = true;
         this.thisLastCreatedLabelEditorCategory = string.Empty;
 

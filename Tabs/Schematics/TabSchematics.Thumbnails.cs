@@ -73,6 +73,8 @@ public partial class TabSchematics
         if (this.thisSuppressThumbnailSelectionChanged)
             return;
 
+        this.CancelWorklogEntryMode();
+
         this.UpdateOverlayLabels();
 
         this.RebuildImportantSignalsPanel();
@@ -171,7 +173,7 @@ public partial class TabSchematics
             this.polylineManager.ImportTraces(loaded);
         }
 
-        // Defer a clamp call so the engine can measure and center the new image layout 
+        // Defer a clamp call so the engine can measure and center the new image layout
         // immediately instead of waiting for a window resize or banner collapse.
         Dispatcher.UIThread.Post(() =>
         {
@@ -179,6 +181,12 @@ public partial class TabSchematics
             this.UpdateComponentLabels();
             this.RefreshHoveredComponentHighlightOverlay();
             this.RefreshKiCadOverlay();
+
+            // RefreshWorklogEntriesListOverlay bails out while currentFullResBitmap is still null,
+            // so a "Show worklogs" checkbox that starts checked (at app launch, or after switching
+            // boards) needs re-applying once this schematic's bitmap has actually finished loading -
+            // otherwise the overlay silently never appears until the checkbox is toggled off and on.
+            this.RefreshWorklogEntriesListOverlay();
         });
     }
 

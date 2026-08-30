@@ -54,6 +54,23 @@ namespace CRT
 
         private string _currentSyncFileRelativePath = string.Empty;
 
+        // ###########################################################################################
+        // The workbook id the "Show worklogs" checkbox is currently showing entries for (0 when
+        // unchecked). RefreshWorklogBar compares this against the board's current active workbook
+        // so switching boards (or the active workbook closing) drops the list view instead of
+        // silently carrying it over to whatever workbook happens to be active now.
+        // ###########################################################################################
+        private int _worklogShowEntriesWorkbookId;
+
+        // ###########################################################################################
+        // Suppresses the "Show worklogs" preference save while RefreshWorklogBar seeds the checkbox
+        // programmatically. Without it, seeding re-enters OnWorklogShowEntriesCheckedChanged and
+        // persists the seeded value as if the user had clicked: selecting a board with no workbook
+        // forces the box off, which would overwrite a saved "on" preference for every board and
+        // every future session. Same pattern as _suppressCategoryFilterSave above.
+        // ###########################################################################################
+        private bool _suppressWorklogShowEntriesSave;
+
         // Region toggle: local override, does not affect the global setting
         private string _localRegion = UserSettings.Region;
 
@@ -86,6 +103,8 @@ namespace CRT
             this.TabContribute.Initialize(this);
 
             this.ApplyOscilloscopeTabVisibility();
+            this.ApplyWorklogBarVisibility();
+            this.RefreshWorklogBar();
 
             // Restore left panel width from settings
             this.RootGrid.ColumnDefinitions[0].Width = new GridLength(UserSettings.LeftPanelWidth);
@@ -686,6 +705,8 @@ namespace CRT
         // ###########################################################################################
         private async void OnBoardSelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
+            this.TabSchematicsControl.CancelWorklogEntryMode();
+
             this._suppressCategoryFilterSave = true;
             int loadVersion = unchecked(++this._boardSelectionLoadVersion);
 
@@ -734,6 +755,7 @@ namespace CRT
             UserSettings.SetLastBoardForHardware(selectedHardware, selectedBoard);
 
             string boardKey = this.GetCurrentBoardKey();
+            this.RefreshWorklogBar();
             var innerGrid = this.TabSchematicsControl.FindControl<Grid>("SchematicsInnerGrid");
 
             if (innerGrid != null)
@@ -1278,6 +1300,220 @@ namespace CRT
 
             if (firstVisibleTab != null)
                 this.MainTabControl.SelectedItem = firstVisibleTab;
+        }
+
+        // ###########################################################################################
+        // Shows or hides the permanent worklog bar above the tabs to match the "Enable Worklog"
+        // configuration setting - and, when switching the feature off, tears down everything the
+        // feature had put on the schematic.
+        //
+        // Hiding the bar alone was not enough: the entry overlays, "#N" badges and thumbnail pills
+        // all stayed drawn and clickable, and any active entry-drawing mode stayed live with its
+        // cross cursor - while the only controls that could dismiss them had just been hidden.
+        // ###########################################################################################
+        public void ApplyWorklogBarVisibility()
+        {
+            if (this.WorklogBar == null)
+                return;
+
+            bool isEnabled = UserSettings.EnableWorklog;
+            this.WorklogBar.IsVisible = isEnabled;
+
+            if (isEnabled)
+                return;
+
+            this.TabSchematicsControl.CancelWorklogEntryMode();
+            this.TabSchematicsControl.SetShowWorklogEntriesList(false, 0);
+            this._worklogShowEntriesWorkbookId = 0;
+        }
+
+        // ###########################################################################################
+        // Refreshes the worklog bar's content for the currently selected board: either the empty
+        // "no jobs recorded" state, or that board's latest workbook.
+        //
+        // The bar deliberately shows the latest workbook whether it is Open or Closed. Resolving a
+        // workbook's last outstanding entry closes it automatically, and showing only open workbooks
+        // meant a finished workbook disappeared from the UI entirely - indistinguishable from having
+        // been deleted. Status is presentation only: it picks the status dot's color and appears in
+        // the label, and changes nothing about what the bar's buttons offer. "Add entry" still works
+        // on a closed workbook (adding a still-Pending entry reopens it through the normal
+        // RecomputeWorkbookStatus rule), as does the "Show worklogs" toggle.
+        // ###########################################################################################
+        public void RefreshWorklogBar()
+        {
+            if (this.WorklogNoJobText == null)
+                return;
+
+            string boardKey = this.GetCurrentBoardKey();
+            var latestWorkbook = WorklogManager.GetLatestWorkbookForBoard(boardKey);
+            bool hasWorkbook = latestWorkbook != null;
+            bool isOpen = hasWorkbook && string.Equals(latestWorkbook!.Status, "Open", StringComparison.Ordinal);
+
+            this.WorklogNoJobText.IsVisible = !hasWorkbook;
+            this.WorklogJobBox.IsVisible = hasWorkbook;
+            this.WorklogJobStatusPanel.IsVisible = hasWorkbook;
+            this.WorklogShowEntriesPanel.IsVisible = hasWorkbook;
+            this.WorklogAddEntryButton.IsVisible = hasWorkbook;
+
+            if (!hasWorkbook || latestWorkbook!.Id != this._worklogShowEntriesWorkbookId)
+            {
+                // A different (or no) workbook is now shown - re-seed the checkbox from the user's
+                // saved preference and apply it to this workbook directly, rather than relying on
+                // IsCheckedChanged (which will not fire below when the new value matches what the
+                // checkbox already showed for the previous workbook).
+                //
+                // The write is suppressed because it is this code seeding the checkbox, not the
+                // user clicking it: showByDefault is forced false whenever the board has no
+                // workbook, and letting that reach the handler would persist it as the user's
+                // preference. See _suppressWorklogShowEntriesSave.
+                bool showByDefault = hasWorkbook && UserSettings.WorklogShowEntriesChecked;
+
+                this._suppressWorklogShowEntriesSave = true;
+                try
+                {
+                    this.WorklogShowEntriesCheckBox.IsChecked = showByDefault;
+                }
+                finally
+                {
+                    this._suppressWorklogShowEntriesSave = false;
+                }
+
+                int workbookId = showByDefault ? latestWorkbook!.Id : 0;
+                this._worklogShowEntriesWorkbookId = workbookId;
+                this.TabSchematicsControl.SetShowWorklogEntriesList(showByDefault, workbookId);
+            }
+
+            if (latestWorkbook == null)
+                return;
+
+            this.WorklogJobBoxText.Text = $"#{latestWorkbook.Id} | {latestWorkbook.Title}";
+            this.WorklogJobStatusDot.Fill = this.ResolveWorklogStatusDotBrush(isOpen);
+
+            string startDate = latestWorkbook.StartDate.ToString("yyyy-MMMM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+            if (latestWorkbook.EntryCount == 0)
+            {
+                this.WorklogJobStatusText.Text = $"No worklog entries yet · started {startDate}";
+                return;
+            }
+
+            string entryWord = latestWorkbook.EntryCount == 1 ? "worklog entry" : "worklog entries";
+            this.WorklogJobStatusText.Text =
+                $"{latestWorkbook.Status} · {latestWorkbook.EntryCount} {entryWord} · started {startDate}";
+        }
+
+        // ###########################################################################################
+        // Resolves the worklog bar's status dot color: green for an open workbook, dark gray for a
+        // closed one - the same dot-plus-label look the "New fault" card uses for its category
+        // chips, just with the Open/Closed axis instead of Note/Cosmetic/Issue.
+        // ###########################################################################################
+        private IBrush ResolveWorklogStatusDotBrush(bool isOpen)
+        {
+            string resourceKey = isOpen ? "Worklog_Status_Open" : "Worklog_Status_Closed";
+            IBrush fallbackBrush = isOpen ? Brushes.Green : Brushes.DarkGray;
+
+            return this.TryFindResource(resourceKey, out var brushResource) && brushResource is IBrush brush
+                ? brush
+                : fallbackBrush;
+        }
+
+        // ###########################################################################################
+        // Opens the "Create new workbook" dialog for the currently selected board and refreshes the
+        // worklog bar to show the workbook it creates.
+        // ###########################################################################################
+        private async void OnWorklogCreateWorkbookClick(object? sender, RoutedEventArgs e)
+        {
+            string boardKey = this.GetCurrentBoardKey();
+            if (string.IsNullOrWhiteSpace(boardKey))
+                return;
+
+            var dialog = new CreateWorkbookWindow();
+            dialog.Initialize(boardKey);
+
+            var record = await dialog.ShowDialog<WorkbookRecord?>(this);
+            if (record == null)
+                return;
+
+            this.RefreshWorklogBar();
+        }
+
+        // ###########################################################################################
+        // Switches to the Schematics tab and enters worklog entry-drawing mode for the workbook the
+        // bar is showing, so the user can drag out the area a new fault applies to. Uses the same
+        // latest-workbook lookup the bar does rather than the Open-only one, so this keeps working
+        // on a closed workbook - the entry it adds is Pending, which reopens the workbook anyway.
+        // ###########################################################################################
+        private void OnWorklogAddEntryClick(object? sender, RoutedEventArgs e)
+        {
+            var activeWorkbook = WorklogManager.GetLatestWorkbookForBoard(this.GetCurrentBoardKey());
+            if (activeWorkbook == null)
+                return;
+
+            if (!ReferenceEquals(this.MainTabControl.SelectedItem, this.SchematicsTabItem))
+                this.MainTabControl.SelectedItem = this.SchematicsTabItem;
+
+            if (!this.TabSchematicsControl.BeginWorklogEntryMode(activeWorkbook.Id))
+                return;
+
+            this.WorklogAddEntryButton.IsEnabled = false;
+            this.WorklogCancelEntryButton.IsVisible = true;
+        }
+
+        // ###########################################################################################
+        // Cancels the in-progress worklog entry-drawing mode. TabSchematics calls back into
+        // ResetWorklogEntryModeButtons() once it has actually torn the mode down, so the buttons
+        // stay in sync whether cancellation came from here, Escape, or the "New fault" card itself.
+        // ###########################################################################################
+        private void OnWorklogCancelEntryClick(object? sender, RoutedEventArgs e)
+        {
+            this.TabSchematicsControl.CancelWorklogEntryMode();
+        }
+
+        // ###########################################################################################
+        // Toggles the "Show worklogs" list view for the workbook the bar is showing, and saves the
+        // checked state as the user's default for next time. TabSchematics scopes what it actually
+        // draws to the schematic currently on screen - see TabSchematics.Worklog.cs's
+        // RefreshWorklogEntriesListOverlay for why. Uses the same latest-workbook lookup the bar
+        // does, so a closed workbook's entries stay viewable.
+        //
+        // Only a real user toggle is saved: RefreshWorklogBar seeds the checkbox programmatically
+        // and suppresses the save, because the value it seeds is derived from the board on screen
+        // rather than from the user's intent. It applies the overlay itself, so returning early
+        // here loses nothing.
+        // ###########################################################################################
+        private void OnWorklogShowEntriesCheckedChanged(object? sender, RoutedEventArgs e)
+        {
+            if (this._suppressWorklogShowEntriesSave)
+                return;
+
+            bool isChecked = this.WorklogShowEntriesCheckBox.IsChecked == true;
+            UserSettings.WorklogShowEntriesChecked = isChecked;
+
+            var activeWorkbook = WorklogManager.GetLatestWorkbookForBoard(this.GetCurrentBoardKey());
+            int workbookId = isChecked && activeWorkbook != null ? activeWorkbook.Id : 0;
+
+            this._worklogShowEntriesWorkbookId = workbookId;
+            this.TabSchematicsControl.SetShowWorklogEntriesList(isChecked && activeWorkbook != null, workbookId);
+        }
+
+        // ###########################################################################################
+        // Makes the "Show worklogs" text act like part of the checkbox it labels, since a bare
+        // TextBlock does not react to clicks on its own. Toggling the checkbox itself fires
+        // IsCheckedChanged, which does the actual work and persists the preference.
+        // ###########################################################################################
+        private void OnWorklogShowEntriesLabelPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            this.WorklogShowEntriesCheckBox.IsChecked = !(this.WorklogShowEntriesCheckBox.IsChecked == true);
+        }
+
+        // ###########################################################################################
+        // Restores the worklog bar's "Add entry" / "Cancel entry" buttons to their idle state.
+        // Called by TabSchematics whenever worklog entry-drawing mode ends, regardless of trigger.
+        // ###########################################################################################
+        public void ResetWorklogEntryModeButtons()
+        {
+            this.WorklogAddEntryButton.IsEnabled = true;
+            this.WorklogCancelEntryButton.IsVisible = false;
         }
 
         // ###########################################################################################

@@ -162,6 +162,14 @@
 
 			<CheckBox x:Name="EnableMiniproExperimentalDemoModeCheckBox"
                       Content="Enable MiniPro programmer simulated demo mode (only required for CRT development)" />
+
+			<TextBlock Text="Misc"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       Margin="0,16,0,4" />
+
+			<CheckBox x:Name="EnableWorklogCheckBox"
+                      Content="Enable Worklog" />
 			
 			<Button x:Name="OpenAppDataFolderButton"
                     Content="Open data/log/settings folder"

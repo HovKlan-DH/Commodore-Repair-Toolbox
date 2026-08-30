@@ -1,6 +1,7 @@
 ﻿using Avalonia;
 using Avalonia.Media;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -16,6 +17,7 @@ namespace Tabs.TabSchematics
         private bool isMatchForSelection;
         private bool isDropPlaceholder;
         private double placeholderHeight = 120.0;
+        private IReadOnlyList<ThumbnailWorklogPillsOverlay.Pill> worklogPills = Array.Empty<ThumbnailWorklogPillsOverlay.Pill>();
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -23,6 +25,21 @@ namespace Tabs.TabSchematics
         public string ImageFilePath { get; init; } = string.Empty;
         public IImage? BaseThumbnail { get; init; }
         public PixelSize OriginalPixelSize { get; init; }
+
+        // ###########################################################################################
+        // State pills for the "Show worklogs" overlay - see ThumbnailWorklogPillsOverlay. Populated
+        // and cleared by TabSchematics.Worklog.cs's RefreshWorklogEntriesListOverlay so visibility
+        // follows the same "Show worklogs" checkbox as the full-size overlay.
+        // ###########################################################################################
+        public IReadOnlyList<ThumbnailWorklogPillsOverlay.Pill> WorklogPills
+        {
+            get => this.worklogPills;
+            set
+            {
+                this.worklogPills = value ?? Array.Empty<ThumbnailWorklogPillsOverlay.Pill>();
+                this.OnPropertyChanged();
+            }
+        }
 
         public IImage? ImageSource
         {

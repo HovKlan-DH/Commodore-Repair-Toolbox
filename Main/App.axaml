@@ -91,6 +91,14 @@
 					<Color x:Key="Schematics_TracePalette_Color3">#0BC419</Color>
 					<Color x:Key="Schematics_TracePalette_Color4">#E6E600</Color>
 
+					<!-- Light, Worklog -->
+					<SolidColorBrush x:Key="Worklog_Category_Note">#2F6FB5</SolidColorBrush>
+					<SolidColorBrush x:Key="Worklog_Category_Cosmetic">#C8880E</SolidColorBrush>
+					<SolidColorBrush x:Key="Worklog_Category_Issue">IndianRed</SolidColorBrush>
+					<SolidColorBrush x:Key="Worklog_State_Fixed">#4C8C31</SolidColorBrush>
+					<SolidColorBrush x:Key="Worklog_Status_Open">Green</SolidColorBrush>
+					<SolidColorBrush x:Key="Worklog_Status_Closed">DarkGray</SolidColorBrush>
+
 					<!-- Light, Thumbnail -->
 					<SolidColorBrush x:Key="Thumbnail_Border">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="Thumbnail_BorderSelected">IndianRed</SolidColorBrush>
@@ -200,6 +208,14 @@
 				<Color x:Key="Schematics_TracePalette_Color2">#1564F4</Color>
 				<Color x:Key="Schematics_TracePalette_Color3">#0BC419</Color>
 				<Color x:Key="Schematics_TracePalette_Color4">#E6E600</Color>
+
+				<!-- Dark, Worklog -->
+				<SolidColorBrush x:Key="Worklog_Category_Note">#2F6FB5</SolidColorBrush>
+				<SolidColorBrush x:Key="Worklog_Category_Cosmetic">#C8880E</SolidColorBrush>
+				<SolidColorBrush x:Key="Worklog_Category_Issue">IndianRed</SolidColorBrush>
+				<SolidColorBrush x:Key="Worklog_State_Fixed">#4C8C31</SolidColorBrush>
+				<SolidColorBrush x:Key="Worklog_Status_Open">Green</SolidColorBrush>
+				<SolidColorBrush x:Key="Worklog_Status_Closed">DarkGray</SolidColorBrush>
 
 				<!-- Dark, Thumbnail -->
 				<SolidColorBrush x:Key="Thumbnail_Border">LightGray</SolidColorBrush>

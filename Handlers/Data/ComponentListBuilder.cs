@@ -17,6 +17,16 @@ namespace Handlers.DataHandling
     }
 
     // ###########################################################################################
+    // One row of the worklog entry card's "Mark components in scope" checklist: a component's
+    // board label kept apart from its friendly/technical name, since the UI bolds only the label.
+    // ###########################################################################################
+    public sealed class ComponentInScope
+    {
+        public string BoardLabel { get; init; } = string.Empty;
+        public string DisplayName { get; init; } = string.Empty;
+    }
+
+    // ###########################################################################################
     // Builds the main window's component list: the region filter, the category filter, the
     // multi-term search, and the composed display text and selection key for each row.
     //
@@ -108,6 +118,44 @@ namespace Handlers.DataHandling
             }
 
             return items;
+        }
+
+        // ###########################################################################################
+        // Builds the "Mark components in scope" checklist rows: every component whose board label is
+        // in boardLabelsInScope, kept in boardData.Components order (the same order Overview and the
+        // main Component list use - neither re-sorts) rather than the order boardLabelsInScope was
+        // built in.
+        // ###########################################################################################
+        public static List<ComponentInScope> BuildComponentsInScope(BoardData boardData, IReadOnlyCollection<string> boardLabelsInScope)
+        {
+            // Always rebuilt with OrdinalIgnoreCase rather than trusting the caller's set, so
+            // matching stays case-insensitive - board label comparisons are case-insensitive
+            // everywhere else in the app (e.g. the schematic hover lookups) - regardless of which
+            // comparer the caller's HashSet happened to be constructed with.
+            var scope = new HashSet<string>(boardLabelsInScope, StringComparer.OrdinalIgnoreCase);
+            var results = new List<ComponentInScope>();
+
+            foreach (var component in boardData.Components)
+            {
+                string boardLabel = component.BoardLabel?.Trim() ?? string.Empty;
+
+                if (!scope.Contains(boardLabel))
+                    continue;
+
+                var parts = new List<string>(2);
+                if (!string.IsNullOrWhiteSpace(component.FriendlyName))
+                    parts.Add(component.FriendlyName.Trim());
+                if (!string.IsNullOrWhiteSpace(component.TechnicalNameOrValue))
+                    parts.Add(component.TechnicalNameOrValue.Trim());
+
+                results.Add(new ComponentInScope
+                {
+                    BoardLabel = boardLabel,
+                    DisplayName = string.Join(" | ", parts)
+                });
+            }
+
+            return results;
         }
 
         // ###########################################################################################

@@ -48,6 +48,24 @@ namespace CRT
         // Used by: TraceStorage.LoadFromFile
         public const string TracesFileName = "Classic-Repair-Toolbox.traces.json";
 
+        // Name of the local folder holding worklog workbooks (repair jobs) and their entries. Stored
+        // alongside the log file, but deliberately its own subfolder: worklog data is purely local
+        // and must never be synced like "Data" nor mixed in with settings/log files.
+        // Used by: WorklogManager.Load
+        public const string WorklogFolderName = "Workbook";
+
+        // Name of the JSON file holding one workbook's own record, stored inside that workbook's
+        // own subfolder of WorklogFolderName (e.g. "Workbook/1/index.json"). There is deliberately
+        // no separate file indexing all workbooks - deleting a workbook's subfolder is how a
+        // workbook is removed, with nothing else left to keep in sync.
+        // Used by: WorklogManager
+        public const string WorklogIndexFileName = "index.json";
+
+        // Name of the JSON file holding one workbook's list of worklog entries, stored inside that
+        // same workbook subfolder alongside WorklogIndexFileName (e.g. "Workbook/1/entries.json").
+        // Used by: WorklogManager
+        public const string WorklogEntriesFileName = "entries.json";
+
         // Prefix and suffix for the versioned main Excel file containing hardware definitions.
         // Used by: DataManager.InitializeAsync, DataManager.LoadMainExcel
         public const string MainExcelFileNamePrefix = "Classic-Repair-Toolbox.v";
@@ -342,6 +360,7 @@ namespace CRT
             Logger.Info(startupTimeline.Record("Runtime and UI framework ready", DateTime.Now));
 
             UserSettings.Load();
+            WorklogManager.Load();
 
             // Loud on purpose. A simulated update looks exactly like a real one in a screenshot, so
             // the log has to be the place where that is unambiguous when a bug report arrives.

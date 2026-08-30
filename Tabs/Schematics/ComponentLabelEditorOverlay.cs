@@ -22,6 +22,7 @@ namespace Tabs.TabSchematics
         private Color thisHighlightColor = Colors.IndianRed;
         private double thisHighlightOpacity = 0.20;
         private Rect? thisDraftRectangle;
+        private bool thisUseDashedBorder;
         private Rect? thisSelectionBounds;
         private IReadOnlyList<(Point Start, Point End)> thisSnapGuides = Array.Empty<(Point Start, Point End)>();
 
@@ -115,6 +116,21 @@ namespace Tabs.TabSchematics
             }
         }
 
+        // ###########################################################################################
+        // When true, rectangle and draft borders are dashed instead of solid - used by the worklog
+        // entry-area overlay to match its mockup. The label editor never sets this, so its solid
+        // borders are unaffected.
+        // ###########################################################################################
+        public bool UseDashedBorder
+        {
+            get => this.thisUseDashedBorder;
+            set
+            {
+                this.thisUseDashedBorder = value;
+                this.InvalidateVisual();
+            }
+        }
+
         public Rect? DraftRectangle
         {
             get => this.thisDraftRectangle;
@@ -169,11 +185,15 @@ namespace Tabs.TabSchematics
             double borderThickness = Math.Clamp(1.0 / scale, 0.5, 1.0);
             double fillOpacity = Math.Clamp(this.thisHighlightOpacity, 0.0, 1.0);
 
+            DashStyle? borderDashStyle = this.thisUseDashedBorder
+                ? new DashStyle(new[] { Math.Clamp(6.0 / scale, 2.0, 6.0), Math.Clamp(4.0 / scale, 2.0, 4.0) }, 0)
+                : null;
+
             var fillBrush = new SolidColorBrush(this.thisHighlightColor, fillOpacity);
-            var normalPen = new Pen(new SolidColorBrush(this.thisHighlightColor, Math.Min(1.0, fillOpacity * 1.25)), borderThickness);
-            var selectedPen = new Pen(new SolidColorBrush(this.thisHighlightColor, 1.0), borderThickness);
+            var normalPen = new Pen(new SolidColorBrush(this.thisHighlightColor, Math.Min(1.0, fillOpacity * 1.25)), borderThickness, borderDashStyle);
+            var selectedPen = new Pen(new SolidColorBrush(this.thisHighlightColor, 1.0), borderThickness, borderDashStyle);
             var draftFillBrush = new SolidColorBrush(this.thisHighlightColor, Math.Min(0.12, fillOpacity));
-            var draftPen = new Pen(new SolidColorBrush(this.thisHighlightColor, 1.0), borderThickness);
+            var draftPen = new Pen(new SolidColorBrush(this.thisHighlightColor, 1.0), borderThickness, borderDashStyle);
             var snapPen = new Pen(
                 new SolidColorBrush(this.thisHighlightColor, 1.0),
                 2.0 / scale,

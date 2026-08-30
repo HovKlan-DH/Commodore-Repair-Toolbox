@@ -50,6 +50,22 @@ namespace Handlers.DataHandling
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? EnableMiniproExperimentalDemoMode { get; set; }
 
+        [JsonPropertyName("enableWorklog")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? EnableWorklog { get; set; }
+
+        [JsonPropertyName("worklogCommentsSortNewestFirst")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? WorklogCommentsSortNewestFirst { get; set; }
+
+        [JsonPropertyName("worklogWorkDoneSortNewestFirst")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? WorklogWorkDoneSortNewestFirst { get; set; }
+
+        [JsonPropertyName("worklogShowEntriesChecked")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? WorklogShowEntriesChecked { get; set; }
+
         [JsonPropertyName("contributorMode")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? ContributorMode { get; set; }
@@ -556,6 +572,75 @@ namespace Handlers.DataHandling
             }
         }
 
+        public static bool EnableWorklog
+        {
+            get => _data.EnableWorklog ?? true; // Default is true
+            set
+            {
+                _data.EnableWorklog = value;
+                Logger.Info($"Setting changed: [EnableWorklog] [{value}]");
+                Save();
+            }
+        }
+
+        // ###########################################################################################
+        // Sort order for the worklog entry editor's Comments list. Defaults to newest-first, matching
+        // the editor's in-memory default before this was persisted.
+        // ###########################################################################################
+        public static bool WorklogCommentsSortNewestFirst
+        {
+            get => _data.WorklogCommentsSortNewestFirst ?? true;
+            set
+            {
+                if ((_data.WorklogCommentsSortNewestFirst ?? true) == value)
+                    return;
+
+                _data.WorklogCommentsSortNewestFirst = value;
+                Logger.Info($"Setting changed: [WorklogCommentsSortNewestFirst] [{value}]");
+                Save();
+            }
+        }
+
+        // ###########################################################################################
+        // Sort order for the worklog entry editor's Work done list. Defaults to newest-first, matching
+        // the editor's in-memory default before this was persisted.
+        // ###########################################################################################
+        public static bool WorklogWorkDoneSortNewestFirst
+        {
+            get => _data.WorklogWorkDoneSortNewestFirst ?? true;
+            set
+            {
+                if ((_data.WorklogWorkDoneSortNewestFirst ?? true) == value)
+                    return;
+
+                _data.WorklogWorkDoneSortNewestFirst = value;
+                Logger.Info($"Setting changed: [WorklogWorkDoneSortNewestFirst] [{value}]");
+                Save();
+            }
+        }
+
+        // ###########################################################################################
+        // Whether the top-bar's "Show worklogs" checkbox should default to checked. Defaults to
+        // true so the entries list overlay shows automatically. This is the checkbox's own
+        // preferred value, not whether it is currently showing entries for the board on screen -
+        // RefreshWorklogBar forces it unchecked whenever there is no workbook, or a different one
+        // than it was showing, to avoid displaying entries for a workbook the user is no longer
+        // looking at.
+        // ###########################################################################################
+        public static bool WorklogShowEntriesChecked
+        {
+            get => _data.WorklogShowEntriesChecked ?? true;
+            set
+            {
+                if ((_data.WorklogShowEntriesChecked ?? true) == value)
+                    return;
+
+                _data.WorklogShowEntriesChecked = value;
+                Logger.Info($"Setting changed: [WorklogShowEntriesChecked] [{value}]");
+                Save();
+            }
+        }
+
         public static bool ContributorMode
         {
             get => _data.ContributorMode ?? false;
@@ -900,6 +985,10 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [OpenMultiplePopups] [{MultipleInstancesForComponentPopup}]");
                     Logger.Info($"        [EnableNetworkConnectedOscilloscopeTab] [{EnableNetworkConnectedOscilloscopeTab}]");
                     Logger.Info($"        [EnableMiniproExperimentalMode] [{EnableMiniproExperimentalMode}]");
+                    Logger.Info($"        [EnableWorklog] [{EnableWorklog}]");
+                    Logger.Info($"        [WorklogCommentsSortNewestFirst] [{WorklogCommentsSortNewestFirst}]");
+                    Logger.Info($"        [WorklogWorkDoneSortNewestFirst] [{WorklogWorkDoneSortNewestFirst}]");
+                    Logger.Info($"        [WorklogShowEntriesChecked] [{WorklogShowEntriesChecked}]");
                     Logger.Info($"        [CheckDataOnLaunch] [{CheckDataOnLaunch}]");
                     Logger.Info($"        [DownloadDataFromTestSource] [{DownloadDataFromTestSource}]");
                     Logger.Info($"        [AllowDeletionOfOrphanAndNonUsedFiles] [{AllowDeletionOfOrphanAndNonUsedFiles}]");
@@ -972,29 +1061,7 @@ namespace Handlers.DataHandling
             if (string.IsNullOrEmpty(_settingsFilePath))
                 return;
 
-            string tempPath = _settingsFilePath + ".tmp";
-
-            try
-            {
-                var json = JsonSerializer.Serialize(_data, SaveJsonOptions);
-                File.WriteAllText(tempPath, json);
-
-                // File.Replace, not File.Move: on Windows a rename-over cannot displace a file
-                // that another handle (backup tool, sync client, antivirus) has open for reading,
-                // while ReplaceFile swaps the names and succeeds. Move only ever runs for the
-                // very first save, when no settings file exists yet to replace.
-                if (File.Exists(_settingsFilePath))
-                    File.Replace(tempPath, _settingsFilePath, destinationBackupFileName: null, ignoreMetadataErrors: true);
-                else
-                    File.Move(tempPath, _settingsFilePath);
-            }
-            catch (Exception ex)
-            {
-                Logger.Warning($"Failed to save settings: [{ex.Message}]");
-
-                // Clean up the temp file if it was left behind
-                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
-            }
+            AtomicJsonFile.Write(_settingsFilePath, _data, SaveJsonOptions, "settings");
         }
 
         // ###########################################################################################

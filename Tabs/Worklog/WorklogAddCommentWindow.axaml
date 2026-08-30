@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="CRT.WorklogAddCommentWindow"
+        Title="Add comment"
+        Width="440"
+        MinWidth="380"
+        CanResize="False"
+        ShowInTaskbar="False"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Bg}"
+        Foreground="{DynamicResource Fg}">
+
+	<StackPanel Margin="18" Spacing="4">
+		<TextBlock x:Name="HeaderText" Text="Add comment" FontSize="16" FontWeight="Bold" Margin="0,0,0,10" />
+
+		<TextBlock Text="Comment" />
+		<TextBox x:Name="CommentTextBox"
+				 AcceptsReturn="True"
+				 TextWrapping="Wrap"
+				 Height="100"
+				 VerticalContentAlignment="Top" />
+		<TextBlock Text="Ctrl+Enter to save" FontSize="10" Opacity="0.6" Margin="0,2,0,0" />
+		<TextBlock x:Name="CommentValidationText"
+				   Text="A comment is required."
+				   Foreground="{DynamicResource Text_Fail_Fg}"
+				   FontSize="11"
+				   Margin="0,2,0,0"
+				   IsVisible="False" />
+
+		<StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,16,0,0">
+			<Button Content="Cancel" Click="OnCancelClick" />
+			<Button x:Name="AddButton"
+					Content="Add comment"
+					Foreground="{DynamicResource Button_Ok_Fg}"
+					Background="{DynamicResource Button_Ok_Bg}"
+					BorderBrush="{DynamicResource Button_Ok_Border}"
+					Click="OnAddClick" />
+		</StackPanel>
+	</StackPanel>
+</Window>

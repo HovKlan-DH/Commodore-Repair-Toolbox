@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Media;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace Handlers.Geometry
@@ -55,7 +56,12 @@ namespace Handlers.Geometry
         // ###########################################################################################
         public static Rect GetImageContentRect(Size controlSize, PixelSize bitmapPixelSize)
         {
-            if (controlSize.Width <= 0 || controlSize.Height <= 0)
+            // A zero bitmap dimension is reachable, not theoretical: a thumbnail whose image failed
+            // to load keeps OriginalPixelSize at 0x0. Without this the aspect division yields
+            // Infinity or NaN, and the NaN case returns a rect with NaN X/Width that poisons every
+            // layout it reaches.
+            if (controlSize.Width <= 0 || controlSize.Height <= 0 ||
+                bitmapPixelSize.Width <= 0 || bitmapPixelSize.Height <= 0)
                 return new Rect(controlSize);
 
             double containerAspect = controlSize.Width / controlSize.Height;
@@ -70,6 +76,37 @@ namespace Handlers.Geometry
             {
                 // Height-constrained - content starts at (0, 0), no horizontal centering
                 return new Rect(0, 0, controlSize.Height * bitmapAspect, controlSize.Height);
+            }
+        }
+
+        // ###########################################################################################
+        // Returns the area the bitmap occupies inside its control when the control centers its
+        // content instead of anchoring it top-left - the schematic thumbnail gallery's Image is
+        // HorizontalAlignment/VerticalAlignment="Stretch" with Stretch="Uniform", so its rendered
+        // content sits centered in the control box rather than starting at (0, 0) like
+        // GetImageContentRect's Left/Top-aligned SchematicsImage.
+        // ###########################################################################################
+        public static Rect GetCenteredImageContentRect(Size controlSize, PixelSize bitmapPixelSize)
+        {
+            // Same zero-dimension guard as GetImageContentRect above - see the reasoning there.
+            if (controlSize.Width <= 0 || controlSize.Height <= 0 ||
+                bitmapPixelSize.Width <= 0 || bitmapPixelSize.Height <= 0)
+                return new Rect(controlSize);
+
+            double containerAspect = controlSize.Width / controlSize.Height;
+            double bitmapAspect = (double)bitmapPixelSize.Width / bitmapPixelSize.Height;
+
+            if (bitmapAspect > containerAspect)
+            {
+                // Width-constrained - full width, centered vertically
+                double height = controlSize.Width / bitmapAspect;
+                return new Rect(0, (controlSize.Height - height) / 2.0, controlSize.Width, height);
+            }
+            else
+            {
+                // Height-constrained - full height, centered horizontally
+                double width = controlSize.Height * bitmapAspect;
+                return new Rect((controlSize.Width - width) / 2.0, 0, width, controlSize.Height);
             }
         }
 
@@ -180,6 +217,70 @@ namespace Handlers.Geometry
             double height = Math.Max(0.0, rect.Height - strokeThickness);
 
             return new Rect(rect.X + inset, rect.Y + inset, width, height);
+        }
+
+        // ###########################################################################################
+        // Returns the keys whose rect list contains at least one rect intersecting the target rect -
+        // used to find which board labels a worklog entry area touches. A key with several rects
+        // (a component can have more than one highlight) counts as touching if any one of them does.
+        // ###########################################################################################
+        public static HashSet<string> FindKeysWithRectsIntersecting(
+            IReadOnlyDictionary<string, List<Rect>> rectsByKey,
+            Rect targetRect)
+        {
+            var matches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in rectsByKey)
+            {
+                foreach (var rect in entry.Value)
+                {
+                    if (rect.Intersects(targetRect))
+                    {
+                        matches.Add(entry.Key);
+                        break;
+                    }
+                }
+            }
+
+            return matches;
+        }
+
+        // ###########################################################################################
+        // The rect a control actually occupies once a CENTERED ScaleTransform is applied to it -
+        // the arrangement the "Show worklogs" pills use, where a per-zoom inverse scale keeps each
+        // pill a constant size on screen (TabSchematics.Worklog.cs, PositionWorklogEntriesListBadge).
+        //
+        // layoutTopLeft/layoutSize are the control's placement and unscaled size. Because the
+        // transform's origin is the middle of that layout box rather than its corner, the drawn
+        // rect is NOT layoutTopLeft plus the scaled size: shrinking pulls all four edges inward
+        // toward the center, so the top-left moves too. Getting that wrong leaves a hover rect
+        // that is offset from what the user sees - fine at scale 1, drifting further out the more
+        // the view is zoomed.
+        //
+        // Callers that can reach the live visual tree should prefer TranslatePoint, which applies
+        // the real transforms; this is for reasoning about, and testing, the same placement.
+        // ###########################################################################################
+        public static Rect GetCenterScaledControlRect(Point layoutTopLeft, Size layoutSize, double scale)
+        {
+            if (layoutSize.Width <= 0 || layoutSize.Height <= 0)
+            {
+                return new Rect(layoutTopLeft, new Size(0, 0));
+            }
+
+            double safeScale = Math.Max(0.0, scale);
+
+            var center = new Point(
+                layoutTopLeft.X + (layoutSize.Width / 2.0),
+                layoutTopLeft.Y + (layoutSize.Height / 2.0));
+
+            double scaledWidth = layoutSize.Width * safeScale;
+            double scaledHeight = layoutSize.Height * safeScale;
+
+            return new Rect(
+                center.X - (scaledWidth / 2.0),
+                center.Y - (scaledHeight / 2.0),
+                scaledWidth,
+                scaledHeight);
         }
     }
 }

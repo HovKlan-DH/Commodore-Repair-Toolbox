@@ -96,6 +96,54 @@
 					</ts:KiCadOverlayRenderControl.RenderTransform>
 				</ts:KiCadOverlayRenderControl>
 
+				<!-- Draft/final rectangle for the worklog "Add entry" area-marking flow. Reuses
+				     ComponentLabelEditorOverlay: DraftRectangle while dragging, then Rectangles with
+				     SelectedIndex/HoveredIndex set so the corner+side markers render once released. -->
+				<ts:ComponentLabelEditorOverlay x:Name="SchematicsWorklogEntryOverlay"
+												IsVisible="False"
+												IsHitTestVisible="False"
+												RenderTransformOrigin="0%,0%">
+					<ts:ComponentLabelEditorOverlay.RenderTransform>
+						<MatrixTransform />
+					</ts:ComponentLabelEditorOverlay.RenderTransform>
+				</ts:ComponentLabelEditorOverlay>
+
+				<!-- Entry-number badge anchored at the top-left of a saved worklog entry's marked
+				     bounds, so the board keeps showing which entry number a marking belongs to. -->
+				<Canvas x:Name="SchematicsWorklogEntryBadgeCanvas"
+						IsHitTestVisible="False"
+						RenderTransformOrigin="0%,0%"
+						Background="Transparent">
+					<Canvas.RenderTransform>
+						<MatrixTransform />
+					</Canvas.RenderTransform>
+				</Canvas>
+
+				<!-- "Show worklogs" list view: every saved entry's marked area for the schematic
+				     currently on screen, each drawn in its own category color. Toggled by the
+				     top-bar "Show worklogs" checkbox - see TabSchematics.Worklog.cs. -->
+				<ts:WorklogEntriesOverlay x:Name="SchematicsWorklogEntriesOverlay"
+										   IsVisible="False"
+										   IsHitTestVisible="False"
+										   RenderTransformOrigin="0%,0%">
+					<ts:WorklogEntriesOverlay.RenderTransform>
+						<MatrixTransform />
+					</ts:WorklogEntriesOverlay.RenderTransform>
+				</ts:WorklogEntriesOverlay>
+
+				<!-- "#N" badge + category/state pill for each entry shown by the "Show worklogs"
+				     list view above. Populated/positioned in TabSchematics.Worklog.cs. Each badge
+				     is clickable (opens the full editor), so unlike the other overlay canvases the
+				     canvas itself stays hit-test visible; its own Background="Transparent" keeps
+				     clicks on empty space from being captured. -->
+				<Canvas x:Name="SchematicsWorklogEntriesBadgeCanvas"
+						RenderTransformOrigin="0%,0%"
+						Background="Transparent">
+					<Canvas.RenderTransform>
+						<MatrixTransform />
+					</Canvas.RenderTransform>
+				</Canvas>
+
 				<StackPanel Orientation="Horizontal"
 							HorizontalAlignment="Left"
 							VerticalAlignment="Top"
@@ -140,10 +188,35 @@
 						BorderThickness="1"
 						CornerRadius="4"
 						Padding="8,4">
-						<TextBlock x:Name="SchematicsHoverLabelText"
-							FontSize="11"
-									FontWeight="Bold"
-									Foreground="{DynamicResource Schematics_ComponentHover_Fg}" />
+						<StackPanel Orientation="Horizontal" Spacing="4">
+							<TextBlock x:Name="SchematicsHoverLabelIdText"
+								IsVisible="False"
+								FontSize="11"
+								FontWeight="Bold"
+								VerticalAlignment="Center"
+								Foreground="White" />
+							<Border x:Name="SchematicsHoverLabelIconBorder"
+								IsVisible="False"
+								Width="16"
+								Height="16"
+								CornerRadius="8"
+								BorderBrush="White"
+								BorderThickness="1"
+								VerticalAlignment="Center">
+								<TextBlock x:Name="SchematicsHoverLabelIcon"
+									FontFamily="{StaticResource FontAwesomeSolid}"
+									FontWeight="Black"
+									FontSize="9"
+									Foreground="White"
+									HorizontalAlignment="Center"
+									VerticalAlignment="Center" />
+							</Border>
+							<TextBlock x:Name="SchematicsHoverLabelText"
+								FontSize="11"
+										FontWeight="Bold"
+										VerticalAlignment="Center"
+										Foreground="{DynamicResource Schematics_ComponentHover_Fg}" />
+						</StackPanel>
 					</Border>
 					<Border x:Name="SchematicsHoverPadBorder"
 						IsVisible="False"
@@ -833,6 +906,10 @@
 										   Stretch="Uniform"
 										   HorizontalAlignment="Stretch"
 										   RenderOptions.BitmapInterpolationMode="HighQuality" />
+
+									<ts:ThumbnailWorklogPillsOverlay BitmapPixelSize="{Binding OriginalPixelSize}"
+																	  Pills="{Binding WorklogPills}"
+																	  IsHitTestVisible="False" />
 								</Grid>
 							</Grid>
 						</Grid>
@@ -993,6 +1070,241 @@
 					<Button x:Name="ConfirmNewLabelEditorBoardLabelButton"
 							Content="OK"
 							MinWidth="72" />
+				</StackPanel>
+			</StackPanel>
+		</Border>
+
+		<!-- "New fault" quick card: opens after a worklog entry area is drag-drawn on the board.
+		     Cancel dismisses it; Save writes the entry via WorklogManager.AddEntry - see
+		     TabSchematics.Worklog.cs's OnWorklogEntryCardSaveClick. -->
+		<Border x:Name="SchematicsNewWorklogEntryCardBorder"
+				IsVisible="False"
+				ZIndex="5002"
+				HorizontalAlignment="Left"
+				VerticalAlignment="Top"
+				Background="{DynamicResource Schematics_Panels_Bg}"
+				BorderBrush="{DynamicResource Schematics_Panels_Border}"
+				BorderThickness="1"
+				CornerRadius="8"
+				Padding="0">
+			<StackPanel Width="340">
+
+				<Border Background="{DynamicResource Table_Header_Bg}"
+						BorderBrush="{DynamicResource Schematics_Panels_Border}"
+						BorderThickness="0,0,0,1"
+						CornerRadius="8,8,0,0"
+						Padding="10,8">
+					<Grid ColumnDefinitions="Auto,*">
+						<Border Grid.Column="0"
+								x:Name="WorklogEntryIdBadge"
+								CornerRadius="12"
+								Padding="10,4"
+								VerticalAlignment="Center"
+								Margin="0,0,10,0">
+							<TextBlock x:Name="WorklogEntryIdText"
+									   FontSize="14"
+									   FontWeight="Bold"
+									   Foreground="White" />
+						</Border>
+
+						<TextBox Grid.Column="1"
+								 x:Name="WorklogEntryTitleTextBox"
+								 PlaceholderText="Entry headline" />
+					</Grid>
+				</Border>
+
+				<StackPanel Margin="10" Spacing="8">
+
+					<TextBox x:Name="WorklogEntryDescriptionTextBox"
+							 PlaceholderText="Elaborative comment"
+							 AcceptsReturn="True"
+							 TextWrapping="Wrap"
+							 Height="60" />
+
+					<StackPanel Orientation="Horizontal" Spacing="5">
+						<Border x:Name="WorklogCategoryNoteChip"
+								VerticalAlignment="Center"
+								Background="{DynamicResource Form_Bg}"
+								BorderBrush="{DynamicResource Form_Border}"
+								BorderThickness="1"
+								CornerRadius="3"
+								Padding="8,4"
+								Cursor="Hand"
+								Tag="Note"
+								PointerPressed="OnWorklogEntryCategoryChipPointerPressed">
+							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
+								<Ellipse x:Name="WorklogCategoryNoteDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Category_Note}" VerticalAlignment="Center" />
+								<TextBlock x:Name="WorklogCategoryNoteText" Text="Note" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
+							</StackPanel>
+						</Border>
+						<Border x:Name="WorklogCategoryCosmeticChip"
+								VerticalAlignment="Center"
+								Background="{DynamicResource Form_Bg}"
+								BorderBrush="{DynamicResource Form_Border}"
+								BorderThickness="1"
+								CornerRadius="3"
+								Padding="8,4"
+								Cursor="Hand"
+								Tag="Cosmetic"
+								PointerPressed="OnWorklogEntryCategoryChipPointerPressed">
+							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
+								<Ellipse x:Name="WorklogCategoryCosmeticDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Category_Cosmetic}" VerticalAlignment="Center" />
+								<TextBlock x:Name="WorklogCategoryCosmeticText" Text="Cosmetic" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
+							</StackPanel>
+						</Border>
+						<Border x:Name="WorklogCategoryIssueChip"
+								VerticalAlignment="Center"
+								Background="{DynamicResource Form_Bg}"
+								BorderBrush="{DynamicResource Form_Border}"
+								BorderThickness="1"
+								CornerRadius="3"
+								Padding="8,4"
+								Cursor="Hand"
+								Tag="Issue"
+								PointerPressed="OnWorklogEntryCategoryChipPointerPressed">
+							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
+								<Ellipse x:Name="WorklogCategoryIssueDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Category_Issue}" VerticalAlignment="Center" />
+								<TextBlock x:Name="WorklogCategoryIssueText" Text="Issue" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
+							</StackPanel>
+						</Border>
+					</StackPanel>
+
+					<StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+						<Border x:Name="WorklogStatePendingPill"
+								VerticalAlignment="Center"
+								Background="{DynamicResource Form_Bg}"
+								BorderBrush="{DynamicResource Form_Border}"
+								BorderThickness="1"
+								CornerRadius="10"
+								Padding="10,1"
+								Cursor="Hand"
+								Tag="Pending"
+								PointerPressed="OnWorklogEntryStatePillPointerPressed">
+							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
+								<TextBlock x:Name="WorklogStatePendingIcon" Text="&#xf128;" FontFamily="{StaticResource FontAwesomeSolid}" FontWeight="Black" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" VerticalAlignment="Center" />
+								<TextBlock x:Name="WorklogStatePendingText" Text="Pending" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
+							</StackPanel>
+						</Border>
+						<Border x:Name="WorklogStateRuledOutPill"
+								VerticalAlignment="Center"
+								Background="{DynamicResource Form_Bg}"
+								BorderBrush="{DynamicResource Form_Border}"
+								BorderThickness="1"
+								CornerRadius="10"
+								Padding="10,1"
+								Cursor="Hand"
+								Tag="RuledOut"
+								PointerPressed="OnWorklogEntryStatePillPointerPressed">
+							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
+								<TextBlock x:Name="WorklogStateRuledOutIcon" Text="&#xf00d;" FontFamily="{StaticResource FontAwesomeSolid}" FontWeight="Black" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" VerticalAlignment="Center" />
+								<TextBlock x:Name="WorklogStateRuledOutText" Text="Ruled out" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
+							</StackPanel>
+						</Border>
+						<Border x:Name="WorklogStateFixedPill"
+								VerticalAlignment="Center"
+								Background="{DynamicResource Form_Bg}"
+								BorderBrush="{DynamicResource Form_Border}"
+								BorderThickness="1"
+								CornerRadius="10"
+								Padding="10,1"
+								Cursor="Hand"
+								Tag="Fixed"
+								PointerPressed="OnWorklogEntryStatePillPointerPressed">
+							<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
+								<TextBlock x:Name="WorklogStateFixedIcon" Text="&#xf00c;" FontFamily="{StaticResource FontAwesomeSolid}" FontWeight="Black" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" VerticalAlignment="Center" />
+								<TextBlock x:Name="WorklogStateFixedText" Text="Fixed" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" />
+							</StackPanel>
+						</Border>
+					</StackPanel>
+
+					<StackPanel Spacing="4">
+						<StackPanel Orientation="Horizontal" Spacing="10">
+							<TextBlock Text="Mark components in scope" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" VerticalAlignment="Center" />
+							<TextBlock x:Name="WorklogEntryComponentCountText" Text="0 found" FontSize="10" Foreground="{DynamicResource Schematics_Panels_Fg}" Opacity="0.7" VerticalAlignment="Center" />
+							<Button Content="All"
+									FontSize="10"
+									Padding="0"
+									Background="Transparent"
+									BorderThickness="0"
+									Foreground="{DynamicResource Link_Fg}"
+									Cursor="Hand"
+									Click="OnWorklogEntrySelectAllComponentsClick" />
+							<Button Content="None"
+									FontSize="10"
+									Padding="0"
+									Background="Transparent"
+									BorderThickness="0"
+									Foreground="{DynamicResource Link_Fg}"
+									Cursor="Hand"
+									Click="OnWorklogEntrySelectNoneComponentsClick" />
+						</StackPanel>
+
+						<Border Background="{DynamicResource Form_Bg}" BorderBrush="{DynamicResource Form_Border}" BorderThickness="1" CornerRadius="3" MinHeight="40">
+							<Grid>
+								<TextBlock x:Name="WorklogEntryNoComponentsText"
+										   Text="No components in this area"
+										   FontSize="10"
+										   Foreground="{DynamicResource Schematics_Panels_Fg}"
+										   Opacity="0.7"
+										   HorizontalAlignment="Center"
+										   Margin="8,10"
+										   IsVisible="False" />
+
+								<ScrollViewer MaxHeight="120"
+											  VerticalScrollBarVisibility="Auto"
+											  HorizontalScrollBarVisibility="Disabled">
+									<ItemsControl x:Name="WorklogEntryComponentList">
+										<ItemsControl.ItemTemplate>
+											<DataTemplate x:DataType="local:WorklogEntryComponentRow">
+												<Border Background="Transparent"
+														Cursor="Hand"
+														PointerPressed="OnWorklogEntryComponentRowPointerPressed">
+													<StackPanel Orientation="Horizontal" Spacing="6" Margin="8,0">
+														<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+															<CheckBox IsChecked="{Binding IsChecked}"
+																	  MinWidth="0"
+																	  MinHeight="0"
+																	  Margin="0"
+																	  Padding="0"
+																	  CornerRadius="2"
+																	  IsHitTestVisible="False"
+																	  VerticalAlignment="Center" />
+														</Viewbox>
+														<TextBlock Text="{Binding BoardLabel}"
+																   FontSize="10"
+																   FontWeight="Bold"
+																   Foreground="{DynamicResource Schematics_Panels_Fg}"
+																   VerticalAlignment="Center"
+																   IsHitTestVisible="False" />
+														<TextBlock Text="{Binding DisplayName}"
+																   FontSize="10"
+																   Foreground="{DynamicResource Schematics_Panels_Fg}"
+																   VerticalAlignment="Center"
+																   TextTrimming="CharacterEllipsis"
+																   IsHitTestVisible="False" />
+													</StackPanel>
+												</Border>
+											</DataTemplate>
+										</ItemsControl.ItemTemplate>
+									</ItemsControl>
+								</ScrollViewer>
+							</Grid>
+						</Border>
+					</StackPanel>
+
+					<StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+						<Button Content="Cancel"
+								FontSize="11"
+								Padding="10,4"
+								Click="OnWorklogEntryCardDismissClick" />
+						<Button Content="Save"
+								FontSize="11"
+								Padding="10,4"
+								Foreground="{DynamicResource Button_Ok_Fg}"
+								Background="{DynamicResource Button_Ok_Bg}"
+								BorderBrush="{DynamicResource Button_Ok_Border}"
+								Click="OnWorklogEntryCardSaveClick" />
+					</StackPanel>
 				</StackPanel>
 			</StackPanel>
 		</Border>

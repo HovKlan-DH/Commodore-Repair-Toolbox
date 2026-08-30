@@ -261,6 +261,7 @@
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
 					<RowDefinition Height="*" />
 				</Grid.RowDefinitions>
 
@@ -412,7 +413,105 @@
 							   TextWrapping="Wrap" />
 				</Border>
 
-				<TabControl x:Name="MainTabControl" Grid.Row="4" Padding="0">
+				<!-- Worklog bar: shows the active repair worklog job for the selected board. Permanently
+				     visible above the tabs (toggled by "Enable Worklog" in Configuration), not a
+				     dismissible banner like the ones above it. -->
+				<Border x:Name="WorklogBar"
+						Grid.Row="4"
+						IsVisible="False"
+						Background="{DynamicResource Schematics_Panels_Bg}"
+						BorderBrush="{DynamicResource Schematics_Panels_Border}"
+						BorderThickness="0,0,0,1"
+						Padding="14,8">
+					<Grid ColumnDefinitions="Auto,*">
+						<StackPanel Grid.Column="0"
+									Orientation="Horizontal"
+									Spacing="12"
+									VerticalAlignment="Center">
+							<TextBlock Text="Active job"
+									   FontSize="12"
+									   Foreground="{DynamicResource Schematics_Panels_Fg}"
+									   VerticalAlignment="Center" />
+							<TextBlock x:Name="WorklogNoJobText"
+									   Text="No jobs recorded for this board"
+									   FontSize="12"
+									   Foreground="{DynamicResource Schematics_Panels_Fg}"
+									   VerticalAlignment="Center" />
+							<Border x:Name="WorklogJobBox"
+									IsVisible="False"
+									Background="{DynamicResource Form_Bg}"
+									BorderBrush="{DynamicResource Form_Border}"
+									BorderThickness="1"
+									CornerRadius="4"
+									Padding="10,3"
+									VerticalAlignment="Center">
+								<TextBlock x:Name="WorklogJobBoxText"
+										   FontSize="12"
+										   Foreground="{DynamicResource Form_Fg}" />
+							</Border>
+							<StackPanel x:Name="WorklogJobStatusPanel"
+										Orientation="Horizontal"
+										Spacing="5"
+										IsVisible="False"
+										VerticalAlignment="Center">
+								<Ellipse x:Name="WorklogJobStatusDot" Width="8" Height="8" VerticalAlignment="Center" />
+								<TextBlock x:Name="WorklogJobStatusText"
+										   FontSize="12"
+										   Foreground="{DynamicResource Schematics_Panels_Fg}"
+										   VerticalAlignment="Center" />
+							</StackPanel>
+						</StackPanel>
+
+						<StackPanel Grid.Column="1"
+									Orientation="Horizontal"
+									Spacing="8"
+									HorizontalAlignment="Right"
+									VerticalAlignment="Center">
+							<StackPanel x:Name="WorklogShowEntriesPanel"
+										Orientation="Horizontal"
+										Spacing="5"
+										IsVisible="False"
+										VerticalAlignment="Center"
+										Margin="0,0,6,0">
+								<TextBlock x:Name="WorklogShowEntriesLabel"
+										   Text="Show worklogs"
+										   FontSize="12"
+										   Foreground="{DynamicResource Schematics_Panels_Fg}"
+										   VerticalAlignment="Center"
+										   Cursor="Hand"
+										   PointerPressed="OnWorklogShowEntriesLabelPointerPressed" />
+								<CheckBox x:Name="WorklogShowEntriesCheckBox"
+										  MinHeight="0"
+										  Margin="0"
+										  Padding="0"
+										  VerticalAlignment="Center"
+										  IsCheckedChanged="OnWorklogShowEntriesCheckedChanged" />
+							</StackPanel>
+							<Button x:Name="WorklogCancelEntryButton"
+									Content="Cancel entry"
+									IsVisible="False"
+									FontSize="11"
+									Padding="10,4"
+									Click="OnWorklogCancelEntryClick" />
+							<Button x:Name="WorklogAddEntryButton"
+									Content="Add entry"
+									IsVisible="False"
+									Foreground="{DynamicResource Button_Ok_Fg}"
+									Background="{DynamicResource Button_Ok_Bg}"
+									BorderBrush="{DynamicResource Button_Ok_Border}"
+									FontSize="11"
+									Padding="10,4"
+									Click="OnWorklogAddEntryClick" />
+							<Button x:Name="WorklogCreateWorkbookButton"
+									Content="Create new workbook"
+									FontSize="11"
+									Padding="10,4"
+									Click="OnWorklogCreateWorkbookClick" />
+						</StackPanel>
+					</Grid>
+				</Border>
+
+				<TabControl x:Name="MainTabControl" Grid.Row="5" Padding="0">
 
 					<TabItem x:Name="SchematicsTabItem" Header="Schematics">
 						<local:TabSchematics x:Name="TabSchematicsControl" />
@@ -449,7 +548,7 @@
 				</TabControl>
 
 				<Border x:Name="DataSyncStatusIconBorder"
-						Grid.Row="4"
+						Grid.Row="5"
 						ZIndex="10"
 						HorizontalAlignment="Right"
 						VerticalAlignment="Top"

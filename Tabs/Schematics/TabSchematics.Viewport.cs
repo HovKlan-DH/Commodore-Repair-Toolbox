@@ -327,6 +327,10 @@ public partial class TabSchematics
         ((MatrixTransform)this.SchematicsPolylineCanvas.RenderTransform!).Matrix = this.schematicsMatrix;
         ((MatrixTransform)this.SchematicsLabelsCanvas.RenderTransform!).Matrix = this.schematicsMatrix;
         ((MatrixTransform)this.SchematicsKiCadOverlayCanvas.RenderTransform!).Matrix = this.schematicsMatrix;
+        ((MatrixTransform)this.SchematicsWorklogEntryOverlay.RenderTransform!).Matrix = this.schematicsMatrix;
+        ((MatrixTransform)this.SchematicsWorklogEntryBadgeCanvas.RenderTransform!).Matrix = this.schematicsMatrix;
+        ((MatrixTransform)this.SchematicsWorklogEntriesOverlay.RenderTransform!).Matrix = this.schematicsMatrix;
+        ((MatrixTransform)this.SchematicsWorklogEntriesBadgeCanvas.RenderTransform!).Matrix = this.schematicsMatrix;
 
         // The KiCad overlay culls to the visible area, so it needs the same view matrix the
         // highlights overlay uses. Assigning it does not invalidate anything on its own.
@@ -337,6 +341,9 @@ public partial class TabSchematics
 
         this.SchematicsHoverHighlightsOverlay.ViewMatrix = this.schematicsMatrix;
         this.SchematicsHoverHighlightsOverlay.InvalidateVisual();
+
+        this.SchematicsWorklogEntriesOverlay.ViewMatrix = this.schematicsMatrix;
+        this.SchematicsWorklogEntriesOverlay.InvalidateVisual();
 
         this.SchematicsLabelEditorOverlay.ApplyState(
             rectangles: this.SchematicsLabelEditorOverlay.Rectangles,
@@ -351,6 +358,9 @@ public partial class TabSchematics
             highlightColor: this.SchematicsLabelEditorOverlay.HighlightColor,
             highlightOpacity: this.SchematicsLabelEditorOverlay.HighlightOpacity,
             isVisible: this.SchematicsLabelEditorOverlay.IsVisible);
+
+        this.RefreshWorklogEntryOverlay();
+        this.RescaleWorklogEntriesListBadges();
 
         this.polylineManager?.UpdateScaleFactor(scale);
 

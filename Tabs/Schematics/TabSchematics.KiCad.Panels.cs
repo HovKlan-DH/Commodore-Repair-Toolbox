@@ -370,6 +370,7 @@ public partial class TabSchematics
         this.SetHoveredKiCadNet(null);
         this.thisHoveredKiCadPadNumber = null;
 
+        this.ResetSchematicsHoverLabelToDefaultAppearance();
         this.SchematicsHoverLabelBorder.IsVisible = false;
         this.SchematicsHoverLabelText.Text = string.Empty;
         this.SchematicsHoverPadBorder.IsVisible = false;

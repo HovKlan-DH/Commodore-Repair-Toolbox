@@ -258,6 +258,10 @@ public partial class TabSchematics
         this.thisKiCadCalibrationStartImageRight = this.thisKiCadCalibrationImageRight;
         this.thisKiCadCalibrationStartImageBottom = this.thisKiCadCalibrationImageBottom;
 
+        // Same one-sided exclusion as the label editor: worklog entry mode grabs the pointer
+        // handlers first, so it has to be ended rather than left running underneath this.
+        this.CancelWorklogEntryMode();
+
         this.thisKiCadTraceCalibrationDragMode = LabelEditorDragMode.None;
         this.thisIsKiCadTraceCalibrationMode = true;
 

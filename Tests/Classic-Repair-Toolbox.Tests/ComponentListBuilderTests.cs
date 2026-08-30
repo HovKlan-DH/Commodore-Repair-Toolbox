@@ -335,4 +335,87 @@ public class ComponentListBuilderTests
     {
         Assert.Equal("Sync done", ComponentListBuilder.BuildSyncBannerText("Sync done", -1));
     }
+
+    // -------------------------------------------------------------- BuildComponentsInScope
+
+    // This backs the worklog entry card's "Mark components in scope" checklist: given the set of
+    // board labels a drawn area touches, return the matching components in board-data order (the
+    // same order Overview and the main Component list already use).
+    [Fact]
+    public void Only_components_whose_label_is_in_scope_are_returned()
+    {
+        var board = Board(
+            Component(boardLabel: "C1", friendly: "Ceramic"),
+            Component(boardLabel: "R1", friendly: "Resistor"));
+
+        var rows = ComponentListBuilder.BuildComponentsInScope(board, new HashSet<string> { "C1" });
+
+        Assert.Equal("C1", Assert.Single(rows).BoardLabel);
+    }
+
+    // Order must follow boardData.Components, not the (unordered) scope set, or the list would
+    // shuffle components relative to how Overview and the main Component list show them.
+    [Fact]
+    public void Matched_components_keep_board_data_order_regardless_of_scope_set_order()
+    {
+        var board = Board(
+            Component(boardLabel: "C3"),
+            Component(boardLabel: "C1"),
+            Component(boardLabel: "C2"));
+
+        var rows = ComponentListBuilder.BuildComponentsInScope(
+            board, new HashSet<string> { "C1", "C2", "C3" });
+
+        Assert.Equal(new[] { "C3", "C1", "C2" }, rows.Select(row => row.BoardLabel));
+    }
+
+    [Fact]
+    public void Board_label_matching_is_case_insensitive()
+    {
+        var board = Board(Component(boardLabel: "C1"));
+
+        var rows = ComponentListBuilder.BuildComponentsInScope(board, new HashSet<string> { "c1" });
+
+        Assert.Single(rows);
+    }
+
+    [Fact]
+    public void An_empty_scope_yields_no_rows()
+    {
+        var board = Board(Component(boardLabel: "C1"));
+
+        Assert.Empty(ComponentListBuilder.BuildComponentsInScope(board, new HashSet<string>()));
+    }
+
+    // The display name deliberately excludes the board label - the UI shows that separately, bold.
+    [Fact]
+    public void Display_name_joins_friendly_and_technical_name_but_not_the_board_label()
+    {
+        var board = Board(Component(boardLabel: "C1", friendly: "Ceramic", technical: "100pF 25V"));
+
+        var row = ComponentListBuilder.BuildComponentsInScope(board, new HashSet<string> { "C1" }).Single();
+
+        Assert.Equal("Ceramic | 100pF 25V", row.DisplayName);
+    }
+
+    [Fact]
+    public void Blank_display_name_parts_are_omitted()
+    {
+        var board = Board(Component(boardLabel: "C1", technical: "100pF 25V"));
+
+        var row = ComponentListBuilder.BuildComponentsInScope(board, new HashSet<string> { "C1" }).Single();
+
+        Assert.Equal("100pF 25V", row.DisplayName);
+    }
+
+    [Fact]
+    public void Board_label_and_display_name_parts_are_trimmed()
+    {
+        var board = Board(Component(boardLabel: "  C1  ", friendly: "  Ceramic  "));
+
+        var row = ComponentListBuilder.BuildComponentsInScope(board, new HashSet<string> { "C1" }).Single();
+
+        Assert.Equal("C1", row.BoardLabel);
+        Assert.Equal("Ceramic", row.DisplayName);
+    }
 }

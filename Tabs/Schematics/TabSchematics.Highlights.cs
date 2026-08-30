@@ -54,6 +54,22 @@ public partial class TabSchematics
     private string thisHighlightedBoardLabelsSignature = string.Empty;
 
     // ###########################################################################################
+    // Which worklog entry the hover label is currently painted for, or 0 when it is in its default
+    // component-hover appearance. Both UpdateSchematicsHoverUi's worklog branch and
+    // ResetSchematicsHoverLabelToDefaultAppearance run on every PointerMoved frame, and each one
+    // otherwise reassigns brushes on every one of those frames - the worklog side allocating two
+    // SolidColorBrushes, the default side resolving three theme brushes. Repainting only when the
+    // hovered entry actually changes keeps a hot path free of that.
+    // ###########################################################################################
+    private int thisHoverLabelPaintedWorklogEntryId;
+
+    // ###########################################################################################
+    // Cursor instances are IDisposable and were previously allocated per frame by the hover paths.
+    // Two are enough for the whole tab, so they are created once and reused.
+    // ###########################################################################################
+    private readonly Cursor thisHandCursor = new(StandardCursorType.Hand);
+
+    // ###########################################################################################
     // Updates UI visibility for all contextual label borders at once.
     // ###########################################################################################
     public void HideLabels()
@@ -502,6 +518,50 @@ public partial class TabSchematics
     }
 
     // ###########################################################################################
+    // Returns the hover label to its default component-hover appearance: theme colors, and no
+    // worklog "#N"/state-icon parts.
+    //
+    // Every path that clears or rewrites the hover label must call this, because the worklog
+    // branch of UpdateSchematicsHoverUi repaints the shared SchematicsHoverLabelBorder in the
+    // hovered entry's category color with white text. Merely hiding the border is not enough -
+    // the colors survive into whatever shows it next. That is what went wrong when only some of
+    // the paths reset them: hovering a pill, moving into the KiCad net connections panel and
+    // back out onto a plain component drew that component's name white-on-white in the previous
+    // entry's color, with a stale "#5" and icon still beside it.
+    //
+    // Restores the DynamicResource bindings rather than assigning resolved brushes, the same way
+    // UpdateOverlayLabels rebinds the region border. Assigning a brush would replace the binding
+    // the AXAML set up with a permanent local value, so the label would keep whichever theme was
+    // active at the moment a pill was first hovered and stop following ApplyConfiguredTheme.
+    // ###########################################################################################
+    private void ResetSchematicsHoverLabelToDefaultAppearance()
+    {
+        // Already in the default appearance - nothing to undo. This also keeps the rebinding below
+        // off the per-frame pointer-move path.
+        if (this.thisHoverLabelPaintedWorklogEntryId == 0)
+        {
+            return;
+        }
+
+        this.thisHoverLabelPaintedWorklogEntryId = 0;
+
+        this.SchematicsHoverLabelIdText.IsVisible = false;
+        this.SchematicsHoverLabelIconBorder.IsVisible = false;
+
+        this.SchematicsHoverLabelBorder.Bind(
+            Border.BackgroundProperty,
+            this.GetResourceObservable("Schematics_ComponentHover_Bg"));
+
+        this.SchematicsHoverLabelBorder.Bind(
+            Border.BorderBrushProperty,
+            this.GetResourceObservable("Schematics_ComponentHover_Border"));
+
+        this.SchematicsHoverLabelText.Bind(
+            TextBlock.ForegroundProperty,
+            this.GetResourceObservable("Schematics_ComponentHover_Fg"));
+    }
+
+    // ###########################################################################################
     // Clears hover label and resets schematic cursor.
     // ###########################################################################################
     public void HideSchematicsHoverUi()
@@ -509,6 +569,7 @@ public partial class TabSchematics
         this.SetHoveredComponentBoardLabel(null);
         this.SetHoveredKiCadNet(null);
         this.thisHoveredKiCadPadNumber = null;
+        this.ResetSchematicsHoverLabelToDefaultAppearance();
         this.SchematicsHoverLabelBorder.IsVisible = false;
         this.SchematicsHoverLabelText.Text = string.Empty;
         this.SchematicsHoverPadBorder.IsVisible = false;
@@ -532,6 +593,7 @@ public partial class TabSchematics
             this.SetHoveredKiCadNet(null);
             this.thisHoveredKiCadPadNumber = null;
 
+            this.ResetSchematicsHoverLabelToDefaultAppearance();
             this.SchematicsHoverLabelText.Text =
                 "KiCad calibration mode - drag inside box to move, drag edges to resize, drag across to flip";
             this.SchematicsHoverLabelBorder.IsVisible = true;
@@ -562,6 +624,7 @@ public partial class TabSchematics
                 this.MainWindow.isHoveringComponent = false;
             }
 
+            this.ResetSchematicsHoverLabelToDefaultAppearance();
             this.SchematicsHoverLabelBorder.IsVisible = false;
             this.SchematicsHoverLabelText.Text = string.Empty;
             this.SchematicsHoverPadBorder.IsVisible = false;
@@ -569,6 +632,56 @@ public partial class TabSchematics
             this.UpdateLabelEditorCursor(pointerInContainer);
             return;
         }
+
+        // A saved worklog entry's marked area is frequently drawn right on top of the component it
+        // concerns, so its pill takes priority over the component hover label underneath it -
+        // checked first, before the component highlight hit-test below.
+        if (this.TryGetHoveredWorklogEntry(pointerInContainer, out var hoveredWorklogEntry, out var hoveredWorklogColor))
+        {
+            // Clears all three hover sources, as the calibration branch above does. Without the
+            // KiCad half the pad box kept showing a pin from the copper underneath the pill,
+            // beside a label that had already switched to describing the worklog entry.
+            this.SetHoveredComponentBoardLabel(null);
+            this.SetHoveredKiCadNet(null);
+            this.thisHoveredKiCadPadNumber = null;
+
+            // Only repaint when the hovered entry changed - this runs on every pointer-move frame.
+            if (this.thisHoverLabelPaintedWorklogEntryId != hoveredWorklogEntry.Id)
+            {
+                this.thisHoverLabelPaintedWorklogEntryId = hoveredWorklogEntry.Id;
+
+                // Drop the theme bindings ResetSchematicsHoverLabelToDefaultAppearance restores,
+                // so they cannot overwrite the entry colors assigned just below.
+                this.SchematicsHoverLabelBorder.ClearValue(Border.BackgroundProperty);
+                this.SchematicsHoverLabelBorder.ClearValue(Border.BorderBrushProperty);
+                this.SchematicsHoverLabelText.ClearValue(TextBlock.ForegroundProperty);
+
+                this.SchematicsHoverLabelIdText.Text = $"#{hoveredWorklogEntry.Id}";
+                this.SchematicsHoverLabelIdText.Foreground = Brushes.White;
+                this.SchematicsHoverLabelIdText.IsVisible = true;
+                this.SchematicsHoverLabelIcon.Text = ResolveWorklogStateIconGlyph(hoveredWorklogEntry.State);
+                this.SchematicsHoverLabelIconBorder.Background = new SolidColorBrush(this.ResolveWorklogStateColor(hoveredWorklogEntry.State));
+                this.SchematicsHoverLabelIconBorder.IsVisible = true;
+                this.SchematicsHoverLabelText.Text = hoveredWorklogEntry.Title;
+                this.SchematicsHoverLabelBorder.Background = new SolidColorBrush(hoveredWorklogColor);
+                this.SchematicsHoverLabelBorder.BorderBrush = Brushes.White;
+                this.SchematicsHoverLabelText.Foreground = Brushes.White;
+                this.SchematicsHoverLabelBorder.IsVisible = true;
+            }
+
+            if (this.MainWindow != null)
+            {
+                this.MainWindow.isHoveringComponent = false;
+            }
+
+            this.SchematicsHoverPadBorder.IsVisible = false;
+            this.SchematicsHoverPadText.Text = string.Empty;
+
+            this.SchematicsContainer.Cursor = this.thisHandCursor;
+            return;
+        }
+
+        this.ResetSchematicsHoverLabelToDefaultAppearance();
 
         bool hoveringComponent = this.TryGetHoveredBoardLabel(pointerInContainer, out var hoveredBoardLabel, out var displayText);
 
@@ -600,7 +713,7 @@ public partial class TabSchematics
 
         if (hoveringComponent || this.SchematicsHoverPadBorder.IsVisible)
         {
-            this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.Hand);
+            this.SchematicsContainer.Cursor = this.thisHandCursor;
         }
         else
         {
