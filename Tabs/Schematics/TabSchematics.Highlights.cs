@@ -576,6 +576,12 @@ public partial class TabSchematics
         this.SchematicsHoverPadText.Text = string.Empty;
         this.SchematicsContainer.Cursor = Cursor.Default;
 
+        // The worklog area's resize markers are hover state too, so they go with everything else.
+        // Without this they stayed painted after the pointer left the schematic entirely - and rode
+        // along on a stale entry while panning - advertising a grab affordance for an area the
+        // pointer was nowhere near.
+        this.ClearWorklogEntryResizeHover();
+
         if (this.MainWindow != null)
             this.MainWindow.isHoveringComponent = false;
     }
@@ -587,6 +593,18 @@ public partial class TabSchematics
     // ###########################################################################################
     private void UpdateSchematicsHoverUi(Point pointerInContainer)
     {
+        // Hovering a marked worklog area shows its resize markers and a directional cursor. Checked
+        // before the component/net branches below because the area is drawn ON TOP of them: the
+        // pointer is visibly over the area, so offering the component underneath instead would
+        // contradict what the user sees - the same reason the worklog pill wins the hover label.
+        //
+        // Returns false the moment the pointer leaves every area, which also clears the markers, so
+        // normal hover behaviour resumes without this branch having to undo anything.
+        if (this.UpdateWorklogEntryResizeHover(pointerInContainer))
+        {
+            return;
+        }
+
         if (this.thisIsKiCadTraceCalibrationMode)
         {
             this.SetHoveredComponentBoardLabel(null);

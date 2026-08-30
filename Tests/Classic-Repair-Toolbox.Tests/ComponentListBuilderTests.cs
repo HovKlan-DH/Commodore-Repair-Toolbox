@@ -495,4 +495,103 @@ public class ComponentListBuilderTests
         Assert.Equal("C1", row.BoardLabel);
         Assert.Equal("Ceramic", row.DisplayName);
     }
+
+    // -------------------------------------------------------- NarrowSelectionToScope
+
+    // The rule when a worklog area is resized: it can only ever REMOVE. Shrinking an area off a
+    // component the user had marked leaves that component recorded against a fault whose area no
+    // longer covers it, so it goes.
+    [Fact]
+    public void A_component_the_area_no_longer_touches_is_dropped()
+    {
+        var kept = ComponentListBuilder.NarrowSelectionToScope(
+            new[] { "U7", "C34", "Y1" },
+            new HashSet<string> { "U7", "Y1" });
+
+        Assert.Equal(new[] { "U7", "Y1" }, kept);
+    }
+
+    // The other half, and the one that is easy to get wrong: a component the area now covers is
+    // NOT auto-selected. Being inside the rectangle is not the same as the user deciding it is
+    // relevant - auto-ticking would quietly add components nobody chose, more of them the wider the
+    // area is dragged.
+    [Fact]
+    public void A_newly_covered_component_is_not_selected_automatically()
+    {
+        var kept = ComponentListBuilder.NarrowSelectionToScope(
+            new[] { "U7" },
+            new HashSet<string> { "U7", "C34", "R3" });
+
+        Assert.Equal(new[] { "U7" }, kept);
+    }
+
+    // Both directions at once, which is what an ordinary drag produces: the area slides off some
+    // components and onto others.
+    [Fact]
+    public void A_resize_that_both_gains_and_loses_components_only_removes()
+    {
+        var kept = ComponentListBuilder.NarrowSelectionToScope(
+            new[] { "U7", "C34" },
+            new HashSet<string> { "C34", "R3", "Q2" });
+
+        Assert.Equal(new[] { "C34" }, kept);
+    }
+
+    // Matching is case-insensitive, as board-label comparisons are everywhere else in the app - a
+    // selection stored as "u7" must survive an area whose rects key it as "U7".
+    [Fact]
+    public void Selection_matching_ignores_case()
+    {
+        var kept = ComponentListBuilder.NarrowSelectionToScope(
+            new[] { "u7" },
+            new HashSet<string> { "U7" });
+
+        Assert.Equal(new[] { "u7" }, kept);
+    }
+
+    // The user's own ordering is preserved rather than rebuilt from the board, so a hand-curated
+    // entry keeps its arrangement across a resize.
+    [Fact]
+    public void The_existing_selection_order_is_preserved()
+    {
+        var kept = ComponentListBuilder.NarrowSelectionToScope(
+            new[] { "Y1", "C34", "U7" },
+            new HashSet<string> { "U7", "C34", "Y1" });
+
+        Assert.Equal(new[] { "Y1", "C34", "U7" }, kept);
+    }
+
+    // An area dragged clear of everything empties the selection - that IS the correct answer, and
+    // is distinct from the "scope unknown" case, which the caller handles by not calling this.
+    [Fact]
+    public void An_area_touching_nothing_clears_the_selection()
+    {
+        var kept = ComponentListBuilder.NarrowSelectionToScope(
+            new[] { "U7", "C34" },
+            new HashSet<string>());
+
+        Assert.Empty(kept);
+    }
+
+    [Fact]
+    public void An_entry_with_no_selection_stays_empty()
+    {
+        Assert.Empty(ComponentListBuilder.NarrowSelectionToScope(
+            Array.Empty<string>(), new HashSet<string> { "U7" }));
+
+        Assert.Empty(ComponentListBuilder.NarrowSelectionToScope(
+            null, new HashSet<string> { "U7" }));
+    }
+
+    // Blank entries identify no component, so they cannot be in scope and are not carried forward
+    // as unmatchable labels.
+    [Fact]
+    public void Blank_labels_are_dropped_from_the_selection()
+    {
+        var kept = ComponentListBuilder.NarrowSelectionToScope(
+            new[] { "U7", "", "   " },
+            new HashSet<string> { "U7", "" });
+
+        Assert.Equal(new[] { "U7" }, kept);
+    }
 }

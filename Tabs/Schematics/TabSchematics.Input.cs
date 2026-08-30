@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
@@ -287,6 +287,18 @@ public partial class TabSchematics
             return;
         }
 
+        // Resizing a marked worklog area takes precedence over panning and component selection:
+        // the pointer is on a handle or inside an area the user can see, so a drag there means the
+        // area, not the view. Only claims the press when a handle or area was actually hit, so
+        // clicking anywhere else behaves exactly as before.
+        if (pointer.Properties.IsLeftButtonPressed && this.TryBeginWorklogEntryResize(point))
+        {
+            this.HideSchematicsHoverUi();
+            e.Pointer.Capture(this.SchematicsContainer);
+            e.Handled = true;
+            return;
+        }
+
         bool hoveringComponent = this.TryGetHoveredBoardLabel(point, out var boardLabel, out var displayText);
         string? activeHoveredKiCadNetName = this.GetActiveHoveredKiCadNetName();
         bool hoveringKiCadNet = !string.IsNullOrWhiteSpace(activeHoveredKiCadNetName);
@@ -370,6 +382,16 @@ public partial class TabSchematics
         var point = e.GetPosition(this.SchematicsContainer);
         bool isShiftDown = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
+
+        // An in-progress worklog area drag owns the pointer until release - checked before the
+        // net-connections panel guard below, so dragging across that panel keeps updating the area
+        // instead of silently stalling the gesture half-way.
+        if (this.thisIsResizingWorklogEntry)
+        {
+            this.UpdateWorklogEntryResize(point);
+            e.Handled = true;
+            return;
+        }
 
         if (!this.isPanning && this.IsPointerInsideKiCadNetConnectionsPanel(point))
         {
@@ -518,6 +540,28 @@ public partial class TabSchematics
         var point = e.GetPosition(this.SchematicsContainer);
 
         this.UpdateInteractiveCadTraceHoverShiftState(e.KeyModifiers);
+
+        // BEFORE the net-connections panel guard, not after.
+        //
+        // That guard returns early, so a resize released with the pointer over the panel never
+        // reached CompleteWorklogEntryResize: the drag was never saved AND thisIsResizingWorklogEntry
+        // stayed true forever, after which every pointer-move was swallowed by the resize branch -
+        // panning, hover and selection all dead until the board was switched. An in-flight gesture
+        // has to be finished wherever the pointer happens to be when the button comes up.
+        if (this.thisIsResizingWorklogEntry)
+        {
+            this.CompleteWorklogEntryResize();
+
+            // Releases the capture taken in TryBeginWorklogEntryResize. Without this the pointer
+            // stays captured to SchematicsContainer after the drag, routing later events there even
+            // once the pointer has left - the same fault the worklog-drawing branch below carries a
+            // comment about having already had to fix once.
+            e.Pointer.Capture(null);
+
+            this.UpdateWorklogEntryResizeHover(point);
+            e.Handled = true;
+            return;
+        }
 
         if (!this.isPanning && this.IsPointerInsideKiCadNetConnectionsPanel(point))
         {

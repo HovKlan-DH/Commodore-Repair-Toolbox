@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -48,6 +48,12 @@ public class WorklogEntryScopeTests
     {
         UiTest.Run(() =>
         {
+            // Placement persistence off for this window only: it otherwise restores the size,
+            // position and splitter ratio from the developer's REAL settings file, so every layout
+            // assertion below would depend on how they last left the editor. Scoped rather than
+            // assigned, so it cannot leak into other tests in the shared session.
+            using var placementScope = WorklogEntryEditorWindow.SuppressWindowPlacementPersistence();
+
             var window = new WorklogEntryEditorWindow();
             window.Width = 900;
             window.Height = 700;

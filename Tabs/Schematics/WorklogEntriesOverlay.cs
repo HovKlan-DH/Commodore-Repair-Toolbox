@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using System;
@@ -16,7 +16,22 @@ namespace Tabs.TabSchematics
     // ###########################################################################################
     public sealed class WorklogEntriesOverlay : Control
     {
-        public readonly record struct Entry(Rect PixelRect, Color Color);
+        public readonly record struct Entry(Rect PixelRect, Color Color, int EntryId);
+
+        // ###########################################################################################
+        // The entry whose resize markers are shown, or -1 for none. Set by TabSchematics as the
+        // pointer moves over a marked area; the markers are exactly the ones the component label
+        // editor draws on a selected highlight, so resizing a worklog area looks and behaves the
+        // same as resizing a component label.
+        // ###########################################################################################
+        public static readonly StyledProperty<int> HoveredEntryIdProperty =
+            AvaloniaProperty.Register<WorklogEntriesOverlay, int>(nameof(HoveredEntryId), defaultValue: -1);
+
+        public int HoveredEntryId
+        {
+            get => this.GetValue(HoveredEntryIdProperty);
+            set => this.SetValue(HoveredEntryIdProperty, value);
+        }
 
         private IReadOnlyList<Entry> thisEntries = Array.Empty<Entry>();
 
@@ -50,7 +65,8 @@ namespace Tabs.TabSchematics
 
         static WorklogEntriesOverlay()
         {
-            AffectsRender<WorklogEntriesOverlay>(BitmapPixelSizeProperty, ViewMatrixProperty, FillOpacityProperty);
+            AffectsRender<WorklogEntriesOverlay>(
+                BitmapPixelSizeProperty, ViewMatrixProperty, FillOpacityProperty, HoveredEntryIdProperty);
         }
 
         public PixelSize BitmapPixelSize
@@ -114,6 +130,36 @@ namespace Tabs.TabSchematics
 
                 context.DrawRectangle(fillBrush, null, localRect);
                 context.DrawRectangle(null, pen, borderRect);
+
+                if (entry.EntryId >= 0 && entry.EntryId == this.HoveredEntryId)
+                {
+                    DrawResizeMarkers(context, borderRect, scale, entry.Color);
+                }
+            }
+        }
+
+        // ###########################################################################################
+        // Draws compact square marker segments at the 4 corners and 4 side centres of the hovered
+        // area, matching ComponentLabelEditorOverlay.DrawSelectionMarkers so the two editors present
+        // the same affordance. On a small area the side markers shrink or vanish rather than
+        // overlapping the corners, which would imply a resize direction the handle does not offer.
+        //
+        // Sized in screen terms (divided by scale) so the markers stay a constant size on screen at
+        // any zoom, exactly as the hit rectangles in LabelEditorGeometry are.
+        // ###########################################################################################
+        // Draws the resize affordance on the hovered area, in the entry's own category colour.
+        //
+        // The marker layout comes from SelectionMarkerGeometry, shared with the component label
+        // editor's selected highlight - the two are meant to look identical, and sharing the maths
+        // is what makes that true rather than a comment claiming it.
+        // ###########################################################################################
+        private static void DrawResizeMarkers(DrawingContext context, Rect rect, double scale, Color color)
+        {
+            var markerBrush = new SolidColorBrush(color, 1.0);
+
+            foreach (var markerRect in SelectionMarkerGeometry.BuildSelectionMarkerRects(rect, scale))
+            {
+                context.DrawRectangle(markerBrush, null, markerRect);
             }
         }
     }

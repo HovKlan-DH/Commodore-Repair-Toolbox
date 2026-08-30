@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
@@ -400,6 +400,47 @@ public partial class TabSchematics
         double py = ((localPoint.Y - contentRect.Y) / contentRect.Height) * this.currentFullResBitmap.PixelSize.Height;
 
         pixelPoint = new Point(px, py);
+        return true;
+    }
+
+    // ###########################################################################################
+    // The same mapping as TryGetSchematicsImagePixelPoint, but WITHOUT requiring the pointer to be
+    // over the image - the returned point may sit outside the bitmap's bounds.
+    //
+    // Needed by drags that continue past the edge of the board. The bounded version returns false
+    // there, so a caller using it simply stops receiving updates: a worklog area being widened
+    // froze at the last in-bounds sample instead of continuing to follow the pointer, and the
+    // clamp that was written to handle exactly that case never ran. Callers are expected to clamp
+    // the RESULT (see LabelEditorGeometry.ClampRectToBounds) rather than the input.
+    // ###########################################################################################
+    private bool TryGetSchematicsImagePixelPointUnbounded(Point pointerInContainer, out Point pixelPoint)
+    {
+        pixelPoint = default;
+
+        if (this.currentFullResBitmap == null)
+        {
+            return false;
+        }
+
+        if (!RectGeometry.TryInvert(this.schematicsMatrix, out var inv))
+        {
+            return false;
+        }
+
+        var localPoint = new Point(
+            (pointerInContainer.X * inv.M11) + (pointerInContainer.Y * inv.M21) + inv.M31,
+            (pointerInContainer.X * inv.M12) + (pointerInContainer.Y * inv.M22) + inv.M32);
+
+        var contentRect = this.GetImageContentRect();
+        if (contentRect.Width <= 0 || contentRect.Height <= 0)
+        {
+            return false;
+        }
+
+        pixelPoint = new Point(
+            ((localPoint.X - contentRect.X) / contentRect.Width) * this.currentFullResBitmap.PixelSize.Width,
+            ((localPoint.Y - contentRect.Y) / contentRect.Height) * this.currentFullResBitmap.PixelSize.Height);
+
         return true;
     }
 }

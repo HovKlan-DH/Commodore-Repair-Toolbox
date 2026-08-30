@@ -334,7 +334,7 @@ public partial class TabSchematics
         this.thisWorklogEntryBadgeBorder.IsVisible = true;
         this.thisWorklogEntryBadgeBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
 
-        Size desiredSize = this.thisWorklogEntryBadgeBorder.DesiredSize * inverseScale;
+        Size unscaledSize = this.thisWorklogEntryBadgeBorder.DesiredSize;
 
         Point anchorPoint = this.thisWorklogEntryBadgeCorner switch
         {
@@ -344,8 +344,13 @@ public partial class TabSchematics
             _ => new Point(localRect.Left, localRect.Top),
         };
 
-        Canvas.SetLeft(this.thisWorklogEntryBadgeBorder, anchorPoint.X - (desiredSize.Width / 2.0));
-        Canvas.SetTop(this.thisWorklogEntryBadgeBorder, anchorPoint.Y - (desiredSize.Height / 2.0));
+        // Centred on its chosen corner, the same way the saved entries' badges are - see
+        // PositionWorklogEntriesListBadge. Placing it at anchor - scaledSize/2 only lands correctly
+        // at inverseScale 0.5; BadgeGeometry carries the derivation.
+        var centreOffset = BadgeGeometry.GetCenterScaledCentreOffset(unscaledSize);
+
+        Canvas.SetLeft(this.thisWorklogEntryBadgeBorder, anchorPoint.X + centreOffset.X);
+        Canvas.SetTop(this.thisWorklogEntryBadgeBorder, anchorPoint.Y + centreOffset.Y);
     }
 
     // ###########################################################################################
@@ -796,7 +801,7 @@ public partial class TabSchematics
             var pixelRect = new Rect(entry.AreaX, entry.AreaY, entry.AreaWidth, entry.AreaHeight);
             Color color = this.ResolveWorklogCategoryColor(entry.Category);
 
-            overlayEntries.Add(new WorklogEntriesOverlay.Entry(pixelRect, color));
+            overlayEntries.Add(new WorklogEntriesOverlay.Entry(pixelRect, color, entry.Id));
 
             this.CreateWorklogEntriesListBadge(entry, color, pixelRect, contentRect, inverseScale);
         }
@@ -808,6 +813,456 @@ public partial class TabSchematics
         this.SchematicsWorklogEntriesOverlay.InvalidateVisual();
 
         this.RefreshThumbnailWorklogPills(allEntries);
+    }
+
+    // ###########################################################################################
+    // Resizing a saved worklog entry's marked area directly on the schematic.
+    //
+    // Hovering a marked area shows the same corner/side markers the component label editor puts on
+    // a selected highlight, and dragging one resizes the area; dragging its interior moves it. The
+    // new bounds are written straight back to the entry's workbook on release, so the change is
+    // saved without opening the editor.
+    //
+    // Only available while "Show worklogs" is on - that is when the areas are drawn, and an
+    // invisible drag target would be a trap. It is also skipped while the label editor or the
+    // new-entry card is active, so those modes keep exclusive use of the pointer.
+    // ###########################################################################################
+    private int thisWorklogResizeEntryId = -1;
+
+    private LabelEditorDragMode thisWorklogResizeDragMode = LabelEditorDragMode.None;
+
+    private Point thisWorklogResizeStartPixelPoint;
+
+    private Rect thisWorklogResizeOriginalRect;
+
+    private bool thisIsResizingWorklogEntry;
+
+    // Small enough that a deliberately tiny area is still allowed, large enough that an area
+    // cannot be shrunk to something impossible to grab again.
+    private const double MinimumWorklogAreaSize = 8.0;
+
+    // thisIsWorklogEntryMode is checked as well as the card's visibility: entry mode is entered
+    // BEFORE the card appears (the card only shows once the rectangle is finished), so during the
+    // initial drag-out of a new area the card is invisible and resize hit-testing would otherwise
+    // run - painting markers and a directional cursor over the crosshair the drawing mode set.
+    private bool IsWorklogEntryResizeAvailable =>
+        this.thisIsShowingWorklogEntriesList &&
+        this.currentFullResBitmap != null &&
+        !this.thisIsWorklogEntryMode &&
+        !this.SchematicsNewWorklogEntryCardBorder.IsVisible &&
+        !this.IsLabelEditorActive;
+
+    // ###########################################################################################
+    // Finds the marked area under the pointer and which of its handles, if any, is being touched.
+    //
+    // Entries are tested in reverse draw order so the one drawn last - the one on top - wins when
+    // two overlap, matching what the user sees. The handle hit rectangles come from
+    // LabelEditorGeometry, so they sit in exactly the same places as the label editor's.
+    // ###########################################################################################
+    private bool TryGetWorklogEntryHandleAt(
+        Point pointerInContainer,
+        out int entryId,
+        out LabelEditorDragMode dragMode,
+        out Rect pixelRect)
+    {
+        entryId = -1;
+        dragMode = LabelEditorDragMode.None;
+        pixelRect = default;
+
+        if (!this.IsWorklogEntryResizeAvailable)
+        {
+            return false;
+        }
+
+        if (!RectGeometry.TryInvert(this.schematicsMatrix, out var inv))
+        {
+            return false;
+        }
+
+        var localPoint = new Point(
+            (pointerInContainer.X * inv.M11) + (pointerInContainer.Y * inv.M21) + inv.M31,
+            (pointerInContainer.X * inv.M12) + (pointerInContainer.Y * inv.M22) + inv.M32);
+
+        var contentRect = this.GetImageContentRect();
+        if (contentRect.Width <= 0 || contentRect.Height <= 0)
+        {
+            return false;
+        }
+
+        double scale = Math.Max(0.0001, this.schematicsMatrix.M11);
+        var entries = this.SchematicsWorklogEntriesOverlay.Entries;
+
+        // EVERY area's handles are tested before ANY area's interior.
+        //
+        // Testing each entry completely in turn made handles win only within a single entry: a
+        // small area sitting inside a larger one drawn later had its corner handles swallowed by
+        // the larger area's interior, so it could never be grabbed. Two passes make "a handle
+        // always beats an interior" true across entries, which is what the user sees - the handle
+        // markers are drawn on top.
+        //
+        // Both passes run in reverse draw order, so among equals the area drawn last (on top) wins.
+        for (int i = entries.Count - 1; i >= 0; i--)
+        {
+            var entry = entries[i];
+            var localRect = RectGeometry.PixelToLocalRect(entry.PixelRect, contentRect, this.currentFullResBitmap!.PixelSize);
+
+            foreach (var (hitRect, handleMode) in LabelEditorGeometry.BuildLabelEditorHandleHitRects(localRect, scale))
+            {
+                if (hitRect.Contains(localPoint))
+                {
+                    entryId = entry.EntryId;
+                    dragMode = handleMode;
+                    pixelRect = entry.PixelRect;
+                    return true;
+                }
+            }
+        }
+
+        for (int i = entries.Count - 1; i >= 0; i--)
+        {
+            var entry = entries[i];
+            var localRect = RectGeometry.PixelToLocalRect(entry.PixelRect, contentRect, this.currentFullResBitmap!.PixelSize);
+
+            // Inside the area but not on a handle: a move rather than a resize. Whether the
+            // interior actually belongs to the area is decided by the callers, which give a
+            // component underneath precedence - see UpdateWorklogEntryResizeHover.
+            if (localRect.Contains(localPoint))
+            {
+                entryId = entry.EntryId;
+                dragMode = LabelEditorDragMode.Move;
+                pixelRect = entry.PixelRect;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // ###########################################################################################
+    // Updates the hovered area's markers and the pointer cursor. Returns true when the pointer is
+    // over an area, so the caller can leave the schematic's normal hover handling alone.
+    // ###########################################################################################
+    private bool UpdateWorklogEntryResizeHover(Point pointerInContainer)
+    {
+        if (this.thisIsResizingWorklogEntry)
+        {
+            return true;
+        }
+
+        if (!this.TryGetWorklogEntryHandleAt(pointerInContainer, out int entryId, out var dragMode, out _))
+        {
+            this.ClearWorklogEntryResizeHover();
+            return false;
+        }
+
+        // A component underneath wins the INTERIOR of a marked area.
+        //
+        // A worklog area is often drawn around the very component it is about, so if the interior
+        // always belonged to the area, that component could never be hovered or selected again -
+        // the area would swallow it entirely. The edges do not have that problem: they are a thin
+        // band, and the user is deliberately aiming at them.
+        //
+        // So the handles always win (there is nothing else to mean at the edge of an area being
+        // resized), and the interior defers whenever a component is actually there. Where no
+        // component is underneath, the interior still moves the area - so dragging one around
+        // empty board space keeps working.
+        if (dragMode == LabelEditorDragMode.Move &&
+            this.TryGetHoveredBoardLabel(pointerInContainer, out _, out _))
+        {
+            this.ClearWorklogEntryResizeHover();
+            return false;
+        }
+
+        this.SchematicsWorklogEntriesOverlay.HoveredEntryId = entryId;
+        this.SetWorklogResizeCursor(dragMode);
+        return true;
+    }
+
+    // ###########################################################################################
+    // Sets the directional cursor, reusing one Cursor instance per drag mode.
+    //
+    // This runs on every pointer-move frame while an area is hovered, so allocating a fresh Cursor
+    // each time meant hundreds of platform handles a second for a value that only takes nine
+    // distinct forms. The cache also lets the setter skip the assignment when nothing changed,
+    // which keeps it from fighting whatever else last wrote the cursor.
+    // ###########################################################################################
+    private readonly Dictionary<StandardCursorType, Cursor> thisWorklogResizeCursors = new();
+
+    private StandardCursorType? thisAppliedWorklogResizeCursor;
+
+    private void SetWorklogResizeCursor(LabelEditorDragMode dragMode)
+    {
+        var cursorType = ResolveWorklogResizeCursor(dragMode);
+
+        if (this.thisAppliedWorklogResizeCursor == cursorType)
+        {
+            return;
+        }
+
+        if (!this.thisWorklogResizeCursors.TryGetValue(cursorType, out var cursor))
+        {
+            cursor = new Cursor(cursorType);
+            this.thisWorklogResizeCursors[cursorType] = cursor;
+        }
+
+        this.SchematicsContainer.Cursor = cursor;
+        this.thisAppliedWorklogResizeCursor = cursorType;
+    }
+
+    // Drops the markers and the directional cursor. Guarded so it does not fight whatever else is
+    // setting the cursor when no area was hovered in the first place.
+    private void ClearWorklogEntryResizeHover()
+    {
+        this.SchematicsWorklogEntriesOverlay.HoveredEntryId = -1;
+
+        // Only reset the cursor if THIS feature is what last set it. The old guard was on the
+        // hovered id, not on ownership, so leaving an area onto a polyline or a KiCad hover reset
+        // the cursor those modes had just set, one frame later.
+        if (this.thisAppliedWorklogResizeCursor != null)
+        {
+            this.SchematicsContainer.Cursor = Cursor.Default;
+            this.thisAppliedWorklogResizeCursor = null;
+        }
+    }
+
+    // The standard directional cursors, so the pointer says which way the edge will move.
+    private static StandardCursorType ResolveWorklogResizeCursor(LabelEditorDragMode dragMode) => dragMode switch
+    {
+        LabelEditorDragMode.ResizeTopLeft => StandardCursorType.TopLeftCorner,
+        LabelEditorDragMode.ResizeTopRight => StandardCursorType.TopRightCorner,
+        LabelEditorDragMode.ResizeBottomLeft => StandardCursorType.BottomLeftCorner,
+        LabelEditorDragMode.ResizeBottomRight => StandardCursorType.BottomRightCorner,
+        LabelEditorDragMode.ResizeTop => StandardCursorType.SizeNorthSouth,
+        LabelEditorDragMode.ResizeBottom => StandardCursorType.SizeNorthSouth,
+        LabelEditorDragMode.ResizeLeft => StandardCursorType.SizeWestEast,
+        LabelEditorDragMode.ResizeRight => StandardCursorType.SizeWestEast,
+        _ => StandardCursorType.SizeAll,
+    };
+
+    // ###########################################################################################
+    // Begins a resize or move. Returns true when one started, so the caller can stop the press
+    // reaching pan/selection.
+    // ###########################################################################################
+    private bool TryBeginWorklogEntryResize(Point pointerInContainer)
+    {
+        if (!this.TryGetWorklogEntryHandleAt(pointerInContainer, out int entryId, out var dragMode, out var pixelRect))
+        {
+            return false;
+        }
+
+        // Same precedence as the hover above: a press on the interior belongs to the component
+        // underneath if there is one, so a component covered by a marked area stays selectable.
+        if (dragMode == LabelEditorDragMode.Move &&
+            this.TryGetHoveredBoardLabel(pointerInContainer, out _, out _))
+        {
+            return false;
+        }
+
+        // Unbounded so the drag origin is expressed in the same space every later move uses.
+        if (!this.TryGetSchematicsImagePixelPointUnbounded(pointerInContainer, out var pixelPoint))
+        {
+            return false;
+        }
+
+        this.thisWorklogResizeEntryId = entryId;
+        this.thisWorklogResizeDragMode = dragMode;
+        this.thisWorklogResizeStartPixelPoint = pixelPoint;
+        this.thisWorklogResizeOriginalRect = pixelRect;
+        this.thisIsResizingWorklogEntry = true;
+
+        return true;
+    }
+
+    // ###########################################################################################
+    // Applies the in-progress drag to the overlay only. Nothing is written to disk until release,
+    // so an abandoned drag costs no saves and an interrupted one cannot leave a half-applied area.
+    // ###########################################################################################
+    private void UpdateWorklogEntryResize(Point pointerInContainer)
+    {
+        if (!this.thisIsResizingWorklogEntry || this.currentFullResBitmap == null)
+        {
+            return;
+        }
+
+        // Unbounded: a drag that leaves the image must keep tracking the pointer, with the RESULT
+        // clamped below. The bounded variant returns false past the edge, which froze the area at
+        // its last in-bounds size and made ClampRectToBounds unreachable on the very path it names.
+        if (!this.TryGetSchematicsImagePixelPointUnbounded(pointerInContainer, out var pixelPoint))
+        {
+            return;
+        }
+
+        double dx = pixelPoint.X - this.thisWorklogResizeStartPixelPoint.X;
+        double dy = pixelPoint.Y - this.thisWorklogResizeStartPixelPoint.Y;
+
+        var resized = LabelEditorGeometry.ResizeRect(
+            this.thisWorklogResizeOriginalRect, this.thisWorklogResizeDragMode, dx, dy, MinimumWorklogAreaSize);
+
+        var bitmapSize = new Size(this.currentFullResBitmap.PixelSize.Width, this.currentFullResBitmap.PixelSize.Height);
+
+        // A Move slides the whole area back inside, keeping its size; a RESIZE trims only the edge
+        // that strayed out, so the edge the user is not dragging stays anchored. Using the move
+        // clamp for both pushed the opposite edge outward whenever a resize hit the board boundary.
+        resized = this.thisWorklogResizeDragMode == LabelEditorDragMode.Move
+            ? LabelEditorGeometry.ClampRectToBounds(resized, bitmapSize)
+            : LabelEditorGeometry.ClampResizedRectToBounds(resized, bitmapSize, MinimumWorklogAreaSize);
+
+        var updated = new List<WorklogEntriesOverlay.Entry>(this.SchematicsWorklogEntriesOverlay.Entries.Count);
+
+        foreach (var entry in this.SchematicsWorklogEntriesOverlay.Entries)
+        {
+            updated.Add(entry.EntryId == this.thisWorklogResizeEntryId
+                ? entry with { PixelRect = resized }
+                : entry);
+        }
+
+        this.SchematicsWorklogEntriesOverlay.Entries = updated;
+        this.RepositionWorklogEntriesListBadge(this.thisWorklogResizeEntryId, resized);
+    }
+
+    // ###########################################################################################
+    // Ends the drag and persists the new bounds.
+    //
+    // The overlay is rebuilt from disk afterwards rather than trusted: if the save failed, the area
+    // must snap back to what is actually stored rather than showing bounds nothing recorded.
+    // ###########################################################################################
+    private void CompleteWorklogEntryResize()
+    {
+        if (!this.thisIsResizingWorklogEntry)
+        {
+            return;
+        }
+
+        int entryId = this.thisWorklogResizeEntryId;
+        var originalRect = this.thisWorklogResizeOriginalRect;
+
+        this.thisIsResizingWorklogEntry = false;
+        this.thisWorklogResizeEntryId = -1;
+        this.thisWorklogResizeDragMode = LabelEditorDragMode.None;
+
+        Rect? finalRect = null;
+        foreach (var entry in this.SchematicsWorklogEntriesOverlay.Entries)
+        {
+            if (entry.EntryId == entryId)
+            {
+                finalRect = entry.PixelRect;
+                break;
+            }
+        }
+
+        if (finalRect == null || entryId < 0)
+        {
+            return;
+        }
+
+        // Unchanged bounds mean the user clicked rather than dragged - no save, so a stray click on
+        // an area does not rewrite its workbook.
+        //
+        // The overlay is still rebuilt: a drag that wandered and came back (or was pinned by the
+        // minimum or the board edge) has already written intermediate rects into the overlay and
+        // moved the badge, and nothing else would undo them. Skipping the refresh here left what is
+        // drawn disagreeing with what is on disk until some unrelated redraw happened.
+        if (AreWorklogRectsEquivalent(finalRect.Value, originalRect))
+        {
+            this.RefreshWorklogEntriesListOverlay();
+            return;
+        }
+
+        var record = WorklogManager.GetEntries(this.thisWorklogEntriesListWorkbookId)
+            .FirstOrDefault(x => x.Id == entryId);
+
+        if (record == null)
+        {
+            this.RefreshWorklogEntriesListOverlay();
+            return;
+        }
+
+        record.AreaX = finalRect.Value.X;
+        record.AreaY = finalRect.Value.Y;
+        record.AreaWidth = finalRect.Value.Width;
+        record.AreaHeight = finalRect.Value.Height;
+
+        // A resize can only ever REMOVE components from the selection.
+        //
+        // Shrinking an area off a component the user had marked in scope leaves that component
+        // recorded against a fault whose area no longer covers it, so it is dropped. Growing an
+        // area over new components does NOT tick them: being inside the rectangle is not the same
+        // as the user deciding they are relevant, and auto-ticking would quietly add components
+        // nobody chose - more of them the wider the area is dragged. Adding stays a deliberate act
+        // in the full editor's checklist. See ComponentListBuilder.NarrowSelectionToScope.
+        //
+        // Skipped when the scope cannot be determined (no board data, or no highlight rectangles
+        // for this schematic): an unknown scope is not an empty one, and treating it as such would
+        // wipe the whole selection.
+        var scopeAfterResize = this.BuildWorklogEntryComponentScope(record);
+        if (scopeAfterResize != null)
+        {
+            record.ComponentLabels = ComponentListBuilder.NarrowSelectionToScope(
+                record.ComponentLabels,
+                scopeAfterResize.Select(c => c.BoardLabel).ToList());
+        }
+
+        if (!WorklogManager.UpdateEntry(this.thisWorklogEntriesListWorkbookId, record))
+        {
+            Logger.Warning($"Failed to save resized worklog entry area [#{entryId}]");
+        }
+
+        // Rebuilt either way - on success to pick up anything the save normalised, on failure to
+        // snap the area back to what is genuinely on disk.
+        this.RefreshWorklogEntriesListOverlay();
+        this.MainWindow?.RefreshWorklogBar();
+    }
+
+    // Sub-pixel differences come from the pointer maths, not from the user, so they do not count
+    // as a change worth saving.
+    private static bool AreWorklogRectsEquivalent(Rect a, Rect b) =>
+        Math.Abs(a.X - b.X) < 0.5 &&
+        Math.Abs(a.Y - b.Y) < 0.5 &&
+        Math.Abs(a.Width - b.Width) < 0.5 &&
+        Math.Abs(a.Height - b.Height) < 0.5;
+
+    // ###########################################################################################
+    // Moves an entry's "#N" badge to follow its area during a drag, so the badge does not sit at
+    // the old corner until the drag ends.
+    // ###########################################################################################
+    private void RepositionWorklogEntriesListBadge(int entryId, Rect pixelRect)
+    {
+        if (this.currentFullResBitmap == null)
+        {
+            return;
+        }
+
+        var contentRect = this.GetImageContentRect();
+        if (contentRect.Width <= 0 || contentRect.Height <= 0)
+        {
+            return;
+        }
+
+        double scale = this.schematicsMatrix.M11;
+        double inverseScale = scale > 0 ? 1.0 / scale : 1.0;
+
+        for (int i = 0; i < this.thisWorklogEntriesListBadges.Count; i++)
+        {
+            var (badge, _, badgeEntry, color) = this.thisWorklogEntriesListBadges[i];
+
+            if (badgeEntry.Id != entryId)
+            {
+                continue;
+            }
+
+            // Positioned through the shared method, NOT by writing Canvas.SetLeft directly. That
+            // shortcut dropped both the centre offset and the viewport nudge, so the badge jumped
+            // by half its own size the moment a drag began and ignored the view edge for the whole
+            // gesture - the exact drift BadgeGeometry was extracted to stop, reintroduced at the one
+            // call site that bypassed it.
+            this.PositionWorklogEntriesListBadge(badge, pixelRect, contentRect, inverseScale);
+
+            // The cache carries each badge's anchor rect, and RescaleWorklogEntriesListBadges
+            // repositions from it on every zoom/pan tick. Left stale, a wheel-zoom mid-drag would
+            // snap the badge back to the pre-resize corner and strand it there until release.
+            this.thisWorklogEntriesListBadges[i] = (badge, pixelRect, badgeEntry, color);
+            break;
+        }
     }
 
     // ###########################################################################################
@@ -982,9 +1437,21 @@ public partial class TabSchematics
     }
 
     // ###########################################################################################
-    // Positions and scales one "Show worklogs" badge for the given inverse-scale, anchored at the
-    // top-left of its entry's marked area - shared by CreateWorklogEntriesListBadge (first layout)
-    // and RescaleWorklogEntriesListBadges (every later zoom/pan tick).
+    // Positions and scales one "Show worklogs" badge for the given inverse-scale, CENTRED on the
+    // top-left corner of its entry's marked area at EVERY zoom level - shared by
+    // CreateWorklogEntriesListBadge (first layout) and RescaleWorklogEntriesListBadges (every later
+    // zoom/pan tick).
+    //
+    // Centred, so the badge straddles the corner with roughly a quarter of it outside the marked
+    // area. That reads as a label attached to the area rather than a box sitting inside it, and it
+    // keeps the badge clear of whatever the area's top-left corner is drawn over.
+    //
+    // The offset comes from BadgeGeometry rather than being open-coded: Canvas.SetLeft/SetTop place
+    // the badge's PRE-transform layout box, and the badge carries a centred ScaleTransform
+    // (RenderTransformOrigin 0.5,0.5) that keeps it a constant size on screen while the board
+    // scales. Getting that interaction wrong is what made the badge slide away from its corner as
+    // the user zoomed - by nearly a badge-width at high zoom - so the maths and its reasoning live
+    // together in one tested place.
     // ###########################################################################################
     private void PositionWorklogEntriesListBadge(Border badge, Rect pixelRect, Rect contentRect, double inverseScale)
     {
@@ -994,11 +1461,71 @@ public partial class TabSchematics
         var localRect = RectGeometry.PixelToLocalRect(pixelRect, contentRect, this.currentFullResBitmap!.PixelSize);
 
         badge.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Size desiredSize = badge.DesiredSize * inverseScale;
+        Size unscaledSize = badge.DesiredSize;
 
-        Canvas.SetLeft(badge, localRect.Left - (desiredSize.Width / 2.0));
-        Canvas.SetTop(badge, localRect.Top - (desiredSize.Height / 2.0));
+        var offset = BadgeGeometry.GetCenterScaledCentreOffset(unscaledSize);
+
+        double left = localRect.Left + offset.X;
+        double top = localRect.Top + offset.Y;
+
+        var nudge = this.GetWorklogBadgeViewportNudge(new Point(left, top), unscaledSize, inverseScale);
+
+        Canvas.SetLeft(badge, left + nudge.X);
+        Canvas.SetTop(badge, top + nudge.Y);
     }
+
+    // ###########################################################################################
+    // How far a badge must move to stay fully inside the visible viewport, in the badge canvas's
+    // own (pre-transform) coordinates.
+    //
+    // A badge whose area sits near the edge of the view has half of itself off-screen - its "#N"
+    // unreadable and its click target unreachable - because the badges straddle their corner. This
+    // pushes it back in by exactly the overhang, so it stays against the edge it belongs to.
+    //
+    // The conversion matters: Canvas.SetLeft works in the canvas's local space, but "visible" is a
+    // property of SchematicsContainer, and the canvas carries the same zoom/pan matrix as the
+    // image. So the badge's rendered rect is mapped INTO container space, clamped there against
+    // the container's bounds, and the resulting adjustment mapped back out. Clamping in local space
+    // instead would use the wrong units and drift with zoom - the same class of mistake that made
+    // the badges slide off their corners.
+    // ###########################################################################################
+    private Point GetWorklogBadgeViewportNudge(Point layoutTopLeft, Size unscaledSize, double inverseScale)
+    {
+        var viewportSize = this.SchematicsContainer.Bounds.Size;
+        if (viewportSize.Width <= 0 || viewportSize.Height <= 0)
+        {
+            return new Point(0, 0);
+        }
+
+        // The badge holds a constant SCREEN size, so its on-screen extent is the unscaled size -
+        // the ScaleTransform and the view matrix cancel out.
+        var renderedTopLeftLocal = BadgeGeometry.GetCenterScaledRenderedTopLeft(layoutTopLeft, unscaledSize, inverseScale);
+
+        var matrix = this.schematicsMatrix;
+        var topLeftInContainer = new Point(
+            (renderedTopLeftLocal.X * matrix.M11) + (renderedTopLeftLocal.Y * matrix.M21) + matrix.M31,
+            (renderedTopLeftLocal.X * matrix.M12) + (renderedTopLeftLocal.Y * matrix.M22) + matrix.M32);
+
+        var renderedInContainer = new Rect(topLeftInContainer, unscaledSize);
+
+        var nudge = BadgeGeometry.GetViewportNudge(renderedInContainer, viewportSize, WorklogBadgeViewportMargin);
+        if (nudge.X == 0 && nudge.Y == 0)
+        {
+            return nudge;
+        }
+
+        // Back into canvas space. Only the scale matters for a delta - the translation cancels.
+        double scale = matrix.M11;
+        if (scale <= 0)
+        {
+            return new Point(0, 0);
+        }
+
+        return new Point(nudge.X / scale, nudge.Y / scale);
+    }
+
+    // A small inset so a nudged badge sits just clear of the edge rather than flush against it.
+    private const double WorklogBadgeViewportMargin = 2.0;
 
     // ###########################################################################################
     // Hit-tests the "Show worklogs" list view's own "#N" pills (not the marked area they are

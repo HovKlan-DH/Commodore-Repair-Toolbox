@@ -69,9 +69,72 @@ namespace CRT
 
         public bool WasSaved { get; private set; }
 
+        // The window's last NON-maximized bounds, tracked continuously so they are correct however
+        // the window is closed. Persisting this.Width/Height directly would store the maximized
+        // size, and un-maximizing on the next open would then restore to full screen with no memory
+        // of the size the user actually chose. Same approach as ComponentInfoWindow.
+        private double thisNormalWidth;
+        private double thisNormalHeight;
+
+        // Nullable on purpose: null means "this window has never reported a normal-state position",
+        // which is NOT the same as being at (0,0). Storing 0 for the unknown case made a first run
+        // persist a top-left position and set the has-layout flag, so every later open was pinned to
+        // the corner of the primary screen instead of centring on its owner - permanently, since
+        // each close rewrote the same zeros.
+        private int? thisNormalX;
+        private int? thisNormalY;
+
+        // ###########################################################################################
+        // Test seam: when false, the window keeps the size and split its XAML declares instead of
+        // restoring the user's saved placement, and does not persist on close.
+        //
+        // The headless UI tests build this window on a developer's real machine, where UserSettings
+        // is the live settings file - so without this a test asserting anything about the layout is
+        // really asserting whatever size and splitter position the developer last left the editor
+        // in. That is not a hypothetical: it made the responsiveness and splitter tests pass alone
+        // and fail in the suite. Tests that specifically exercise persistence set this to true and
+        // point UserSettings at a temp file first.
+        //
+        // Defaults to true so the shipping app is unaffected; only a test ever turns it off.
+        // ###########################################################################################
+        internal static bool PersistWindowPlacement { get; private set; } = true;
+
+        // ###########################################################################################
+        // Turns placement persistence off for the duration of a using-block, then restores whatever
+        // it was before.
+        //
+        // The flag used to be set directly and never put back, which made it a one-way latch: the
+        // first test to disable it disabled it for every window built afterwards in the shared
+        // headless session, so anything written later to exercise RestoreWindowPlacement or
+        // TrackWindowPlacement would pass vacuously. A scope makes the off-state bounded even when
+        // the body throws - the same discipline the ColumnDefinition restore in
+        // WorklogEditorSplitterTests already uses.
+        // ###########################################################################################
+        internal static IDisposable SuppressWindowPlacementPersistence()
+        {
+            var scope = new PlacementPersistenceScope(PersistWindowPlacement);
+            PersistWindowPlacement = false;
+            return scope;
+        }
+
+        private sealed class PlacementPersistenceScope : IDisposable
+        {
+            private readonly bool thisPrevious;
+
+            public PlacementPersistenceScope(bool previous) => this.thisPrevious = previous;
+
+            public void Dispose() => PersistWindowPlacement = this.thisPrevious;
+        }
+
         public WorklogEntryEditorWindow()
         {
             this.InitializeComponent();
+
+            if (PersistWindowPlacement)
+            {
+                this.RestoreWindowPlacement();
+                this.TrackWindowPlacement();
+            }
 
             this.EditorLinksList.ItemsSource = this.thisLinkRows;
             this.EditorCommentsList.ItemsSource = this.thisCommentRows;
@@ -136,6 +199,158 @@ namespace CRT
                 this.thisCommentRows.Clear();
                 this.thisWorkDoneRows.Clear();
                 this.thisComponentRows.Clear();
+            };
+        }
+
+        // ###########################################################################################
+        // Restores the size, position and maximized state this window was last closed with.
+        //
+        // Position is only applied when something was actually saved: without it the window would
+        // be placed at (0,0) on a first run instead of honouring WindowStartupLocation="CenterOwner".
+        // The saved position is also range-checked against the available screens, so a window last
+        // closed on a monitor that is no longer attached does not open off-screen where it cannot be
+        // reached - it falls back to centring on the owner.
+        // ###########################################################################################
+        private void RestoreWindowPlacement()
+        {
+            this.thisNormalWidth = UserSettings.HasWorklogEntryWindowLayout
+                ? UserSettings.WorklogEntryWindowWidth
+                : this.Width;
+
+            this.thisNormalHeight = UserSettings.HasWorklogEntryWindowLayout
+                ? UserSettings.WorklogEntryWindowHeight
+                : this.Height;
+
+            if (!UserSettings.HasWorklogEntryWindowLayout)
+            {
+                return;
+            }
+
+            // Clamped to the window's own minimums, so a settings file carrying a smaller size (or
+            // a hand-edited one) cannot produce a window too small to use.
+            this.Width = Math.Max(this.MinWidth, UserSettings.WorklogEntryWindowWidth);
+            this.Height = Math.Max(this.MinHeight, UserSettings.WorklogEntryWindowHeight);
+
+            this.thisNormalWidth = this.Width;
+            this.thisNormalHeight = this.Height;
+
+            int savedX = UserSettings.WorklogEntryWindowX;
+            int savedY = UserSettings.WorklogEntryWindowY;
+
+            if (this.IsSavedPositionOnAScreen(savedX, savedY))
+            {
+                this.thisNormalX = savedX;
+                this.thisNormalY = savedY;
+                this.WindowStartupLocation = WindowStartupLocation.Manual;
+                this.Position = new PixelPoint(savedX, savedY);
+            }
+
+            if (string.Equals(UserSettings.WorklogEntryWindowState, "Maximized", StringComparison.OrdinalIgnoreCase))
+            {
+                this.WindowState = WindowState.Maximized;
+            }
+
+            // The splitter, as the left column's share of the two content columns. Clamped so a
+            // corrupt or hand-edited value cannot collapse either side to nothing - the MinWidths on
+            // the columns would fight it, and the result is a splitter that will not move.
+            double ratio = Math.Clamp(UserSettings.WorklogEntryWindowLeftColumnRatio, 0.15, 0.85);
+            this.EditorSplitGrid.ColumnDefinitions[0].Width = new GridLength(ratio, GridUnitType.Star);
+            this.EditorSplitGrid.ColumnDefinitions[2].Width = new GridLength(1.0 - ratio, GridUnitType.Star);
+        }
+
+        // ###########################################################################################
+        // The left column's share of the two content columns, as laid out right now.
+        //
+        // Measured from the actual bounds rather than read back from the ColumnDefinitions: dragging
+        // a GridSplitter rewrites those definitions, but reading the star VALUES back would mean
+        // reconstructing the proportion from two numbers whose units depend on how the splitter left
+        // them. The rendered widths are unambiguous. Returns the saved value unchanged when the
+        // window has not been laid out (bounds still zero), so closing an unshown window cannot
+        // overwrite a good setting with a meaningless one.
+        // ###########################################################################################
+        private double CurrentLeftColumnRatio()
+        {
+            double leftWidth = this.EditorSplitGrid.ColumnDefinitions[0].ActualWidth;
+            double rightWidth = this.EditorSplitGrid.ColumnDefinitions[2].ActualWidth;
+            double total = leftWidth + rightWidth;
+
+            if (total <= 0.0)
+            {
+                return UserSettings.WorklogEntryWindowLeftColumnRatio;
+            }
+
+            return Math.Clamp(leftWidth / total, 0.15, 0.85);
+        }
+
+        // ###########################################################################################
+        // True when the saved top-left lands inside one of the currently connected screens.
+        //
+        // Guards the monitor-unplugged case: a position saved on a second display would otherwise
+        // put the window somewhere with no screen, where it cannot be moved or closed. Screens can
+        // be unavailable this early in construction, in which case the position is accepted - the
+        // OS will not place a window entirely off-screen on its own.
+        // ###########################################################################################
+        private bool IsSavedPositionOnAScreen(int x, int y)
+        {
+            var screens = this.Screens;
+            if (screens == null || screens.ScreenCount == 0)
+            {
+                return true;
+            }
+
+            foreach (var screen in screens.All)
+            {
+                if (screen.Bounds.Contains(new PixelPoint(x, y)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // ###########################################################################################
+        // Keeps the normal-state bounds current and writes them out when the window closes.
+        //
+        // Both trackers ignore anything but WindowState.Normal, which is what keeps a maximized
+        // session from overwriting the restore size - see the fields above.
+        // ###########################################################################################
+        private void TrackWindowPlacement()
+        {
+            this.SizeChanged += (_, _) =>
+            {
+                if (this.WindowState == WindowState.Normal)
+                {
+                    this.thisNormalWidth = this.Width;
+                    this.thisNormalHeight = this.Height;
+                }
+            };
+
+            this.PositionChanged += (_, _) =>
+            {
+                if (this.WindowState == WindowState.Normal)
+                {
+                    this.thisNormalX = this.Position.X;
+                    this.thisNormalY = this.Position.Y;
+                }
+            };
+
+            // Closing, not Closed: the window's bounds are still meaningful here. It fires for every
+            // route out - Save, Cancel, Escape and the title-bar close - so no exit path loses the
+            // placement.
+            this.Closing += (_, _) =>
+            {
+                string state = this.WindowState == WindowState.Maximized ? "Maximized" : "Normal";
+
+                // Falls back to whatever is already stored when this window never reported a
+                // normal-state position, rather than inventing (0,0) - see the fields above.
+                UserSettings.SaveWorklogEntryWindowLayout(
+                    state,
+                    this.thisNormalWidth,
+                    this.thisNormalHeight,
+                    this.thisNormalX ?? UserSettings.WorklogEntryWindowX,
+                    this.thisNormalY ?? UserSettings.WorklogEntryWindowY,
+                    this.CurrentLeftColumnRatio());
             };
         }
 

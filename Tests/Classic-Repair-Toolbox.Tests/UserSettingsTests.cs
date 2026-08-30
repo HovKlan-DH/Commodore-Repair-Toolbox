@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using Handlers.DataHandling;
 
@@ -733,5 +733,72 @@ public sealed class UserSettingsTests : IDisposable
         Assert.Equal(150, json["componentInfoWindowX"]!.GetValue<int>());
         Assert.Equal(80, json["componentInfoWindowY"]!.GetValue<int>());
         Assert.True(json["hasComponentInfoWindowLayout"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public void Worklog_entry_window_layout_round_trips()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SaveWorklogEntryWindowLayout("Maximized", 1000, 720, 240, 130, 0.42);
+        UserSettings.LoadFrom(path);
+
+        JsonNode json = ReadJson(path);
+
+        Assert.Equal("Maximized", json["worklogEntryWindowState"]!.GetValue<string>());
+        Assert.Equal(1000, json["worklogEntryWindowWidth"]!.GetValue<double>());
+        Assert.Equal(720, json["worklogEntryWindowHeight"]!.GetValue<double>());
+        Assert.Equal(240, json["worklogEntryWindowX"]!.GetValue<int>());
+        Assert.Equal(130, json["worklogEntryWindowY"]!.GetValue<int>());
+        Assert.Equal(0.42, json["worklogEntryWindowLeftColumnRatio"]!.GetValue<double>());
+        Assert.True(json["hasWorklogEntryWindowLayout"]!.GetValue<bool>());
+
+        // And it reads back through the accessors the window restores from.
+        Assert.True(UserSettings.HasWorklogEntryWindowLayout);
+        Assert.Equal("Maximized", UserSettings.WorklogEntryWindowState);
+        Assert.Equal(1000, UserSettings.WorklogEntryWindowWidth);
+        Assert.Equal(720, UserSettings.WorklogEntryWindowHeight);
+        Assert.Equal(240, UserSettings.WorklogEntryWindowX);
+        Assert.Equal(130, UserSettings.WorklogEntryWindowY);
+        Assert.Equal(0.42, UserSettings.WorklogEntryWindowLeftColumnRatio);
+    }
+
+    // The flag is what tells the window whether to apply a saved position at all. Without a saved
+    // layout the window must keep WindowStartupLocation="CenterOwner" rather than jumping to (0,0),
+    // so a fresh settings file has to report false.
+    [Fact]
+    public void A_fresh_settings_file_has_no_worklog_entry_window_layout()
+    {
+        this.LoadSettings("{}");
+
+        Assert.False(UserSettings.HasWorklogEntryWindowLayout);
+    }
+
+    // Defaults match the window's own declared size, so a first run and a settings file that
+    // predates this feature both open at the size the XAML asks for.
+    [Fact]
+    public void The_default_worklog_entry_window_size_matches_the_windows_declared_size()
+    {
+        this.LoadSettings("{}");
+
+        Assert.Equal(1200, UserSettings.WorklogEntryWindowWidth);
+        Assert.Equal(800, UserSettings.WorklogEntryWindowHeight);
+        Assert.Equal("Normal", UserSettings.WorklogEntryWindowState);
+
+        // 0.6 is the 3*:2* split the XAML declares, so an unsaved window opens exactly as designed.
+        Assert.Equal(0.6, UserSettings.WorklogEntryWindowLeftColumnRatio);
+    }
+
+    // A settings file written by an older build has none of these keys; reading it must not throw
+    // and must fall back to the defaults rather than a zero-sized window.
+    [Fact]
+    public void A_settings_file_without_the_worklog_keys_falls_back_to_defaults()
+    {
+        this.LoadSettings("""{ "region": "NTSC" }""");
+
+        Assert.False(UserSettings.HasWorklogEntryWindowLayout);
+        Assert.Equal(1200, UserSettings.WorklogEntryWindowWidth);
+        Assert.Equal(800, UserSettings.WorklogEntryWindowHeight);
+        Assert.Equal(0.6, UserSettings.WorklogEntryWindowLeftColumnRatio);
     }
 }

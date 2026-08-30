@@ -265,68 +265,19 @@ namespace Tabs.TabSchematics
         // rectangle. On very small rectangles, side markers are reduced or suppressed so they do
         // not overlap the corner markers and imply the wrong resize behavior.
         // ###########################################################################################
+        // Draws the resize affordance on the selected highlight.
+        //
+        // The marker layout comes from SelectionMarkerGeometry, shared with the worklog area
+        // overlay - the two are meant to look identical, and sharing the maths is what makes that
+        // true rather than a comment claiming it.
+        // ###########################################################################################
         private void DrawSelectionMarkers(DrawingContext context, Rect rect, double scale)
         {
-            double markerThickness = Math.Clamp(2.5 / scale, 1.0, 2.5);
-            double baseCornerLength = Math.Clamp(6.5 / scale, 3.0, 6.5);
-            double baseSideLength = Math.Clamp(5.0 / scale, 2.5, 5.5);
-            double halfThickness = markerThickness / 2.0;
-
-            double maxCornerLengthX = Math.Max(markerThickness, (rect.Width / 2.0) + halfThickness);
-            double maxCornerLengthY = Math.Max(markerThickness, (rect.Height / 2.0) + halfThickness);
-
-            double cornerLengthX = Math.Min(baseCornerLength, maxCornerLengthX);
-            double cornerLengthY = Math.Min(baseCornerLength, maxCornerLengthY);
-
-            double minimumGap = Math.Clamp(2.0 / scale, markerThickness, 3.0);
-
-            double horizontalSideLength = Math.Max(0.0, rect.Width - (cornerLengthX * 2.0) - minimumGap);
-            double verticalSideLength = Math.Max(0.0, rect.Height - (cornerLengthY * 2.0) - minimumGap);
-
-            if (horizontalSideLength > 0.0)
-            {
-                horizontalSideLength = Math.Min(baseSideLength, horizontalSideLength);
-            }
-
-            if (verticalSideLength > 0.0)
-            {
-                verticalSideLength = Math.Min(baseSideLength, verticalSideLength);
-            }
-
-            double horizontalSideHalf = horizontalSideLength / 2.0;
-            double verticalSideHalf = verticalSideLength / 2.0;
-
             var markerBrush = new SolidColorBrush(this.thisHighlightColor, 1.0);
 
-            double left = rect.Left;
-            double top = rect.Top;
-            double right = rect.Right;
-            double bottom = rect.Bottom;
-            double centerX = rect.Center.X;
-            double centerY = rect.Center.Y;
-
-            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, top - halfThickness, cornerLengthX, markerThickness));
-            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, top - halfThickness, markerThickness, cornerLengthY));
-
-            context.DrawRectangle(markerBrush, null, new Rect(right - cornerLengthX + halfThickness, top - halfThickness, cornerLengthX, markerThickness));
-            context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, top - halfThickness, markerThickness, cornerLengthY));
-
-            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, bottom - halfThickness, cornerLengthX, markerThickness));
-            context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, bottom - cornerLengthY + halfThickness, markerThickness, cornerLengthY));
-
-            context.DrawRectangle(markerBrush, null, new Rect(right - cornerLengthX + halfThickness, bottom - halfThickness, cornerLengthX, markerThickness));
-            context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, bottom - cornerLengthY + halfThickness, markerThickness, cornerLengthY));
-
-            if (horizontalSideLength > 0.0)
+            foreach (var markerRect in SelectionMarkerGeometry.BuildSelectionMarkerRects(rect, scale))
             {
-                context.DrawRectangle(markerBrush, null, new Rect(centerX - horizontalSideHalf, top - halfThickness, horizontalSideLength, markerThickness));
-                context.DrawRectangle(markerBrush, null, new Rect(centerX - horizontalSideHalf, bottom - halfThickness, horizontalSideLength, markerThickness));
-            }
-
-            if (verticalSideLength > 0.0)
-            {
-                context.DrawRectangle(markerBrush, null, new Rect(left - halfThickness, centerY - verticalSideHalf, markerThickness, verticalSideLength));
-                context.DrawRectangle(markerBrush, null, new Rect(right - halfThickness, centerY - verticalSideHalf, markerThickness, verticalSideLength));
+                context.DrawRectangle(markerBrush, null, markerRect);
             }
         }
 

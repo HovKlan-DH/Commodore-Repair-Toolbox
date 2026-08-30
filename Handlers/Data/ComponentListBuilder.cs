@@ -183,6 +183,57 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
+        // Narrows a worklog entry's selected components to those its marked area still touches.
+        //
+        // Called when an area is resized on the schematic. The rule is deliberately one-directional:
+        //
+        //   - a label the area NO LONGER touches is dropped, because the user's selection said
+        //     "this component is in scope" about an area that no longer covers it, and leaving it
+        //     would silently keep a component associated with a fault it is no longer part of;
+        //   - a label the area NOW touches is NOT added, because being inside the rectangle is not
+        //     the same as the user having decided it is relevant. Auto-ticking would quietly put
+        //     components into someone's worklog that they never chose, and the wider the area is
+        //     dragged the more of them appear.
+        //
+        // So a resize can only ever remove. Adding stays a deliberate act in the full editor's
+        // "Mark components in scope" checklist.
+        //
+        // Order is preserved from the existing selection rather than rebuilt from the board, so an
+        // entry that has been curated by hand keeps its arrangement.
+        // ###########################################################################################
+        public static List<string> NarrowSelectionToScope(
+            IReadOnlyList<string>? selectedBoardLabels,
+            IReadOnlyCollection<string> boardLabelsInScope)
+        {
+            if (selectedBoardLabels == null || selectedBoardLabels.Count == 0)
+            {
+                return new List<string>();
+            }
+
+            // Case-insensitive, matching every other board-label comparison in the app - a label
+            // stored as "u7" must still be recognised as in scope when the rects key it as "U7".
+            var scope = new HashSet<string>(
+                boardLabelsInScope ?? Array.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase);
+
+            var kept = new List<string>(selectedBoardLabels.Count);
+
+            foreach (string? label in selectedBoardLabels)
+            {
+                // A null or blank entry identifies no component, so it can never be in scope and is
+                // dropped rather than carried forward as an unmatchable label.
+                string trimmed = label?.Trim() ?? string.Empty;
+
+                if (trimmed.Length > 0 && scope.Contains(trimmed))
+                {
+                    kept.Add(label!);
+                }
+            }
+
+            return kept;
+        }
+
+        // ###########################################################################################
         // Returns true when the provided board has at least one component explicitly tagged as PAL or NTSC.
         // This is what decides whether the region switch is offered at all for a board.
         // ###########################################################################################

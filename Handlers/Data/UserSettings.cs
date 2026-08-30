@@ -98,6 +98,13 @@ namespace Handlers.DataHandling
         [JsonPropertyName("componentInfoWindowThumbnailRowHeight")] public double ComponentInfoWindowThumbnailRowHeight { get; set; } = 100.0;
         [JsonPropertyName("componentInfoWindowX")] public int ComponentInfoWindowX { get; set; } = 0;
         [JsonPropertyName("componentInfoWindowY")] public int ComponentInfoWindowY { get; set; } = 0;
+        [JsonPropertyName("hasWorklogEntryWindowLayout")] public bool HasWorklogEntryWindowLayout { get; set; } = false;
+        [JsonPropertyName("worklogEntryWindowState")] public string WorklogEntryWindowState { get; set; } = "Normal";
+        [JsonPropertyName("worklogEntryWindowWidth")] public double WorklogEntryWindowWidth { get; set; } = 1200.0;
+        [JsonPropertyName("worklogEntryWindowHeight")] public double WorklogEntryWindowHeight { get; set; } = 800.0;
+        [JsonPropertyName("worklogEntryWindowX")] public int WorklogEntryWindowX { get; set; } = 0;
+        [JsonPropertyName("worklogEntryWindowY")] public int WorklogEntryWindowY { get; set; } = 0;
+        [JsonPropertyName("worklogEntryWindowLeftColumnRatio")] public double WorklogEntryWindowLeftColumnRatio { get; set; } = 0.6;
         [JsonPropertyName("componentInfoScrollAction")] public string ComponentInfoScrollAction { get; set; } = "Image change";
         [JsonPropertyName("schematicsLabelBoard")] public bool SchematicsLabelBoard { get; set; } = false;
         [JsonPropertyName("schematicsLabelTechnical")] public bool SchematicsLabelTechnical { get; set; } = false;
@@ -801,6 +808,38 @@ namespace Handlers.DataHandling
             _data.ComponentInfoWindowX = x;
             _data.ComponentInfoWindowY = y;
             Logger.Info($"Setting changed: [ComponentInfoWindowLayout] [{state}] [{width:F0}x{height:F0}] [LeftRatio: {leftColumnRatio:F3}] [ThumbnailHeight: {thumbnailRowHeight:F1}] [Position: {x},{y}]");
+            Save();
+        }
+
+        // Worklog entry window layout - read-only; written atomically via SaveWorklogEntryWindowLayout.
+        // The splitter is stored as the left column's SHARE of the two content columns rather than a
+        // pixel width, so reopening at a different window size keeps the same proportions instead of
+        // leaving one side squeezed. 0.6 is the 3*:2* the XAML declares.
+        public static bool HasWorklogEntryWindowLayout => _data.HasWorklogEntryWindowLayout;
+        public static string WorklogEntryWindowState => _data.WorklogEntryWindowState;
+        public static double WorklogEntryWindowWidth => _data.WorklogEntryWindowWidth;
+        public static double WorklogEntryWindowHeight => _data.WorklogEntryWindowHeight;
+        public static int WorklogEntryWindowX => _data.WorklogEntryWindowX;
+        public static int WorklogEntryWindowY => _data.WorklogEntryWindowY;
+        public static double WorklogEntryWindowLeftColumnRatio => _data.WorklogEntryWindowLeftColumnRatio;
+
+        // ###########################################################################################
+        // Saves the worklog entry editor's window placement atomically in a single disk write.
+        //
+        // Width/height/x/y are always the NORMAL (non-maximized) values - see the caller. Storing a
+        // maximized window's bounds here would mean un-maximizing it later restored it to full
+        // screen size, with no memory of the size the user actually chose.
+        // ###########################################################################################
+        public static void SaveWorklogEntryWindowLayout(string state, double width, double height, int x, int y, double leftColumnRatio)
+        {
+            _data.HasWorklogEntryWindowLayout = true;
+            _data.WorklogEntryWindowState = state;
+            _data.WorklogEntryWindowWidth = width;
+            _data.WorklogEntryWindowHeight = height;
+            _data.WorklogEntryWindowX = x;
+            _data.WorklogEntryWindowY = y;
+            _data.WorklogEntryWindowLeftColumnRatio = leftColumnRatio;
+            Logger.Info($"Setting changed: [WorklogEntryWindowLayout] [{state}] [{width:F0}x{height:F0}] [Position: {x},{y}] [LeftRatio: {leftColumnRatio:F3}]");
             Save();
         }
 

@@ -1,4 +1,5 @@
 - **Application**
+  - Added "Worklog" feature
   - Added option to add a new component in "Contribute" tab
   - Added option to delete an existing component in "Contribute" tab (on the specific component)
   - Changed a contribution via "Contribute" tab can only be done with version `2.5.0` or newer

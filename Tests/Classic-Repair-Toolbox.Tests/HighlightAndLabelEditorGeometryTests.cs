@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Input;
 using Handlers.DataHandling;
 using Handlers.Geometry;
@@ -296,5 +296,199 @@ public class LabelEditorGeometryTests
 
         Assert.Equal(100, topLeft.Center.X, precision: 6);
         Assert.Equal(100, topLeft.Center.Y, precision: 6);
+    }
+
+    // ------------------------------------------------------------------------ ResizeRect
+
+    // Each handle moves its own edge and leaves the opposite one alone - the property that makes a
+    // resize feel like grabbing an edge rather than moving the whole shape.
+    [Theory]
+    [InlineData(LabelEditorDragMode.ResizeLeft, 10, 0, 110, 100, 90, 100)]
+    [InlineData(LabelEditorDragMode.ResizeRight, 10, 0, 100, 100, 110, 100)]
+    [InlineData(LabelEditorDragMode.ResizeTop, 0, 10, 100, 110, 100, 90)]
+    [InlineData(LabelEditorDragMode.ResizeBottom, 0, 10, 100, 100, 100, 110)]
+    internal void A_side_handle_moves_only_its_own_edge(
+        LabelEditorDragMode mode, double dx, double dy,
+        double expectedX, double expectedY, double expectedWidth, double expectedHeight)
+    {
+        var result = LabelEditorGeometry.ResizeRect(new Rect(100, 100, 100, 100), mode, dx, dy, 1.0);
+
+        Assert.Equal(expectedX, result.X, 3);
+        Assert.Equal(expectedY, result.Y, 3);
+        Assert.Equal(expectedWidth, result.Width, 3);
+        Assert.Equal(expectedHeight, result.Height, 3);
+    }
+
+    // A corner moves both of its edges.
+    [Fact]
+    public void A_corner_handle_moves_both_of_its_edges()
+    {
+        var result = LabelEditorGeometry.ResizeRect(
+            new Rect(100, 100, 100, 100), LabelEditorDragMode.ResizeBottomRight, 20, 30, 1.0);
+
+        Assert.Equal(new Rect(100, 100, 120, 130), result);
+    }
+
+    // Dragging an edge past its opposite must pin at the minimum, never invert. A negative width
+    // is not "a small rectangle" - Rect mirrors it about the origin, so the area jumps to the wrong
+    // side of the board and the user loses it.
+    [Theory]
+    [InlineData(LabelEditorDragMode.ResizeLeft, 500.0, 0.0)]
+    [InlineData(LabelEditorDragMode.ResizeRight, -500.0, 0.0)]
+    [InlineData(LabelEditorDragMode.ResizeTop, 0.0, 500.0)]
+    [InlineData(LabelEditorDragMode.ResizeBottom, 0.0, -500.0)]
+    [InlineData(LabelEditorDragMode.ResizeTopLeft, 500.0, 500.0)]
+    [InlineData(LabelEditorDragMode.ResizeBottomRight, -500.0, -500.0)]
+    internal void A_resize_can_never_invert_the_rectangle(LabelEditorDragMode mode, double dx, double dy)
+    {
+        var result = LabelEditorGeometry.ResizeRect(new Rect(100, 100, 100, 100), mode, dx, dy, 5.0);
+
+        Assert.True(result.Width >= 5.0, $"width collapsed to {result.Width}");
+        Assert.True(result.Height >= 5.0, $"height collapsed to {result.Height}");
+    }
+
+    // The edge that was NOT being dragged stays anchored even when the drag is clamped, so the
+    // rectangle shrinks towards the fixed edge rather than sliding across the board.
+    [Fact]
+    public void A_clamped_resize_keeps_the_opposite_edge_anchored()
+    {
+        var result = LabelEditorGeometry.ResizeRect(
+            new Rect(100, 100, 100, 100), LabelEditorDragMode.ResizeLeft, 500, 0, 5.0);
+
+        // Dragging the left edge far right pins it 5px from the right edge, which has not moved.
+        Assert.Equal(200.0, result.Right, 3);
+        Assert.Equal(195.0, result.Left, 3);
+    }
+
+    // Move shifts the whole rectangle and changes neither dimension.
+    [Fact]
+    public void Move_translates_without_resizing()
+    {
+        var result = LabelEditorGeometry.ResizeRect(
+            new Rect(100, 100, 60, 40), LabelEditorDragMode.Move, 25, -15, 1.0);
+
+        Assert.Equal(new Rect(125, 85, 60, 40), result);
+    }
+
+    [Fact]
+    public void An_unset_drag_mode_leaves_the_rectangle_untouched()
+    {
+        var original = new Rect(10, 20, 30, 40);
+
+        Assert.Equal(original, LabelEditorGeometry.ResizeRect(original, LabelEditorDragMode.None, 99, 99, 1.0));
+    }
+
+    // ------------------------------------------------------------------ ClampRectToBounds
+
+    // A worklog area dragged off the board would be saved at coordinates outside the bitmap, where
+    // it cannot be seen or grabbed again - so it is pushed back inside instead.
+    [Theory]
+    [InlineData(-50.0, -50.0, 0.0, 0.0)]
+    [InlineData(950.0, 550.0, 900.0, 500.0)]
+    public void A_rectangle_outside_the_image_is_pushed_back_inside(
+        double x, double y, double expectedX, double expectedY)
+    {
+        var result = LabelEditorGeometry.ClampRectToBounds(new Rect(x, y, 100, 100), new Size(1000, 600));
+
+        Assert.Equal(expectedX, result.X, 3);
+        Assert.Equal(expectedY, result.Y, 3);
+        Assert.Equal(100.0, result.Width, 3);
+        Assert.Equal(100.0, result.Height, 3);
+    }
+
+    // A rectangle already inside is returned untouched - clamping must not nudge a valid area.
+    [Fact]
+    public void A_rectangle_inside_the_image_is_left_alone()
+    {
+        var original = new Rect(100, 100, 200, 150);
+
+        Assert.Equal(original, LabelEditorGeometry.ClampRectToBounds(original, new Size(1000, 600)));
+    }
+
+    // An area larger than the image is capped rather than left overhanging.
+    [Fact]
+    public void A_rectangle_larger_than_the_image_is_capped_to_it()
+    {
+        var result = LabelEditorGeometry.ClampRectToBounds(new Rect(-10, -10, 5000, 5000), new Size(1000, 600));
+
+        Assert.Equal(new Rect(0, 0, 1000, 600), result);
+    }
+
+    // A zero-sized image cannot be clamped against, so the input is returned rather than collapsed.
+    [Fact]
+    public void An_unknown_image_size_leaves_the_rectangle_alone()
+    {
+        var original = new Rect(10, 20, 30, 40);
+
+        Assert.Equal(original, LabelEditorGeometry.ClampRectToBounds(original, new Size(0, 0)));
+    }
+
+    // ------------------------------------------------------- ClampResizedRectToBounds
+
+    // The whole reason this exists separately from ClampRectToBounds: a RESIZE clamped at the board
+    // edge must trim the edge that strayed out and leave every other edge alone. The translate-clamp
+    // preserved width instead, so dragging the LEFT edge out past x=0 slid the rectangle back and
+    // pushed the RIGHT edge outward - the user dragged one handle and the opposite edge moved.
+    [Fact]
+    public void A_resize_clamped_at_the_left_edge_keeps_the_right_edge_anchored()
+    {
+        // Left edge dragged to -40; right edge is at 200 and must stay there.
+        var result = LabelEditorGeometry.ClampResizedRectToBounds(
+            new Rect(-40, 100, 240, 100), new Size(1000, 600), 8.0);
+
+        Assert.Equal(0.0, result.Left, 3);
+        Assert.Equal(200.0, result.Right, 3);
+    }
+
+    [Fact]
+    public void A_resize_clamped_at_the_right_edge_keeps_the_left_edge_anchored()
+    {
+        // Right edge dragged to 1100 against a 1000-wide image; left stays at 900.
+        var result = LabelEditorGeometry.ClampResizedRectToBounds(
+            new Rect(900, 100, 200, 100), new Size(1000, 600), 8.0);
+
+        Assert.Equal(900.0, result.Left, 3);
+        Assert.Equal(1000.0, result.Right, 3);
+    }
+
+    [Fact]
+    public void A_resize_clamped_at_the_top_keeps_the_bottom_anchored()
+    {
+        var result = LabelEditorGeometry.ClampResizedRectToBounds(
+            new Rect(100, -30, 100, 230), new Size(1000, 600), 8.0);
+
+        Assert.Equal(0.0, result.Top, 3);
+        Assert.Equal(200.0, result.Bottom, 3);
+    }
+
+    // A rectangle already inside must come back untouched - clamping cannot nudge a valid area.
+    [Fact]
+    public void A_resized_rectangle_inside_the_image_is_left_alone()
+    {
+        var original = new Rect(100, 100, 200, 150);
+
+        Assert.Equal(original, LabelEditorGeometry.ClampResizedRectToBounds(original, new Size(1000, 600), 8.0));
+    }
+
+    // The minimum is still honoured at the boundary: an edge dragged far outside collapses against
+    // it rather than inverting.
+    [Fact]
+    public void A_resize_pinned_against_the_edge_still_respects_the_minimum()
+    {
+        var result = LabelEditorGeometry.ClampResizedRectToBounds(
+            new Rect(-500, 100, 502, 100), new Size(1000, 600), 8.0);
+
+        Assert.True(result.Width >= 8.0, $"width collapsed to {result.Width}");
+        Assert.True(result.Left >= -0.001, $"left escaped the image at {result.Left}");
+    }
+
+    // A zero-sized image gives nothing to clamp against, so the input is returned rather than
+    // collapsed to nothing.
+    [Fact]
+    public void An_unknown_image_size_leaves_a_resized_rectangle_alone()
+    {
+        var original = new Rect(10, 20, 30, 40);
+
+        Assert.Equal(original, LabelEditorGeometry.ClampResizedRectToBounds(original, new Size(0, 0), 8.0));
     }
 }
