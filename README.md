@@ -171,6 +171,8 @@ I will keep adding and enhancing data, but if this is only me providing data, th
 
 Data contribution can be almost anything - tiny and trivial updates (spelling mistakes, wrong or missing technical values or alike) or it can be huge new boards, but I really would like to get a massive amount of **quality** data, for the benefit of everyone using this. The goal is that it should have (most) relevant data in one place, so it would not be required to go and lookup for other data sources, but of course it also needs to be balanced a little, not overwelming with too much data 🤔
 
+Contributing data is very easy - just go to the "Contribute" tab, select the component you want to edit and send your update - that's it.
+
 You can help specifically with these topics:
 - Do you have higher-quality images of the used schematics?
 - Do you have (better) datasheets or pinouts for any of the components?
