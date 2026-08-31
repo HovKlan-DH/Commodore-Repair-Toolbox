@@ -118,4 +118,103 @@ public class WorklogLocationPreviewTests
             widthAfter!.Value < widthBefore!.Value,
             $"marker did not shrink with the preview: before={widthBefore}, after={widthAfter}");
     }
+
+    // ------------------------------------------------------------- shrink-wrapped frame
+
+    // The preview box used to be a fixed 220px tall with a Stretch="Uniform" image centred in it,
+    // so a wide schematic sat in a tall box padded top and bottom with empty Form_Bg - on a
+    // typical board image, most of those 220px were blank. The border now shrink-wraps the image
+    // the way the Photos thumbnails do, so the 1px frame lands on the picture rather than around
+    // a mostly-empty box.
+    //
+    // Asserted as "the frame is no taller than the image plus its own border" rather than against
+    // a pixel figure, so the test states the rule instead of a measurement that a font or padding
+    // change would invalidate.
+    [Fact]
+    public void The_location_preview_frame_does_not_add_vertical_space_around_the_image()
+    {
+        double imageHeight = 0;
+        double frameHeight = 0;
+
+        UiTest.Run(() =>
+        {
+            using var placementScope = WorklogEntryEditorWindow.SuppressWindowPlacementPersistence();
+
+            var window = new WorklogEntryEditorWindow();
+            window.Width = 1000;
+            window.Height = 700;
+
+            // Deliberately WIDE and short - the aspect ratio that letterboxed worst in the fixed
+            // 220px box, and therefore the one that proves the box is gone.
+            using var bitmap = CreateBitmap(800, 200);
+            window.Initialize(1, CreateEntry(), bitmap);
+
+            try
+            {
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+
+                var image = window.GetVisualDescendants()
+                    .OfType<Image>()
+                    .First(i => i.Name == "EditorLocationPreviewImage");
+
+                var frame = (Border)window.GetVisualDescendants()
+                    .OfType<Grid>()
+                    .First(g => g.Name == "EditorLocationPreviewGrid")
+                    .GetVisualParent()!;
+
+                imageHeight = image.Bounds.Height;
+                frameHeight = frame.Bounds.Height;
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
+        Assert.True(imageHeight > 0, "the preview image was not laid out");
+
+        // 1px border top and bottom is the only extra the frame may add.
+        Assert.True(
+            frameHeight <= imageHeight + 2.5,
+            $"frame is {frameHeight}px around a {imageHeight}px image - it is padding the image out again");
+    }
+
+    // The MaxHeight still applies, so a very TALL schematic cannot push the right-hand panel into
+    // a scroll of its own.
+    [Fact]
+    public void A_tall_schematic_is_capped_rather_than_growing_without_limit()
+    {
+        double imageHeight = 0;
+
+        UiTest.Run(() =>
+        {
+            using var placementScope = WorklogEntryEditorWindow.SuppressWindowPlacementPersistence();
+
+            var window = new WorklogEntryEditorWindow();
+            window.Width = 1000;
+            window.Height = 700;
+
+            using var bitmap = CreateBitmap(200, 2000);
+            window.Initialize(1, CreateEntry(), bitmap);
+
+            try
+            {
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+
+                imageHeight = window.GetVisualDescendants()
+                    .OfType<Image>()
+                    .First(i => i.Name == "EditorLocationPreviewImage")
+                    .Bounds.Height;
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
+        Assert.True(imageHeight > 0, "the preview image was not laid out");
+        Assert.True(imageHeight <= 220.5, $"a tall schematic grew to {imageHeight}px, past the 220px cap");
+    }
 }

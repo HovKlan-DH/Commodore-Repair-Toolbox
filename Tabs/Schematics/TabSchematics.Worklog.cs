@@ -16,11 +16,11 @@ using Tabs.TabSchematics;
 namespace CRT;
 
 // ###########################################################################################
-// Worklog "Add entry" area-marking mode: drag-draw a rectangle on the board to mark where a
+// Worklog "Add worklog" area-marking mode: drag-draw a rectangle on the board to mark where a
 // fault is, then show the "New fault" quick card anchored near it, pre-populated with every
 // component whose highlight rectangle intersects the drawn area. Cancel just dismisses the
-// card and exits the mode; Save persists the entry via WorklogManager.AddEntry and then does
-// the same.
+// card and exits the mode; "Add worklog" persists the entry via WorklogManager.AddEntry and
+// then does the same.
 //
 // Part of the TabSchematics partial class - see TabSchematics.axaml.cs for the tab overview.
 // ###########################################################################################
@@ -105,6 +105,23 @@ public partial class TabSchematics
     private readonly List<(Border Badge, Rect PixelRect, WorklogEntryRecord Entry, Color Color)> thisWorklogEntriesListBadges = new();
 
     // ###########################################################################################
+    // The pills of entries whose "Show marked area" is unticked. They have no marked area to sit
+    // on, so they are stacked in the top-right corner of the schematic panel instead of being
+    // hidden - an entry with no area AND no pill would be invisible on the board and unreachable
+    // without opening the worklog list.
+    //
+    // Kept separate from thisWorklogEntriesListBadges because they live on a different canvas and
+    // obey different rules: these sit in the container's own coordinate space and do not move with
+    // zoom or pan, so a rescale tick repositions them for the viewport rather than for the board.
+    // ###########################################################################################
+    private readonly List<(Border Badge, WorklogEntryRecord Entry)> thisWorklogParkedBadges = new();
+
+    // Gap from the panel edges, and between stacked pills.
+    private const double WorklogParkedBadgeMargin = 10.0;
+
+    private const double WorklogParkedBadgeSpacing = 6.0;
+
+    // ###########################################################################################
     // Enters worklog entry-drawing mode for the given active workbook. Refuses to start while the
     // label editor or KiCad calibration mode is active, or while no schematic image is loaded, so
     // the caller can tell whether the mode actually started.
@@ -129,6 +146,9 @@ public partial class TabSchematics
         this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.Cross);
         this.SchematicsContainer.Focus();
         this.Focus();
+
+        // The crosshair alone does not say what to do with it.
+        this.MainWindow?.ShowModeHint(Main.WorklogAreaModeHint);
 
         Logger.Info($"Worklog entry drawing mode enabled for workbook [#{workbookId}] on schematic [{this.GetCurrentSchematicName()}]");
         return true;
@@ -157,6 +177,8 @@ public partial class TabSchematics
         this.SchematicsContainer.Cursor = Cursor.Default;
         this.SchematicsContainer.Focus();
 
+        this.MainWindow?.HideModeHint();
+
         this.MainWindow?.ResetWorklogEntryModeButtons();
 
         Logger.Info("Worklog entry drawing mode canceled");
@@ -169,6 +191,7 @@ public partial class TabSchematics
     {
         this.thisIsDrawingWorklogEntryRectangle = true;
         this.thisWorklogEntryDrawStartPixelPoint = startPixelPoint;
+
         this.thisWorklogEntryDraftRectangle = new Rect(startPixelPoint.X, startPixelPoint.Y, 0, 0);
         this.thisWorklogEntryFinalRectangle = null;
 
@@ -382,7 +405,9 @@ public partial class TabSchematics
         this.UpdateWorklogEntryCategoryChipVisuals();
         this.thisWorklogEntrySelectedState = WorklogStateOpen;
         this.UpdateWorklogEntryStatePillVisuals();
+        this.WorklogEntryShowMarkedAreaCheckBox.IsChecked = true;
         this.RefreshWorklogEntryComponentList();
+        this.UpdateWorklogEntryCardSaveEnabled();
 
         this.SchematicsNewWorklogEntryCardBorder.IsVisible = true;
         this.SchematicsNewWorklogEntryCardBorder.Margin = new Thickness(0);
@@ -412,6 +437,24 @@ public partial class TabSchematics
         this.RefreshWorklogEntryOverlay();
 
         Dispatcher.UIThread.Post(() => this.WorklogEntryTitleTextBox.Focus(), DispatcherPriority.Background);
+    }
+
+    // ###########################################################################################
+    // Keeps the card's "Add worklog" button in step with the title box - a worklog with no title
+    // is unidentifiable in the worklog list and on the board (the "#N" badge is all that would
+    // distinguish it), so an empty title is not a saveable state.
+    //
+    // Whitespace does not count: the title is Trim()ed before it is persisted, so a title of
+    // spaces would be saved as an empty one and the gate has to agree with what the save does.
+    // ###########################################################################################
+    private void OnWorklogEntryTitleTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        this.UpdateWorklogEntryCardSaveEnabled();
+    }
+
+    private void UpdateWorklogEntryCardSaveEnabled()
+    {
+        this.WorklogEntryCardSaveButton.IsEnabled = !string.IsNullOrWhiteSpace(this.WorklogEntryTitleTextBox.Text);
     }
 
     // ###########################################################################################
@@ -478,14 +521,17 @@ public partial class TabSchematics
     // ###########################################################################################
     private void UpdateWorklogEntryCategoryChipVisuals()
     {
-        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryNoteChip, this.WorklogCategoryNoteText, WorklogCategoryNote);
-        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryCosmeticChip, this.WorklogCategoryCosmeticText, WorklogCategoryCosmetic);
-        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryIssueChip, this.WorklogCategoryIssueText, WorklogCategoryIssue);
+        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryNoteChip, this.WorklogCategoryNoteText, this.WorklogCategoryNoteIcon, WorklogCategoryNote);
+        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryCosmeticChip, this.WorklogCategoryCosmeticText, this.WorklogCategoryCosmeticIcon, WorklogCategoryCosmetic);
+        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryIssueChip, this.WorklogCategoryIssueText, this.WorklogCategoryIssueIcon, WorklogCategoryIssue);
 
         this.WorklogEntryIdBadge.Background = new SolidColorBrush(this.GetSelectedWorklogEntryCategoryColor());
     }
 
-    private void ApplyWorklogCategoryChipVisualState(Border chip, TextBlock label, string category)
+    // The icon takes the label's color rather than a color of its own - white on the selected
+    // chip's filled background, the ordinary foreground otherwise. An icon left at one fixed color
+    // would either disappear into the fill or stay dark while its own label went white.
+    private void ApplyWorklogCategoryChipVisualState(Border chip, TextBlock label, TextBlock icon, string category)
     {
         var categoryBrush = this.ResolveThemeBrush($"Worklog_Category_{category}", new SolidColorBrush(Colors.IndianRed));
 
@@ -497,6 +543,7 @@ public partial class TabSchematics
             chip.Opacity = 0.9;
             label.Foreground = Brushes.White;
             label.FontWeight = FontWeight.SemiBold;
+            icon.Foreground = label.Foreground;
         }
         else
         {
@@ -506,6 +553,7 @@ public partial class TabSchematics
             chip.Opacity = 1.0;
             label.Foreground = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
             label.FontWeight = FontWeight.Normal;
+            icon.Foreground = label.Foreground;
         }
     }
 
@@ -522,32 +570,55 @@ public partial class TabSchematics
         }
     }
 
+
     // ###########################################################################################
-    // Restyles both state pills to reflect thisWorklogEntrySelectedState: the selected pill
-    // gets an outline and text in its state color, the other shows the usual neutral outline.
-    // Unlike the category chips, the selected pill stays outline-only (no filled background) -
-    // that is the visual distinction the maintainer asked for between category and state.
+    // Reserves the top pixel row an over-tall Font Awesome glyph needs, computed from the control's
+    // OWN text and font size.
     //
-    // The dot keeps its state color in BOTH pills, exactly as the category chips' dots do - it is
-    // the state's identity, not a selection cue, so dimming it when unselected would read as a
-    // different state rather than an unselected one.
+    // Applied from code rather than as a literal Padding in markup: the literal is correct only for
+    // the size it was written against (the padlocks need 2px at FontSize 17), and XAML cannot call
+    // the calculation - so every hardcoded site was a clipped icon waiting for a font-size change.
+    // Harmless on glyphs that do not overshoot; it resolves to an empty Thickness.
+    // ###########################################################################################
+    private static void ApplyFontAwesomeOverflowPadding(params TextBlock[] icons)
+    {
+        foreach (var icon in icons)
+        {
+            icon.Padding = FontAwesomeGlyphMetrics.GetTopOverflowThicknessForText(icon.Text, icon.FontSize);
+        }
+    }
+
+    // ###########################################################################################
+    // Restyles both state pills to reflect thisWorklogEntrySelectedState: the selected pill is
+    // FILLED with its state color and its label goes white and bold, the same treatment the
+    // category chips use. It was outline-only, which on the pale panel background left "selected"
+    // and "unselected" separated by little more than a 1px border-width difference - the selected
+    // pill was genuinely hard to pick out.
+    //
+    // The padlock keeps its state color in the UNSELECTED pill (it is the state's identity, not a
+    // selection cue) but turns white in the selected one, where the fill already carries the color
+    // and a colored glyph on a same-colored fill would simply vanish.
     // ###########################################################################################
     private void UpdateWorklogEntryStatePillVisuals()
     {
-        this.ApplyWorklogEntryStatePillVisualState(this.WorklogStateOpenPill, this.WorklogStateOpenText, WorklogStateOpen, "Worklog_Status_Open");
-        this.ApplyWorklogEntryStatePillVisualState(this.WorklogStateClosedPill, this.WorklogStateClosedText, WorklogStateClosed, "Worklog_Status_Closed");
+        ApplyFontAwesomeOverflowPadding(this.WorklogStateOpenDot, this.WorklogStateClosedDot);
+
+        this.ApplyWorklogEntryStatePillVisualState(this.WorklogStateOpenPill, this.WorklogStateOpenText, this.WorklogStateOpenDot, WorklogStateOpen, "Worklog_Status_Open");
+        this.ApplyWorklogEntryStatePillVisualState(this.WorklogStateClosedPill, this.WorklogStateClosedText, this.WorklogStateClosedDot, WorklogStateClosed, "Worklog_Status_Closed");
     }
 
-    private void ApplyWorklogEntryStatePillVisualState(Border pill, TextBlock label, string state, string colorResourceKey)
+    private void ApplyWorklogEntryStatePillVisualState(Border pill, TextBlock label, TextBlock icon, string state, string colorResourceKey)
     {
         var stateBrush = this.ResolveThemeBrush(colorResourceKey, new SolidColorBrush(Colors.IndianRed));
 
         if (string.Equals(this.thisWorklogEntrySelectedState, state, StringComparison.Ordinal))
         {
-            pill.Background = this.ResolveThemeBrush("Schematics_Panels_Bg", new SolidColorBrush(Color.Parse("#F5F5F5")));
+            pill.Background = stateBrush;
             pill.BorderBrush = stateBrush;
             pill.BorderThickness = new Thickness(2);
-            label.Foreground = stateBrush;
+            pill.Opacity = 0.9;
+            icon.Foreground = Brushes.White;
+            label.Foreground = Brushes.White;
             label.FontWeight = FontWeight.SemiBold;
         }
         else
@@ -555,6 +626,8 @@ public partial class TabSchematics
             pill.Background = this.ResolveThemeBrush("Form_Bg", new SolidColorBrush(Color.Parse("#F5F5F5")));
             pill.BorderBrush = this.ResolveThemeBrush("Form_Border", new SolidColorBrush(Color.Parse("#CCCCCC")));
             pill.BorderThickness = new Thickness(1);
+            pill.Opacity = 1.0;
+            icon.Foreground = stateBrush;
             label.Foreground = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
             label.FontWeight = FontWeight.Normal;
         }
@@ -592,7 +665,7 @@ public partial class TabSchematics
             }
         }
 
-        this.WorklogEntryComponentCountText.Text = $"{this.thisWorklogEntryComponentRows.Count} found";
+        this.UpdateWorklogEntryComponentCount();
         this.WorklogEntryNoComponentsText.IsVisible = this.thisWorklogEntryComponentRows.Count == 0;
     }
 
@@ -631,12 +704,27 @@ public partial class TabSchematics
     // "All" / "None" links above the checklist for quickly bulk-marking every touched component
     // as in or out of scope.
     // ###########################################################################################
+    // ###########################################################################################
+    // The count beside the card's checklist heading. Reports the SELECTION against the total, the
+    // same wording the full editor uses - "8 found" said nothing about the choice the user had
+    // actually made, and never changed when they made one.
+    // ###########################################################################################
+    private void UpdateWorklogEntryComponentCount()
+    {
+        int total = this.thisWorklogEntryComponentRows.Count;
+        int selected = this.thisWorklogEntryComponentRows.Count(row => row.IsChecked);
+
+        this.WorklogEntryComponentCountText.Text = $"{selected} of {total} selected";
+    }
+
     private void OnWorklogEntrySelectAllComponentsClick(object? sender, RoutedEventArgs e)
     {
         foreach (var row in this.thisWorklogEntryComponentRows)
         {
             row.IsChecked = true;
         }
+
+        this.UpdateWorklogEntryComponentCount();
     }
 
     private void OnWorklogEntrySelectNoneComponentsClick(object? sender, RoutedEventArgs e)
@@ -645,6 +733,8 @@ public partial class TabSchematics
         {
             row.IsChecked = false;
         }
+
+        this.UpdateWorklogEntryComponentCount();
     }
 
     // ###########################################################################################
@@ -657,6 +747,7 @@ public partial class TabSchematics
         if (sender is Control control && control.DataContext is WorklogEntryComponentRow row)
         {
             row.IsChecked = !row.IsChecked;
+            this.UpdateWorklogEntryComponentCount();
         }
     }
 
@@ -705,6 +796,16 @@ public partial class TabSchematics
         }
 
         string title = this.WorklogEntryTitleTextBox.Text?.Trim() ?? string.Empty;
+        if (title.Length == 0)
+        {
+            // The button is disabled while the title is blank, so this is only reachable via a
+            // keyboard default-button path - but the rule belongs with the save, not only with
+            // the affordance, so a titleless entry can never be written.
+            this.UpdateWorklogEntryCardSaveEnabled();
+            this.WorklogEntryTitleTextBox.Focus();
+            return;
+        }
+
         string description = this.WorklogEntryDescriptionTextBox.Text?.Trim() ?? string.Empty;
         var componentLabels = this.thisWorklogEntryComponentRows
             .Where(row => row.IsChecked)
@@ -718,7 +819,8 @@ public partial class TabSchematics
             description,
             this.thisWorklogEntrySelectedCategory,
             this.thisWorklogEntrySelectedState,
-            componentLabels);
+            componentLabels,
+            this.WorklogEntryShowMarkedAreaCheckBox.IsChecked ?? true);
 
         if (savedEntry == null)
         {
@@ -768,6 +870,8 @@ public partial class TabSchematics
         }
         this.thisWorklogEntriesListBadges.Clear();
 
+        this.ClearWorklogParkedBadges();
+
         // The hover label caches which entry it is painted for and skips repainting while that id
         // is unchanged. An entry edited in the full editor keeps its id, so without this the label
         // would keep showing the pre-edit title and state icon until the pointer moved to a
@@ -801,10 +905,20 @@ public partial class TabSchematics
             var pixelRect = new Rect(entry.AreaX, entry.AreaY, entry.AreaWidth, entry.AreaHeight);
             Color color = this.ResolveWorklogCategoryColor(entry.Category);
 
+            // "Show marked area" unticked: no coloured rectangle and no anchored badge. The pill is
+            // parked in the corner instead - see LayOutWorklogParkedBadges.
+            if (!entry.ShowMarkedArea)
+            {
+                this.CreateWorklogParkedBadge(entry, color);
+                continue;
+            }
+
             overlayEntries.Add(new WorklogEntriesOverlay.Entry(pixelRect, color, entry.Id));
 
             this.CreateWorklogEntriesListBadge(entry, color, pixelRect, contentRect, inverseScale);
         }
+
+        this.LayOutWorklogParkedBadges();
 
         this.SchematicsWorklogEntriesOverlay.BitmapPixelSize = this.currentFullResBitmap.PixelSize;
         this.SchematicsWorklogEntriesOverlay.ViewMatrix = this.schematicsMatrix;
@@ -1197,8 +1311,12 @@ public partial class TabSchematics
         var scopeAfterResize = this.BuildWorklogEntryComponentScope(record);
         if (scopeAfterResize != null)
         {
-            record.ComponentLabels = ComponentListBuilder.NarrowSelectionToScope(
+            // Both lists narrowed together, so the completed list is measured against the scope
+            // that REMAINS rather than against the raw area - see NarrowEntryToScope for why those
+            // are not the same thing.
+            (record.ComponentLabels, record.CompletedComponentLabels) = ComponentListBuilder.NarrowEntryToScope(
                 record.ComponentLabels,
+                record.CompletedComponentLabels,
                 scopeAfterResize.Select(c => c.BoardLabel).ToList());
         }
 
@@ -1281,6 +1399,10 @@ public partial class TabSchematics
             this.SchematicsWorklogEntriesBadgeCanvas.Children.Remove(badge);
         }
         this.thisWorklogEntriesListBadges.Clear();
+
+        // Parked pills live on their own canvas, so tearing down the anchored ones leaves these
+        // behind - stranded pills for a board that is no longer on screen.
+        this.ClearWorklogParkedBadges();
 
         this.SchematicsWorklogEntriesOverlay.IsVisible = false;
         this.SchematicsWorklogEntriesOverlay.Entries = Array.Empty<WorklogEntriesOverlay.Entry>();
@@ -1367,6 +1489,39 @@ public partial class TabSchematics
     // Anything unrecognised falls through to Open: state is a free-form string in entries.json, so
     // a hand-edited or future value must still render rather than throw.
     // ###########################################################################################
+    // fa-solid lock-open / lock. Read out of the shipped Solid OTF rather than from memory - the
+    // Free faces are subsets, so a codepoint that is wrong renders a blank box with nothing failing.
+    private const int WorklogOpenCodepoint = 0xF3C1;
+
+    private const int WorklogClosedCodepoint = 0xF023;
+
+    private const string WorklogOpenGlyph = "";
+
+    private const string WorklogClosedGlyph = "";
+
+    // Anything that is not the closed state is treated as open, matching ResolveWorklogStateColor
+    // below - an unrecognised value from a future build shows as open rather than as nothing.
+    private bool IsWorklogStateResolved(string state) =>
+        string.Equals(state, WorklogStateClosed, StringComparison.Ordinal);
+
+    // The FontAwesomeSolid family from the app resources, with the system default as a fallback so
+    // a missing resource degrades to readable text rather than throwing.
+    private FontFamily ResolveFontAwesomeSolid()
+    {
+        if (this.TryFindResource("FontAwesomeSolid", out object? resource) && resource is FontFamily family)
+        {
+            return family;
+        }
+
+        if (Application.Current?.TryGetResource("FontAwesomeSolid", Application.Current.ActualThemeVariant, out object? themed) == true
+            && themed is FontFamily themedFamily)
+        {
+            return themedFamily;
+        }
+
+        return FontFamily.Default;
+    }
+
     private Color ResolveWorklogStateColor(string state)
     {
         string stateColorResourceKey = state switch
@@ -1387,6 +1542,157 @@ public partial class TabSchematics
     // ###########################################################################################
     private void CreateWorklogEntriesListBadge(WorklogEntryRecord entry, Color color, Rect pixelRect, Rect contentRect, double inverseScale)
     {
+        var badge = this.CreateWorklogBadgeControl(entry, color, inverseScale);
+
+        this.SchematicsWorklogEntriesBadgeCanvas.Children.Add(badge);
+        this.thisWorklogEntriesListBadges.Add((badge, pixelRect, entry, color));
+
+        this.PositionWorklogEntriesListBadge(badge, pixelRect, contentRect, inverseScale);
+    }
+
+    // ###########################################################################################
+    // Builds the pill for an entry whose marked area is hidden and adds it to the parked canvas.
+    // Position is left to LayOutWorklogParkedBadges, which needs the whole set to stack them.
+    //
+    // Scale 1, unlike the anchored badges: those sit on a canvas carrying the view matrix and use
+    // an inverse scale to cancel it out, so they hold a constant screen size while the board zooms.
+    // The parked canvas has no such transform, so the same compensation would shrink or magnify
+    // these pills for no reason.
+    // ###########################################################################################
+    private void CreateWorklogParkedBadge(WorklogEntryRecord entry, Color color)
+    {
+        var badge = this.CreateWorklogBadgeControl(entry, color, 1.0);
+
+        this.SchematicsWorklogParkedBadgeCanvas.Children.Add(badge);
+        this.thisWorklogParkedBadges.Add((badge, entry));
+    }
+
+    private void ClearWorklogParkedBadges()
+    {
+        foreach (var (badge, _) in this.thisWorklogParkedBadges)
+        {
+            this.SchematicsWorklogParkedBadgeCanvas.Children.Remove(badge);
+        }
+
+        this.thisWorklogParkedBadges.Clear();
+    }
+
+    // ###########################################################################################
+    // Arranges the parked pills as a compact block in the schematic panel's top-right corner,
+    // stepping left out of the "Netlist names" panel's way whenever that panel is open. A block
+    // rather than one long column - see ParkedBadgeGeometry for the row/column progression.
+    //
+    // The reservation is read from the panel's ACTUAL laid-out width rather than from its MaxWidth,
+    // because the panel sizes itself to its content: a short net name gives a narrow panel, and
+    // reserving the maximum would leave the pills floating in empty space most of the time. Its
+    // margin is added on so the pills clear the panel rather than touching it.
+    //
+    // Called on refresh AND on every zoom/pan tick. The pills do not move with the board, but the
+    // panel can open, close or change width underneath them, and the viewport itself can resize.
+    // ###########################################################################################
+    private bool thisIsLayingOutParkedBadges;
+
+    private void LayOutWorklogParkedBadges()
+    {
+        if (this.thisWorklogParkedBadges.Count == 0)
+        {
+            return;
+        }
+
+        // Re-entrancy guard. This method Measures every parked badge and writes Canvas.SetLeft/Top,
+        // which invalidates the canvas's arrange; when that settles, the container's own Bounds can
+        // change and fire the very PropertyChanged handler that called us. The property filter in
+        // that handler screens out unrelated properties but says nothing about a pass this method
+        // triggers itself, so without this a single resize could run the measure loop twice over.
+        if (this.thisIsLayingOutParkedBadges)
+        {
+            return;
+        }
+
+        this.thisIsLayingOutParkedBadges = true;
+        try
+        {
+
+            var viewportSize = this.SchematicsContainer.Bounds.Size;
+            if (viewportSize.Width <= 0 || viewportSize.Height <= 0)
+            {
+                return;
+            }
+
+            var sizes = new List<Size>(this.thisWorklogParkedBadges.Count);
+            foreach (var (badge, _) in this.thisWorklogParkedBadges)
+            {
+                badge.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                sizes.Add(badge.DesiredSize);
+            }
+
+            var positions = ParkedBadgeGeometry.ArrangeInTopRightBlock(
+                sizes,
+                viewportSize,
+                WorklogParkedBadgeMargin,
+                WorklogParkedBadgeSpacing,
+                this.GetWorklogParkedBadgeReservedRight());
+
+            for (int i = 0; i < this.thisWorklogParkedBadges.Count && i < positions.Count; i++)
+            {
+                Canvas.SetLeft(this.thisWorklogParkedBadges[i].Badge, positions[i].X);
+                Canvas.SetTop(this.thisWorklogParkedBadges[i].Badge, positions[i].Y);
+            }
+        }
+        finally
+        {
+            this.thisIsLayingOutParkedBadges = false;
+        }
+    }
+
+    // ###########################################################################################
+    // Re-stacks the parked pills when something they are positioned against moves: the "Netlist
+    // names" panel appearing, disappearing or resizing, or the schematic container itself being
+    // resized by the window or the splitter.
+    //
+    // Filtered to the two properties that actually matter. PropertyChanged fires for every styled
+    // property on these controls - a re-layout on each would run the stack maths hundreds of times
+    // per second during a drag for no visible difference.
+    // ###########################################################################################
+    private void OnWorklogParkedBadgeLayoutTriggerChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property != Visual.BoundsProperty && e.Property != Visual.IsVisibleProperty)
+        {
+            return;
+        }
+
+        this.LayOutWorklogParkedBadges();
+    }
+
+    // The width the "Netlist names" panel is currently claiming on the right-hand edge, including
+    // its own margin - zero when it is not showing.
+    private double GetWorklogParkedBadgeReservedRight()
+    {
+        if (!this.KiCadNetConnectionsPanel.IsVisible)
+        {
+            return 0.0;
+        }
+
+        double width = this.KiCadNetConnectionsPanel.Bounds.Width;
+        if (width <= 0)
+        {
+            return 0.0;
+        }
+
+        // Right margin only. The panel is right-aligned, so the space it claims on that edge is its
+        // width plus the gap between it and the window edge; its LEFT margin is on the board-facing
+        // side - the gap the pills are meant to sit beside, not extra to reserve. Counting both put
+        // the block 10px further left than needed, doubling the intended gap.
+        return width + this.KiCadNetConnectionsPanel.Margin.Right;
+    }
+
+    // ###########################################################################################
+    // The pill control itself - shared by the anchored badges and the parked ones so the two can
+    // never drift apart visually. An entry that is merely parked must still look like the same
+    // worklog it was when its area was showing.
+    // ###########################################################################################
+    private Border CreateWorklogBadgeControl(WorklogEntryRecord entry, Color color, double inverseScale)
+    {
         var idText = new TextBlock
         {
             Text = $"#{entry.Id}",
@@ -1398,19 +1704,43 @@ public partial class TabSchematics
 
         var stateBrush = new SolidColorBrush(this.ResolveWorklogStateColor(entry.State));
 
-        // A solid disc of the state colour inside a white ring - no glyph. It used to carry a white
-        // FontAwesome circle, which filled the interior white and left only a thin rim of the state
-        // colour showing, so the dot read as white-on-colour rather than as the state's own colour.
-        // The state is conveyed by the fill alone, exactly as the dots in the state pills are.
+        // A padlock in the state colour, on a white disc - the same open/closed padlocks the state
+        // pills in both modals use, so an entry reads the same wherever it appears.
+        //
+        // The disc stays WHITE rather than taking the state colour: the badge behind it is already
+        // filled with the entry's category colour, and a state-coloured disc on that would put two
+        // saturated colours against each other with the glyph lost between them. White separates
+        // the two and lets the padlock itself carry the state.
+        bool isResolved = this.IsWorklogStateResolved(entry.State);
+        int stateGlyphCodepoint = isResolved ? WorklogClosedCodepoint : WorklogOpenCodepoint;
+
+        const double stateIconFontSize = 10.0;
+
+        var stateIcon = new TextBlock
+        {
+            Text = isResolved ? WorklogClosedGlyph : WorklogOpenGlyph,
+            FontFamily = this.ResolveFontAwesomeSolid(),
+            FontSize = stateIconFontSize,
+            Foreground = stateBrush,
+
+            // The padlocks are drawn taller than the font's declared ascent, so without a reserved
+            // row their top pixel row falls outside the line box and is clipped - see
+            // FontAwesomeGlyphMetrics. Computed rather than hardcoded, so changing the font size
+            // above cannot quietly reintroduce the clipping.
+            Padding = FontAwesomeGlyphMetrics.GetTopOverflowThickness(stateGlyphCodepoint, stateIconFontSize),
+
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+        };
+
         var statePill = new Border
         {
             Width = 16,
             Height = 16,
             CornerRadius = new CornerRadius(8),
-            Background = stateBrush,
-            BorderBrush = Brushes.White,
-            BorderThickness = new Thickness(1),
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+            Background = Brushes.White,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            Child = stateIcon
         };
 
         var content = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 4 };
@@ -1430,10 +1760,7 @@ public partial class TabSchematics
         };
         badge.PointerPressed += this.OnWorklogEntryPillPointerPressed;
 
-        this.SchematicsWorklogEntriesBadgeCanvas.Children.Add(badge);
-        this.thisWorklogEntriesListBadges.Add((badge, pixelRect, entry, color));
-
-        this.PositionWorklogEntriesListBadge(badge, pixelRect, contentRect, inverseScale);
+        return badge;
     }
 
     // ###########################################################################################
@@ -1598,6 +1925,14 @@ public partial class TabSchematics
     // ###########################################################################################
     private void RescaleWorklogEntriesListBadges()
     {
+        // Parked pills are deliberately NOT laid out here. This runs on every zoom/pan frame, and
+        // the parked canvas carries no transform - by construction those pills do not move when the
+        // view matrix changes, so a pass here would Measure every one of them and recompute the
+        // same positions, per frame, for no visible difference.
+        //
+        // The two things that genuinely move them - the container resizing, and the "Netlist names"
+        // panel opening or changing width - are covered by the Bounds/IsVisible subscriptions set
+        // up in Initialize (see OnWorklogParkedBadgeLayoutTriggerChanged).
         if (this.thisWorklogEntriesListBadges.Count == 0 || this.currentFullResBitmap == null)
         {
             return;

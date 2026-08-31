@@ -658,8 +658,11 @@ public sealed class WorklogManagerTests : IDisposable
         Assert.Empty(entries);
     }
 
+    // Was "starts it with no comments". A new entry now opens its own audit trail with the
+    // automatic "Worklog created" line, so the rule this guards - what an entry's comment list
+    // holds the moment it is created - is unchanged; only the expected content moved.
     [Fact]
-    public void Adding_an_entry_starts_it_with_no_comments_and_a_matching_title()
+    public void Adding_an_entry_starts_it_with_only_the_created_comment_and_a_matching_title()
     {
         this.LoadWorklog();
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
@@ -667,7 +670,8 @@ public sealed class WorklogManagerTests : IDisposable
         var entry = WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Open", Array.Empty<string>());
 
         Assert.Equal("Bad cap", entry!.Title);
-        Assert.Empty(entry.Comments);
+        Assert.Single(entry.Comments);
+        Assert.Equal("Worklog created", entry.Comments[0].Text);
     }
 
     [Fact]
@@ -738,13 +742,18 @@ public sealed class WorklogManagerTests : IDisposable
         var staleCopy = WorklogManager.GetEntries(workbook.Id).Single();
         staleCopy.Title = "Bad cap";
         staleCopy.State = "Open";
-        staleCopy.Comments.Add(new WorklogCommentRecord { Id = 1, Text = "Added a note", Date = DateTime.Now });
+        staleCopy.Comments.Add(new WorklogCommentRecord { Id = 2, Text = "Added a note", Date = DateTime.Now });
         Assert.True(WorklogManager.UpdateEntry(workbook.Id, staleCopy));
 
         var stored = WorklogManager.GetEntries(workbook.Id).Single();
         Assert.Equal("Bad cap", stored.Title);
         Assert.Equal("Open", stored.State);
-        Assert.Single(stored.Comments);
+
+        // Two: the automatic "Worklog created" comment the entry was born with, plus the one the
+        // stale copy added. What matters here is that the stale write took the record back
+        // wholesale, not the count itself.
+        Assert.Equal(2, stored.Comments.Count);
+        Assert.Equal("Added a note", stored.Comments[1].Text);
 
         // And the reverted state feeds straight back into the workbook's Open/Closed status.
         Assert.Equal("Open", WorklogManager.GetLatestWorkbookForBoard("Commodore 64|250469")!.Status);
@@ -826,5 +835,302 @@ public sealed class WorklogManagerTests : IDisposable
         string? attachmentsFolder = WorklogManager.GetEntryAttachmentsFolder(999, 1);
 
         Assert.Null(attachmentsFolder);
+    }
+
+    // ------------------------------------------------------------- automatic "created" comment
+
+    // A new worklog starts its own history with the fact that it was created, so its Comments list
+    // is an audit trail from the first entry rather than starting empty and only recording what
+    // happened afterwards.
+    [Fact]
+    public void A_new_entry_starts_with_a_worklog_created_comment()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        var entry = WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Open", Array.Empty<string>());
+
+        Assert.NotNull(entry);
+        Assert.Single(entry!.Comments);
+        Assert.Equal("Worklog created", entry.Comments[0].Text);
+        Assert.Equal(1, entry.Comments[0].Id);
+    }
+
+    // The comment must survive the write, not just exist on the returned object - it is the stored
+    // entry the editor will later read back and show.
+    [Fact]
+    public void The_created_comment_is_written_to_disk()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Open", Array.Empty<string>());
+
+        var stored = WorklogManager.GetEntries(workbook.Id);
+
+        Assert.Single(stored);
+        Assert.Single(stored[0].Comments);
+        Assert.Equal("Worklog created", stored[0].Comments[0].Text);
+    }
+
+    // Each entry gets its OWN created comment - the list is per-entry, so a second entry must not
+    // inherit or share the first one.
+    [Fact]
+    public void Every_new_entry_gets_its_own_created_comment()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "First", "", "Note", "Open", Array.Empty<string>());
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Second", "", "Note", "Open", Array.Empty<string>());
+
+        var stored = WorklogManager.GetEntries(workbook.Id);
+
+        Assert.Equal(2, stored.Count);
+        Assert.All(stored, e =>
+        {
+            Assert.Single(e.Comments);
+            Assert.Equal("Worklog created", e.Comments[0].Text);
+        });
+    }
+
+    // ------------------------------------------------------------- "Show marked area"
+
+    [Fact]
+    public void A_new_entry_shows_its_marked_area_by_default()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        var entry = WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Open", Array.Empty<string>());
+
+        Assert.True(entry!.ShowMarkedArea);
+    }
+
+    // The setting is a normal round-tripped field: unticking it must survive the write and the
+    // read back, or the area would reappear the next time the board was opened.
+    [Fact]
+    public void Hiding_the_marked_area_survives_a_save_and_reload()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+        var entry = WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Open", Array.Empty<string>())!;
+
+        entry.ShowMarkedArea = false;
+        Assert.True(WorklogManager.UpdateEntry(workbook.Id, entry));
+
+        Assert.False(WorklogManager.GetEntries(workbook.Id).Single().ShowMarkedArea);
+    }
+
+    // THE upgrade case. An entry written by a build that predates this field has no
+    // "showMarkedArea" key at all, and must read back as true - a default of false would silently
+    // blank every marked area on the board for anyone upgrading.
+    [Fact]
+    public void An_entry_written_before_the_field_existed_still_shows_its_area()
+    {
+        string root = this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+        WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Open", Array.Empty<string>());
+
+        // Strip the key back out, reproducing exactly what an older build wrote.
+        string entriesPath = Path.Combine(root, workbook.Id.ToString(), "entries.json");
+        string json = File.ReadAllText(entriesPath);
+        Assert.Contains("showMarkedArea", json);
+
+        using (var document = JsonDocument.Parse(json))
+        {
+            var stripped = document.RootElement.EnumerateArray()
+                .Select(e =>
+                {
+                    var map = new Dictionary<string, JsonElement>();
+                    foreach (var property in e.EnumerateObject())
+                    {
+                        if (!string.Equals(property.Name, "showMarkedArea", StringComparison.Ordinal))
+                        {
+                            map[property.Name] = property.Value;
+                        }
+                    }
+                    return map;
+                })
+                .ToList();
+
+            File.WriteAllText(entriesPath, JsonSerializer.Serialize(stripped));
+        }
+
+        Assert.DoesNotContain("showMarkedArea", File.ReadAllText(entriesPath));
+
+        Assert.True(WorklogManager.GetEntries(workbook.Id).Single().ShowMarkedArea);
+    }
+
+    // ------------------------------------------------------------- "Mark components completed"
+
+    // A new entry has nothing done yet - a component that was just put in scope is work still to
+    // do, so "not started" is the only honest starting point.
+    [Fact]
+    public void A_new_entry_has_no_completed_components()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        var entry = WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Recap", "", "Issue", "Open", new[] { "C1", "C2" });
+
+        Assert.Empty(entry!.CompletedComponentLabels);
+    }
+
+    [Fact]
+    public void Completed_components_survive_a_save_and_reload()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+        var entry = WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Recap", "", "Issue", "Open", new[] { "C1", "C2" })!;
+
+        entry.CompletedComponentLabels = new List<string> { "C1" };
+        Assert.True(WorklogManager.UpdateEntry(workbook.Id, entry));
+
+        Assert.Equal(new[] { "C1" }, WorklogManager.GetEntries(workbook.Id).Single().CompletedComponentLabels);
+    }
+
+    // An entry written before this field existed reads back with an empty list rather than null -
+    // every consumer enumerates it, so a null would be a crash rather than a missing feature.
+    [Fact]
+    public void An_entry_written_before_the_completed_field_existed_reads_back_empty()
+    {
+        string root = this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+        WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Recap", "", "Issue", "Open", new[] { "C1" });
+
+        string entriesPath = Path.Combine(root, workbook.Id.ToString(), "entries.json");
+        string json = File.ReadAllText(entriesPath);
+
+        using (var document = JsonDocument.Parse(json))
+        {
+            var stripped = document.RootElement.EnumerateArray()
+                .Select(e =>
+                {
+                    var map = new Dictionary<string, JsonElement>();
+                    foreach (var property in e.EnumerateObject())
+                    {
+                        if (!string.Equals(property.Name, "completedComponentLabels", StringComparison.Ordinal))
+                        {
+                            map[property.Name] = property.Value;
+                        }
+                    }
+                    return map;
+                })
+                .ToList();
+
+            File.WriteAllText(entriesPath, JsonSerializer.Serialize(stripped));
+        }
+
+        var reloaded = WorklogManager.GetEntries(workbook.Id).Single();
+
+        Assert.NotNull(reloaded.CompletedComponentLabels);
+        Assert.Empty(reloaded.CompletedComponentLabels);
+    }
+
+    // ------------------------------------------------------------- collapsed list sections
+
+    [Fact]
+    public void A_new_entry_has_no_collapsed_sections()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        var entry = WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Recap", "", "Issue", "Open", Array.Empty<string>());
+
+        Assert.Empty(entry!.CollapsedSections);
+    }
+
+    [Fact]
+    public void Collapsed_sections_survive_a_save_and_reload()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+        var entry = WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Recap", "", "Issue", "Open", Array.Empty<string>())!;
+
+        entry.CollapsedSections = new List<string> { "EditorCommentsHeader", "EditorPhotosHeader" };
+        Assert.True(WorklogManager.UpdateEntry(workbook.Id, entry));
+
+        Assert.Equal(
+            new[] { "EditorCommentsHeader", "EditorPhotosHeader" },
+            WorklogManager.GetEntries(workbook.Id).Single().CollapsedSections);
+    }
+
+    // An entry written before the field existed reads back with an empty list rather than null -
+    // the editor enumerates it on open, so a null would be a crash rather than a missing feature.
+    [Fact]
+    public void An_entry_written_before_the_collapsed_field_existed_reads_back_empty()
+    {
+        string root = this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+        WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Recap", "", "Issue", "Open", Array.Empty<string>());
+
+        string entriesPath = Path.Combine(root, workbook.Id.ToString(), "entries.json");
+
+        using (var document = JsonDocument.Parse(File.ReadAllText(entriesPath)))
+        {
+            var stripped = document.RootElement.EnumerateArray()
+                .Select(e =>
+                {
+                    var map = new Dictionary<string, JsonElement>();
+                    foreach (var property in e.EnumerateObject())
+                    {
+                        if (!string.Equals(property.Name, "collapsedSections", StringComparison.Ordinal))
+                        {
+                            map[property.Name] = property.Value;
+                        }
+                    }
+                    return map;
+                })
+                .ToList();
+
+            File.WriteAllText(entriesPath, JsonSerializer.Serialize(stripped));
+        }
+
+        var reloaded = WorklogManager.GetEntries(workbook.Id).Single();
+
+        Assert.NotNull(reloaded.CollapsedSections);
+        Assert.Empty(reloaded.CollapsedSections);
+    }
+
+    // Persisting a fold must not carry unsaved direct-field edits with it. The editor writes the
+    // fold onto the STORED record rather than its working copy, so a pending Description change or
+    // an unticked "Show marked area" - fields the user can still abandon with Cancel - stay off
+    // disk. This models that write and pins the rule the editor depends on.
+    [Fact]
+    public void Writing_a_fold_onto_the_stored_record_leaves_other_fields_untouched()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+        var entry = WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Recap", "Original description", "Issue", "Open", Array.Empty<string>())!;
+
+        // A working copy carrying edits the user has NOT saved.
+        var workingCopy = WorklogManager.GetEntries(workbook.Id).Single();
+        workingCopy.Description = "Edited but not saved";
+        workingCopy.ShowMarkedArea = false;
+
+        // The fold is written onto a freshly read record, not onto that working copy.
+        var stored = WorklogManager.GetEntries(workbook.Id).Single();
+        stored.CollapsedSections = new List<string> { "EditorCommentsHeader" };
+        Assert.True(WorklogManager.UpdateEntry(workbook.Id, stored));
+
+        var reloaded = WorklogManager.GetEntries(workbook.Id).Single();
+
+        Assert.Equal(new[] { "EditorCommentsHeader" }, reloaded.CollapsedSections);
+        Assert.Equal("Original description", reloaded.Description);
+        Assert.True(reloaded.ShowMarkedArea);
+        Assert.Equal(entry.Id, reloaded.Id);
     }
 }

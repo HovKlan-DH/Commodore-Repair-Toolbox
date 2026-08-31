@@ -468,7 +468,7 @@
 										CornerRadius="10"
 										Padding="10,1">
 									<StackPanel Orientation="Horizontal" Spacing="5">
-										<Ellipse x:Name="WorklogJobStatusDot" Width="8" Height="8" VerticalAlignment="Center" />
+										<TextBlock x:Name="WorklogJobStatusDot" FontFamily="{DynamicResource FontAwesomeSolid}" FontSize="11" VerticalAlignment="Center" />
 										<TextBlock x:Name="WorklogJobStatusPillText"
 												   FontSize="12"
 												   Foreground="{DynamicResource Schematics_Panels_Fg}"
@@ -566,6 +566,44 @@
 					</TabItem>
 
 				</TabControl>
+
+				<!-- MODE HINT: the "what to do next" label shown while a mode is waiting for the
+				     user to act on the schematic image - clicking "Add worklog" otherwise leaves
+				     them with a crosshair and no instruction.
+
+				     It sits in the tab-header row, stretched from the tabs to the window edge, and
+				     ABOVE the data-sync icon (ZIndex 20 against its 10) so it covers that icon
+				     rather than being crowded beside it. The khaki is the same highlight the
+				     component hover label and thumbnail headers use, so it reads as the app's own
+				     "look here" colour rather than a new kind of alert.
+
+				     It clears itself on the first pointer press, so it costs an experienced user
+				     one click they were going to make anyway. Driven from Main.ModeHint.cs.
+
+				     The TextBlock is the Border's DIRECT child, with no StackPanel around it. A
+				     horizontal StackPanel measures its children with infinite width, so a
+				     TextWrapping="Wrap" inside one never wraps at all - the text just ran past the
+				     window edge no matter what MaxWidth the Border carried. -->
+				<Border x:Name="ModeHintBorder"
+						Grid.Row="5"
+						ZIndex="20"
+						IsVisible="False"
+						IsHitTestVisible="False"
+						HorizontalAlignment="Right"
+						VerticalAlignment="Top"
+						MaxWidth="560"
+						Margin="0,10,10,0"
+						Background="{DynamicResource Schematics_ComponentHover_Bg}"
+						BorderBrush="{DynamicResource Schematics_ComponentHover_Border}"
+						BorderThickness="1"
+						CornerRadius="3"
+						Padding="10,4">
+					<TextBlock x:Name="ModeHintText"
+							   FontSize="12"
+							   TextWrapping="Wrap"
+							   VerticalAlignment="Center"
+							   Foreground="{DynamicResource Schematics_ComponentHover_Fg}" />
+				</Border>
 
 				<Border x:Name="DataSyncStatusIconBorder"
 						Grid.Row="5"

@@ -23,7 +23,7 @@
 //   TabSchematics.KiCad.Geometry.cs           KiCad world/screen mapping and zone geometry
 //   TabSchematics.KiCad.HitTest.cs            Hover hit-testing over the KiCad overlay
 //   TabSchematics.KiCad.Calibration.cs        Interactive KiCad trace calibration mode
-//   TabSchematics.Worklog.cs                  Worklog "Add entry" area-drawing mode and its card
+//   TabSchematics.Worklog.cs                  Worklog "Add worklog" area-drawing mode and its card
 //   TabSchematics.Settings.cs                 Board-level and global setting rows
 //
 // They are one partial class, so state is shared; each field is declared in the part
@@ -146,6 +146,14 @@ public partial class TabSchematics : UserControl
 
         this.SchematicsContainer.Pinch += this.OnSchematicsPinch;
         this.SchematicsContainer.ScrollGesture += this.OnSchematicsScrollGesture;
+
+        // Parked worklog pills sit in the schematic panel's top-right corner and step aside for
+        // the "Netlist names" panel. Subscribed here rather than calling the layout from each of
+        // the six places that set IsVisible - a seventh would be added one day and quietly not
+        // move the pills. Bounds covers the panel resizing to fit a longer net name, and the
+        // container's own Bounds covers the window or splitter being dragged.
+        this.KiCadNetConnectionsPanel.PropertyChanged += this.OnWorklogParkedBadgeLayoutTriggerChanged;
+        this.SchematicsContainer.PropertyChanged += this.OnWorklogParkedBadgeLayoutTriggerChanged;
 
         // Restore initial states from User Settings
         this.CheckLabelBoard.IsChecked = UserSettings.SchematicsLabelBoard;

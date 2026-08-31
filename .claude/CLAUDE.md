@@ -283,6 +283,9 @@ excludes `Tests/**` from its compile glob. Leave that exclusion in place.
   application (including JSON-defined user-preference theme colors), global exception logging, and the
   startup sequence: show `Splash` → `DataManager.InitializeAsync` (loads/syncs hardware data) → open
   `Main` window → fire-and-forget version check-in.
+- [Main/Main.ModeHint.cs](../Main/Main.ModeHint.cs) — the khaki "what to do next" label in the tab-header
+  row, shown while a mode (e.g. worklog area-marking) is waiting for the user to act. `ShowModeHint`/
+  `HideModeHint`; it clears itself on the first pointer press.
 - [Main/Main.axaml.cs](../Main/Main.axaml.cs) — the main window's code-behind (~2,700 lines). It acts as
   the central controller coordinating board selection, schematics zoom/pan/thumbnails, and cross-tab
   state. It reaches directly into `TabSchematicsControl` members (`currentThumbnails`,

@@ -201,6 +201,28 @@ namespace Handlers.DataHandling
         // Order is preserved from the existing selection rather than rebuilt from the board, so an
         // entry that has been curated by hand keeps its arrangement.
         // ###########################################################################################
+        // ###########################################################################################
+        // Narrows an entry's in-scope AND completed lists together after its area has been resized,
+        // returning both. Completed is narrowed to the SCOPE THAT REMAINS rather than to the raw
+        // area scope, which is what enforces the invariant the two lists depend on: a completed
+        // component is always one the entry still covers.
+        //
+        // Narrowing them independently against the area looks equivalent and is not. A label the
+        // user had unticked from the scope but which the area still touches would survive in
+        // completed - claiming a component was done for an entry that does not include it. Doing it
+        // in one place stops the two calls being written the wrong way round at a call site.
+        // ###########################################################################################
+        public static (List<string> InScope, List<string> Completed) NarrowEntryToScope(
+            IReadOnlyList<string>? selectedBoardLabels,
+            IReadOnlyList<string>? completedBoardLabels,
+            IReadOnlyCollection<string> boardLabelsInScope)
+        {
+            var inScope = NarrowSelectionToScope(selectedBoardLabels, boardLabelsInScope);
+            var completed = NarrowSelectionToScope(completedBoardLabels, inScope);
+
+            return (inScope, completed);
+        }
+
         public static List<string> NarrowSelectionToScope(
             IReadOnlyList<string>? selectedBoardLabels,
             IReadOnlyCollection<string> boardLabelsInScope)

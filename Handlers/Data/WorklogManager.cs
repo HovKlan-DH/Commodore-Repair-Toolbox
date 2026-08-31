@@ -54,6 +54,35 @@ namespace Handlers.DataHandling
         [JsonPropertyName("category")] public string Category { get; set; } = "Note";
         [JsonPropertyName("state")] public string State { get; set; } = "Open";
         [JsonPropertyName("componentLabels")] public List<string> ComponentLabels { get; set; } = new();
+
+        // Whether the entry's coloured area is drawn on the Schematics tab. Defaults to true, which
+        // is also what an entry written by an older build gets: the property is simply absent from
+        // its JSON, so the initialiser stands and every existing worklog keeps showing its area.
+        // A default of false would silently blank the board for anyone upgrading.
+        //
+        // An entry with this off still shows its "#N" pill - parked in the top-right corner of the
+        // schematic panel rather than on the board (see ParkedBadgeGeometry). Hiding the pill too
+        // would make the entry invisible and unreachable from the board.
+        [JsonPropertyName("showMarkedArea")] public bool ShowMarkedArea { get; set; } = true;
+
+        // Which of the in-scope components the user has ticked off as done - the "Mark components
+        // completed" checklist, for tracking progress through a job like "replace every capacitor".
+        //
+        // Always a SUBSET of ComponentLabels: the completed list offers exactly the components that
+        // are in scope, so a label dropped from the scope is dropped from here too rather than
+        // lingering as a completed component the entry no longer covers. Empty by default, and for
+        // every entry written before this field existed - a new component is work still to do, so
+        // "not started" is the only honest starting point.
+        [JsonPropertyName("completedComponentLabels")] public List<string> CompletedComponentLabels { get; set; } = new();
+
+        // Which of the editor's list sections (Links, Work done, Comments, Components in scope,
+        // Components completed, Photos, Files) the user has folded away, keyed by section name.
+        //
+        // A map of only the COLLAPSED sections rather than a flag per list: sections are expanded by
+        // default, so an absent key means "open" and an entry written before this existed opens with
+        // everything showing. It also means adding an eighth list later needs no schema change and
+        // no migration - the new section simply has no key yet.
+        [JsonPropertyName("collapsedSections")] public List<string> CollapsedSections { get; set; } = new();
         [JsonPropertyName("createdDate")] public DateTime CreatedDate { get; set; }
 
         [JsonPropertyName("links")] public List<WorklogLinkRecord> Links { get; set; } = new();
@@ -373,6 +402,66 @@ namespace Handlers.DataHandling
         private static readonly HashSet<string> ResolvedEntryStates = new(StringComparer.Ordinal) { "Closed" };
 
         // ###########################################################################################
+        // The automatic comments the app writes into an entry's own Comments list when something
+        // worth recording happens to it: it was created, its state was flipped, or its category was
+        // changed. They read as an audit trail beside the user's own comments, so a worklog explains
+        // its own history rather than only showing its current state.
+        //
+        // The wording lives here rather than at the two call sites (the quick create card and the
+        // full editor) so the phrasing cannot drift apart between them, and so the tests assert the
+        // same strings the app writes.
+        // ###########################################################################################
+        public const string CreatedCommentText = "Worklog created";
+
+        public const string OpenedCommentText = "Worklog opened";
+
+        public const string ClosedCommentText = "Worklog closed";
+
+        // The category is quoted, deliberately: a bare Worklog changed to Note reads as a sentence
+        // that has lost a word, and the quotes mark the value as the literal category name.
+        public static string BuildCategoryChangedCommentText(string category) =>
+            $"Worklog changed to \"{category}\"";
+
+        // The state comment for a state value - null for anything that is neither Open nor Closed,
+        // so an unrecognised state (a value from a future build, say) records nothing rather than
+        // claiming the worklog was opened.
+        public static string? BuildStateChangedCommentText(string state)
+        {
+            if (string.Equals(state, "Open", StringComparison.Ordinal))
+                return OpenedCommentText;
+
+            if (string.Equals(state, "Closed", StringComparison.Ordinal))
+                return ClosedCommentText;
+
+            return null;
+        }
+
+        // ###########################################################################################
+        // Appends an automatic comment to the given list, allocating the next free id the same way
+        // the editor's own Add-comment does. Returns the record it added so a caller can show it.
+        //
+        // Blank text adds nothing: BuildStateChangedCommentText can decline to describe a state, and
+        // an empty comment row in the list would be worse than no row at all.
+        // ###########################################################################################
+        public static WorklogCommentRecord? AppendAutomaticComment(List<WorklogCommentRecord> comments, string? text)
+        {
+            if (comments == null || string.IsNullOrWhiteSpace(text))
+                return null;
+
+            int nextId = comments.Count == 0 ? 1 : comments.Max(c => c.Id) + 1;
+
+            var comment = new WorklogCommentRecord
+            {
+                Id = nextId,
+                Text = text.Trim(),
+                Date = DateTime.Now
+            };
+
+            comments.Add(comment);
+            return comment;
+        }
+
+        // ###########################################################################################
         // Reads the given workbook's entries.json (empty list when the workbook has none yet, or its
         // folder cannot be found).
         // ###########################################################################################
@@ -507,7 +596,8 @@ namespace Handlers.DataHandling
             string description,
             string category,
             string state,
-            IEnumerable<string> componentLabels)
+            IEnumerable<string> componentLabels,
+            bool showMarkedArea = true)
         {
             string? folder = GetWorkbookFolder(workbookId);
             if (folder == null)
@@ -532,8 +622,14 @@ namespace Handlers.DataHandling
                 Category = string.IsNullOrWhiteSpace(category) ? "Note" : category,
                 State = string.IsNullOrWhiteSpace(state) ? "Open" : state,
                 ComponentLabels = componentLabels?.ToList() ?? new List<string>(),
+                ShowMarkedArea = showMarkedArea,
                 CreatedDate = DateTime.Now
             };
+
+            // Every worklog starts its own history with the fact that it was created, so the
+            // Comments list is an audit trail from the first entry rather than starting empty and
+            // only recording what happened later.
+            AppendAutomaticComment(entry.Comments, CreatedCommentText);
 
             entries.Add(entry);
 

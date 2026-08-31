@@ -594,4 +594,79 @@ public class ComponentListBuilderTests
 
         Assert.Equal(new[] { "U7" }, kept);
     }
+
+    // -------------------------------------------------------- NarrowEntryToScope
+
+    // Resizing an area narrows the in-scope list AND the completed list together. The completed
+    // list is measured against the scope that REMAINS, not against the raw area - which is the
+    // whole reason this exists as one function rather than two calls at the call site.
+    //
+    // C2 is the case that separates the two: the area still touches it, but the user had unticked
+    // it from the scope. Narrowing completed against the area would keep it, claiming a component
+    // was done for an entry that does not include it.
+    [Fact]
+    public void Completed_is_narrowed_to_the_remaining_scope_not_to_the_raw_area()
+    {
+        var (inScope, completed) = ComponentListBuilder.NarrowEntryToScope(
+            selectedBoardLabels: new[] { "C1", "C3" },
+            completedBoardLabels: new[] { "C1", "C2" },
+            boardLabelsInScope: new[] { "C1", "C2", "C3" });
+
+        Assert.Equal(new[] { "C1", "C3" }, inScope);
+
+        // C2 is gone: it is in the area but not in the entry's scope.
+        Assert.Equal(new[] { "C1" }, completed);
+    }
+
+    // Shrinking an area off a component drops it from both lists at once - it is no longer part of
+    // the entry, so it cannot remain recorded as completed work for it.
+    [Fact]
+    public void A_component_the_area_no_longer_covers_leaves_both_lists()
+    {
+        var (inScope, completed) = ComponentListBuilder.NarrowEntryToScope(
+            selectedBoardLabels: new[] { "C1", "C2" },
+            completedBoardLabels: new[] { "C1", "C2" },
+            boardLabelsInScope: new[] { "C1" });
+
+        Assert.Equal(new[] { "C1" }, inScope);
+        Assert.Equal(new[] { "C1" }, completed);
+    }
+
+    // The invariant, asserted directly: completed is always a subset of in-scope, whatever went in.
+    [Fact]
+    public void Completed_is_always_a_subset_of_what_is_in_scope()
+    {
+        var (inScope, completed) = ComponentListBuilder.NarrowEntryToScope(
+            selectedBoardLabels: new[] { "C1" },
+            completedBoardLabels: new[] { "C1", "C2", "C9" },
+            boardLabelsInScope: new[] { "C1", "C2" });
+
+        Assert.All(completed, label => Assert.Contains(label, inScope));
+    }
+
+    // Same case-insensitive matching as everything else that compares board labels - a label
+    // stored as "c1" must still be recognised against a scope that keys it as "C1".
+    [Fact]
+    public void Narrowing_an_entry_matches_labels_case_insensitively()
+    {
+        var (inScope, completed) = ComponentListBuilder.NarrowEntryToScope(
+            selectedBoardLabels: new[] { "c1" },
+            completedBoardLabels: new[] { "C1" },
+            boardLabelsInScope: new[] { "C1" });
+
+        Assert.Equal(new[] { "c1" }, inScope);
+        Assert.Equal(new[] { "C1" }, completed);
+    }
+
+    [Fact]
+    public void An_entry_with_nothing_completed_narrows_to_nothing_completed()
+    {
+        var (inScope, completed) = ComponentListBuilder.NarrowEntryToScope(
+            selectedBoardLabels: new[] { "C1" },
+            completedBoardLabels: null,
+            boardLabelsInScope: new[] { "C1" });
+
+        Assert.Equal(new[] { "C1" }, inScope);
+        Assert.Empty(completed);
+    }
 }

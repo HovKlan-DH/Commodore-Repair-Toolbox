@@ -1,5 +1,7 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
+using Avalonia.Threading;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -46,6 +48,12 @@ namespace CRT
         // this window has no board data and no highlight rectangles of its own, so it cannot work
         // out which components an area touches; see InitializeComponentScope.
         private readonly ObservableCollection<WorklogEntryComponentRow> thisComponentRows = new();
+
+        // "Mark components completed" - one row per component currently TICKED in the scope list
+        // above, carrying whether it has been done. A separate collection rather than a second flag
+        // on the scope rows, because the two lists hold different sets: the scope list offers every
+        // component the area touches, this one offers only those the user put in scope.
+        private readonly ObservableCollection<WorklogEntryComponentRow> thisCompletedComponentRows = new();
 
         // Whether the caller supplied a scope at all. Distinct from "the list is empty": an area
         // that genuinely touches nothing shows "No components in this area", whereas an unknown
@@ -142,6 +150,9 @@ namespace CRT
             this.EditorPhotosList.ItemsSource = this.thisPhotoRows;
             this.EditorFilesList.ItemsSource = this.thisFileRows;
             this.EditorComponentList.ItemsSource = this.thisComponentRows;
+            this.EditorCompletedComponentList.ItemsSource = this.thisCompletedComponentRows;
+
+            this.InitializeListSections();
 
             // The marker's position is computed from EditorLocationPreviewGrid's OWN size, so the
             // redraw has to be driven by that grid rather than by the window. Dragging the
@@ -199,6 +210,7 @@ namespace CRT
                 this.thisCommentRows.Clear();
                 this.thisWorkDoneRows.Clear();
                 this.thisComponentRows.Clear();
+                this.thisCompletedComponentRows.Clear();
             };
         }
 
@@ -409,6 +421,7 @@ namespace CRT
             this.EditorTitleTextBox.Text = this.thisEntry.Title;
             this.EditorDescriptionTextBox.Text = this.thisEntry.Description;
             this.EditorLocationSchematicNameText.Text = this.thisEntry.SchematicName;
+            this.EditorShowMarkedAreaCheckBox.IsChecked = this.thisEntry.ShowMarkedArea;
 
             this.thisSelectedCategory = string.IsNullOrWhiteSpace(this.thisEntry.Category) ? "Note" : this.thisEntry.Category;
             this.thisSelectedState = string.IsNullOrWhiteSpace(this.thisEntry.State) ? "Open" : this.thisEntry.State;
@@ -430,8 +443,32 @@ namespace CRT
             this.EditorLocationPreviewImage.Source = this.thisSchematicBitmap;
             this.RefreshLocationPreviewOverlay();
 
-            this.thisIsInitializing = false;
+            // After the lists are built, so the sections fold over real row counts and the
+            // empty-state lines settle correctly. Inside the initializing guard, so restoring the
+            // user's saved folds cannot itself write them back to disk.
+            this.RestoreCollapsedSections();
+            this.RefreshListSectionEmptyStates();
+
+            this.thisIsDirty = false;
             this.EditorSaveButton.IsEnabled = false;
+
+            // The initializing guard is lifted on the dispatcher, not here. Setting TextBox.Text
+            // above does not raise TextChanged synchronously - Avalonia posts it - so clearing the
+            // flag inline let Initialize's OWN title and description assignments arrive afterwards
+            // and mark the untouched window dirty. Every editor therefore opened with Save already
+            // enabled, contradicting the "starts disabled" rule this class is built around, and a
+            // straight open-and-close reported an edit that never happened.
+            //
+            // Posting at Background priority puts the lift behind those queued TextChanged jobs,
+            // so they run while the guard is still up and are correctly ignored.
+            Dispatcher.UIThread.Post(
+                () =>
+                {
+                    this.thisIsInitializing = false;
+                    this.thisIsDirty = false;
+                    this.UpdateSaveButtonEnabled();
+                },
+                DispatcherPriority.Background);
         }
 
         // ###########################################################################################
@@ -446,10 +483,62 @@ namespace CRT
             if (this.thisIsInitializing)
                 return;
 
-            this.EditorSaveButton.IsEnabled = true;
+            this.thisIsDirty = true;
+            this.UpdateSaveButtonEnabled();
         }
 
+        private bool thisIsDirty;
+
+        // ###########################################################################################
+        // Save is offered only when there is something to save AND the entry is valid - which here
+        // means a non-blank title. A worklog with no title is unidentifiable in the worklog list and
+        // on the board, where the "#N" badge would be all that distinguishes it.
+        //
+        // Whitespace does not count: SyncDirectFieldsToEntry Trim()s the title before writing it, so
+        // a title of spaces would be persisted as an empty one and the gate has to agree with what
+        // the save actually does.
+        // ###########################################################################################
+        private void UpdateSaveButtonEnabled()
+        {
+            bool hasTitle = this.HasValidTitle();
+
+            this.EditorSaveButton.IsEnabled = this.thisIsDirty && hasTitle;
+
+            // A disabled Save with no explanation reads as a broken button. Say why - and say it
+            // only when there is actually something waiting to be saved, so merely opening an entry
+            // and clearing its title does not scold the user before they have done anything.
+            //
+            // This matters more than it looks: SyncDirectFieldsToEntry keeps the STORED title when
+            // the box is blank (a blank title must never reach disk), so without a message the
+            // window and the file would silently disagree about the title while an instant-save -
+            // adding a comment, say - wrote every other field.
+            if (this.thisIsDirty && !hasTitle)
+            {
+                this.ShowSaveFailed(BlankTitleMessage);
+            }
+            else if (string.Equals(this.EditorSaveFailedText.Text, BlankTitleMessage, StringComparison.Ordinal))
+            {
+                // Only clears OUR message - a real save failure must stay on screen.
+                this.EditorSaveFailedText.IsVisible = false;
+            }
+        }
+
+        private const string BlankTitleMessage = "A worklog needs a title before it can be saved.";
+
+        private bool HasValidTitle() => !string.IsNullOrWhiteSpace(this.EditorTitleTextBox.Text);
+
         private void OnDirectFieldTextChanged(object? sender, TextChangedEventArgs e)
+        {
+            this.MarkDirty();
+        }
+
+        // ###########################################################################################
+        // "Show marked area" is a direct field like the title and category: it marks the window dirty
+        // and reaches disk with Save, rather than saving itself the way the sub-lists do. It changes
+        // what the board looks like, not what the entry records, so it belongs with the fields the
+        // user can still abandon with Cancel.
+        // ###########################################################################################
+        private void OnShowMarkedAreaCheckedChanged(object? sender, RoutedEventArgs e)
         {
             this.MarkDirty();
         }
@@ -461,10 +550,21 @@ namespace CRT
         // ###########################################################################################
         private void SyncDirectFieldsToEntry()
         {
-            this.thisEntry.Title = this.EditorTitleTextBox.Text?.Trim() ?? string.Empty;
+            // The title is only taken from the box when it actually has one. The sub-lists
+            // (links, comments, work done, photos, files) save themselves instantly through
+            // PersistEntrySilently, which comes through here - so without this guard, adding a
+            // comment while the title box happened to be cleared would write the blank straight
+            // to disk, past the Save button that is disabled for exactly that reason.
+            string typedTitle = this.EditorTitleTextBox.Text?.Trim() ?? string.Empty;
+            if (typedTitle.Length > 0)
+            {
+                this.thisEntry.Title = typedTitle;
+            }
+
             this.thisEntry.Description = this.EditorDescriptionTextBox.Text?.Trim() ?? string.Empty;
             this.thisEntry.Category = this.thisSelectedCategory;
             this.thisEntry.State = this.thisSelectedState;
+            this.thisEntry.ShowMarkedArea = this.EditorShowMarkedAreaCheckBox.IsChecked ?? true;
 
             // Only when a scope was actually supplied. If the caller could not determine it, the
             // checklist was never shown and the rows are empty - writing that back would silently
@@ -491,6 +591,18 @@ namespace CRT
                     .Select(r => r.BoardLabel)
                     .Concat(keptFromBeforeOpening)
                     .ToList();
+
+                // The completed list is written from the rows on screen, then narrowed to the scope
+                // that was just written. The narrowing is what enforces the invariant that a
+                // completed label is always a component the entry actually covers - including for
+                // the labels carried over above, which have no row here to tick and so must not
+                // survive as completed on the strength of an older save.
+                this.thisEntry.CompletedComponentLabels = ComponentListBuilder.NarrowSelectionToScope(
+                    this.thisCompletedComponentRows
+                        .Where(r => r.IsChecked)
+                        .Select(r => r.BoardLabel)
+                        .ToList(),
+                    this.thisEntry.ComponentLabels);
             }
         }
 
@@ -507,23 +619,27 @@ namespace CRT
         // ###########################################################################################
         public void InitializeComponentScope(IReadOnlyList<(string BoardLabel, string DisplayName)> componentsInScope)
         {
-            // Populating the checklist is not an edit. The flag is re-raised because Initialize has
-            // already cleared it by the time this runs, and building the rows drives the CheckBox
-            // bindings - without this the window opened with Save already enabled, making every
+            // Populating the checklist is not an edit, and building the rows drives the CheckBox
+            // bindings - without a guard the window opened with Save already enabled, making every
             // entry look modified before the user had touched anything.
+            //
+            // The guard is NOT lowered here. Initialize raises it and posts the lift at Background
+            // priority so that its own TextBox assignments' queued TextChanged events run while it
+            // is still up; lowering it synchronously at the end of this method - which the caller
+            // runs immediately after Initialize - put it back down before those queued events
+            // arrived, so they called MarkDirty and set thisIsDirty on an untouched window.
+            //
+            // (That was masked only because Initialize's posted job later reset thisIsDirty, so the
+            // Save button looked right while the flag was transiently wrong. Verified: after the
+            // normal-priority jobs ran, dirty was true and Save was enabled.)
+            //
+            // Leaving the lift to Initialize's single posted job also makes the flag's lifetime the
+            // same whether or not a scope was supplied - it previously differed depending on
+            // whether the caller could work one out.
             this.thisIsInitializing = true;
 
-            try
-            {
-                this.PopulateComponentScope(componentsInScope);
-            }
-            finally
-            {
-                this.thisIsInitializing = false;
-            }
+            this.PopulateComponentScope(componentsInScope);
 
-            // Set last and outside the guard: Save must be disabled on open regardless of what the
-            // binding traffic above did.
             this.EditorSaveButton.IsEnabled = false;
         }
 
@@ -547,8 +663,380 @@ namespace CRT
             }
 
             this.EditorComponentScopePanel.IsVisible = true;
-            this.EditorComponentCountText.Text = $"{this.thisComponentRows.Count} found";
+
+            // Decided here, beside the scope panel's own visibility, rather than inside the count
+            // helper - that ran on every checkbox tick, re-asserting the panel's visibility as a
+            // side effect of updating a label and silently overriding anything that might later
+            // want to hide it.
+            this.EditorComponentCompletedPanel.IsVisible = true;
+            this.EditorComponentCountText.Text = $"{this.thisComponentRows.Count(r => r.IsChecked)} of {this.thisComponentRows.Count} selected";
             this.EditorNoComponentsText.IsVisible = this.thisComponentRows.Count == 0;
+
+            this.PopulateCompletedComponentRows();
+        }
+
+        // ###########################################################################################
+        // Builds the completed checklist for a freshly opened entry: one row per in-scope component,
+        // ticked if the entry has it saved as completed.
+        //
+        // Separate from RefreshCompletedComponentRows because the source of the ticks differs. That
+        // one carries ticks forward from the rows already on screen, which is right for a live scope
+        // edit; on open there are no such rows, and the saved list is the only truth.
+        // ###########################################################################################
+        private void PopulateCompletedComponentRows()
+        {
+            // On open there are no rows to carry ticks from, so the saved list is the only truth.
+            this.RebuildCompletedComponentRows(this.thisEntry.CompletedComponentLabels ?? new List<string>());
+        }
+
+        // ###########################################################################################
+        // Collapsible list sections.
+        //
+        // Each of the seven lists (Links, Work done, Comments, Components in scope, Components
+        // completed, Photos, Files) has a header the user can click to fold its content away, so a
+        // worklog with a long checklist and forty photos can be skimmed rather than scrolled past.
+        //
+        // Driven by one table rather than seven near-identical handlers: the sections differ only in
+        // which controls they own, and duplicating the toggle logic per section is how one of them
+        // eventually ends up with a subtly different rule.
+        //
+        // Collapsed state IS persisted, per entry, in entries.json - see PersistCollapsedSections.
+        // It is a reading convenience rather than an edit, so it saves itself immediately instead of
+        // waiting for "Update worklog", and it never marks the window dirty.
+        //
+        // (An earlier draft of this comment said the opposite. Only the collapsed sections are
+        // stored, so an absent key means "expanded" and an entry written before the field existed -
+        // or one never folded - opens with everything showing.)
+        // ###########################################################################################
+        private sealed class WorklogListSection
+        {
+            public required TextBlock Icon { get; init; }
+
+            // The controls folded away, and shown again unconditionally when the section expands.
+            public required IReadOnlyList<Control> Body { get; init; }
+
+            // The section's "No links added" line, if it has one. Kept apart from Body because
+            // whether it belongs on screen depends on whether the list is EMPTY, not on whether the
+            // section is open - showing it with the rest would put "No links added" above a list of
+            // links. Expanding therefore asks the refresh methods to restore it.
+            public Control? EmptyState { get; init; }
+
+            public bool IsExpanded { get; set; } = true;
+        }
+
+        private readonly Dictionary<string, WorklogListSection> thisListSections = new(StringComparer.Ordinal);
+
+        // fa-regular square-plus / square-minus. Read out of the shipped OTF rather than from
+        // memory: the Free Regular face is a 362-glyph subset, so a codepoint that exists in Solid
+        // is often absent here and renders as a blank box with nothing failing.
+        private const string ExpandIconGlyph = "";
+
+        private const string CollapseIconGlyph = "";
+
+        private void InitializeListSections()
+        {
+            this.thisListSections["EditorLinksHeader"] = new WorklogListSection
+            {
+                Icon = this.EditorLinksHeaderIcon,
+                Body = new Control[] { this.EditorLinksList },
+                EmptyState = this.EditorNoLinksText,
+            };
+
+            this.thisListSections["EditorWorkDoneHeader"] = new WorklogListSection
+            {
+                Icon = this.EditorWorkDoneHeaderIcon,
+                Body = new Control[] { this.EditorWorkDoneList },
+                EmptyState = this.EditorNoWorkDoneText,
+            };
+
+            this.thisListSections["EditorCommentsHeader"] = new WorklogListSection
+            {
+                Icon = this.EditorCommentsHeaderIcon,
+                Body = new Control[] { this.EditorCommentsList },
+                EmptyState = this.EditorNoCommentsText,
+            };
+
+            // The checklists fold their whole bordered box, not the ItemsControl inside it - the
+            // border is the visible extent of the list, so leaving it behind would collapse the
+            // rows into an empty frame rather than out of the way.
+            this.thisListSections["EditorComponentScopeHeader"] = new WorklogListSection
+            {
+                Icon = this.EditorComponentScopeHeaderIcon,
+                Body = new Control[] { this.EditorComponentScopeBody },
+            };
+
+            this.thisListSections["EditorComponentCompletedHeader"] = new WorklogListSection
+            {
+                Icon = this.EditorComponentCompletedHeaderIcon,
+                Body = new Control[] { this.EditorComponentCompletedBody },
+            };
+
+            this.thisListSections["EditorPhotosHeader"] = new WorklogListSection
+            {
+                Icon = this.EditorPhotosHeaderIcon,
+                Body = new Control[] { this.EditorPhotosList },
+                EmptyState = this.EditorNoPhotosText,
+            };
+
+            this.thisListSections["EditorFilesHeader"] = new WorklogListSection
+            {
+                Icon = this.EditorFilesHeaderIcon,
+                Body = new Control[] { this.EditorFilesList },
+                EmptyState = this.EditorNoFilesText,
+            };
+
+            foreach (var section in this.thisListSections.Values)
+            {
+                ApplyListSectionState(section);
+            }
+        }
+
+        private void OnListHeaderTogglePointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (sender is not Control { Tag: string key })
+                return;
+
+            this.SetListSectionExpanded(key, !this.IsListSectionExpanded(key));
+        }
+
+        // ###########################################################################################
+        // Opens or folds one section and writes the change straight to disk.
+        //
+        // Persisted immediately rather than with Save, matching the sub-lists: which sections are
+        // folded is a reading preference, not an edit to the worklog, so it must not enable the
+        // "Update worklog" button or be discardable with Cancel. Nor may it be lost by closing the
+        // window the way it was opened.
+        // ###########################################################################################
+        private void SetListSectionExpanded(string key, bool isExpanded)
+        {
+            if (!this.thisListSections.TryGetValue(key, out var section))
+                return;
+
+            if (section.IsExpanded == isExpanded)
+                return;
+
+            section.IsExpanded = isExpanded;
+            ApplyListSectionState(section);
+
+            if (section.IsExpanded)
+            {
+                this.RefreshListSectionEmptyStates();
+            }
+
+            this.PersistCollapsedSections();
+        }
+
+        // ###########################################################################################
+        // Expands a section that is folded, used when something is ADDED to it - a new comment that
+        // lands in a collapsed list would otherwise appear to have gone nowhere.
+        //
+        // Only ever opens, never closes: a user who has a section open and adds to it must not have
+        // it fold underneath them.
+        // ###########################################################################################
+        private void EnsureListSectionExpanded(string key) => this.SetListSectionExpanded(key, true);
+
+        // ###########################################################################################
+        // Writes ONLY the fold state, by re-reading the stored record and putting the folds on that.
+        //
+        // Deliberately not PersistEntrySilently, which syncs every direct field first. Folding a
+        // section is a reading convenience, not an edit - the Description, category, state and
+        // "Show marked area" are the fields the user can still abandon with Cancel, and routing a
+        // fold through the sub-list save path committed all of them to disk the moment a header was
+        // clicked. Pressing Cancel afterwards then reported success with the abandoned edits live.
+        //
+        // Reading the stored record back rather than writing the working copy is what keeps those
+        // pending edits out: the folds land on what is genuinely on disk. If the entry cannot be
+        // read back - deleted from under the window - the fold is simply not persisted, which is
+        // the right outcome for a preference.
+        // ###########################################################################################
+        private void PersistCollapsedSections()
+        {
+            if (this.thisIsInitializing)
+                return;
+
+            var collapsed = this.thisListSections
+                .Where(pair => !pair.Value.IsExpanded)
+                .Select(pair => pair.Key)
+                .OrderBy(key => key, StringComparer.Ordinal)
+                .ToList();
+
+            // Kept on the working copy too, so a later Save does not write back the old folds.
+            this.thisEntry.CollapsedSections = collapsed;
+
+            var stored = WorklogManager.GetEntries(this.thisWorkbookId)
+                .FirstOrDefault(entry => entry.Id == this.thisEntry.Id);
+
+            if (stored == null)
+                return;
+
+            stored.CollapsedSections = collapsed;
+            WorklogManager.UpdateEntry(this.thisWorkbookId, stored);
+        }
+
+        // ###########################################################################################
+        // Applies the folds saved on the entry. Absent keys mean expanded, so an entry written before
+        // this field existed - or one the user has never folded - opens with everything showing.
+        // ###########################################################################################
+        private void RestoreCollapsedSections()
+        {
+            var collapsed = new HashSet<string>(
+                this.thisEntry.CollapsedSections ?? new List<string>(),
+                StringComparer.Ordinal);
+
+            foreach (var (key, section) in this.thisListSections)
+            {
+                section.IsExpanded = !collapsed.Contains(key);
+                ApplyListSectionState(section);
+            }
+        }
+
+        // ###########################################################################################
+        // Re-applies every list's "No ... added" line from its row count and its section's fold
+        // state. Called after expanding a section, because whether that line belongs on screen is a
+        // property of the DATA - showing it along with the rest of the body would put "No links
+        // added" above a list that has links in it.
+        // ###########################################################################################
+        private void RefreshListSectionEmptyStates()
+        {
+            this.EditorNoLinksText.IsVisible = this.thisLinkRows.Count == 0 && this.IsListSectionExpanded("EditorLinksHeader");
+            this.EditorNoWorkDoneText.IsVisible = this.thisWorkDoneRows.Count == 0 && this.IsListSectionExpanded("EditorWorkDoneHeader");
+            this.EditorNoCommentsText.IsVisible = this.thisCommentRows.Count == 0 && this.IsListSectionExpanded("EditorCommentsHeader");
+            this.EditorNoPhotosText.IsVisible = this.thisPhotoRows.Count == 0 && this.IsListSectionExpanded("EditorPhotosHeader");
+            this.EditorNoFilesText.IsVisible = this.thisFileRows.Count == 0 && this.IsListSectionExpanded("EditorFilesHeader");
+        }
+
+        // ###########################################################################################
+        // Shows or hides a section's body and swaps its icon.
+        //
+        // The empty-state line is hidden on collapse but NOT shown on expand - whether it belongs
+        // on screen depends on whether the list is empty. RefreshListSectionEmptyStates restores it
+        // from the row counts after an expand.
+        // ###########################################################################################
+        private static void ApplyListSectionState(WorklogListSection section)
+        {
+            section.Icon.Text = section.IsExpanded ? CollapseIconGlyph : ExpandIconGlyph;
+
+            foreach (var control in section.Body)
+            {
+                control.IsVisible = section.IsExpanded;
+            }
+
+            // Collapsing always hides the empty-state line. Expanding does NOT simply show it -
+            // that is decided by whether the list has rows, so the caller refreshes it instead.
+            if (section.EmptyState != null && !section.IsExpanded)
+            {
+                section.EmptyState.IsVisible = false;
+            }
+        }
+
+        // ###########################################################################################
+        // The item count shown beside a list's title. "none" rather than "0 items" for an empty
+        // list: the section already carries a "No links added" line inside it, and a zero repeated
+        // twice reads as noise.
+        // ###########################################################################################
+        private static string FormatItemCount(int count, string singular, string plural) =>
+            count switch
+            {
+                0 => "none",
+                1 => $"1 {singular}",
+                _ => $"{count} {plural}",
+            };
+
+        private bool IsListSectionExpanded(string key) =>
+            !this.thisListSections.TryGetValue(key, out var section) || section.IsExpanded;
+
+        // ###########################################################################################
+        // Rebuilds the "Mark components completed" checklist from whatever is currently TICKED in
+        // the scope list above. Called after every change to that list, so the two can never
+        // disagree about which components the entry covers.
+        //
+        // Existing completed ticks are preserved across the rebuild, keyed by board label - the
+        // rows are recreated but the user's progress is not thrown away by an unrelated scope edit.
+        //
+        // Two rules that fall out of this, both deliberate:
+        //   - a component newly ticked INTO scope appears here UNTICKED. It is work still to do,
+        //     which is the whole point of the list; arriving pre-ticked would claim it was already
+        //     done and quietly overstate progress.
+        //   - a component unticked OUT of scope loses its completed state entirely. It is no longer
+        //     part of the entry, so a remembered "done" flag would be about a component the entry
+        //     does not cover, and would resurface if the label was ever re-added.
+        // ###########################################################################################
+        private void RefreshCompletedComponentRows()
+        {
+            // Ticks carried across from the rows already on screen, so progress survives a rebuild
+            // triggered by an unrelated scope edit. Read BEFORE the rebuild clears them.
+            this.RebuildCompletedComponentRows(
+                this.thisCompletedComponentRows.Where(r => r.IsChecked).Select(r => r.BoardLabel));
+        }
+
+        // ###########################################################################################
+        // The single rebuild both entry points share: one row per component currently ticked in the
+        // scope list, ticked if its label is in the given set.
+        //
+        // The two callers differ only in where that set comes from - the rows on screen for a live
+        // scope edit, the saved list on open - so they were one copy-pasted body apart, which is how
+        // a later change to the row shape or the comparer ends up applied to only one of them.
+        // ###########################################################################################
+        private void RebuildCompletedComponentRows(IEnumerable<string> tickedLabels)
+        {
+            var ticked = new HashSet<string>(tickedLabels, StringComparer.OrdinalIgnoreCase);
+
+            this.thisCompletedComponentRows.Clear();
+
+            foreach (var row in this.thisComponentRows.Where(r => r.IsChecked))
+            {
+                this.thisCompletedComponentRows.Add(new WorklogEntryComponentRow
+                {
+                    BoardLabel = row.BoardLabel,
+                    DisplayName = row.DisplayName,
+                    IsChecked = ticked.Contains(row.BoardLabel)
+                });
+            }
+
+            this.UpdateCompletedComponentSummary();
+        }
+
+        // The count reads as progress ("3 of 8 completed") rather than as a bare total - the list
+        // exists to answer "how much is left", and a total alone does not.
+        private void UpdateCompletedComponentSummary()
+        {
+            int total = this.thisCompletedComponentRows.Count;
+            int done = this.thisCompletedComponentRows.Count(r => r.IsChecked);
+
+            this.EditorCompletedCountText.Text = $"{done} of {total} completed";
+            this.EditorNoCompletedText.IsVisible = total == 0;
+        }
+
+        private void OnEditorSelectAllCompletedClick(object? sender, RoutedEventArgs e)
+        {
+            foreach (var row in this.thisCompletedComponentRows)
+            {
+                row.IsChecked = true;
+            }
+
+            this.UpdateCompletedComponentSummary();
+            this.MarkDirty();
+        }
+
+        private void OnEditorSelectNoneCompletedClick(object? sender, RoutedEventArgs e)
+        {
+            foreach (var row in this.thisCompletedComponentRows)
+            {
+                row.IsChecked = false;
+            }
+
+            this.UpdateCompletedComponentSummary();
+            this.MarkDirty();
+        }
+
+        private void OnEditorCompletedRowPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (sender is Control control && control.DataContext is WorklogEntryComponentRow row)
+            {
+                row.IsChecked = !row.IsChecked;
+                this.UpdateCompletedComponentSummary();
+                this.MarkDirty();
+            }
         }
 
         // ###########################################################################################
@@ -563,6 +1051,7 @@ namespace CRT
                 row.IsChecked = true;
             }
 
+            this.RefreshCompletedComponentRows();
             this.MarkDirty();
         }
 
@@ -573,6 +1062,7 @@ namespace CRT
                 row.IsChecked = false;
             }
 
+            this.RefreshCompletedComponentRows();
             this.MarkDirty();
         }
 
@@ -583,6 +1073,7 @@ namespace CRT
             if (sender is Control control && control.DataContext is WorklogEntryComponentRow row)
             {
                 row.IsChecked = !row.IsChecked;
+                this.RefreshCompletedComponentRows();
                 this.MarkDirty();
             }
         }
@@ -659,6 +1150,9 @@ namespace CRT
                 Category = source.Category,
                 State = source.State,
                 ComponentLabels = source.ComponentLabels?.ToList() ?? new(),
+                CompletedComponentLabels = source.CompletedComponentLabels?.ToList() ?? new(),
+                CollapsedSections = source.CollapsedSections?.ToList() ?? new(),
+                ShowMarkedArea = source.ShowMarkedArea,
                 CreatedDate = source.CreatedDate,
                 Links = source.Links?.Select(l => new WorklogLinkRecord { Id = l.Id, Headline = l.Headline, Url = l.Url }).ToList() ?? new(),
                 Comments = source.Comments?.Select(c => new WorklogCommentRecord { Id = c.Id, Text = c.Text, Date = c.Date }).ToList() ?? new(),
@@ -738,29 +1232,65 @@ namespace CRT
             this.EditorLocationPreviewOverlayCanvas.Children.Add(marker);
         }
 
+        // ###########################################################################################
+        // Clicking a category chip records the change as an automatic comment, so the entry carries
+        // its own history rather than only its current category.
+        //
+        // Clicking the ALREADY-selected chip records nothing: it is not a change, and treating it as
+        // one would let a user fill the comment list by clicking the same chip repeatedly.
+        // ###########################################################################################
         private void OnEditorCategoryChipPointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            if (sender is Border { Tag: string category })
-            {
-                this.thisSelectedCategory = category;
-                this.UpdateCategoryChipVisuals();
-                this.RefreshLocationPreviewOverlay();
-                this.MarkDirty();
-            }
+            if (sender is not Border { Tag: string category })
+                return;
+
+            if (string.Equals(this.thisSelectedCategory, category, StringComparison.Ordinal))
+                return;
+
+            this.thisSelectedCategory = category;
+            this.UpdateCategoryChipVisuals();
+            this.RefreshLocationPreviewOverlay();
+            this.MarkDirty();
+
+            this.RecordAutomaticComment(WorklogManager.BuildCategoryChangedCommentText(category));
+        }
+
+        // ###########################################################################################
+        // Adds an automatic comment to the working copy, shows it, and writes it straight to disk.
+        //
+        // Persisted immediately rather than waiting for Save, matching every other sub-list change
+        // in this window: a comment the user can see in the list but which vanishes on Cancel would
+        // be the odd one out, and the audit trail is least useful if it can be discarded.
+        //
+        // PersistEntrySilently syncs the direct fields too, so the category or state that prompted
+        // the comment reaches disk with it - the two can never disagree.
+        // ###########################################################################################
+        private void RecordAutomaticComment(string? text)
+        {
+            if (WorklogManager.AppendAutomaticComment(this.thisEntry.Comments, text) == null)
+                return;
+
+            // Deliberately does NOT expand the Comments section. Only a direct "Add comment" click
+            // does that - the user asked to write a comment there, so they should see it land.
+            // Flipping a status is not that request; unfolding a list they had folded away, every
+            // time they touch a pill, is the app second-guessing them.
+            this.RefreshCommentRows();
+            this.PersistEntrySilently();
         }
 
         private void UpdateCategoryChipVisuals()
         {
-            this.ApplyCategoryChipVisualState(this.EditorCategoryNoteChip, this.EditorCategoryNoteText, "Note");
-            this.ApplyCategoryChipVisualState(this.EditorCategoryCosmeticChip, this.EditorCategoryCosmeticText, "Cosmetic");
-            this.ApplyCategoryChipVisualState(this.EditorCategoryIssueChip, this.EditorCategoryIssueText, "Issue");
+            this.ApplyCategoryChipVisualState(this.EditorCategoryNoteChip, this.EditorCategoryNoteText, this.EditorCategoryNoteIcon, "Note");
+            this.ApplyCategoryChipVisualState(this.EditorCategoryCosmeticChip, this.EditorCategoryCosmeticText, this.EditorCategoryCosmeticIcon, "Cosmetic");
+            this.ApplyCategoryChipVisualState(this.EditorCategoryIssueChip, this.EditorCategoryIssueText, this.EditorCategoryIssueIcon, "Issue");
 
             this.EditorIdBadge.Background = new SolidColorBrush(this.ResolveCategoryColor(this.thisSelectedCategory));
         }
 
-        // Text only - see UpdateWorklogEntryCategoryChipVisuals in TabSchematics.Worklog.cs for why
-        // the chips carry no colour dot.
-        private void ApplyCategoryChipVisualState(Border chip, TextBlock label, string category)
+        // The icon takes the label's colour rather than a colour of its own - white on the selected
+        // chip's filled background, the ordinary foreground otherwise. An icon left at one fixed
+        // colour would either disappear into the fill or stay dark while its own label went white.
+        private void ApplyCategoryChipVisualState(Border chip, TextBlock label, TextBlock icon, string category)
         {
             var categoryBrush = this.ResolveThemeBrush($"Worklog_Category_{category}", new SolidColorBrush(Colors.IndianRed));
 
@@ -772,6 +1302,7 @@ namespace CRT
                 chip.Opacity = 0.9;
                 label.Foreground = Brushes.White;
                 label.FontWeight = FontWeight.SemiBold;
+                icon.Foreground = label.Foreground;
             }
             else
             {
@@ -781,38 +1312,65 @@ namespace CRT
                 chip.Opacity = 1.0;
                 label.Foreground = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
                 label.FontWeight = FontWeight.Normal;
+                icon.Foreground = label.Foreground;
             }
         }
 
+        // Clicking the already-selected pill records nothing - see the category handler above.
         private void OnEditorStatePillPointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            if (sender is Border { Tag: string state })
+            if (sender is not Border { Tag: string state })
+                return;
+
+            if (string.Equals(this.thisSelectedState, state, StringComparison.Ordinal))
+                return;
+
+            this.thisSelectedState = state;
+            this.UpdateStatePillVisuals();
+            this.MarkDirty();
+
+            this.RecordAutomaticComment(WorklogManager.BuildStateChangedCommentText(state));
+        }
+
+        // Reserves the top pixel row the padlocks need, computed from each control's own font size
+        // rather than hardcoded in markup - see FontAwesomeGlyphMetrics for why the literal form is
+        // a clipped icon waiting for a font-size change.
+        private static void ApplyFontAwesomeOverflowPadding(params TextBlock[] icons)
+        {
+            foreach (var icon in icons)
             {
-                this.thisSelectedState = state;
-                this.UpdateStatePillVisuals();
-                this.MarkDirty();
+                icon.Padding = FontAwesomeGlyphMetrics.GetTopOverflowThicknessForText(icon.Text, icon.FontSize);
             }
         }
 
         private void UpdateStatePillVisuals()
         {
-            this.ApplyStatePillVisualState(this.EditorStateOpenPill, this.EditorStateOpenText, "Open", "Worklog_Status_Open");
-            this.ApplyStatePillVisualState(this.EditorStateClosedPill, this.EditorStateClosedText, "Closed", "Worklog_Status_Closed");
+            ApplyFontAwesomeOverflowPadding(this.EditorStateOpenDot, this.EditorStateClosedDot);
+
+            this.ApplyStatePillVisualState(this.EditorStateOpenPill, this.EditorStateOpenText, this.EditorStateOpenDot, "Open", "Worklog_Status_Open");
+            this.ApplyStatePillVisualState(this.EditorStateClosedPill, this.EditorStateClosedText, this.EditorStateClosedDot, "Closed", "Worklog_Status_Closed");
         }
 
-        // The dot is left at its state colour in both pills (it is the state's identity, not a
-        // selection cue) - only the outline and label weight mark which one is selected, matching
-        // the category chips directly above.
-        private void ApplyStatePillVisualState(Border pill, TextBlock label, string state, string colorResourceKey)
+        // The SELECTED pill is filled with its state colour and its label goes white and bold -
+        // the same treatment the category chips use. It was outline-only, which on the pale
+        // Schematics_Panels_Bg left "selected" and "unselected" separated by little more than a
+        // 1px border-width difference, and the selected pill was genuinely hard to pick out.
+        //
+        // The padlock keeps its state colour in the UNSELECTED pill (it is the state's identity, not
+        // a selection cue) but turns white in the selected one, where the fill already carries the
+        // colour and a coloured glyph on a same-coloured fill would simply vanish.
+        private void ApplyStatePillVisualState(Border pill, TextBlock label, TextBlock icon, string state, string colorResourceKey)
         {
             var stateBrush = this.ResolveThemeBrush(colorResourceKey, new SolidColorBrush(Colors.IndianRed));
 
             if (string.Equals(this.thisSelectedState, state, StringComparison.Ordinal))
             {
-                pill.Background = this.ResolveThemeBrush("Schematics_Panels_Bg", new SolidColorBrush(Color.Parse("#F5F5F5")));
+                pill.Background = stateBrush;
                 pill.BorderBrush = stateBrush;
                 pill.BorderThickness = new Thickness(2);
-                label.Foreground = stateBrush;
+                pill.Opacity = 0.9;
+                icon.Foreground = Brushes.White;
+                label.Foreground = Brushes.White;
                 label.FontWeight = FontWeight.SemiBold;
             }
             else
@@ -820,6 +1378,8 @@ namespace CRT
                 pill.Background = this.ResolveThemeBrush("Form_Bg", new SolidColorBrush(Color.Parse("#F5F5F5")));
                 pill.BorderBrush = this.ResolveThemeBrush("Form_Border", new SolidColorBrush(Color.Parse("#CCCCCC")));
                 pill.BorderThickness = new Thickness(1);
+                pill.Opacity = 1.0;
+                icon.Foreground = stateBrush;
                 label.Foreground = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
                 label.FontWeight = FontWeight.Normal;
             }
@@ -835,7 +1395,8 @@ namespace CRT
             {
                 this.thisLinkRows.Add(new WorklogLinkRow { Id = link.Id, Headline = link.Headline, Url = link.Url });
             }
-            this.EditorNoLinksText.IsVisible = this.thisLinkRows.Count == 0;
+            this.EditorNoLinksText.IsVisible = this.thisLinkRows.Count == 0 && this.IsListSectionExpanded("EditorLinksHeader");
+            this.EditorLinksCountText.Text = FormatItemCount(this.thisLinkRows.Count, "link", "links");
         }
 
         private async void OnAddLinkClick(object? sender, RoutedEventArgs e)
@@ -847,6 +1408,10 @@ namespace CRT
 
             int nextId = this.thisEntry.Links.Count == 0 ? 1 : this.thisEntry.Links.Max(l => l.Id) + 1;
             this.thisEntry.Links.Add(new WorklogLinkRecord { Id = nextId, Headline = result.Value.Headline, Url = result.Value.Url });
+
+            // A new row landing in a folded list would look like nothing happened, so adding always
+            // opens the section it went into.
+            this.EnsureListSectionExpanded("EditorLinksHeader");
             this.RefreshLinkRows();
             this.PersistEntrySilently();
         }
@@ -914,6 +1479,9 @@ namespace CRT
                 });
             }
 
+            this.EditorNoCommentsText.IsVisible = this.thisCommentRows.Count == 0 && this.IsListSectionExpanded("EditorCommentsHeader");
+            this.EditorCommentsCountText.Text = FormatItemCount(this.thisCommentRows.Count, "comment", "comments");
+
             this.UpdateCommentsSortIconVisuals();
         }
 
@@ -949,6 +1517,8 @@ namespace CRT
 
             int nextId = this.thisEntry.Comments.Count == 0 ? 1 : this.thisEntry.Comments.Max(c => c.Id) + 1;
             this.thisEntry.Comments.Add(new WorklogCommentRecord { Id = nextId, Text = result.Trim(), Date = DateTime.Now });
+
+            this.EnsureListSectionExpanded("EditorCommentsHeader");
             this.RefreshCommentRows();
             this.PersistEntrySilently();
         }
@@ -1009,7 +1579,11 @@ namespace CRT
 
             double totalHours = this.thisEntry.WorkDoneItems.Sum(w => w.HoursSpent);
             double totalCost = this.thisEntry.WorkDoneItems.Sum(w => w.Cost);
-            this.EditorWorkDoneHeaderText.Text = $"Work done (total {totalHours:0.##} h · {totalCost:0.##})";
+            this.EditorWorkDoneCountText.Text = this.thisWorkDoneRows.Count == 0
+                ? "none"
+                : $"{FormatItemCount(this.thisWorkDoneRows.Count, "entry", "entries")} · {totalHours:0.##} h · {totalCost:0.##}";
+
+            this.EditorNoWorkDoneText.IsVisible = this.thisWorkDoneRows.Count == 0 && this.IsListSectionExpanded("EditorWorkDoneHeader");
 
             this.UpdateWorkDoneSortIconVisuals();
         }
@@ -1053,6 +1627,8 @@ namespace CRT
                 HoursSpent = result.Value.HoursSpent,
                 Cost = result.Value.Cost
             });
+
+            this.EnsureListSectionExpanded("EditorWorkDoneHeader");
             this.RefreshWorkDoneRows();
             this.PersistEntrySilently();
         }
@@ -1128,7 +1704,8 @@ namespace CRT
                     Thumbnail = this.TryLoadPhotoThumbnail(photo.FileName)
                 });
             }
-            this.EditorNoPhotosText.IsVisible = this.thisPhotoRows.Count == 0;
+            this.EditorNoPhotosText.IsVisible = this.thisPhotoRows.Count == 0 && this.IsListSectionExpanded("EditorPhotosHeader");
+            this.EditorPhotosCountText.Text = FormatItemCount(this.thisPhotoRows.Count, "photo", "photos");
         }
 
         // ###########################################################################################
@@ -1247,6 +1824,7 @@ namespace CRT
                 DisplayOrder = nextOrder
             });
 
+            this.EnsureListSectionExpanded("EditorPhotosHeader");
             this.RefreshPhotoRows();
 
             // A failed save means entries.json will never mention this photo, so the bytes just
@@ -1809,7 +2387,8 @@ namespace CRT
                     Comment = file.Comment
                 });
             }
-            this.EditorNoFilesText.IsVisible = this.thisFileRows.Count == 0;
+            this.EditorNoFilesText.IsVisible = this.thisFileRows.Count == 0 && this.IsListSectionExpanded("EditorFilesHeader");
+            this.EditorFilesCountText.Text = FormatItemCount(this.thisFileRows.Count, "file", "files");
         }
 
         private async void OnAddFileClick(object? sender, RoutedEventArgs e)
@@ -1868,6 +2447,7 @@ namespace CRT
                 DisplayOrder = nextOrder
             });
 
+            this.EnsureListSectionExpanded("EditorFilesHeader");
             this.RefreshFileRows();
 
             // Undo the copy when the save fails, so the folder never holds bytes that entries.json

@@ -24,6 +24,34 @@
 		<Style Selector="Button.WorklogRowIconButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
 			<Setter Property="Background" Value="{DynamicResource Form_Bg}" />
 		</Style>
+
+		<!-- The clickable half of a list header: the expand/collapse icon, the title and the item
+		     count. A Border rather than a Button so the header keeps its plain look - only the
+		     Hand cursor and a faint hover tint say it is clickable.
+
+		     Transparent background, deliberately: in Avalonia a null background is not hit-testable,
+		     so without it the gaps between the icon and the text would not respond to a click and
+		     the header would feel broken in exactly the places the eye aims for. -->
+		<Style Selector="Border.WorklogListHeaderToggle">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Padding" Value="0,2" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
+		<Style Selector="Border.WorklogListHeaderToggle:pointerover">
+			<Setter Property="Opacity" Value="0.75" />
+		</Style>
+
+		<!-- The "All"/"None" bulk links in the two component checklists. -->
+		<Style Selector="Button.WorklogHeaderLink">
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Foreground" Value="{DynamicResource Link_Fg}" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
 	</Window.Styles>
 
 	<Grid RowDefinitions="*,Auto" Margin="16">
@@ -56,26 +84,31 @@
 			     down the modal. -->
 			<Grid Grid.Column="0" RowDefinitions="Auto,*">
 
-			<!-- Header: entry id, title field, category chips, state pills. -->
-			<Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="0,0,12,12">
-				<Border Grid.Column="0"
-						x:Name="EditorIdBadge"
-						CornerRadius="12"
-						Padding="12,5"
-						VerticalAlignment="Top"
-						Margin="0,4,12,0">
-					<TextBlock x:Name="EditorIdText"
-							   FontSize="16"
-							   FontWeight="Bold"
-							   Foreground="White" />
-				</Border>
+			<!-- Header: title field with the entry id badge to its RIGHT, then category chips and
+			     state pills beneath. The badge sits on the title's own row rather than beside the
+			     whole block, so the chips and pills start at the title box's left edge instead of
+			     being indented past a badge that is no longer above them. -->
+			<Grid Grid.Row="0" Margin="0,0,12,12">
+				<StackPanel Spacing="8">
+					<Grid ColumnDefinitions="*,Auto">
+						<TextBox Grid.Column="0" x:Name="EditorTitleTextBox"
+								 PlaceholderText="Worklog title"
+								 FontSize="16"
+								 FontWeight="Bold"
+								 TextChanged="OnDirectFieldTextChanged" />
 
-				<StackPanel Grid.Column="1" Spacing="8">
-					<TextBox x:Name="EditorTitleTextBox"
-							 PlaceholderText="Worklog title"
-							 FontSize="16"
-							 FontWeight="Bold"
-							 TextChanged="OnDirectFieldTextChanged" />
+						<Border Grid.Column="1"
+								x:Name="EditorIdBadge"
+								CornerRadius="12"
+								Padding="12,5"
+								VerticalAlignment="Center"
+								Margin="12,0,0,0">
+							<TextBlock x:Name="EditorIdText"
+									   FontSize="16"
+									   FontWeight="Bold"
+									   Foreground="White" />
+						</Border>
+					</Grid>
 
 					<!-- WrapPanel, not a horizontal StackPanel: the category chips and the state pills
 					     together want ~440px, and the left column can be dragged narrower than that.
@@ -97,6 +130,7 @@
 									Tag="Note"
 									PointerPressed="OnEditorCategoryChipPointerPressed">
 								<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
+									<TextBlock x:Name="EditorCategoryNoteIcon" Text="&#xf15c;" FontFamily="{DynamicResource FontAwesomeRegular}" FontSize="11" VerticalAlignment="Center" />
 									<TextBlock x:Name="EditorCategoryNoteText" Text="Note" FontSize="11" Foreground="{DynamicResource Fg}" />
 								</StackPanel>
 							</Border>
@@ -111,6 +145,7 @@
 									Tag="Cosmetic"
 									PointerPressed="OnEditorCategoryChipPointerPressed">
 								<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
+									<TextBlock x:Name="EditorCategoryCosmeticIcon" Text="&#xf5d0;" FontFamily="{DynamicResource FontAwesomeSolid}" FontSize="11" VerticalAlignment="Center" />
 									<TextBlock x:Name="EditorCategoryCosmeticText" Text="Cosmetic" FontSize="11" Foreground="{DynamicResource Fg}" />
 								</StackPanel>
 							</Border>
@@ -125,6 +160,7 @@
 									Tag="Issue"
 									PointerPressed="OnEditorCategoryChipPointerPressed">
 								<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
+									<TextBlock x:Name="EditorCategoryIssueIcon" Text="&#xf188;" FontFamily="{DynamicResource FontAwesomeSolid}" FontSize="11" VerticalAlignment="Center" />
 									<TextBlock x:Name="EditorCategoryIssueText" Text="Issue" FontSize="11" Foreground="{DynamicResource Fg}" />
 								</StackPanel>
 							</Border>
@@ -142,7 +178,11 @@
 									Tag="Open"
 									PointerPressed="OnEditorStatePillPointerPressed">
 								<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-									<Ellipse x:Name="EditorStateOpenDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Status_Open}" VerticalAlignment="Center" />
+									<!-- The padlocks are drawn taller than the font's declared ascent, so their top
+									     pixel row would be clipped without a reserved one. The reservation is applied
+									     from code at construction, computed from each control's own font size - see
+									     ApplyFontAwesomeOverflowPadding and FontAwesomeGlyphMetrics. -->
+									<TextBlock x:Name="EditorStateOpenDot" Text="&#xf3c1;" FontFamily="{DynamicResource FontAwesomeSolid}" FontSize="11" Foreground="{DynamicResource Worklog_Status_Open}" VerticalAlignment="Center" />
 									<TextBlock x:Name="EditorStateOpenText" Text="Open" FontSize="11" Foreground="{DynamicResource Fg}" />
 								</StackPanel>
 							</Border>
@@ -157,7 +197,7 @@
 									Tag="Closed"
 									PointerPressed="OnEditorStatePillPointerPressed">
 								<StackPanel Orientation="Horizontal" Spacing="5" IsHitTestVisible="False">
-									<Ellipse x:Name="EditorStateClosedDot" Width="8" Height="8" Fill="{DynamicResource Worklog_Status_Closed}" VerticalAlignment="Center" />
+									<TextBlock x:Name="EditorStateClosedDot" Text="&#xf023;" FontFamily="{DynamicResource FontAwesomeSolid}" FontSize="11" Foreground="{DynamicResource Worklog_Status_Closed}" VerticalAlignment="Center" />
 									<TextBlock x:Name="EditorStateClosedText" Text="Closed" FontSize="11" Foreground="{DynamicResource Fg}" />
 								</StackPanel>
 							</Border>
@@ -180,12 +220,30 @@
 							<TextBlock Text="Ctrl+Enter to save"
 									   FontSize="10"
 									   Opacity="0.6" />
+
+							<!-- Unticking this hides the entry's coloured area on the Schematics tab.
+							     Its "#N" pill is NOT hidden with it - the pill parks in the top-right
+							     corner of the schematic panel instead, so the entry stays visible and
+							     clickable from the board. See TabSchematics.Worklog.cs. -->
+							<CheckBox x:Name="EditorShowMarkedAreaCheckBox"
+									  Content="Show marked area on schematics image"
+									  FontSize="11"
+									  Margin="0,4,0,0"
+									  IsCheckedChanged="OnShowMarkedAreaCheckedChanged" />
 						</StackPanel>
 
 						<StackPanel Spacing="6">
 							<Grid ColumnDefinitions="*,Auto">
-								<TextBlock Grid.Column="0" Text="Links of interest" FontWeight="SemiBold" VerticalAlignment="Center" />
-								<Button Grid.Column="1" Content="Add link" FontSize="11" Padding="8,3" Click="OnAddLinkClick" />
+								<Border Grid.Column="0" Classes="WorklogListHeaderToggle" Tag="EditorLinksHeader" PointerPressed="OnListHeaderTogglePointerPressed">
+									<!-- WrapPanel so a long title plus its count folds onto a second line inside the narrow
+									     right-hand column instead of being clipped at the panel edge. -->
+									<WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="2" IsHitTestVisible="False">
+										<TextBlock x:Name="EditorLinksHeaderIcon" FontFamily="{DynamicResource FontAwesomeRegular}" FontSize="12" VerticalAlignment="Center" />
+										<TextBlock Text="Links of interest" FontWeight="SemiBold" VerticalAlignment="Center" />
+										<TextBlock x:Name="EditorLinksCountText" FontSize="11" Opacity="0.7" VerticalAlignment="Center" />
+									</WrapPanel>
+								</Border>
+								<Button Grid.Column="1" Content="Add link" FontSize="11" Padding="8,3" VerticalAlignment="Top" Click="OnAddLinkClick" />
 							</Grid>
 							<ItemsControl x:Name="EditorLinksList">
 								<ItemsControl.ItemTemplate>
@@ -209,8 +267,16 @@
 
 						<StackPanel Spacing="6">
 							<Grid ColumnDefinitions="*,Auto,Auto,Auto">
-								<TextBlock Grid.Column="0" x:Name="EditorWorkDoneHeaderText" Text="Work done" FontWeight="SemiBold" VerticalAlignment="Center" />
-								<Button Grid.Column="1" Classes="WorklogRowIconButton" Click="OnWorkDoneSortNewestFirstClick" ToolTip.Tip="Newest first">
+								<Border Grid.Column="0" Classes="WorklogListHeaderToggle" Tag="EditorWorkDoneHeader" PointerPressed="OnListHeaderTogglePointerPressed">
+									<!-- WrapPanel so a long title plus its count folds onto a second line inside the narrow
+									     right-hand column instead of being clipped at the panel edge. -->
+									<WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="2" IsHitTestVisible="False">
+										<TextBlock x:Name="EditorWorkDoneHeaderIcon" FontFamily="{DynamicResource FontAwesomeRegular}" FontSize="12" VerticalAlignment="Center" />
+										<TextBlock Text="Work done" FontWeight="SemiBold" VerticalAlignment="Center" />
+										<TextBlock x:Name="EditorWorkDoneCountText" FontSize="11" Opacity="0.7" VerticalAlignment="Center" />
+									</WrapPanel>
+								</Border>
+								<Button Grid.Column="1" Classes="WorklogRowIconButton" VerticalAlignment="Top" Click="OnWorkDoneSortNewestFirstClick" ToolTip.Tip="Newest first">
 									<TextBlock x:Name="WorkDoneSortNewestFirstIcon" Text="&#xf160;" FontFamily="{DynamicResource FontAwesomeSolid}" FontSize="12" />
 								</Button>
 								<Button Grid.Column="2" Classes="WorklogRowIconButton" Margin="2,0,6,0" Click="OnWorkDoneSortOldestFirstClick" ToolTip.Tip="Oldest first">
@@ -236,12 +302,21 @@
 									</DataTemplate>
 								</ItemsControl.ItemTemplate>
 							</ItemsControl>
+							<TextBlock x:Name="EditorNoWorkDoneText" Text="No work done added" FontSize="11" Opacity="0.7" IsVisible="False" />
 						</StackPanel>
 
 						<StackPanel Spacing="6">
 							<Grid ColumnDefinitions="*,Auto,Auto,Auto">
-								<TextBlock Grid.Column="0" Text="Comments" FontWeight="SemiBold" VerticalAlignment="Center" />
-								<Button Grid.Column="1" Classes="WorklogRowIconButton" Click="OnCommentsSortNewestFirstClick" ToolTip.Tip="Newest first">
+								<Border Grid.Column="0" Classes="WorklogListHeaderToggle" Tag="EditorCommentsHeader" PointerPressed="OnListHeaderTogglePointerPressed">
+									<!-- WrapPanel so a long title plus its count folds onto a second line inside the narrow
+									     right-hand column instead of being clipped at the panel edge. -->
+									<WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="2" IsHitTestVisible="False">
+										<TextBlock x:Name="EditorCommentsHeaderIcon" FontFamily="{DynamicResource FontAwesomeRegular}" FontSize="12" VerticalAlignment="Center" />
+										<TextBlock Text="Comments" FontWeight="SemiBold" VerticalAlignment="Center" />
+										<TextBlock x:Name="EditorCommentsCountText" FontSize="11" Opacity="0.7" VerticalAlignment="Center" />
+									</WrapPanel>
+								</Border>
+								<Button Grid.Column="1" Classes="WorklogRowIconButton" VerticalAlignment="Top" Click="OnCommentsSortNewestFirstClick" ToolTip.Tip="Newest first">
 									<TextBlock x:Name="CommentsSortNewestFirstIcon" Text="&#xf160;" FontFamily="{DynamicResource FontAwesomeSolid}" FontSize="12" />
 								</Button>
 								<Button Grid.Column="2" Classes="WorklogRowIconButton" Margin="2,0,6,0" Click="OnCommentsSortOldestFirstClick" ToolTip.Tip="Oldest first">
@@ -266,6 +341,7 @@
 									</DataTemplate>
 								</ItemsControl.ItemTemplate>
 							</ItemsControl>
+							<TextBlock x:Name="EditorNoCommentsText" Text="No comments added" FontSize="11" Opacity="0.7" IsVisible="False" />
 						</StackPanel>
 
 					</StackPanel>
@@ -281,9 +357,9 @@
 
 					<StackPanel Spacing="4">
 						<TextBlock Text="Worklog location" FontWeight="SemiBold" />
-						<Border Background="{DynamicResource Form_Bg}" BorderBrush="{DynamicResource Form_Border}" BorderThickness="1" CornerRadius="3" Height="220">
+						<Border Background="{DynamicResource Form_Bg}" BorderBrush="{DynamicResource Form_Border}" BorderThickness="1" CornerRadius="3" HorizontalAlignment="Left">
 							<Grid x:Name="EditorLocationPreviewGrid" ClipToBounds="True">
-								<Image x:Name="EditorLocationPreviewImage" Stretch="Uniform" />
+								<Image x:Name="EditorLocationPreviewImage" Stretch="Uniform" MaxHeight="220" />
 								<Canvas x:Name="EditorLocationPreviewOverlayCanvas" IsHitTestVisible="False" />
 							</Grid>
 						</Border>
@@ -297,28 +373,22 @@
 					     could not work out the scope, rather than showing an empty box that looks
 					     like "no components here". -->
 					<StackPanel x:Name="EditorComponentScopePanel" Spacing="4" IsVisible="False">
-						<StackPanel Orientation="Horizontal" Spacing="10">
-							<TextBlock Text="Mark components in scope" FontWeight="SemiBold" VerticalAlignment="Center" />
-							<TextBlock x:Name="EditorComponentCountText" Text="0 found" FontSize="11" Opacity="0.7" VerticalAlignment="Center" />
-							<Button Content="All"
-									FontSize="11"
-									Padding="0"
-									Background="Transparent"
-									BorderThickness="0"
-									Foreground="{DynamicResource Link_Fg}"
-									Cursor="Hand"
-									Click="OnEditorSelectAllComponentsClick" />
-							<Button Content="None"
-									FontSize="11"
-									Padding="0"
-									Background="Transparent"
-									BorderThickness="0"
-									Foreground="{DynamicResource Link_Fg}"
-									Cursor="Hand"
-									Click="OnEditorSelectNoneComponentsClick" />
-						</StackPanel>
+						<Grid ColumnDefinitions="*,Auto">
+							<Border Grid.Column="0" Classes="WorklogListHeaderToggle" Tag="EditorComponentScopeHeader" PointerPressed="OnListHeaderTogglePointerPressed">
+								<WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="2" IsHitTestVisible="False">
+									<TextBlock x:Name="EditorComponentScopeHeaderIcon" FontFamily="{DynamicResource FontAwesomeRegular}" FontSize="12" VerticalAlignment="Center" />
+									<TextBlock Text="Components in scope" FontWeight="SemiBold" VerticalAlignment="Center" />
+									<TextBlock x:Name="EditorComponentCountText" FontSize="11" Opacity="0.7" VerticalAlignment="Center" />
+								</WrapPanel>
+							</Border>
 
-						<Border Background="{DynamicResource Form_Bg}" BorderBrush="{DynamicResource Form_Border}" BorderThickness="1" CornerRadius="3" MinHeight="40">
+							<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Top" Margin="10,2,0,0">
+								<Button Classes="WorklogHeaderLink" Content="All" Click="OnEditorSelectAllComponentsClick" />
+								<Button Classes="WorklogHeaderLink" Content="None" Click="OnEditorSelectNoneComponentsClick" />
+							</StackPanel>
+						</Grid>
+
+						<Border x:Name="EditorComponentScopeBody" Background="{DynamicResource Form_Bg}" BorderBrush="{DynamicResource Form_Border}" BorderThickness="1" CornerRadius="3" MinHeight="40">
 							<Grid>
 								<TextBlock x:Name="EditorNoComponentsText"
 										   Text="No components in this area"
@@ -368,10 +438,89 @@
 						</Border>
 					</StackPanel>
 
+					<!-- "Mark components completed": progress tracking through the components that
+					     are IN SCOPE. Its rows mirror the ticked rows of the checklist above, so a
+					     component only appears here once it has been declared part of the entry.
+					     Ticking one here means "this one is done" - see
+					     RefreshCompletedComponentRows in the code-behind. -->
+					<StackPanel x:Name="EditorComponentCompletedPanel" Spacing="4" IsVisible="False">
+						<Grid ColumnDefinitions="*,Auto">
+							<Border Grid.Column="0" Classes="WorklogListHeaderToggle" Tag="EditorComponentCompletedHeader" PointerPressed="OnListHeaderTogglePointerPressed">
+								<WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="2" IsHitTestVisible="False">
+									<TextBlock x:Name="EditorComponentCompletedHeaderIcon" FontFamily="{DynamicResource FontAwesomeRegular}" FontSize="12" VerticalAlignment="Center" />
+									<TextBlock Text="Components completed" FontWeight="SemiBold" VerticalAlignment="Center" />
+									<TextBlock x:Name="EditorCompletedCountText" FontSize="11" Opacity="0.7" VerticalAlignment="Center" />
+								</WrapPanel>
+							</Border>
+
+							<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Top" Margin="10,2,0,0">
+								<Button Classes="WorklogHeaderLink" Content="All" Click="OnEditorSelectAllCompletedClick" />
+								<Button Classes="WorklogHeaderLink" Content="None" Click="OnEditorSelectNoneCompletedClick" />
+							</StackPanel>
+						</Grid>
+
+						<Border x:Name="EditorComponentCompletedBody" Background="{DynamicResource Form_Bg}" BorderBrush="{DynamicResource Form_Border}" BorderThickness="1" CornerRadius="3" MinHeight="40">
+							<Grid>
+								<TextBlock x:Name="EditorNoCompletedText"
+										   Text="No components marked in scope"
+										   FontSize="11"
+										   Opacity="0.7"
+										   HorizontalAlignment="Center"
+										   Margin="8,10"
+										   IsVisible="False" />
+
+								<ScrollViewer MaxHeight="160"
+											  VerticalScrollBarVisibility="Auto"
+											  HorizontalScrollBarVisibility="Disabled">
+									<ItemsControl x:Name="EditorCompletedComponentList">
+										<ItemsControl.ItemTemplate>
+											<DataTemplate x:DataType="local:WorklogEntryComponentRow">
+												<Border Background="Transparent"
+														Cursor="Hand"
+														PointerPressed="OnEditorCompletedRowPointerPressed">
+													<StackPanel Orientation="Horizontal" Spacing="6" Margin="8,0">
+														<Viewbox Width="20" Height="20" IsHitTestVisible="False">
+															<CheckBox IsChecked="{Binding IsChecked}"
+																	  MinWidth="0"
+																	  MinHeight="0"
+																	  Margin="0"
+																	  Padding="0"
+																	  CornerRadius="2"
+																	  IsHitTestVisible="False"
+																	  VerticalAlignment="Center" />
+														</Viewbox>
+														<TextBlock Text="{Binding BoardLabel}"
+																   FontSize="11"
+																   FontWeight="Bold"
+																   VerticalAlignment="Center"
+																   IsHitTestVisible="False" />
+														<TextBlock Text="{Binding DisplayName}"
+																   FontSize="11"
+																   VerticalAlignment="Center"
+																   TextTrimming="CharacterEllipsis"
+																   IsHitTestVisible="False" />
+													</StackPanel>
+												</Border>
+											</DataTemplate>
+										</ItemsControl.ItemTemplate>
+									</ItemsControl>
+								</ScrollViewer>
+							</Grid>
+						</Border>
+					</StackPanel>
+
 					<StackPanel Spacing="6">
 						<Grid ColumnDefinitions="*,Auto">
-							<TextBlock Grid.Column="0" Text="Photos" FontWeight="SemiBold" VerticalAlignment="Center" />
-							<Button Grid.Column="1" Content="Add photo" FontSize="11" Padding="8,3" Click="OnAddPhotoClick" />
+							<Border Grid.Column="0" Classes="WorklogListHeaderToggle" Tag="EditorPhotosHeader" PointerPressed="OnListHeaderTogglePointerPressed">
+								<!-- WrapPanel so a long title plus its count folds onto a second line inside the narrow
+								     right-hand column instead of being clipped at the panel edge. -->
+								<WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="2" IsHitTestVisible="False">
+									<TextBlock x:Name="EditorPhotosHeaderIcon" FontFamily="{DynamicResource FontAwesomeRegular}" FontSize="12" VerticalAlignment="Center" />
+									<TextBlock Text="Photos" FontWeight="SemiBold" VerticalAlignment="Center" />
+									<TextBlock x:Name="EditorPhotosCountText" FontSize="11" Opacity="0.7" VerticalAlignment="Center" />
+								</WrapPanel>
+							</Border>
+							<Button Grid.Column="1" Content="Add photo" FontSize="11" Padding="8,3" VerticalAlignment="Top" Click="OnAddPhotoClick" />
 						</Grid>
 						<ItemsControl x:Name="EditorPhotosList">
 							<ItemsControl.ItemTemplate>
@@ -499,8 +648,16 @@
 
 					<StackPanel Spacing="6">
 						<Grid ColumnDefinitions="*,Auto">
-							<TextBlock Grid.Column="0" Text="Files" FontWeight="SemiBold" VerticalAlignment="Center" />
-							<Button Grid.Column="1" Content="Add file" FontSize="11" Padding="8,3" Click="OnAddFileClick" />
+							<Border Grid.Column="0" Classes="WorklogListHeaderToggle" Tag="EditorFilesHeader" PointerPressed="OnListHeaderTogglePointerPressed">
+								<!-- WrapPanel so a long title plus its count folds onto a second line inside the narrow
+								     right-hand column instead of being clipped at the panel edge. -->
+								<WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="2" IsHitTestVisible="False">
+									<TextBlock x:Name="EditorFilesHeaderIcon" FontFamily="{DynamicResource FontAwesomeRegular}" FontSize="12" VerticalAlignment="Center" />
+									<TextBlock Text="Files" FontWeight="SemiBold" VerticalAlignment="Center" />
+									<TextBlock x:Name="EditorFilesCountText" FontSize="11" Opacity="0.7" VerticalAlignment="Center" />
+								</WrapPanel>
+							</Border>
+							<Button Grid.Column="1" Content="Add file" FontSize="11" Padding="8,3" VerticalAlignment="Top" Click="OnAddFileClick" />
 						</Grid>
 						<ItemsControl x:Name="EditorFilesList">
 							<ItemsControl.ItemTemplate>
@@ -598,7 +755,7 @@
 					   IsVisible="False" />
 			<Button Content="Cancel" Padding="14,6" Click="OnCancelClick" />
 			<Button x:Name="EditorSaveButton"
-					Content="Save"
+					Content="Update worklog"
 					Padding="14,6"
 					IsEnabled="False"
 					Foreground="{DynamicResource Button_Ok_Fg}"

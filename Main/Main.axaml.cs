@@ -110,6 +110,15 @@ namespace CRT
             this.RootGrid.ColumnDefinitions[0].Width = new GridLength(UserSettings.LeftPanelWidth);
             this.RootGrid.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
 
+            // The mode hint clears on the first press anywhere. Tunnel, so it runs before the press
+            // reaches the control that was clicked and cannot be swallowed by one that marks the
+            // event handled - the schematic image does exactly that when an area drag begins,
+            // which is the most likely first click after the hint appears.
+            this.AddHandler(
+                InputElement.PointerPressedEvent,
+                this.OnModeHintDismissPointerPressed,
+                RoutingStrategies.Tunnel);
+
             // Subscribe to splitter pointer-release to persist positions when a drag ends.
             // handledEventsToo: true is required because GridSplitter marks the event as handled.
             this.MainSplitter.AddHandler(
@@ -1394,7 +1403,19 @@ namespace CRT
             // with green text in a green outline - the two claiming to be "the same pill" while
             // visibly differing, which is the whole thing this pill was added to avoid.
             var statusBrush = this.ResolveWorklogStatusDotBrush(isOpen);
-            this.WorklogJobStatusDot.Fill = statusBrush;
+
+            // fa-solid lock-open / lock, the same padlocks the entry state pills use - a workbook
+            // and an entry showing the same status must look the same. Verified present in the
+            // shipped Solid OTF; the glyph is set here rather than in the markup because this one
+            // pill shows whichever status the workbook currently has.
+            this.WorklogJobStatusDot.Text = isOpen ? "" : "";
+            this.WorklogJobStatusDot.Foreground = statusBrush;
+
+            // The padlocks overshoot the font's declared ascent, so reserve the row they need -
+            // computed from this control's own font size rather than hardcoded, see
+            // Handlers/Geometry/FontAwesomeGlyphMetrics.cs.
+            this.WorklogJobStatusDot.Padding = Handlers.Geometry.FontAwesomeGlyphMetrics
+                .GetTopOverflowThicknessForText(this.WorklogJobStatusDot.Text, this.WorklogJobStatusDot.FontSize);
             this.WorklogJobStatusPillText.Foreground = statusBrush;
             this.WorklogJobStatusPillText.FontWeight = Avalonia.Media.FontWeight.SemiBold;
             this.WorklogJobStatusPill.BorderBrush = statusBrush;
