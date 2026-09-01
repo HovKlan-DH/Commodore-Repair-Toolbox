@@ -354,13 +354,35 @@ jobs:
         id: prerelease_check
         run: |
           IS_PRE="${{ needs.determine-version.outputs.is_prerelease }}"
+          VERSION="${{ steps.tag.outputs.tag }}"
 
           echo "is_prerelease=$IS_PRE" >> $GITHUB_OUTPUT
 
           if [ "$IS_PRE" = "true" ]; then
-            echo "release_name=BETA - ${{ steps.tag.outputs.tag }}" >> $GITHUB_OUTPUT
+            case "$VERSION" in
+              *-alpha.*)
+                STAGE_LABEL="ALPHA"
+                BODY_LABEL="DEVELOPMENT"
+                ;;
+              *-beta.*)
+                STAGE_LABEL="BETA"
+                BODY_LABEL="TEST"
+                ;;
+              *-rc.*)
+                STAGE_LABEL="RELEASE CANDIDATE"
+                BODY_LABEL="RELEASE CANDIDATE"
+                ;;
+              *)
+                STAGE_LABEL="ALPHA"
+                BODY_LABEL="DEVELOPMENT"
+                ;;
+            esac
+
+            echo "release_name=$STAGE_LABEL - $VERSION" >> $GITHUB_OUTPUT
+            echo "stage_label=$STAGE_LABEL" >> $GITHUB_OUTPUT
+            echo "body_label=$BODY_LABEL" >> $GITHUB_OUTPUT
           else
-            echo "release_name=${{ steps.tag.outputs.tag }}" >> $GITHUB_OUTPUT
+            echo "release_name=$VERSION" >> $GITHUB_OUTPUT
           fi
 
       - name: Read Changelog and append text
@@ -378,7 +400,7 @@ jobs:
             echo ""
 
             if [ "${{ steps.prerelease_check.outputs.is_prerelease }}" = "true" ]; then
-              echo "This is a **BETA** release, which means there are some functionalities expected not to work perfectly fine. The release is meant as a test, so do not use this if you want the most stable experience."
+              echo "This is a **${{ steps.prerelease_check.outputs.stage_label }}** release, which means there are some functionalities expected not to work perfectly fine. The release is meant as a test, so do not use this if you want the most stable experience."
               echo ""
             fi
 
@@ -395,7 +417,7 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.prerelease_check.outputs.release_name }}
           body: |
-            ${{ steps.prerelease_check.outputs.is_prerelease == 'true' && 'This is a TEST version, and should not be downloaded/used unless if coordinated with the developer.' || format('{0}
+            ${{ steps.prerelease_check.outputs.is_prerelease == 'true' && format('This is a {0} version, and should not be downloaded/used unless if coordinated with the developer.', steps.prerelease_check.outputs.body_label) || format('{0}
 
             ### Direct downloads for different platforms
             | Platform | File |
