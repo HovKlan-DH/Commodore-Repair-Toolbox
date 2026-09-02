@@ -115,7 +115,7 @@ number formats.
 | Security | `ExternalTargetLauncher`, `OnlineServices`' manifest-validation predicates |
 | KiCad | `KiCadRawProjectLoader`, `KiCadProjectLoader`, the `KiCadProjectData` model |
 | Board data | `BoardDataReader`, `BoardDataWriter`, `BoardComponentHighlightStorage`, `ComponentListBuilder`, `ComponentImageQueries`, `OverviewHtmlBuilder`, `ContactLinkFormatter` |
-| Worklog | `WorklogManager` (including `ResolveActiveWorkbook`, `IsResolvedState`, `IsWorkbookStatusOpen`), `WorklogEntryScope` |
+| Worklog | `WorklogManager` (including `ResolveActiveWorkbook`, `IsResolvedState`, `IsWorkbookStatusOpen`, `GetAllWorkbooks`), `WorklogEntryScope`, `WorklogSearchQuery`, `WorklogSearchIndex` |
 | Settings / startup | `UserSettings`, `DataManager` (data-root + master workbook), `DataValidator` (smoke only), `SimulationOptions` |
 | Headless UI (`Tests/.../Ui/`) | All nine tabs built headlessly, the worklog and Workbooks palettes, plus component highlight selection and schematics zoom - see [Headless UI tests](#headless-ui-tests) |
 | Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `KiCadPadGeometry`, `OverlayCullGeometry`, `KiCadOverlayCacheKeys`, `KiCadOverlayNetCache`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry`, `WorklogBadgeLayout` |
@@ -205,8 +205,10 @@ and `UiTest.cs` (runs a body on the UI thread). The rest are the tests themselve
 | `ComponentHighlightSelectionTests.cs` | Selecting/deselecting in the component filter box, and the highlights that appear and vanish across the main image and every thumbnail |
 | `SchematicsZoomTests.cs` | The schematic viewer's zoom limits, and zoom anchoring - that the point under the mouse pointer stays under the mouse pointer |
 | `WorkbooksPaletteTests.cs` | The Workbooks tab's `Workbooks_*` theme keys: that each resolves, that both themes define all of them, and that the pin colours stay identical across themes |
-| `WorkbooksListTests.cs` | The Workbooks tab's workbook list and selection: counts and their singular/plural forms, card contents, newest-first order, board scoping, default/click selection, that the status pill (list and top-line) uses the shared Open/Closed brushes, the activation fallback chain (`UserSettings.ActiveWorkbookIdByBoard` wins over newest; a stale saved id falls back to newest), and that both splitters' widths are restored from `UserSettings.WorkbooksLeftPanelWidth`/`WorkbooksEntryListWidth` via `ApplySplitterWidthsForTests` |
+| `WorkbooksListTests.cs` | The Workbooks tab's workbook list and selection: counts and their singular/plural forms, card contents, newest-first order, board scoping, default/click selection, that the status pill (list and top-line) uses the shared Open/Closed brushes, the activation fallback chain (`UserSettings.ActiveWorkbookIdByBoard` wins over newest; a stale saved id falls back to newest), that both splitters' widths are restored from `UserSettings.WorkbooksLeftPanelWidth`/`WorkbooksEntryListWidth` via `ApplySplitterWidthsForTests`, the top-line's Note text (shown/switched/collapsed-when-blank) and its Edit/Delete actions' visibility (hidden with no workbook selected, shown once one is), and that deleting a workbook via `WorklogManager.DeleteWorkbook` removes its card and a refresh lands the selection on the board's next remaining workbook (or clears the top-line entirely when it was the last one) |
 | `WorkbooksBoardPreviewTests.cs` | The Workbooks tab's board pane: one preview per schematic with an entry in the selected workbook, shared previews for co-located entries, unknown-schematic and missing-image entries skipped without dropping other previews, the pane rebuilding when the selected workbook changes, (via `BuildShownTab`'s real layout pass) that a "show marked area" ON entry's badge anchors to its marker while an OFF entry's badge parks in the image's top-right corner instead, that a pill carries a Hand cursor on a hit-test-visible canvas, `RefreshBoardPreviewsForCurrentSelection` populating the pane from board data supplied after an earlier empty build without touching the workbook list, schematic selection (default-first, highlight moving on click, the entry list switching to the clicked schematic), an entry detail card's four rows read back by content (including the stats row's hours/cost/comment/link/photo/file counts, populated through `WorklogManager.UpdateEntry` rather than a bare in-memory record), that the card has exactly one outer border with no border wrapping any individual row, that the Legend panel is gone, and `BuildWorklogEntryComponentScopeForTests` (matched components whose highlight rect the entry's area touches, `null` with no cached highlight rects at all and `null` when the entry's own schematic has no cache entry) - the computation `OnPreviewBadgePointerPressed` hands to `WorklogEntryEditorWindow.InitializeComponentScope` so the modal opened from a pill is provably the same one the Schematics tab opens |
+| `WorkbooksSearchTests.cs` | The "Find a previous repair" box actually applying `WorklogSearchQuery` to the tab: the workbook list narrowing (by title, by note, and through text in one of the workbook's entries), the result count and each empty state saying "no match" rather than "none recorded", AND/quoted-phrase/`-`exclusion/case-insensitivity end to end, the entry list narrowing to matched entries while a workbook matched by its OWN text keeps all of its entries, that filtering the ACTIVE workbook out moves the top-line to a shown one WITHOUT changing `ActiveWorkbookIdByBoard`, that `ClearSearchForBoardChange` empties both the box and the filter, and the highlighting - the matched runs marked and nothing else, original casing and the full text preserved through the `Inlines` split, no marks with no search active, and marks removed again when the box is cleared |
+| `DeleteWorkbookWindowTests.cs` | That the delete-confirmation modal's Enter/Escape both CANCEL - including with the **Delete button focused**, the case a plain bubbling `KeyDown` handler misses entirely (the button's own Enter handling fires `Click` and confirms the delete). Asserts on the Delete button's `Click` rather than on the window closing, since it closes either way - the fix is `RoutingStrategies.Tunnel`, and this test fails against the bubbling version |
 
 **Do NOT add the `Avalonia.Headless.XUnit` package to get `[AvaloniaFact]`.** At 12.1.1 it depends
 on xunit **v3** while this suite is on xunit 2.9.3; adding it makes every `Fact` and `InlineData`
@@ -378,10 +380,89 @@ on top of it. Split across `TabWorkbooks.axaml(.cs)` and `TabWorkbooks.BoardPrev
   `Main.RefreshWorklogBar`, the one funnel every worklog change already passes through, so none of
   them can go stale in a case the bar handles. **The Legend panel the mockup drew under the board
   pane is gone** - removed as unneeded once every pill already named its own category and state.
-- **Not wired up:** the "Find a previous repair" field. It is `IsEnabled="False"` with a
-  "(not yet available)" placeholder rather than left looking functional - a fully styled search box
-  that silently filters nothing is indistinguishable from a broken one. Re-enable it in the same
-  change that gives it a handler.
+- **The top-line (the highlighted bar above the board pane) is now two lines plus right-aligned
+  actions.** Line 1 is the existing "#{N} · {Title}" and status pill; line 2 is the selected
+  workbook's **Note** (`WorkbookHeaderNoteText`, `WorkbookRecord.Note` - the create dialog's
+  optional free-text field, distinct from `Title`, which the dialog itself labels "Description"),
+  its own row collapsed entirely when blank (most workbooks have no note) rather than showing an
+  empty line. Kept on its own line - not folded into line 1's `WrapPanel` - because a long title
+  plus a long note in one wrapping run read as one run-on line with no clear boundary between
+  them. Right-aligned against both lines: **"Edit workbook"** and **"Delete workbook"** buttons
+  for the selected workbook, both plain text buttons (not icons) grouped in
+  `WorkbookHeaderActionsPanel`, hidden together when no workbook is selected. **Edit**
+  (`OnEditWorkbookClick`) reopens `CreateWorkbookWindow`, the SAME modal "Create new workbook"
+  uses (whose own submit button now reads "Create workbook", not "Create"), switched into edit
+  mode via `InitializeForEdit` (pre-fills the fields, shows the real id instead of the next-id
+  preview, relabels the submit button to "Update workbook") - the same add/edit-share-one-dialog
+  pattern `WorklogAddLinkWindow.InitializeForEdit` already uses for a link row, so title/note
+  editing has exactly one implementation to keep in sync rather than two. It calls
+  `WorklogManager.UpdateWorkbook` (title/note only; id, board key, status, start date and entry
+  count are untouched) and then a bare `Main.RefreshWorklogBar` - not `ActivateWorkbook` - since
+  Edit only ever acts on the workbook already active. **Delete** (`OnDeleteWorkbookClick`) confirms
+  first via `DeleteWorkbookWindow` (naming the workbook in its message, since several cards can be
+  on screen at once; `CanMinimize="False"` alongside its existing `CanResize="False"` so the title
+  bar carries only a close button, and Enter is wired to Cancel rather than the default "submit" -
+  the one modal in the app where Enter must NOT confirm, since confirming here is a permanent
+  delete), then calls `WorklogManager.DeleteWorkbook`, which removes the workbook's entire folder -
+  entries, photos and files included, per the class's own "one folder is the whole workbook" model
+  - and refreshes. Deliberately no separate "which workbook to select next" step: the deleted
+  workbook's id, if it was the board's saved `ActiveWorkbookIdByBoard` entry, now names nothing on
+  disk, so `WorklogManager.ResolveActiveWorkbook`'s existing stale-id fallback lands the refresh on
+  the board's newest remaining workbook automatically - the same fallback that already covers a
+  workbook deleted by hand outside the app.
+- **The "Find a previous repair" field is now wired up** and filters the whole tab as you type.
+  The query language lives in [Handlers/Data/WorklogSearchQuery.cs](../Handlers/Data/WorklogSearchQuery.cs)
+  (pure, unit tested by `WorklogSearchQueryTests`): space-separated terms are ANDed, `"a phrase"`
+  quotes a run containing spaces, a leading `-` excludes, matching is case-insensitive substring
+  throughout (so `p c u` finds `CPU`, and `"full text"` finds `Afull textB`). An empty box is not a
+  filter and matches everything. Which fields are searched is
+  [WorklogSearchIndex](../Handlers/Data/WorklogSearchIndex.cs): every user-typed TEXT field on the
+  workbook (title, note) and on each of its entries (title, description, category, schematic name,
+  component labels, plus every link/comment/work-done/photo/file row) - **numbers
+  are deliberately excluded** (ids, hours, cost, display order, dates), since a search for "2"
+  would otherwise match nearly everything through fields the user never sees as text.
+  **Status/State ("Open"/"Closed") are excluded too**, and for the same class of reason: every
+  record carries one of two values, and "open" is a word this domain uses constantly ("open
+  circuit", "opened the case"), so including them made that search match almost the whole database
+  - and because terms are ANDed across a record, "open trace" then matched any Open workbook
+  mentioning "trace" anywhere. Both values already have an always-visible pill, so they filter by
+  eye far better than by substring. Category IS searched: its three values are descriptive and none
+  turns up incidentally in repair notes.
+  A workbook is shown when its own text matches OR any of its entries does; when the workbook
+  itself matched but no individual entry did, ALL of its entries stay visible rather than leaving
+  the result looking empty. `RefreshWorkbooks` computes the matched entry ids ONCE into
+  `thisMatchedEntryIdsByWorkbookId`, and the board pane and entry list both narrow from that same
+  set rather than re-running the query, so the three surfaces cannot disagree about what matched.
+  Each of the three empty states says "no match" rather than "none recorded yet" when a search is
+  what emptied it - the "yet" wording reads as data loss otherwise.
+  **Which workbook the TAB shows follows the filtered list, while which workbook is ACTIVE does
+  not.** `ResolveActiveWorkbook` still runs against the unfiltered set (typing must never redirect
+  where "Add worklog" writes), but if the active workbook is filtered out, the top-line and the
+  right-hand side move to a workbook that survived - otherwise the top-line named a workbook absent
+  from the list, with live Edit and **Delete** buttons acting on it, above a board pane blanked
+  because none of its entries matched.
+  **The query is dropped on a BOARD change** (`ClearSearchForBoardChange`, called from
+  `Main.OnBoardSelectionChanged` before its refreshes) - a board switch is a change of subject, and
+  carrying the filter over lands the user on an empty list for a board they just chose, with the
+  reason in a box they are not looking at; `OnHardwareSelectionChanged` clears
+  `ComponentSearchTextBox` for the same reason. Every OTHER refresh trigger keeps it, because
+  **`RefreshWorkbooks` re-reads the box itself rather than trusting the copy the `TextChanged`
+  handler cached** - so an entry save or a workbook create/delete cannot silently revert to the
+  unfiltered list; it is also
+  what lets the headless tests drive the real path, since a tab that is never attached to a visual
+  tree never raises `TextChanged`. **Typing is debounced** (`thisSearchDebounceTimer`, 200ms):
+  filtering costs a `GetEntries` per workbook plus a full board-pane rebuild, synchronously on the
+  UI thread, so a rebuild per keystroke made one typed word hundreds of file reads.
+  `GetEntriesForThisPass` caches those reads **within** one pass (cleared at the start of every
+  refresh, never across them) so the filter and the board pane do not each re-read the same file.
+  Matched runs are highlighted via
+  `WorklogSearchQuery.SplitIntoSegments` (the segment maths is on the `Handlers` side precisely
+  because an off-by-one there drops or doubles characters on screen) rendered as `Run`s in the
+  `Workbooks_SearchHit_Bg`/`_Fg` wash; with no search active the blocks carry plain `Text`, which
+  is cheaper to lay out and is what `TabWorkbooks.BuildHighlightedTextBlock` falls back to. **Note
+  for tests reading a card's text: a highlighted `TextBlock` has `Text == null` and its content in
+  `Inlines`**, so a reader that only looks at `Text` sees a highlighted card as blank - see
+  `WorkbooksSearchTests.VisibleText`.
 
 **Board-data timing.** `Main.OnBoardSelectionChanged` used to call `RefreshWorklogBar` (which
 rebuilds this whole tab) BEFORE it awaited `DataManager.LoadBoardDataAsync`, so that pass ran against

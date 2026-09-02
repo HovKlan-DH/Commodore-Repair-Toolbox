@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Templates;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -71,6 +72,33 @@ namespace CRT
         // every future session. Same pattern as _suppressCategoryFilterSave above.
         // ###########################################################################################
         private bool _suppressWorklogShowEntriesSave;
+
+        // ###########################################################################################
+        // Suppresses OnWorklogJobBoxSelectionChanged while RefreshWorklogBar seeds WorklogJobBox's
+        // ItemsSource/SelectedItem programmatically. Without it, seeding the combo box for the newly
+        // selected board re-enters ActivateWorkbook for whatever workbook happens to land in
+        // SelectedItem - including firing it a second time for the very selection a user just made,
+        // and firing it at all on every board switch even though nothing was clicked. Same pattern as
+        // _suppressWorklogShowEntriesSave immediately above.
+        // ###########################################################################################
+        private bool _suppressWorklogJobBoxSave;
+
+        // ###########################################################################################
+        // The board OnHardwareSelectionChanged must select, instead of that hardware's saved last
+        // board, for the one pass right after the worklog picker switches hardware to reach another
+        // board's workbook.
+        //
+        // Without it that switch costs TWO full board loads: setting HardwareComboBox.SelectedItem
+        // runs OnHardwareSelectionChanged synchronously, which picks the saved last board for the new
+        // hardware and starts a complete OnBoardSelectionChanged for it (Excel, thumbnails, KiCad) -
+        // and only then does the picker set the board it actually wanted, starting a second load. The
+        // user sees the wrong board flash past, and the intermediate selection writes itself to
+        // UserSettings.SetLastBoardForHardware as if they had chosen it.
+        //
+        // Cleared by OnHardwareSelectionChanged as soon as it has been honoured, so it can never
+        // affect a later, unrelated hardware change.
+        // ###########################################################################################
+        private string? _pendingBoardSelectionOverride;
 
         // Region toggle: local override, does not affect the global setting
         private string _localRegion = UserSettings.Region;
@@ -178,6 +206,26 @@ namespace CRT
             this.CategoryFilterListBox.SelectionChanged += this.OnCategoryFilterSelectionChanged;
             this.ComponentFilterListBox.SelectionChanged += this.OnComponentFilterSelectionChanged;
             this.PopulateHardwareDropDown();
+
+            // Renders each workbook as "#{Id} | {Title} (hardware/board)", e.g. "#3 | Black screen
+            // (C64/250469)" - the short folder-derived label from FormatBoardKeyForDisplay, not the
+            // full Excel-sheet names ("Commodore 64" / "250469 (short board)"), which read fine as a
+            // combo box's own dedicated row but ran too long once several workbooks from different
+            // boards sit side by side in one dropdown. The board suffix itself is what the plain-text
+            // box never needed - it only ever showed the current board's own workbooks - but the
+            // picker now lists EVERY workbook on every board (see RefreshWorklogBar), so two workbooks
+            // that happen to share a title are otherwise indistinguishable. Built here in code rather
+            // than as an inline XAML DataTemplate bound to a formatted property, since WorkbookRecord
+            // is a plain JSON-backed model (see WorklogManager.cs) with no display-formatting concept
+            // of its own.
+            this.WorklogJobBox.ItemTemplate = new FuncDataTemplate<WorkbookRecord>(
+                (workbook, _) => new TextBlock
+                {
+                    Text = workbook == null
+                        ? string.Empty
+                        : $"#{workbook.Id} | {workbook.Title} ({this.FormatBoardKeyForDisplay(workbook.BoardKey)})",
+                    FontSize = 12,
+                });
 
             var versionString = AppConfig.AppDisplayVersionString;
             var assembly = Assembly.GetExecutingAssembly();
@@ -713,11 +761,17 @@ namespace CRT
 
             UserSettings.SetLastHardware(selectedHardware);
 
-            var lastBoard = UserSettings.GetLastBoardForHardware(selectedHardware);
-            var savedIndex = boards.FindIndex(b =>
-                string.Equals(b, lastBoard, StringComparison.OrdinalIgnoreCase));
+            // Honoured once and cleared, so the caller that set it gets the board it asked for
+            // rather than this hardware's saved last board - see the field's own comment for why
+            // going through the saved board costs an entire extra board load.
+            var pendingBoard = this._pendingBoardSelectionOverride;
+            this._pendingBoardSelectionOverride = null;
 
-            this.BoardComboBox.SelectedIndex = savedIndex >= 0 ? savedIndex : 0;
+            var targetBoard = pendingBoard ?? UserSettings.GetLastBoardForHardware(selectedHardware);
+            var targetIndex = boards.FindIndex(b =>
+                string.Equals(b, targetBoard, StringComparison.OrdinalIgnoreCase));
+
+            this.BoardComboBox.SelectedIndex = targetIndex >= 0 ? targetIndex : 0;
         }
 
         // ###########################################################################################
@@ -727,6 +781,11 @@ namespace CRT
         private async void OnBoardSelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
             this.TabSchematicsControl.CancelWorklogEntryMode();
+
+            // A board change is a change of subject, so the Workbooks tab's search box is cleared
+            // with it - the same reason OnHardwareSelectionChanged clears ComponentSearchTextBox.
+            // Before the refreshes below, so every one of them sees the cleared query.
+            this.TabWorkbooks?.ClearSearchForBoardChange();
 
             this._suppressCategoryFilterSave = true;
             int loadVersion = unchecked(++this._boardSelectionLoadVersion);
@@ -1173,6 +1232,51 @@ namespace CRT
         }
 
         // ###########################################################################################
+        // Finds the hardware/board entry a "{hardware}|{board}" composite key names, by matching
+        // against DataManager.HardwareBoards rather than splitting the string - a hardware or board
+        // name containing "|" would otherwise split wrong, and this way GetCurrentBoardKey stays the
+        // one place that knows the composite's format.
+        //
+        // THE one reader of that format besides GetCurrentBoardKey itself: both
+        // TryResolveHardwareAndBoardForBoardKey and FormatBoardKeyForDisplay go through here rather
+        // than each running their own FirstOrDefault, so a change to the key's shape is a change in
+        // exactly two places rather than three.
+        // ###########################################################################################
+        private static HardwareBoardEntry? FindEntryForBoardKey(string boardKey) =>
+            DataManager.HardwareBoards.FirstOrDefault(e =>
+                string.Equals($"{e.HardwareName}|{e.BoardName}", boardKey, StringComparison.OrdinalIgnoreCase));
+
+        // ###########################################################################################
+        // Reverses a board key into the two drop-down names, for the worklog picker jumping to a
+        // workbook's board when it differs from the one on screen.
+        // ###########################################################################################
+        private static bool TryResolveHardwareAndBoardForBoardKey(string boardKey, out string hardwareName, out string boardName)
+        {
+            var entry = FindEntryForBoardKey(boardKey);
+
+            hardwareName = entry?.HardwareName ?? string.Empty;
+            boardName = entry?.BoardName ?? string.Empty;
+            return entry != null;
+        }
+
+        // ###########################################################################################
+        // Short "hardware/board" label for a workbook's BoardKey, for the worklog picker's item
+        // labels - see WorklogJobBox.ItemTemplate in the constructor. Deliberately not
+        // TryResolveHardwareAndBoardForBoardKey's HardwareName/BoardName (the full names from the
+        // main Excel sheet, e.g. "Commodore 64" / "250469 (short board)") - those are too long once
+        // several workbooks from different boards sit in one dropdown. HardwareBoardEntry's own
+        // ShortHardwareBoardLabel reads the same short names straight from ExcelDataFile's folder
+        // structure instead (e.g. "C64/250469") - see its own comment for why.
+        //
+        // Falls back to the raw key if the board no longer exists in the synced data, e.g. content
+        // that was later removed from classic-repair-toolbox.dk.
+        // ###########################################################################################
+        private string FormatBoardKeyForDisplay(string boardKey) =>
+            FindEntryForBoardKey(boardKey)?.ShortHardwareBoardLabel is { Length: > 0 } shortLabel
+                ? shortLabel
+                : boardKey;
+
+        // ###########################################################################################
         // Resolves the full path to the currently selected board Excel file.
         // ###########################################################################################
         internal string GetCurrentBoardExcelPath()
@@ -1499,6 +1603,79 @@ namespace CRT
         }
 
         // ###########################################################################################
+        // Lets the worklog bar's own workbook picker activate ANY workbook directly - including one
+        // for a board other than the one currently on screen, since the picker now lists every
+        // workbook on every board (see RefreshWorklogBar). Guarded by _suppressWorklogJobBoxSave so
+        // RefreshWorklogBar re-seeding the box's ItemsSource/SelectedItem does not loop back in here.
+        //
+        // Same-board case: identical to clicking a card on the Workbooks tab
+        // (TabWorkbooks.SelectWorkbook -> ActivateWorkbook) - just calls ActivateWorkbook.
+        //
+        // Different-board case: the hardware/board selectors are switched FIRST. Persisting the
+        // target workbook as its board's active one before that switch (rather than after, via
+        // ActivateWorkbook) matters because switching BoardComboBox.SelectedItem starts the async
+        // OnBoardSelectionChanged, and that method calls RefreshWorklogBar itself once the board
+        // finishes loading (see its own comment on why that call moved after _currentBoardData is
+        // assigned) - so by the time it does, ResolveActiveWorkbookForBoard must already see this
+        // choice as the saved one, or the freshly loaded board would show its OWN newest workbook
+        // instead of the one just picked. Calling ActivateWorkbook here too, after triggering the
+        // switch, would be redundant at best and would run against the board being LEFT rather than
+        // the one being entered.
+        // ###########################################################################################
+        private void OnWorklogJobBoxSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (this._suppressWorklogJobBoxSave)
+                return;
+
+            if (this.WorklogJobBox.SelectedItem is not WorkbookRecord selected)
+                return;
+
+            if (string.Equals(selected.BoardKey, this.GetCurrentBoardKey(), StringComparison.Ordinal))
+            {
+                this.ActivateWorkbook(selected.BoardKey, selected.Id);
+                return;
+            }
+
+            if (!TryResolveHardwareAndBoardForBoardKey(selected.BoardKey, out string hardwareName, out string boardName))
+            {
+                // The board this workbook belongs to is no longer in the synced data (its Excel entry
+                // was removed by a later sync), so there is nothing to switch to. Put the box back on
+                // the workbook that IS active rather than leaving it displaying an unreachable one -
+                // the status pill, "Show worklogs" and "Add worklog" beside it all still act on the
+                // active workbook, and a picker naming a different one is the two disagreeing
+                // silently until the next refresh.
+                this.RefreshWorklogBar();
+                return;
+            }
+
+            UserSettings.SetActiveWorkbookId(selected.BoardKey, selected.Id);
+
+            this.TabSchematicsControl.CancelWorklogEntryMode();
+
+            // Switching HardwareComboBox first (if needed) synchronously repopulates BoardComboBox's
+            // ItemsSource via OnHardwareSelectionChanged before BoardComboBox.SelectedItem is set -
+            // setting the board first would pick an index into the OLD hardware's board list.
+            //
+            // _pendingBoardSelectionOverride makes that hardware switch land directly on the board we
+            // are actually after. Without it OnHardwareSelectionChanged selects the new hardware's
+            // SAVED last board, running a whole board load for a board nobody asked for before the
+            // real one is set - see the field's own comment.
+            var currentHardware = this.HardwareComboBox.SelectedItem as string;
+            if (!string.Equals(currentHardware, hardwareName, StringComparison.OrdinalIgnoreCase))
+            {
+                this._pendingBoardSelectionOverride = boardName;
+                this.HardwareComboBox.SelectedItem = hardwareName;
+
+                // Cleared by OnHardwareSelectionChanged, which also selected boardName for us - so
+                // the assignment below is a no-op in the normal case and only does real work if that
+                // handler could not honour the override (the board vanished between the lookup above
+                // and the switch).
+            }
+
+            this.BoardComboBox.SelectedItem = boardName;
+        }
+
+        // ###########################################################################################
         // Switches the main tab strip to Schematics, if it is not already there. A public wrapper
         // rather than exposing MainTabControl/SchematicsTabItem themselves to other tabs: those
         // fields are Avalonia's own x:Name-generated ones, and TabWorkbooks (the one other caller
@@ -1536,9 +1713,18 @@ namespace CRT
 
             string boardKey = this.GetCurrentBoardKey();
 
-            // Read ONCE and used for both the bar's active-workbook resolution and the Workbooks
-            // tab's own list below - see RefreshWorkbooks for why reading it twice was expensive.
-            var workbooks = WorklogManager.GetWorkbooksForBoard(boardKey);
+            // ONE disk scan for both lists. GetAllWorkbooks and GetWorkbooksForBoard each go through
+            // ReadAllWorkbooks, which enumerates every workbook folder and does File.Exists +
+            // ReadAllText + Deserialize per folder, uncached - so calling both would scan the whole
+            // Workbook tree twice on every board change, entry save, workbook create/close/delete and
+            // card click. The board-scoped list is a SUBSET of the full one, so it is filtered here
+            // rather than re-read; the ordering (descending id, newest first) is GetAllWorkbooks' own
+            // and is exactly what GetWorkbooksForBoard would have produced.
+            var allWorkbooks = WorklogManager.GetAllWorkbooks();
+            var workbooks = allWorkbooks
+                .Where(w => string.Equals(w.BoardKey, boardKey, StringComparison.Ordinal))
+                .ToList();
+
             var activeWorkbook = WorklogManager.ResolveActiveWorkbook(workbooks, UserSettings.GetActiveWorkbookId(boardKey));
             bool hasWorkbook = activeWorkbook != null;
             bool isOpen = hasWorkbook && WorklogManager.IsWorkbookStatusOpen(activeWorkbook!.Status);
@@ -1564,7 +1750,17 @@ namespace CRT
             }
 
             this.WorklogNoJobText.IsVisible = !hasWorkbook;
-            this.WorklogJobBox.IsVisible = hasWorkbook;
+
+            // The picker stays visible whenever ANY workbook exists anywhere, not just when THIS
+            // board has one. It lists every workbook on every board and is the only way to reach
+            // another board's workbook from the bar, so hiding it on a board with none of its own
+            // hid it exactly where it is most useful - a board you have never worked on is precisely
+            // where you want to jump to the job you were doing elsewhere. (The visibility rule was
+            // written for the old read-only text box, which genuinely had nothing to show.)
+            this.WorklogJobBox.IsVisible = allWorkbooks.Count > 0;
+
+            // These three still follow the ACTIVE workbook: there is no status to show, no entries to
+            // draw and nothing to add an entry to when this board has no workbook.
             this.WorklogJobStatusPanel.IsVisible = hasWorkbook;
             this.WorklogShowEntriesPanel.IsVisible = hasWorkbook;
             this.WorklogAddEntryButton.IsVisible = hasWorkbook;
@@ -1597,10 +1793,40 @@ namespace CRT
                 this.TabSchematicsControl.SetShowWorklogEntriesList(showByDefault, workbookId);
             }
 
+            // The picker lists EVERY workbook on every board, not just this board's own workbooks in
+            // "workbooks" above - selecting one for a different board is how the bar can jump there
+            // (see OnWorklogJobBoxSelectionChanged). "allWorkbooks" is the single disk read taken at
+            // the top of this method; "workbooks" is its board-scoped subset.
+            //
+            // SelectedItem is looked up BY ID inside this same list rather than set to "activeWorkbook"
+            // directly: WorkbookRecord has no Equals/GetHashCode override, so ComboBox's SelectedItem
+            // only shows as selected when it is REFERENCE-equal to an item actually in ItemsSource -
+            // and while activeWorkbook now comes from a filtered view of this very list (so reference
+            // equality would in fact hold today), the by-id lookup keeps that from being a silent
+            // dependency on how "workbooks" happens to be derived.
+            //
+            // Seeded whether or not a workbook is active: with no active workbook the box shows no
+            // selection while still listing every OTHER board's workbooks, which is what makes it
+            // usable as a navigator on a board that has none of its own. Suppressed the same way
+            // OnWorklogShowEntriesCheckedChanged's seed is: this is RefreshWorklogBar re-populating
+            // the list for the board on screen, not a user picking a workbook, and letting it reach
+            // OnWorklogJobBoxSelectionChanged would call ActivateWorkbook -> RefreshWorklogBar again
+            // for a selection nobody made.
+            this._suppressWorklogJobBoxSave = true;
+            try
+            {
+                this.WorklogJobBox.ItemsSource = allWorkbooks;
+                this.WorklogJobBox.SelectedItem = hasWorkbook
+                    ? allWorkbooks.FirstOrDefault(w => w.Id == activeWorkbook!.Id)
+                    : null;
+            }
+            finally
+            {
+                this._suppressWorklogJobBoxSave = false;
+            }
+
             if (activeWorkbook == null)
                 return;
-
-            this.WorklogJobBoxText.Text = $"#{activeWorkbook.Id} | {activeWorkbook.Title}";
 
             // Dot, label AND border all take the state colour, which is what an entry's own state
             // pill does for the selected state (see ApplyStatePillVisualState). Colouring only the

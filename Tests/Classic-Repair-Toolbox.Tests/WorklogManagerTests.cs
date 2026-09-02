@@ -170,8 +170,9 @@ public sealed class WorklogManagerTests : IDisposable
     [Fact]
     public void Deleting_a_workbook_folder_removes_it_from_the_active_lookup()
     {
-        // This is the whole point of the per-workbook-folder model: there is no in-app "delete
-        // workbook" feature, and none is needed - removing the folder from disk is the delete.
+        // This is the whole point of the per-workbook-folder model: WorklogManager.DeleteWorkbook
+        // below (the Workbooks tab's "Delete workbook" button) is just this - removing the whole
+        // folder - with no separate bookkeeping entry anywhere else that could be left dangling.
         string root = this.LoadWorklog();
 
         CreateWorkbook("Commodore 64|250469", "C64 job", "");
@@ -180,6 +181,147 @@ public sealed class WorklogManagerTests : IDisposable
         Directory.Delete(Path.Combine(root, "1"), recursive: true);
 
         Assert.Null(WorklogManager.GetActiveWorkbookForBoard("Commodore 64|250469"));
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // DeleteWorkbook / UpdateWorkbook - the Workbooks tab's "Delete workbook" button and the
+    // "Edit workbook" dialog (CreateWorkbookWindow.InitializeForEdit).
+    // ---------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Deleting_a_workbook_removes_its_folder_and_it_stops_appearing_in_the_boards_list()
+    {
+        string root = this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        bool deleted = WorklogManager.DeleteWorkbook(workbook.Id);
+
+        Assert.True(deleted);
+        Assert.False(Directory.Exists(Path.Combine(root, workbook.Id.ToString())));
+        Assert.Empty(WorklogManager.GetWorkbooksForBoard("Commodore 64|250469"));
+    }
+
+    [Fact]
+    public void Deleting_one_workbook_leaves_the_boards_other_workbooks_untouched()
+    {
+        // The whole point of "delete the next one in the list" working automatically: the board's
+        // remaining workbooks must still resolve normally once the deleted one is gone.
+        this.LoadWorklog();
+        var first = CreateWorkbook("Commodore 64|250469", "First job", "");
+        var second = CreateWorkbook("Commodore 64|250469", "Second job", "");
+
+        Assert.True(WorklogManager.DeleteWorkbook(first.Id));
+
+        var remaining = WorklogManager.GetWorkbooksForBoard("Commodore 64|250469");
+        Assert.Single(remaining);
+        Assert.Equal(second.Id, remaining[0].Id);
+    }
+
+    [Fact]
+    public void Deleting_the_active_workbook_falls_back_to_the_newest_remaining_one()
+    {
+        // ResolveActiveWorkbook is what the Workbooks tab and the worklog bar both call after a
+        // delete (via Main.RefreshWorklogBar) - this pins down that a saved
+        // ActiveWorkbookIdByBoard entry naming the just-deleted workbook is handled the same way
+        // an id left stale by any other means already is: fall back to the newest, rather than
+        // resolving to nothing.
+        this.LoadWorklog();
+        var older = CreateWorkbook("Commodore 64|250469", "Older job", "");
+        var newer = CreateWorkbook("Commodore 64|250469", "Newer job", "");
+
+        Assert.True(WorklogManager.DeleteWorkbook(newer.Id));
+
+        var workbooks = WorklogManager.GetWorkbooksForBoard("Commodore 64|250469");
+        var active = WorklogManager.ResolveActiveWorkbook(workbooks, savedActiveId: newer.Id);
+
+        Assert.NotNull(active);
+        Assert.Equal(older.Id, active!.Id);
+    }
+
+    [Fact]
+    public void Deleting_an_unknown_workbook_returns_false_instead_of_throwing()
+    {
+        this.LoadWorklog();
+
+        Exception? thrown = Record.Exception(() =>
+        {
+            bool deleted = WorklogManager.DeleteWorkbook(999);
+            Assert.False(deleted);
+        });
+
+        Assert.True(thrown is null);
+    }
+
+    [Fact]
+    public void Updating_a_workbook_overwrites_its_title_and_note_and_leaves_everything_else_alone()
+    {
+        string root = this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "Original title", "Original note");
+        WorklogManager.AddEntry(workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Bad cap", "", "Issue", "Open", Array.Empty<string>());
+
+        var updated = WorklogManager.UpdateWorkbook(workbook.Id, "  New title  ", "  New note  ");
+
+        Assert.NotNull(updated);
+
+        // The RETURNED record is the one that reached disk, so the caller never has to patch up its
+        // own copy - it already carries the trimmed values.
+        Assert.Equal("New title", updated!.Title);
+        Assert.Equal("New note", updated.Note);
+
+        var stored = WorklogManager.GetWorkbooksForBoard("Commodore 64|250469").Single();
+        Assert.Equal("New title", stored.Title);
+        Assert.Equal("New note", stored.Note);
+
+        // Untouched: id, board key, status/entryCount (still derived from the real entry above),
+        // and start date.
+        Assert.Equal(workbook.Id, stored.Id);
+        Assert.Equal(workbook.BoardKey, stored.BoardKey);
+        Assert.Equal(workbook.StartDate, stored.StartDate);
+        Assert.Equal(1, stored.EntryCount);
+        Assert.Equal("Open", stored.Status);
+
+        Assert.True(File.Exists(Path.Combine(root, workbook.Id.ToString(), "index.json")));
+    }
+
+    [Fact]
+    public void Updating_a_workbook_trims_the_title_and_note()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        Assert.NotNull(WorklogManager.UpdateWorkbook(workbook.Id, "  Trimmed title  ", "  Trimmed note  "));
+
+        var stored = WorklogManager.GetWorkbooksForBoard("Commodore 64|250469").Single();
+        Assert.Equal("Trimmed title", stored.Title);
+        Assert.Equal("Trimmed note", stored.Note);
+    }
+
+    [Fact]
+    public void Updating_a_workbook_survives_a_reload_by_being_read_back_from_its_own_folder()
+    {
+        string root = this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "Original title", "");
+
+        WorklogManager.UpdateWorkbook(workbook.Id, "Edited title", "Edited note");
+        WorklogManager.LoadFrom(root);
+
+        var stored = WorklogManager.GetWorkbooksForBoard("Commodore 64|250469").Single();
+        Assert.Equal("Edited title", stored.Title);
+        Assert.Equal("Edited note", stored.Note);
+    }
+
+    [Fact]
+    public void Updating_an_unknown_workbook_returns_null_instead_of_throwing()
+    {
+        this.LoadWorklog();
+
+        Exception? thrown = Record.Exception(() =>
+        {
+            var updated = WorklogManager.UpdateWorkbook(999, "Title", "Note");
+            Assert.Null(updated);
+        });
+
+        Assert.True(thrown is null);
     }
 
     [Fact]
@@ -714,6 +856,57 @@ public sealed class WorklogManagerTests : IDisposable
         // list one board's repairs under another board's name, which is worse than showing none.
         Assert.Empty(WorklogManager.GetWorkbooksForBoard(""));
         Assert.Empty(WorklogManager.GetWorkbooksForBoard("   "));
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // GetAllWorkbooks - the worklog bar's cross-board picker. Unlike GetWorkbooksForBoard this is
+    // the one lookup that is deliberately NOT scoped to a single board.
+    // ---------------------------------------------------------------------------------------
+
+    [Fact]
+    public void No_workbooks_on_disk_lists_an_empty_set_rather_than_null()
+    {
+        this.LoadWorklog();
+
+        var workbooks = WorklogManager.GetAllWorkbooks();
+
+        Assert.NotNull(workbooks);
+        Assert.Empty(workbooks);
+    }
+
+    [Fact]
+    public void Every_workbook_on_every_board_is_listed_newest_first()
+    {
+        this.LoadWorklog();
+
+        var first = CreateWorkbook("Commodore 64|250469", "Full recap", "");
+        var second = CreateWorkbook("Amiga 500|A500", "Dead PLA", "");
+        var third = CreateWorkbook("Commodore 64|250469", "No picture", "");
+
+        var workbooks = WorklogManager.GetAllWorkbooks();
+
+        // Descending id, matching GetWorkbooksForBoard's own order - the picker's items should not
+        // suddenly re-sort just because they now span boards.
+        Assert.Equal(
+            new[] { third.Id, second.Id, first.Id },
+            workbooks.Select(w => w.Id).ToArray());
+    }
+
+    [Fact]
+    public void The_full_list_spans_boards_instead_of_being_scoped_to_one()
+    {
+        this.LoadWorklog();
+        var c64Job = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+        var amigaJob = CreateWorkbook("Amiga 500|A500", "Amiga job", "");
+
+        var workbooks = WorklogManager.GetAllWorkbooks();
+
+        // The whole point of this lookup over GetWorkbooksForBoard: both boards' workbooks come
+        // back together, each still carrying its own BoardKey so the caller can tell them apart
+        // and jump to the right board.
+        Assert.Equal(2, workbooks.Count);
+        Assert.Contains(workbooks, w => w.Id == c64Job.Id && w.BoardKey == "Commodore 64|250469");
+        Assert.Contains(workbooks, w => w.Id == amigaJob.Id && w.BoardKey == "Amiga 500|A500");
     }
 
     [Fact]

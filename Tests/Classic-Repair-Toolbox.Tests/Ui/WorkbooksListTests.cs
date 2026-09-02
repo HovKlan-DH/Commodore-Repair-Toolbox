@@ -714,4 +714,164 @@ public sealed class WorkbooksListTests : IDisposable
 
         splitter.RaiseEvent(args);
     }
+
+    // ---------------------------------------------------------------------------------------
+    // The top-line's Note text and its Edit/Delete workbook actions
+    // (WorkbookHeaderNoteText/WorkbookHeaderActionsPanel) - not the click handlers themselves
+    // (those open a real modal via ShowDialog, which needs a live Window and is exercised by
+    // hand, not headlessly - see BUILDING.md), but everything ApplyHeaderForWorkbook decides
+    // about what is on screen for a given workbook.
+    // ---------------------------------------------------------------------------------------
+
+    private static TextBlock HeaderNoteBlock(TabWorkbooks tab) =>
+        tab.GetControl<TextBlock>("WorkbookHeaderNoteText");
+
+    private static bool HeaderActionsVisible(TabWorkbooks tab) =>
+        tab.GetControl<StackPanel>("WorkbookHeaderActionsPanel").IsVisible;
+
+    [Fact]
+    public void The_top_line_shows_the_selected_workbooks_note()
+    {
+        this.LoadWorklog();
+        WorklogManager.CreateWorkbook(this.thisBoardKey, "C64 job", "Bought at auction, no picture");
+
+        UiTest.Run(() =>
+        {
+            var tab = BuildTab(this.thisBoardKey);
+
+            Assert.True(HeaderNoteBlock(tab).IsVisible);
+            Assert.Equal("Bought at auction, no picture", HeaderNoteBlock(tab).Text);
+        });
+    }
+
+    // Most workbooks are created without a note (it is optional in the create dialog) - the row
+    // must collapse rather than show an empty muted TextBlock next to the status pill.
+    [Fact]
+    public void A_blank_note_is_hidden_rather_than_shown_empty()
+    {
+        this.LoadWorklog();
+        WorklogManager.CreateWorkbook(this.thisBoardKey, "C64 job", "");
+
+        UiTest.Run(() =>
+        {
+            var tab = BuildTab(this.thisBoardKey);
+
+            Assert.False(HeaderNoteBlock(tab).IsVisible);
+        });
+    }
+
+    // Switching between two selected workbooks must show the CLICKED one's own note, not the
+    // first one's left over from before - the same class of bug the status-pill test above guards.
+    [Fact]
+    public void Selecting_a_different_workbook_updates_the_shown_note()
+    {
+        this.LoadWorklog();
+        var withNote = WorklogManager.CreateWorkbook(this.thisBoardKey, "Has a note", "Leaking cap near U4");
+        var withoutNote = WorklogManager.CreateWorkbook(this.thisBoardKey, "No note", "");
+        Assert.NotNull(withNote);
+        Assert.NotNull(withoutNote);
+
+        UiTest.Run(() =>
+        {
+            var tab = BuildTab(this.thisBoardKey);
+
+            // withoutNote is newest, so it starts selected.
+            Assert.False(HeaderNoteBlock(tab).IsVisible);
+
+            tab.SelectWorkbookForTests(withNote!.Id);
+            Assert.True(HeaderNoteBlock(tab).IsVisible);
+            Assert.Equal("Leaking cap near U4", HeaderNoteBlock(tab).Text);
+
+            tab.SelectWorkbookForTests(withoutNote!.Id);
+            Assert.False(HeaderNoteBlock(tab).IsVisible);
+        });
+    }
+
+    // The Edit/Delete actions act on "whichever workbook the top-line shows", so they must appear
+    // exactly when that line names a real workbook and disappear exactly when it does not -
+    // otherwise a click on either would have no workbook to act on.
+    [Fact]
+    public void The_edit_and_delete_actions_are_hidden_when_no_workbook_is_selected()
+    {
+        this.LoadWorklog();
+
+        UiTest.Run(() =>
+        {
+            var tab = BuildTab(this.thisBoardKey);
+
+            Assert.Equal("No workbook selected", HeaderTitleText(tab));
+            Assert.False(HeaderActionsVisible(tab));
+        });
+    }
+
+    [Fact]
+    public void The_edit_and_delete_actions_are_shown_once_a_workbook_is_selected()
+    {
+        this.LoadWorklog();
+        WorklogManager.CreateWorkbook(this.thisBoardKey, "C64 job", "");
+
+        UiTest.Run(() =>
+        {
+            var tab = BuildTab(this.thisBoardKey);
+
+            Assert.True(HeaderActionsVisible(tab));
+        });
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // WorklogManager.DeleteWorkbook, from the list's point of view: the deleted card must be
+    // gone from the list and the panel must land on one of the workbooks that remains - the
+    // click handler itself (OnDeleteWorkbookClick) additionally shows a confirmation modal via
+    // ShowDialog, which is exercised by hand rather than headlessly, per this file's own note
+    // above.
+    // ---------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Deleting_the_selected_workbook_and_refreshing_selects_the_next_one_in_the_list()
+    {
+        this.LoadWorklog();
+        var older = WorklogManager.CreateWorkbook(this.thisBoardKey, "Older job", "");
+        var newer = WorklogManager.CreateWorkbook(this.thisBoardKey, "Newer job", "");
+        Assert.NotNull(older);
+        Assert.NotNull(newer);
+
+        UiTest.Run(() =>
+        {
+            var tab = BuildTab(this.thisBoardKey);
+
+            // Newer starts selected (newest-first default).
+            Assert.Equal($"#{newer!.Id} · Newer job", HeaderTitleText(tab));
+
+            Assert.True(WorklogManager.DeleteWorkbook(newer.Id));
+            tab.RefreshWorkbooks();
+
+            // ResolveActiveWorkbook's stale-id fallback (the saved activation, if any, no longer
+            // names a real workbook) lands the selection on the only one left.
+            Assert.Equal($"#{older!.Id} · Older job", HeaderTitleText(tab));
+            Assert.Single(ListPanel(tab).Children);
+        });
+    }
+
+    // Deleting the board's only workbook must clear the top-line back to its empty state rather
+    // than leave a stale title or a status pill with nothing behind it.
+    [Fact]
+    public void Deleting_the_only_workbook_clears_the_top_line()
+    {
+        this.LoadWorklog();
+        var only = WorklogManager.CreateWorkbook(this.thisBoardKey, "Only one", "");
+        Assert.NotNull(only);
+
+        UiTest.Run(() =>
+        {
+            var tab = BuildTab(this.thisBoardKey);
+
+            Assert.True(WorklogManager.DeleteWorkbook(only!.Id));
+            tab.RefreshWorkbooks();
+
+            Assert.Equal("No workbook selected", HeaderTitleText(tab));
+            Assert.False(HeaderPillVisible(tab));
+            Assert.False(HeaderActionsVisible(tab));
+            Assert.Empty(ListPanel(tab).Children);
+        });
+    }
 }

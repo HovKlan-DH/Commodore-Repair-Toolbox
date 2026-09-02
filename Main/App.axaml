@@ -118,6 +118,13 @@
 					<SolidColorBrush x:Key="Workbooks_Muted_Fg">#5A5A5A</SolidColorBrush>
 					<SolidColorBrush x:Key="Workbooks_Faint_Fg">#7A7A7A</SolidColorBrush>
 
+					<!-- The run of text matched by the "Find a previous repair" search box. A
+					     background wash rather than a foreground colour, so it reads as a marker pen
+					     over the text and stays legible on the muted/faint greys above as well as on
+					     ordinary body text - a recoloured foreground would fight those. -->
+					<SolidColorBrush x:Key="Workbooks_SearchHit_Bg">#FFE58A</SolidColorBrush>
+					<SolidColorBrush x:Key="Workbooks_SearchHit_Fg">#1A1A1A</SolidColorBrush>
+
 					<!-- Light, Thumbnail -->
 					<SolidColorBrush x:Key="Thumbnail_Border">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="Thumbnail_BorderSelected">IndianRed</SolidColorBrush>
@@ -244,6 +251,12 @@
 				<SolidColorBrush x:Key="Workbooks_RowSeparator">#3E342F</SolidColorBrush>
 				<SolidColorBrush x:Key="Workbooks_Muted_Fg">#B5A896</SolidColorBrush>
 				<SolidColorBrush x:Key="Workbooks_Faint_Fg">#8F8578</SolidColorBrush>
+
+				<!-- Search hit. A muted amber rather than the light theme's brighter one: on the
+				     dark ground a saturated wash glares, and the dark foreground below is what keeps
+				     the marked text readable against it. -->
+				<SolidColorBrush x:Key="Workbooks_SearchHit_Bg">#B98A2E</SolidColorBrush>
+				<SolidColorBrush x:Key="Workbooks_SearchHit_Fg">#12100E</SolidColorBrush>
 
 				<!-- Dark, Thumbnail -->
 				<SolidColorBrush x:Key="Thumbnail_Border">LightGray</SolidColorBrush>

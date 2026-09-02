@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
@@ -12,12 +13,12 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace CRT
 {
     // ###########################################################################################
-    // THE WORKBOOKS TAB - concept "C; Worklog tab" from the mockup, now functional apart from one
-    // field.
+    // THE WORKBOOKS TAB - concept "C; Worklog tab" from the mockup, now fully functional.
     //
     // FILE MAP - this class is split across:
     //   TabWorkbooks.axaml.cs        (this file) construction, Main wiring, the splitters and their
@@ -41,10 +42,26 @@ namespace CRT
     //   - clicking a badge opens the SAME WorklogEntryEditorWindow the Schematics tab opens,
     //     component-scope checklist included;
     //   - clicking elsewhere on a preview selects that schematic and switches the entry list on the
-    //     right to it, one detail card per entry.
+    //     right to it, one detail card per entry;
+    //   - the top-line's second line shows the selected workbook's Note (the whole line collapsed
+    //     when blank), and, right-aligned against both lines, "Edit workbook"/"Delete workbook"
+    //     actions for it (OnEditWorkbookClick/OnDeleteWorkbookClick, below). Edit reopens
+    //     CreateWorkbookWindow via InitializeForEdit - the SAME modal "Create new workbook" uses,
+    //     pre-filled, its submit button relabelled "Update workbook" - so title/note editing has
+    //     exactly one implementation rather than a second dialog to keep in sync. Delete confirms
+    //     via DeleteWorkbookWindow (no minimize button, and Enter cancels rather than confirms -
+    //     deleting is a click on the button, never a reflexive keypress), then
+    //     WorklogManager.DeleteWorkbook removes the workbook's whole folder; the refresh that
+    //     follows lands on the board's next workbook automatically, via the same
+    //     ResolveActiveWorkbook stale-id fallback that already handles a workbook deleted by hand.
     //
-    // What is NOT wired up: the "Find a previous repair" field, which is disabled rather than left
-    // looking functional - see the note beside it in the .axaml.
+    //   - the "Find a previous repair" box filters this whole tab as you type
+    //     (OnFindRepairTextChanged -> RefreshWorkbooks): the workbook list, the board pane and the
+    //     entry list all narrow to what matched, and the matched runs are highlighted wherever they
+    //     are drawn. The query grammar and the fields it searches are Handlers/Data's own
+    //     WorklogSearchQuery and WorklogSearchIndex - see their headers. RefreshWorkbooks re-reads
+    //     the box itself rather than trusting a cached copy, so the filter survives every other
+    //     refresh trigger too.
     //
     // Main.RefreshWorklogBar calls RefreshWorkbooks, so the list, the selected card, the top-line
     // and the board pane all follow a board change and any workbook edit through the one funnel the
@@ -120,6 +137,42 @@ namespace CRT
         // Kept across a RefreshWorkbooks rebuild (see the end of that method): a board edit or a
         // theme change must not silently drop the user's selection back to "nothing chosen".
         private int thisSelectedWorkbookId = -1;
+
+        // The parsed "Find a previous repair" query. Parsed ONCE per keystroke here rather than per
+        // record inside the filter loop - a board's worth of workbooks times their entries is a lot
+        // of re-parsing of a string that has not changed.
+        //
+        // An empty query (the normal state) matches everything, so the unfiltered tab costs one
+        // WorklogSearchQuery.IsEmpty check per record and nothing more.
+        private WorklogSearchQuery thisSearchQuery = WorklogSearchQuery.Parse(null);
+
+        // Set by RefreshWorkbooks for the workbooks that survived the filter, so the board pane and
+        // the entry list can narrow themselves to the SAME matched entries rather than each
+        // re-deciding what matched. Empty (not null) means "no filter is active" - see
+        // MatchedEntryIdsForWorkbook.
+        private readonly Dictionary<int, HashSet<int>> thisMatchedEntryIdsByWorkbookId = new();
+
+        // ###########################################################################################
+        // Coalesces keystrokes in the search box into one rebuild.
+        //
+        // Filtering costs a GetEntries per workbook - File.ReadAllText + Deserialize + a per-entry
+        // migrate loop, uncached - plus a full board-pane rebuild, all synchronously on the UI
+        // thread. Rebuilding per keystroke made typing one word on a board with a few dozen
+        // workbooks hundreds of file reads, and the class header already calls reading entries twice
+        // per pass "the single most expensive thing this tab did".
+        //
+        // 200ms: below the ~250ms at which a filter starts to feel detached from typing, and long
+        // enough that an ordinary typing burst collapses into a single pass.
+        // ###########################################################################################
+        private DispatcherTimer? thisSearchDebounceTimer;
+
+        private static readonly TimeSpan SearchDebounceInterval = TimeSpan.FromMilliseconds(200);
+
+        // One pass's worth of entry reads, keyed by workbook id, so the filter and the board pane
+        // that follows it do not each re-read the same entries.json. Cleared at the start of every
+        // RefreshWorkbooks - it is a within-pass cache, NOT a cache of what is on disk, because an
+        // entry save must be visible on the very next refresh.
+        private readonly Dictionary<int, List<WorklogEntryRecord>> thisEntriesReadThisPass = new();
 
         // The SAME two glyphs the worklog bar's status pill and a worklog entry's own state pill use
         // - a workbook reading "Open" here and "Open" there must look identical, which is the whole
@@ -284,21 +337,53 @@ namespace CRT
         // only afterwards - and there is no delete feature, so that set only ever grows. Reading it
         // twice per refresh pass was the single most expensive thing this tab did.
         // ###########################################################################################
+        // ###########################################################################################
+        // Clears the "Find a previous repair" box, for a BOARD CHANGE specifically - called from
+        // Main.OnBoardSelectionChanged before it refreshes.
+        //
+        // A board switch is a change of subject, not a refresh of the same view: carrying the query
+        // over lands the user on a filtered (often empty) list for a board they just chose, reading
+        // as "this board has nothing" while the reason sits in a text box at the top of the panel
+        // they are not looking at. Main.OnHardwareSelectionChanged already clears
+        // ComponentSearchTextBox for exactly this reason.
+        //
+        // Every OTHER refresh trigger - an entry save, a workbook create/delete - deliberately keeps
+        // the query, since those are refreshes of the view the user is already looking at.
+        //
+        // Sets the field as well as the box because the box's TextChanged is debounced: without it,
+        // the refresh that follows immediately would still parse the OLD text.
+        // ###########################################################################################
+        public void ClearSearchForBoardChange()
+        {
+            if (this.FindRepairTextBox == null)
+                return;
+
+            this.thisSearchDebounceTimer?.Stop();
+            this.FindRepairTextBox.Text = string.Empty;
+            this.thisSearchQuery = WorklogSearchQuery.Parse(null);
+        }
+
         public void RefreshWorkbooks(List<WorkbookRecord>? boardWorkbooks = null)
         {
             if (this.WorkbookListPanel == null)
                 return;
 
+            // Re-read from the box rather than trusting the copy OnFindRepairTextChanged cached.
+            // Every refresh path lands here - an entry save, a workbook create or delete - and each
+            // of those must keep showing the filtered view rather than silently reverting to the
+            // unfiltered one because it did not come through the (debounced) text handler. A BOARD
+            // change is the one case that deliberately drops the query, via ClearSearchForBoardChange
+            // above, before this runs.
+            this.thisSearchQuery = WorklogSearchQuery.Parse(this.FindRepairTextBox?.Text);
+
+            // Fresh per pass - this caches reads WITHIN one rebuild, never across them, so an entry
+            // saved between refreshes is picked up by the next one. See the field's own comment.
+            this.thisEntriesReadThisPass.Clear();
+
             string boardKey = this.BoardKeyOverrideForTests ?? this.MainWindow?.GetCurrentBoardKey() ?? string.Empty;
             var workbooks = boardWorkbooks ?? WorklogManager.GetWorkbooksForBoard(boardKey);
 
             this.WorkbookListPanel.Children.Clear();
-
-            // "1 workbook" / "3 workbooks" - the count is the panel's heading, so it has to be
-            // right for one as well as for none and many.
-            this.WorkbookCountText.Text = WorklogEntryScope.FormatCount(workbooks.Count, "workbook", "workbooks");
-
-            this.NoWorkbooksText.IsVisible = workbooks.Count == 0;
 
             // Which card is highlighted is decided by the SAME WorklogManager.ResolveActiveWorkbook
             // the worklog bar, "Show worklogs" and "Add worklog" use (via
@@ -311,17 +396,169 @@ namespace CRT
             // NOTE that when nothing is saved this HIGHLIGHTS the newest workbook without saving
             // it. The highlight is therefore an assumption, not an activation - which is why
             // SelectWorkbook has no "already selected, nothing to do" guard; see its header.
+            //
+            // Resolved from the UNFILTERED set, deliberately: the search box narrows what is SHOWN,
+            // it does not change which workbook the rest of the app is acting on. Typing in it must
+            // never silently re-activate a different workbook, or "Add worklog" would start writing
+            // into whichever workbook happened to survive the filter.
             var active = WorklogManager.ResolveActiveWorkbook(workbooks, UserSettings.GetActiveWorkbookId(boardKey));
-            this.thisSelectedWorkbookId = active?.Id ?? -1;
 
-            foreach (var workbook in workbooks)
+            var shownWorkbooks = this.ApplySearchFilter(workbooks);
+
+            // Which workbook this TAB shows in its top-line, board pane and entry list. Normally the
+            // active one - but a search that filters the active workbook out has to move it, because
+            // everything on the right-hand side belongs to whatever this names: leaving it on the
+            // filtered-out workbook drew a top-line (with live Edit and DELETE buttons) for a
+            // workbook that was not in the list, above a board pane that had gone blank because none
+            // of its entries matched. Deleting from that state destroys a workbook the user cannot
+            // see, and the blank pane reads as the workbook having lost its contents.
+            //
+            // This does NOT re-activate anything: ActiveWorkbookIdByBoard is untouched, so the bar,
+            // "Show worklogs" and "Add worklog" keep acting on the real active workbook. It is a
+            // display choice local to this tab, the same kind RefreshBoardPreviews already makes when
+            // it picks which schematic to show.
+            var shownWorkbook = active != null && shownWorkbooks.Any(w => w.Id == active.Id)
+                ? active
+                : shownWorkbooks.FirstOrDefault();
+
+            this.thisSelectedWorkbookId = shownWorkbook?.Id ?? -1;
+
+            // "1 workbook" / "3 workbooks" - the count is the panel's heading, so it has to be
+            // right for one as well as for none and many. Counts what is SHOWN, so it reads as the
+            // result count while a search is active.
+            this.WorkbookCountText.Text = WorklogEntryScope.FormatCount(shownWorkbooks.Count, "workbook", "workbooks");
+
+            this.NoWorkbooksText.IsVisible = shownWorkbooks.Count == 0;
+
+            // A search that matched nothing is a different situation from a board with no workbooks
+            // at all, and saying "no workbooks" for it reads as data loss.
+            this.NoWorkbooksText.Text = !this.thisSearchQuery.IsEmpty && workbooks.Count > 0
+                ? "No workbooks or worklogs match your search."
+                : NoWorkbooksDefaultText;
+
+            foreach (var workbook in shownWorkbooks)
             {
                 bool isSelected = workbook.Id == this.thisSelectedWorkbookId;
                 this.WorkbookListPanel.Children.Add(this.BuildWorkbookCard(workbook, isSelected));
             }
 
-            this.ApplyHeaderForWorkbook(active);
+            this.ApplyHeaderForWorkbook(shownWorkbook);
             this.RefreshBoardPreviews();
+        }
+
+        // The empty-list message the markup ships with, restored whenever a search is not the reason
+        // the list is empty. Captured as a constant rather than read back off the control, which by
+        // then may be showing the no-results message instead.
+        private const string NoWorkbooksDefaultText =
+            "No repairs recorded for this board yet. Use \"Create new workbook\" above the tabs to start one.";
+
+        // ###########################################################################################
+        // Narrows a board's workbooks to those matching the current search, and records WHICH of each
+        // surviving workbook's entries matched (thisMatchedEntryIdsByWorkbookId) so the board pane and
+        // the entry list can narrow to the same set without re-running the query.
+        //
+        // A workbook matches when its OWN text matches, or when any of its entries does - searching
+        // for a component you replaced should find the job it was replaced in, not nothing. When the
+        // workbook itself matched but no individual entry did, every entry is treated as matched:
+        // the user found the workbook they were after, and hiding all of its contents would make the
+        // result look empty.
+        //
+        // Entries are read once per workbook here, which is the expensive part (GetEntries re-parses
+        // the file per call) - so it is skipped entirely for an empty query, the normal case.
+        // ###########################################################################################
+        private List<WorkbookRecord> ApplySearchFilter(List<WorkbookRecord> workbooks)
+        {
+            this.thisMatchedEntryIdsByWorkbookId.Clear();
+
+            if (this.thisSearchQuery.IsEmpty)
+                return workbooks;
+
+            var matched = new List<WorkbookRecord>();
+
+            foreach (var workbook in workbooks)
+            {
+                var entries = this.GetEntriesForThisPass(workbook.Id);
+
+                bool workbookTextMatches = this.thisSearchQuery.Matches(WorklogSearchIndex.ForWorkbook(workbook));
+
+                var matchedEntryIds = entries
+                    .Where(e => this.thisSearchQuery.Matches(WorklogSearchIndex.ForEntry(e)))
+                    .Select(e => e.Id)
+                    .ToHashSet();
+
+                if (!workbookTextMatches && matchedEntryIds.Count == 0)
+                    continue;
+
+                // The workbook itself matched but none of its entries did - show all of them rather
+                // than an empty workbook, see the header.
+                if (workbookTextMatches && matchedEntryIds.Count == 0)
+                    matchedEntryIds = entries.Select(e => e.Id).ToHashSet();
+
+                this.thisMatchedEntryIdsByWorkbookId[workbook.Id] = matchedEntryIds;
+                matched.Add(workbook);
+            }
+
+            return matched;
+        }
+
+        // ###########################################################################################
+        // One workbook's entries, read at most once per refresh pass. GetEntries has no cache of its
+        // own (File.ReadAllText + Deserialize + a per-entry migrate loop, every call), and within a
+        // single pass the search filter and the board pane both want the same workbook's entries.
+        //
+        // Internal so TabWorkbooks.BoardPreviews.cs (the other half of this class) shares the same
+        // pass cache rather than re-reading.
+        // ###########################################################################################
+        private List<WorklogEntryRecord> GetEntriesForThisPass(int workbookId)
+        {
+            if (this.thisEntriesReadThisPass.TryGetValue(workbookId, out var cached))
+                return cached;
+
+            var entries = WorklogManager.GetEntries(workbookId);
+            this.thisEntriesReadThisPass[workbookId] = entries;
+            return entries;
+        }
+
+        // ###########################################################################################
+        // Which of a workbook's entries the current search matched, or null when no filter applies
+        // and every entry should be shown. Null rather than "all the ids" so callers do not have to
+        // build a set they will not use on the unfiltered path, which is the normal one.
+        // ###########################################################################################
+        private HashSet<int>? MatchedEntryIdsForWorkbook(int workbookId)
+        {
+            if (this.thisSearchQuery.IsEmpty)
+                return null;
+
+            return this.thisMatchedEntryIdsByWorkbookId.TryGetValue(workbookId, out var ids)
+                ? ids
+                : new HashSet<int>();
+        }
+
+        // ###########################################################################################
+        // Rebuilds the tab as the user types, DEBOUNCED - see thisSearchDebounceTimer for why a
+        // rebuild per keystroke is too expensive to run directly. Goes through RefreshWorkbooks
+        // rather than filtering the existing cards in place, so the workbook list, the board pane and
+        // the entry list all narrow together from one pass - the same funnel every other worklog
+        // change already uses.
+        //
+        // Restarting the timer on each keystroke is what coalesces a typing burst: only the pause at
+        // the end of it actually rebuilds. RefreshWorkbooks re-reads the box itself, so nothing about
+        // the query has to be carried through the timer.
+        // ###########################################################################################
+        private void OnFindRepairTextChanged(object? sender, TextChangedEventArgs e)
+        {
+            if (this.thisSearchDebounceTimer == null)
+            {
+                this.thisSearchDebounceTimer = new DispatcherTimer { Interval = SearchDebounceInterval };
+                this.thisSearchDebounceTimer.Tick += (_, _) =>
+                {
+                    this.thisSearchDebounceTimer!.Stop();
+                    this.RefreshWorkbooks();
+                };
+            }
+
+            this.thisSearchDebounceTimer.Stop();
+            this.thisSearchDebounceTimer.Start();
         }
 
         // ###########################################################################################
@@ -394,17 +631,26 @@ namespace CRT
         // the tab's construction-time placeholder when there is none (no board selected, or the
         // board has no workbooks).
         // ###########################################################################################
+        // The workbook the top-line, and so the Edit/Delete buttons beside it, currently act on -
+        // set alongside everything else ApplyHeaderForWorkbook draws, null when nothing is
+        // selected (in which case the buttons are hidden, see below).
+        private WorkbookRecord? thisHeaderWorkbook;
+
         private void ApplyHeaderForWorkbook(WorkbookRecord? workbook)
         {
+            this.thisHeaderWorkbook = workbook;
+
             if (workbook == null)
             {
                 this.WorkbookHeaderTitleText.Text = "No workbook selected";
                 this.WorkbookHeaderStatusPill.IsVisible = false;
+                this.WorkbookHeaderNoteText.IsVisible = false;
+                this.WorkbookHeaderActionsPanel.IsVisible = false;
                 return;
             }
 
             string title = string.IsNullOrWhiteSpace(workbook.Title) ? "(untitled)" : workbook.Title;
-            this.WorkbookHeaderTitleText.Text = $"#{workbook.Id} · {title}";
+            this.ApplyHighlightedText(this.WorkbookHeaderTitleText, $"#{workbook.Id} · {title}");
 
             bool isOpen = WorklogManager.IsWorkbookStatusOpen(workbook.Status);
             var statusBrush = ResolveWorklogStatusBrush(isOpen);
@@ -422,6 +668,141 @@ namespace CRT
             // construction would be right for only one of the two states.
             this.WorkbookHeaderStatusGlyph.Padding = Handlers.Geometry.FontAwesomeGlyphMetrics
                 .GetTopOverflowThicknessForText(this.WorkbookHeaderStatusGlyph.Text, this.WorkbookHeaderStatusGlyph.FontSize);
+
+            // Blank for most workbooks (Note is optional in the create/edit dialog), so the row is
+            // collapsed rather than showing an empty muted TextBlock next to the pill.
+            bool hasNote = !string.IsNullOrWhiteSpace(workbook.Note);
+            this.WorkbookHeaderNoteText.IsVisible = hasNote;
+            this.ApplyHighlightedText(this.WorkbookHeaderNoteText, hasNote ? workbook.Note : string.Empty);
+
+            this.WorkbookHeaderActionsPanel.IsVisible = true;
+        }
+
+        // ###########################################################################################
+        // Opens the SAME modal "Create new workbook" uses, switched into edit mode via
+        // InitializeForEdit so the user can change the description/note of the workbook the
+        // top-line is currently showing.
+        // ###########################################################################################
+        private async void OnEditWorkbookClick(object? sender, RoutedEventArgs e)
+        {
+            if (this.thisHeaderWorkbook == null)
+                return;
+
+            if (TopLevel.GetTopLevel(this) is not Window ownerWindow)
+                return;
+
+            var dialog = new CreateWorkbookWindow();
+            dialog.InitializeForEdit(this.thisHeaderWorkbook);
+
+            var updated = await dialog.ShowDialog<WorkbookRecord?>(ownerWindow);
+            if (updated == null)
+                return;
+
+            // The edited workbook is already the active one (Edit only ever acts on the workbook
+            // the top-line is showing), so a bare refresh - not ActivateWorkbook - is enough to
+            // pick up the new title/note everywhere it is drawn (this tab's list/top-line, and the
+            // worklog bar via RefreshWorklogBar).
+            this.MainWindow?.RefreshWorklogBar();
+        }
+
+        // ###########################################################################################
+        // Deletes the workbook the top-line is currently showing, after the user confirms in
+        // DeleteWorkbookWindow. The board's other workbooks are unaffected; RefreshWorklogBar's own
+        // ResolveActiveWorkbook then picks the next one automatically - the saved
+        // UserSettings.ActiveWorkbookIdByBoard entry (if it named the one just deleted) no longer
+        // matches any workbook on disk, so it falls back to the board's newest remaining one,
+        // exactly as it already does for a workbook deleted by hand outside the app.
+        // ###########################################################################################
+        private async void OnDeleteWorkbookClick(object? sender, RoutedEventArgs e)
+        {
+            if (this.thisHeaderWorkbook == null)
+                return;
+
+            if (TopLevel.GetTopLevel(this) is not Window ownerWindow)
+                return;
+
+            var workbook = this.thisHeaderWorkbook;
+
+            var dialog = new DeleteWorkbookWindow();
+            dialog.Initialize(workbook);
+
+            bool? confirmed = await dialog.ShowDialog<bool?>(ownerWindow);
+            if (confirmed != true)
+                return;
+
+            // An entry-drawing mode armed by "Add worklog" captured a workbook id when it started
+            // (BeginWorklogEntryMode), and nothing about deleting that workbook cancels it. Without
+            // this the cross cursor stays live on the Schematics tab after the workbook is gone, the
+            // user draws an area, and AddEntry finds no folder - the work is discarded with nothing
+            // but a log line. Main.ActivateWorkbook performs the same teardown, and for the same
+            // reason: this is the other way "which workbook is being written to" can stop being
+            // valid.
+            this.MainWindow?.TabSchematicsControl?.CancelWorklogEntryMode();
+
+            if (!WorklogManager.DeleteWorkbook(workbook.Id))
+            {
+                // The folder could not be removed (a photo held open in an external viewer, say).
+                // Say so rather than returning silently: the user confirmed a destructive action and
+                // an unchanged list with no message reads as "the click did not register", which
+                // invites them to try again. Same treatment CreateWorkbookWindow gives a failed
+                // create.
+                await ShowWorkbookActionFailedAsync(
+                    ownerWindow,
+                    $"Could not delete workbook #{workbook.Id} - see the log for details.\n\n" +
+                    "It may be open in another program, for example a photo or file from the workbook.");
+                return;
+            }
+
+            this.MainWindow?.RefreshWorklogBar();
+        }
+
+        // ###########################################################################################
+        // A minimal "that did not work" modal for the workbook actions on this tab. The create/edit
+        // dialog reports its own failures inline in its validation line, but Delete has no dialog
+        // left on screen by the time it fails - its confirmation has already closed - so the message
+        // needs a window of its own.
+        // ###########################################################################################
+        private static async Task ShowWorkbookActionFailedAsync(Window ownerWindow, string message)
+        {
+            var okButton = new Button
+            {
+                Content = "OK",
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 16, 0, 0)
+            };
+
+            var dialog = new Window
+            {
+                Title = "Delete workbook",
+                Width = 420,
+                SizeToContent = SizeToContent.Height,
+                CanResize = false,
+                CanMinimize = false,
+                ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = ThemeResources.ResolveBrush("Bg", Brushes.White),
+                Foreground = ThemeResources.ResolveBrush("Fg", Brushes.Black)
+            };
+
+            var body = new StackPanel { Margin = new Thickness(18), Spacing = 4 };
+            body.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
+            body.Children.Add(okButton);
+            dialog.Content = body;
+
+            okButton.Click += (_, _) => dialog.Close();
+            dialog.AddHandler(
+                KeyDownEvent,
+                (_, args) =>
+                {
+                    if (args.Key == Key.Escape || args.Key == Key.Enter)
+                    {
+                        dialog.Close();
+                        args.Handled = true;
+                    }
+                },
+                RoutingStrategies.Tunnel);
+
+            await dialog.ShowDialog(ownerWindow);
         }
 
         // ###########################################################################################
@@ -437,6 +818,84 @@ namespace CRT
         // An instance method, not static: it needs to reach SelectWorkbook on THIS tab from the
         // click handler it wires up.
         // ###########################################################################################
+        // ###########################################################################################
+        // A TextBlock whose search-matched runs are drawn with the Workbooks_SearchHit_* wash - the
+        // "<highlight>This</highlight> is a <highlight>text</highlight>" behaviour the search was
+        // asked for.
+        //
+        // With no search active (the normal case) this returns an ordinary single-Text TextBlock:
+        // splitting into Inlines costs measurably more to lay out, and there is nothing to mark.
+        //
+        // The SPLIT itself is WorklogSearchQuery.SplitIntoSegments, not done here - every segment
+        // boundary has to line up exactly or characters get dropped or doubled on screen, and that
+        // maths is unit-tested on the Handlers side. This method only turns segments into runs.
+        //
+        // extraSetup runs on the finished block so callers can set the properties they need
+        // (classes, alignment, weight) without this needing a parameter for each.
+        // ###########################################################################################
+        private TextBlock BuildHighlightedTextBlock(
+            string text,
+            double fontSize,
+            TextWrapping wrapping = TextWrapping.NoWrap,
+            Action<TextBlock>? extraSetup = null)
+        {
+            var block = new TextBlock
+            {
+                FontSize = fontSize,
+                TextWrapping = wrapping
+            };
+
+            this.ApplyHighlightedText(block, text);
+
+            extraSetup?.Invoke(block);
+            return block;
+        }
+
+        // ###########################################################################################
+        // Sets an EXISTING TextBlock's content with the search-matched runs marked - the same job as
+        // BuildHighlightedTextBlock, for the blocks that come from the markup rather than from code
+        // (the top-line's title and note).
+        //
+        // Clearing Inlines before every write matters: a block that was highlighted on the previous
+        // pass keeps those runs otherwise, and setting Text alone would leave the old marked runs
+        // rendering underneath the new value.
+        // ###########################################################################################
+        private void ApplyHighlightedText(TextBlock block, string text)
+        {
+            block.Inlines?.Clear();
+
+            var segments = this.thisSearchQuery.IsEmpty
+                ? null
+                : this.thisSearchQuery.SplitIntoSegments(text);
+
+            if (segments == null || !segments.Any(s => s.IsMatch))
+            {
+                block.Text = text;
+                return;
+            }
+
+            var hitBackground = ThemeResources.ResolveBrush("Workbooks_SearchHit_Bg", Brushes.Yellow);
+            var hitForeground = ThemeResources.ResolveBrush("Workbooks_SearchHit_Fg", Brushes.Black);
+
+            // Text must be cleared before Inlines are added - a TextBlock carrying both renders the
+            // Text and ignores the Inlines entirely, which showed up as highlighting that silently
+            // did nothing on the markup-declared blocks.
+            block.Text = null;
+
+            foreach (var segment in segments)
+            {
+                var run = new Run(segment.Text);
+
+                if (segment.IsMatch)
+                {
+                    run.Background = hitBackground;
+                    run.Foreground = hitForeground;
+                }
+
+                block.Inlines!.Add(run);
+            }
+        }
+
         private Border BuildWorkbookCard(WorkbookRecord workbook, bool isSelected)
         {
             bool isOpen = WorklogManager.IsWorkbookStatusOpen(workbook.Status);
@@ -509,12 +968,10 @@ namespace CRT
             // --- Row 2: the title ----------------------------------------------------------------
             // A workbook can be created without one, so fall back to something rather than leaving
             // the card's middle line blank and the card looking broken.
-            var titleText = new TextBlock
-            {
-                Text = string.IsNullOrWhiteSpace(workbook.Title) ? "(untitled)" : workbook.Title,
-                FontSize = 11,
-                TextWrapping = TextWrapping.Wrap
-            };
+            var titleText = this.BuildHighlightedTextBlock(
+                string.IsNullOrWhiteSpace(workbook.Title) ? "(untitled)" : workbook.Title,
+                11,
+                TextWrapping.Wrap);
 
             // --- Row 3: the worklog count and the start date -------------------------------------
             var metaText = new TextBlock

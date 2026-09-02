@@ -171,7 +171,12 @@ namespace CRT
         // The list and the top-line are deliberately NOT rebuilt here: neither depends on the
         // highlight cache, and rebuilding them would reset nothing usefully.
         // ###########################################################################################
-        public void RefreshBoardPreviewsForCurrentSelection() => this.RefreshBoardPreviews();
+        public void RefreshBoardPreviewsForCurrentSelection()
+        {
+            // Its own refresh pass, like SelectSchematic - see the clear there.
+            this.thisEntriesReadThisPass.Clear();
+            this.RefreshBoardPreviews();
+        }
 
         // ###########################################################################################
         // Rebuilds the board pane for the currently selected workbook.
@@ -207,9 +212,19 @@ namespace CRT
             // > 0, not >= 0: workbook ids start at 1 and the rest of the app uses 0 as "no workbook"
             // (Main.RefreshWorklogBar's own "showByDefault ? activeWorkbook.Id : 0"), so admitting 0
             // here would have this half of the feature treat a sentinel as a real workbook.
-            var entries = this.thisSelectedWorkbookId > 0
-                ? WorklogManager.GetEntries(this.thisSelectedWorkbookId)
+            // Through the pass cache, so a rebuild that already read this workbook's entries for the
+            // search filter does not read them again - see GetEntriesForThisPass.
+            var allWorkbookEntries = this.thisSelectedWorkbookId > 0
+                ? this.GetEntriesForThisPass(this.thisSelectedWorkbookId)
                 : new List<WorklogEntryRecord>();
+
+            // Narrowed to the search's matches (null = no search active), using the set
+            // RefreshWorkbooks already computed - so a filtered board pane shows exactly the pills
+            // whose entries matched, and the entry list below it agrees, both from one decision.
+            var matchedEntryIds = this.MatchedEntryIdsForWorkbook(this.thisSelectedWorkbookId);
+            var entries = matchedEntryIds == null
+                ? allWorkbookEntries
+                : allWorkbookEntries.Where(e => matchedEntryIds.Contains(e.Id)).ToList();
 
             var entriesBySchematic = entries
                 .Where(e => schematicsByName.ContainsKey(e.SchematicName))
@@ -255,6 +270,12 @@ namespace CRT
 
             this.NoBoardPreviewsText.IsVisible = entriesBySchematic.Count == 0;
 
+            // As on the two lists: "none matched" is not the same as "none recorded", and saying
+            // "yet" for a search result reads as the entries having gone missing.
+            this.NoBoardPreviewsText.Text = matchedEntryIds != null && allWorkbookEntries.Count > 0
+                ? "No worklog entries in this workbook match your search."
+                : "No worklog entries recorded against a schematic image for this workbook yet.";
+
             // The entries this pass already read are handed on rather than re-read: GetEntries has
             // no cache (File.ReadAllText + Deserialize + a per-entry normalise/migrate loop, every
             // call), and this method and the entry list were reading the same workbook's file twice
@@ -282,6 +303,11 @@ namespace CRT
                 return;
 
             this.thisSelectedSchematicName = schematicName;
+
+            // This is its own refresh pass - it does not come through RefreshWorkbooks, which is
+            // what normally clears the cache - so clear it here too. Without this a click could be
+            // served entries read before an intervening save.
+            this.thisEntriesReadThisPass.Clear();
 
             foreach (var child in this.BoardPreviewPanel.Children)
             {
@@ -322,11 +348,18 @@ namespace CRT
 
             var allEntries = workbookEntries
                 ?? (this.thisSelectedWorkbookId > 0
-                    ? WorklogManager.GetEntries(this.thisSelectedWorkbookId)
+                    ? this.GetEntriesForThisPass(this.thisSelectedWorkbookId)
                     : new List<WorklogEntryRecord>());
+
+            // Narrowed to what the search matched, using the SAME set RefreshWorkbooks computed for
+            // this workbook rather than re-running the query here - so the list cannot disagree with
+            // the workbook card and the board pane about what matched. Null means no search is
+            // active and every entry is shown.
+            var matchedEntryIds = this.MatchedEntryIdsForWorkbook(this.thisSelectedWorkbookId);
 
             var entries = allEntries
                 .Where(e => string.Equals(e.SchematicName, this.thisSelectedSchematicName, StringComparison.OrdinalIgnoreCase))
+                .Where(e => matchedEntryIds == null || matchedEntryIds.Contains(e.Id))
                 .OrderBy(e => e.Id)
                 .ToList();
 
@@ -335,7 +368,11 @@ namespace CRT
 
             if (entries.Count == 0)
             {
-                this.NoSelectedSchematicEntriesText.Text = "No worklog entries for this schematic yet.";
+                // A search that hid them all is a different thing from a schematic that never had
+                // any, and saying "yet" for it reads as the entries having been lost.
+                this.NoSelectedSchematicEntriesText.Text = matchedEntryIds != null
+                    ? "No worklog entries on this schematic match your search."
+                    : "No worklog entries for this schematic yet.";
                 this.NoSelectedSchematicEntriesText.IsVisible = true;
                 return;
             }
@@ -344,7 +381,7 @@ namespace CRT
 
             foreach (var entry in entries)
             {
-                this.SelectedSchematicEntriesPanel.Children.Add(BuildEntryDetailCard(entry));
+                this.SelectedSchematicEntriesPanel.Children.Add(this.BuildEntryDetailCard(entry));
             }
         }
 
@@ -380,7 +417,10 @@ namespace CRT
         // is rather than a selection state. The category chip and status pill beside it are
         // deliberately the OUTLINED variant instead - see BuildOutlinedCategoryChip.
         // ###########################################################################################
-        private static Border BuildEntryDetailCard(WorklogEntryRecord entry)
+        // An instance method rather than static: the title and description are drawn through
+        // BuildHighlightedTextBlock, which needs THIS tab's current search query to know what to
+        // mark. Everything else it builds is still static.
+        private Border BuildEntryDetailCard(WorklogEntryRecord entry)
         {
             string title = string.IsNullOrWhiteSpace(entry.Title) ? "(untitled)" : entry.Title;
             Color categoryColor = ResolveWorklogCategoryColor(entry.Category);
@@ -400,26 +440,26 @@ namespace CRT
                 }
             };
 
-            var titleText = new TextBlock
+            var titleText = this.BuildHighlightedTextBlock(title, 13, TextWrapping.Wrap, block =>
             {
-                Text = title,
-                FontSize = 13,
-                FontWeight = FontWeight.Bold,
-                TextWrapping = TextWrapping.Wrap,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+                block.FontWeight = FontWeight.Bold;
+                block.VerticalAlignment = VerticalAlignment.Center;
+            });
 
             var titleRow = new WrapPanel { ItemSpacing = 8, LineSpacing = 4 };
             titleRow.Children.Add(titleText);
             titleRow.Children.Add(idBadge);
 
-            var descriptionText = new TextBlock
-            {
-                Text = string.IsNullOrWhiteSpace(entry.Description) ? "(no description)" : entry.Description,
-                FontSize = 11,
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = string.IsNullOrWhiteSpace(entry.Description) ? ResolveThemeBrushStatic("Workbooks_Faint_Fg") : null
-            };
+            bool hasDescription = !string.IsNullOrWhiteSpace(entry.Description);
+            var descriptionText = this.BuildHighlightedTextBlock(
+                hasDescription ? entry.Description : "(no description)",
+                11,
+                TextWrapping.Wrap,
+                block =>
+                {
+                    if (!hasDescription)
+                        block.Foreground = ResolveThemeBrushStatic("Workbooks_Faint_Fg");
+                });
 
             var categoryChip = BuildOutlinedCategoryChip(entry.Category, categoryColor);
             var statusPill = BuildOutlinedStatePill(entry.State);

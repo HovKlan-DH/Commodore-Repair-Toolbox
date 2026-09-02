@@ -322,6 +322,17 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
+        // Returns EVERY workbook on disk, for EVERY board, newest first - the one place a caller
+        // genuinely wants workbooks that are not scoped to "the current board" (the worklog bar's
+        // picker, so a workbook for a different board can be selected without a trip to that board
+        // first). Everywhere else in the app - the Workbooks tab, GetActiveWorkbookForBoard,
+        // ResolveActiveWorkbook - deliberately stays board-scoped; see GetWorkbooksForBoard's own
+        // header for why an unscoped list is usually the wrong answer.
+        // ###########################################################################################
+        public static List<WorkbookRecord> GetAllWorkbooks() =>
+            ReadAllWorkbooks().OrderByDescending(w => w.Id).ToList();
+
+        // ###########################################################################################
         // Returns the most recently created still-open workbook for the given board key, or null
         // when that board has no open workbook (including when it has none at all, or its folder
         // was deleted). A board can accumulate several closed workbooks over time; only the
@@ -493,6 +504,88 @@ namespace Handlers.DataHandling
             Logger.Info($"Setting changed: [Worklog] created workbook [#{id}] [{record.Title}] for board [{boardKey}]");
 
             return record;
+        }
+
+        // ###########################################################################################
+        // Overwrites an existing workbook's title/note in place (its id, board key, status, start
+        // date and entry count are untouched - this only edits the two fields the create dialog
+        // collects, reused for "Edit workbook" via CreateWorkbookWindow.InitializeForEdit).
+        //
+        // Returns the SAVED record, or null when the workbook cannot be found or the write itself
+        // failed - the same shape CreateWorkbook returns, and for the same reason: the caller needs
+        // the record that actually reached disk. Returning a bool instead left the caller patching up
+        // its own in-memory copy field by field, re-applying the trim rules a second time, so the two
+        // could drift apart the moment either side's trimming changed.
+        // ###########################################################################################
+        public static WorkbookRecord? UpdateWorkbook(int workbookId, string title, string note)
+        {
+            string? folder = GetWorkbookFolder(workbookId);
+            if (folder == null)
+            {
+                Logger.Warning($"Failed to update workbook: [#{workbookId}] folder not found");
+                return null;
+            }
+
+            string indexPath = Path.Combine(folder, AppConfig.WorklogIndexFileName);
+            WorkbookRecord? record;
+            try
+            {
+                var json = File.ReadAllText(indexPath);
+                record = JsonSerializer.Deserialize<WorkbookRecord>(json);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to update workbook [#{workbookId}]: [{ex.Message}]");
+                return null;
+            }
+
+            if (record == null)
+            {
+                return null;
+            }
+
+            record.Title = title?.Trim() ?? string.Empty;
+            record.Note = note?.Trim() ?? string.Empty;
+
+            if (!SaveWorkbook(folder, record))
+            {
+                return null;
+            }
+
+            Logger.Info($"Setting changed: [Worklog] updated workbook [#{workbookId}] [{record.Title}]");
+
+            return record;
+        }
+
+        // ###########################################################################################
+        // Deletes a workbook entirely: its index.json, entries.json and every entry's attachment
+        // subfolder all live inside its own folder (see the class header), so removing that one
+        // folder removes the whole workbook - there is no separate bookkeeping entry anywhere else
+        // that could be left dangling. Returns false when the workbook cannot be found or the folder
+        // could not be removed (e.g. a file inside it is locked open elsewhere).
+        // ###########################################################################################
+        public static bool DeleteWorkbook(int workbookId)
+        {
+            string? folder = GetWorkbookFolder(workbookId);
+            if (folder == null)
+            {
+                Logger.Warning($"Failed to delete workbook: [#{workbookId}] folder not found");
+                return false;
+            }
+
+            try
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to delete workbook [#{workbookId}]: [{ex.Message}]");
+                return false;
+            }
+
+            Logger.Info($"Setting changed: [Worklog] deleted workbook [#{workbookId}]");
+
+            return true;
         }
 
         // ###########################################################################################

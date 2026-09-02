@@ -428,7 +428,7 @@
 									Orientation="Horizontal"
 									Spacing="12"
 									VerticalAlignment="Center">
-							<TextBlock Text="Active job"
+							<TextBlock Text="Workbook"
 									   FontSize="12"
 									   Foreground="{DynamicResource Schematics_Panels_Fg}"
 									   VerticalAlignment="Center" />
@@ -437,18 +437,22 @@
 									   FontSize="12"
 									   Foreground="{DynamicResource Schematics_Panels_Fg}"
 									   VerticalAlignment="Center" />
-							<Border x:Name="WorklogJobBox"
-									IsVisible="False"
-									Background="{DynamicResource Form_Bg}"
-									BorderBrush="{DynamicResource Form_Border}"
-									BorderThickness="1"
-									CornerRadius="4"
-									Padding="10,3"
-									VerticalAlignment="Center">
-								<TextBlock x:Name="WorklogJobBoxText"
-										   FontSize="12"
-										   Foreground="{DynamicResource Form_Fg}" />
-							</Border>
+							<!-- Lets ANY workbook - any board, not just the one on screen - be picked directly
+							     from the bar: selecting one that belongs to a different board first switches
+							     HardwareComboBox/BoardComboBox to it (OnWorklogJobBoxSelectionChanged), then
+							     calls Main.ActivateWorkbook, exactly what clicking a card on the Workbooks tab
+							     does for a same-board workbook. ItemsSource is WorklogManager.GetAllWorkbooks();
+							     the item template (built in code-behind, see Initialize) renders
+							     "#{Id} | {Title} (hardware/board)" - a short folder-derived label
+							     (HardwareBoardEntry.ShortHardwareBoardLabel), not the full Excel-sheet names,
+							     since those run too long once several boards' workbooks share one dropdown -
+							     so workbooks from other boards are not mistaken for ones on the board
+							     currently on screen. -->
+							<ComboBox x:Name="WorklogJobBox"
+									  IsVisible="False"
+									  FontSize="12"
+									  VerticalAlignment="Center"
+									  SelectionChanged="OnWorklogJobBoxSelectionChanged" />
 							<StackPanel x:Name="WorklogJobStatusPanel"
 										Orientation="Horizontal"
 										Spacing="5"

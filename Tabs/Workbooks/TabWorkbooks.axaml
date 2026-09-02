@@ -60,14 +60,15 @@
 				BorderBrush="{DynamicResource Workbooks_Separator}"
 				BorderThickness="0,0,0,1"
 				Padding="9,7">
-			<!-- NOT WIRED UP YET. Disabled deliberately rather than left looking functional: a fully
-			     styled search box that silently filters nothing is indistinguishable from a broken
-			     one and gets reported as a bug. Re-enable it in the same change that gives it a
-			     TextChanged handler filtering WorkbookListPanel. -->
+			<!-- Filters the workbook list AND the entry list as you type (OnFindRepairTextChanged),
+			     matching against every user-typed text field on a workbook and on each of its
+			     entries - see Handlers/Data/WorklogSearchIndex.cs for exactly which, and
+			     WorklogSearchQuery.cs for the query grammar the placeholder summarises. Matched runs
+			     are highlighted wherever the filtered results are drawn. -->
 			<TextBox x:Name="FindRepairTextBox"
-					 PlaceholderText="Find a previous repair (not yet available)"
-					 IsEnabled="False"
-					 FontSize="11" />
+					 PlaceholderText="Find a previous repair - words are ANDed, &quot;use quotes&quot; for a phrase, -minus excludes"
+					 FontSize="11"
+					 TextChanged="OnFindRepairTextChanged" />
 		</Border>
 
 		<!-- Left = the board's workbooks, right = the selected workbook. The splitter matches the
@@ -131,67 +132,120 @@
 		     =================================================================================== -->
 		<Grid Grid.Column="2" RowDefinitions="Auto,*">
 
-			<!-- The workbook's top-line: "#{N} · {Title}" and its status pill, nothing else. It
-			     spans the FULL width of this side, above the board/entry-list split below, so it
-			     reads as naming the whole right-hand side rather than belonging to either pane.
+			<!-- The workbook's top-line: "#{N} · {Title}", its status pill and note, then the
+				     Edit/Delete workbook actions right-aligned. It spans the FULL width of this
+				     side, above the board/entry-list split below, so it reads as naming the whole
+				     right-hand side rather than belonging to either pane.
 
-			     The board ID, the hardware line and the Add entry / Open job folder buttons the
-			     mockup drew here are gone: the hardware and board are already chosen in the main
-			     window's sidebar, so repeating them made the line long enough to wrap without
-			     saying anything new.
+				     The board ID, the hardware line and the Add entry / Open job folder buttons the
+				     mockup drew here are gone: the hardware and board are already chosen in the main
+				     window's sidebar, so repeating them made the line long enough to wrap without
+				     saying anything new.
 
-			     A WrapPanel rather than a horizontal StackPanel: a long title plus the pill can
-			     still outrun a narrow window, and a StackPanel would run them straight past the
-			     edge instead of dropping the pill onto a second line. -->
+				     Two columns rather than one WrapPanel: the title/pill/note side still needs to
+				     wrap on a narrow window (a WrapPanel), but the actions must stay put at the
+				     right edge rather than wrapping in among them - a single WrapPanel could not
+				     keep both. -->
 			<Border Grid.Row="0"
 					BorderBrush="{DynamicResource Workbooks_Separator}"
 					BorderThickness="0,0,0,1"
 					Padding="11,9">
-				<WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="5" VerticalAlignment="Center">
-					<!-- Text is set from code (ApplyHeaderForWorkbook) to "#{N} · {Title}" of
-					     whichever workbook is active. The literal is the real empty state, NOT
-					     sample data: it used to read "#0042 · No picture, black screen", invented
-					     content that any layout-timing change would have shown to a user as though
-					     it were their own workbook. -->
-					<TextBlock x:Name="WorkbookHeaderTitleText"
-							   Text="No workbook selected"
-							   FontSize="16"
-							   FontWeight="Bold"
-							   VerticalAlignment="Center" />
+				<Grid ColumnDefinitions="*,Auto">
+					<!-- Line 1: "#{N} · {Title}" and the status pill. Line 2: the Note, below rather
+					     than crowded onto line 1 - a WrapPanel with a long title and a long note
+					     could interleave the two in a way that read as one run-on line. Collapsed
+					     as a whole (see ApplyHeaderForWorkbook) when the note is blank, which most
+					     workbooks are. -->
+					<StackPanel Grid.Column="0" Spacing="4">
+						<WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="5" VerticalAlignment="Center">
+							<!-- Text is set from code (ApplyHeaderForWorkbook) to "#{N} · {Title}" of
+							     whichever workbook is active. The literal is the real empty state, NOT
+							     sample data: it used to read "#0042 · No picture, black screen", invented
+							     content that any layout-timing change would have shown to a user as though
+							     it were their own workbook. -->
+							<TextBlock x:Name="WorkbookHeaderTitleText"
+									   Text="No workbook selected"
+									   FontSize="16"
+									   FontWeight="Bold"
+									   VerticalAlignment="Center" />
 
-					<!-- Same pill as the workbook cards in the left panel and the worklog bar:
-					     padlock glyph, status word, both in the status colour with a 2px border of
-					     it. Colours and text are set from code (SelectWorkbook) alongside the
-					     title, so this always shows the selected workbook's real status rather
-					     than the hardcoded "Open" the mockup drew. -->
-					<Border x:Name="WorkbookHeaderStatusPill"
-							Background="{DynamicResource Form_Bg}"
-							BorderBrush="{DynamicResource Worklog_Status_Open}"
-							BorderThickness="2"
-							CornerRadius="10"
-							Padding="10,1"
-							VerticalAlignment="Center">
-						<StackPanel Orientation="Horizontal" Spacing="5">
-							<!-- The padlocks are drawn taller than the font's declared ascent, so their
-							     top pixel row is clipped without a reserved one. That reservation is
-							     applied from the constructor, computed from this control's own font
-							     size - a literal Padding here would be right only for the size it
-							     was written against. Hence the x:Name. -->
-							<TextBlock x:Name="WorkbookHeaderStatusGlyph"
-									   Text="&#xf3c1;"
-									   FontFamily="{DynamicResource FontAwesomeSolid}"
-									   FontSize="11"
-									   Foreground="{DynamicResource Worklog_Status_Open}"
-									   VerticalAlignment="Center" />
-							<TextBlock x:Name="WorkbookHeaderStatusText"
-									   Text="Open"
-									   FontSize="11"
-									   FontWeight="SemiBold"
-									   Foreground="{DynamicResource Worklog_Status_Open}"
-									   VerticalAlignment="Center" />
-						</StackPanel>
-					</Border>
-				</WrapPanel>
+							<!-- Same pill as the workbook cards in the left panel and the worklog bar:
+							     padlock glyph, status word, both in the status colour with a 2px border of
+							     it. Colours and text are set from code (SelectWorkbook) alongside the
+							     title, so this always shows the selected workbook's real status rather
+							     than the hardcoded "Open" the mockup drew. -->
+							<Border x:Name="WorkbookHeaderStatusPill"
+									Background="{DynamicResource Form_Bg}"
+									BorderBrush="{DynamicResource Worklog_Status_Open}"
+									BorderThickness="2"
+									CornerRadius="10"
+									Padding="10,1"
+									VerticalAlignment="Center">
+								<StackPanel Orientation="Horizontal" Spacing="5">
+									<!-- The padlocks are drawn taller than the font's declared ascent, so their
+									     top pixel row is clipped without a reserved one. That reservation is
+									     applied from the constructor, computed from this control's own font
+									     size - a literal Padding here would be right only for the size it
+									     was written against. Hence the x:Name. -->
+									<TextBlock x:Name="WorkbookHeaderStatusGlyph"
+											   Text="&#xf3c1;"
+											   FontFamily="{DynamicResource FontAwesomeSolid}"
+											   FontSize="11"
+											   Foreground="{DynamicResource Worklog_Status_Open}"
+											   VerticalAlignment="Center" />
+									<TextBlock x:Name="WorkbookHeaderStatusText"
+											   Text="Open"
+											   FontSize="11"
+											   FontWeight="SemiBold"
+											   Foreground="{DynamicResource Worklog_Status_Open}"
+											   VerticalAlignment="Center" />
+								</StackPanel>
+							</Border>
+						</WrapPanel>
+
+						<!-- The workbook's Note field (the create dialog's optional free-text box,
+						     WorkbookRecord.Note) - not shown anywhere else on this tab, so a workbook
+						     created with one had no way to see it again without opening the edit
+						     dialog. -->
+						<TextBlock x:Name="WorkbookHeaderNoteText"
+								   Classes="WorkbooksMuted"
+								   Text=""
+								   TextWrapping="Wrap"
+								   IsVisible="False" />
+					</StackPanel>
+
+					<!-- Edit/Delete act on whichever workbook the top-line and board pane currently
+					     show (thisSelectedWorkbookId), so they stay right beside the thing they
+					     affect rather than living in the left-hand list. Hidden together with the
+					     rest of this row's real content when no workbook is selected - see
+					     ApplyHeaderForWorkbook.
+
+					     Top-aligned rather than centered: the left column is now two lines (title/
+					     pill, then the note), and centering against both made the buttons drift
+					     down off the title line whenever a note was showing. Pinning them to the
+					     top keeps them level with line 1 always. -->
+					<StackPanel x:Name="WorkbookHeaderActionsPanel"
+								Grid.Column="1"
+								Orientation="Horizontal"
+								Spacing="4"
+								VerticalAlignment="Top"
+								Margin="8,0,0,0"
+								IsVisible="False">
+						<Button x:Name="EditWorkbookButton"
+								Content="Edit workbook"
+								FontSize="11"
+								Padding="8,4"
+								Click="OnEditWorkbookClick" />
+						<Button x:Name="DeleteWorkbookButton"
+								Content="Delete workbook"
+								FontSize="11"
+								Padding="8,4"
+								Foreground="{DynamicResource Button_Cancel_Fg}"
+								Background="{DynamicResource Button_Cancel_Bg}"
+								BorderBrush="{DynamicResource Button_Cancel_Border}"
+								Click="OnDeleteWorkbookClick" />
+					</StackPanel>
+				</Grid>
 			</Border>
 
 			<!-- Board pane on the left of this row, entry list on the right. Another fixed-4px
