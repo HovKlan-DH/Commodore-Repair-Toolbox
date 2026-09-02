@@ -1,0 +1,282 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CRT"
+             x:Class="CRT.TabWorkbooks">
+
+	<!-- ###########################################################################################
+	     THE WORKBOOKS TAB - originally concept "C; Worklog tab" from
+	     Assets/UI mockups/worklog-mockup.html, laid out as markup so it could be tweaked in the
+	     running app; real behaviour has since landed on top of that layout piece by piece and this
+	     file is no longer a static mockup. See TabWorkbooks.axaml.cs and
+	     TabWorkbooks.BoardPreviews.cs for what each part actually does - both carry their own
+	     up-to-date class-header comments, which is the source of truth over this one.
+
+	     Sizing carried over from the original mockup pass: it was drawn at 1.5x (a 150% DPI
+	     screenshot), so a number here that still traces back to it is the mockup's divided by 1.5 -
+	     16.5px becomes FontSize 11, 12px padding becomes 8. Colours are the Workbooks_* theme keys
+	     in App.axaml, never a hex code, so the tab follows the light/dark theme like everything else.
+
+	     The tab is only reachable when "Enable Worklog" is ticked in Configuration - Main.axaml.cs's
+	     ApplyWorklogBarVisibility shows and hides its TabItem along with the worklog bar.
+	     ########################################################################################### -->
+
+	<UserControl.Styles>
+
+		<!-- A workbook card in the left list. The cards themselves are built in the code-behind
+		     (see BuildWorkbookCard), which adds this class to each one. .Selected is the currently
+		     activated workbook - a tinted fill, applied/removed by SelectWorkbook. -->
+		<Style Selector="Border.WorkbooksJobCard">
+			<Setter Property="Background" Value="{DynamicResource Form_Bg}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource Button_Border}" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="Padding" Value="7" />
+			<Setter Property="Cursor" Value="Hand" />
+		</Style>
+
+		<Style Selector="Border.WorkbooksJobCard.Selected">
+			<Setter Property="Background" Value="{DynamicResource Workbooks_SelectedCard_Bg}" />
+			<Setter Property="BorderBrush" Value="{DynamicResource Form_Border}" />
+		</Style>
+
+		<Style Selector="TextBlock.WorkbooksMuted">
+			<Setter Property="FontSize" Value="10" />
+			<Setter Property="Foreground" Value="{DynamicResource Workbooks_Muted_Fg}" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
+
+		<Style Selector="TextBlock.WorkbooksFaint">
+			<Setter Property="FontSize" Value="10" />
+			<Setter Property="Foreground" Value="{DynamicResource Workbooks_Faint_Fg}" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
+	</UserControl.Styles>
+
+	<!-- The whole tab is one filter field above the two panels. The field is deliberately OUTSIDE
+	     the split so it reads as filtering both sides at once - workbooks on the left, worklogs on
+	     the right - rather than belonging to whichever panel it sat in. -->
+	<Grid RowDefinitions="Auto,*">
+
+		<Border Grid.Row="0"
+				BorderBrush="{DynamicResource Workbooks_Separator}"
+				BorderThickness="0,0,0,1"
+				Padding="9,7">
+			<!-- NOT WIRED UP YET. Disabled deliberately rather than left looking functional: a fully
+			     styled search box that silently filters nothing is indistinguishable from a broken
+			     one and gets reported as a bug. Re-enable it in the same change that gives it a
+			     TextChanged handler filtering WorkbookListPanel. -->
+			<TextBox x:Name="FindRepairTextBox"
+					 PlaceholderText="Find a previous repair (not yet available)"
+					 IsEnabled="False"
+					 FontSize="11" />
+		</Border>
+
+		<!-- Left = the board's workbooks, right = the selected workbook. The splitter matches the
+		     main window and the Schematics tab: a fixed 4px column so the global GridSplitter style
+		     colours it. Column 0's width is restored from UserSettings.WorkbooksLeftPanelWidth in
+		     the code-behind (Initialize) and saved back on OnOuterSplitterPointerReleased - the
+		     same pattern Main.axaml.cs uses for its own LeftPanelWidth. -->
+		<Grid x:Name="OuterSplitGrid" Grid.Row="1" ColumnDefinitions="200,4,*">
+
+		<!-- ===================================================================================
+		     LEFT: the workbooks recorded for the currently selected board.
+
+		     This panel is REAL, unlike the rest of the tab - it lists what WorklogManager actually
+		     has on disk for the current board, rebuilt by RefreshWorkbooks in the code-behind. The
+		     three hardcoded sample cards it replaced are gone.
+		     =================================================================================== -->
+		<Border x:Name="WorkbookListBorder"
+				Grid.Column="0"
+				Background="{DynamicResource Workbooks_Panel_Bg}"
+				BorderBrush="{DynamicResource Workbooks_Separator}"
+				BorderThickness="0,0,1,0">
+			<Grid RowDefinitions="Auto,*" Margin="9">
+
+				<TextBlock Grid.Row="0"
+						   x:Name="WorkbookCountText"
+						   Text="0 workbooks"
+						   FontSize="11"
+						   FontWeight="Bold"
+						   VerticalAlignment="Center"
+						   Margin="0,0,0,7" />
+
+				<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+					<StackPanel Spacing="5">
+
+						<!-- Shown instead of the list when the board has no workbooks at all. The
+						     count above still reads "0 workbooks", so this only has to say what to
+						     do about it. -->
+						<TextBlock x:Name="NoWorkbooksText"
+								   Text="No repairs recorded for this board yet. Use &quot;Create new workbook&quot; above the tabs to start one."
+								   Classes="WorkbooksFaint"
+								   FontSize="10"
+								   TextWrapping="Wrap"
+								   IsVisible="False" />
+
+						<!-- One card per workbook, built in code rather than by an ItemsControl
+						     DataTemplate: each card's status pill needs its brush resolved through
+						     Application.Current with an explicit ThemeVariant (see
+						     BuildWorkbookCard), which a template binding cannot express. -->
+						<StackPanel x:Name="WorkbookListPanel" Spacing="5" />
+
+					</StackPanel>
+				</ScrollViewer>
+			</Grid>
+		</Border>
+
+		<GridSplitter x:Name="OuterSplitter" Grid.Column="1" />
+
+		<!-- ===================================================================================
+		     RIGHT: the selected workbook - its top-line, the board with numbered pins, and the
+		     entry list.
+		     =================================================================================== -->
+		<Grid Grid.Column="2" RowDefinitions="Auto,*">
+
+			<!-- The workbook's top-line: "#{N} · {Title}" and its status pill, nothing else. It
+			     spans the FULL width of this side, above the board/entry-list split below, so it
+			     reads as naming the whole right-hand side rather than belonging to either pane.
+
+			     The board ID, the hardware line and the Add entry / Open job folder buttons the
+			     mockup drew here are gone: the hardware and board are already chosen in the main
+			     window's sidebar, so repeating them made the line long enough to wrap without
+			     saying anything new.
+
+			     A WrapPanel rather than a horizontal StackPanel: a long title plus the pill can
+			     still outrun a narrow window, and a StackPanel would run them straight past the
+			     edge instead of dropping the pill onto a second line. -->
+			<Border Grid.Row="0"
+					BorderBrush="{DynamicResource Workbooks_Separator}"
+					BorderThickness="0,0,0,1"
+					Padding="11,9">
+				<WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="5" VerticalAlignment="Center">
+					<!-- Text is set from code (ApplyHeaderForWorkbook) to "#{N} · {Title}" of
+					     whichever workbook is active. The literal is the real empty state, NOT
+					     sample data: it used to read "#0042 · No picture, black screen", invented
+					     content that any layout-timing change would have shown to a user as though
+					     it were their own workbook. -->
+					<TextBlock x:Name="WorkbookHeaderTitleText"
+							   Text="No workbook selected"
+							   FontSize="16"
+							   FontWeight="Bold"
+							   VerticalAlignment="Center" />
+
+					<!-- Same pill as the workbook cards in the left panel and the worklog bar:
+					     padlock glyph, status word, both in the status colour with a 2px border of
+					     it. Colours and text are set from code (SelectWorkbook) alongside the
+					     title, so this always shows the selected workbook's real status rather
+					     than the hardcoded "Open" the mockup drew. -->
+					<Border x:Name="WorkbookHeaderStatusPill"
+							Background="{DynamicResource Form_Bg}"
+							BorderBrush="{DynamicResource Worklog_Status_Open}"
+							BorderThickness="2"
+							CornerRadius="10"
+							Padding="10,1"
+							VerticalAlignment="Center">
+						<StackPanel Orientation="Horizontal" Spacing="5">
+							<!-- The padlocks are drawn taller than the font's declared ascent, so their
+							     top pixel row is clipped without a reserved one. That reservation is
+							     applied from the constructor, computed from this control's own font
+							     size - a literal Padding here would be right only for the size it
+							     was written against. Hence the x:Name. -->
+							<TextBlock x:Name="WorkbookHeaderStatusGlyph"
+									   Text="&#xf3c1;"
+									   FontFamily="{DynamicResource FontAwesomeSolid}"
+									   FontSize="11"
+									   Foreground="{DynamicResource Worklog_Status_Open}"
+									   VerticalAlignment="Center" />
+							<TextBlock x:Name="WorkbookHeaderStatusText"
+									   Text="Open"
+									   FontSize="11"
+									   FontWeight="SemiBold"
+									   Foreground="{DynamicResource Worklog_Status_Open}"
+									   VerticalAlignment="Center" />
+						</StackPanel>
+					</Border>
+				</WrapPanel>
+			</Border>
+
+			<!-- Board pane on the left of this row, entry list on the right. Another fixed-4px
+			     splitter, so the user can trade board size against list width. Column 2's width is
+			     restored from UserSettings.WorkbooksEntryListWidth in the code-behind (Initialize)
+			     and saved back on OnBoardEntrySplitterPointerReleased. -->
+			<Grid x:Name="BoardEntrySplitGrid" Grid.Row="1" ColumnDefinitions="*,4,347">
+
+				<!-- ===========================================================================
+				     THE BOARD: every schematic image that has one or more worklog entries in
+				     the SELECTED workbook, each with its entries drawn on it - a coloured,
+				     dashed bounds rectangle for an entry with "show marked area" on, a plain
+				     "#N" pill for one without. Real data and real rendering, built by
+				     RefreshBoardPreviews reusing WorklogEntriesOverlay and the same badge
+				     control TabSchematics.Worklog.cs builds - see that method's header for why.
+				     Clicking a preview (not a pill) selects that schematic, highlighting its
+				     border and switching the entry list on the right to its entries - see
+				     SelectSchematic in TabWorkbooks.BoardPreviews.cs.
+
+				     The filter chips, the Top/Bottom side toggle, the "board image" placeholder
+				     and the legend the mockup drew here are all gone: a scrollable list of
+				     possibly several schematic images does not have a single "side" to toggle,
+				     the chips filtered a single image's pins that no longer exists in this
+				     shape, and the legend was dropped as unneeded once entries were real and
+				     the categories were already named on their own pills.
+				     =========================================================================== -->
+				<Grid Grid.Column="0">
+
+					<ScrollViewer VerticalScrollBarVisibility="Auto">
+						<StackPanel x:Name="BoardPreviewPanel" Spacing="12" Margin="12" />
+					</ScrollViewer>
+
+					<!-- Shown instead of the panel above when the selected workbook has no entries
+					     at all, or none with a recognised schematic image. -->
+					<TextBlock x:Name="NoBoardPreviewsText"
+							   Text="No worklog entries recorded against a schematic image for this workbook yet."
+							   Classes="WorkbooksFaint"
+							   FontSize="11"
+							   TextWrapping="Wrap"
+							   Margin="12"
+							   IsVisible="False" />
+				</Grid>
+
+
+				<GridSplitter x:Name="BoardEntrySplitter" Grid.Column="1" />
+
+				<!-- ===========================================================================
+				     THE ENTRY LIST: entries for the schematic selected in the board pane to the
+				     left. Real data, built entirely in TabWorkbooks.BoardPreviews.cs
+				     (RefreshSelectedSchematicEntries) - clicking a schematic image there selects it
+				     (highlighted border) and this list switches to that schematic's entries. Each
+				     entry is ONE 1px-bordered card holding three stacked rows: "#{N} {Title}" (the
+				     "#N" a small filled badge exactly like WorklogEntryEditorWindow's EditorIdBadge,
+				     coloured by category), the description, then the category chip and status pill
+				     in the SAME filled/white-text visual the editor's own selected chip/pill use -
+				     see BuildEntryDetailCard.
+				     =========================================================================== -->
+				<Border x:Name="SelectedSchematicEntriesBorder" Grid.Column="2" Background="{DynamicResource Workbooks_Panel_Bg}">
+					<Grid RowDefinitions="Auto,*">
+
+						<Border Grid.Row="0"
+								BorderBrush="{DynamicResource Workbooks_RowSeparator}"
+								BorderThickness="0,0,0,1"
+								Padding="9,7">
+							<TextBlock x:Name="SelectedSchematicEntriesHeaderText" Text="Select a schematic" Classes="WorkbooksMuted" />
+						</Border>
+
+						<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+							<StackPanel x:Name="SelectedSchematicEntriesPanel" Margin="9" Spacing="12" />
+						</ScrollViewer>
+
+						<!-- Shown instead of the panel above when no schematic is selected, or the
+						     selected one has no entries. -->
+						<TextBlock x:Name="NoSelectedSchematicEntriesText"
+								   Text="Click a schematic image on the left to see its entries here."
+								   Classes="WorkbooksFaint"
+								   FontSize="11"
+								   TextWrapping="Wrap"
+								   Margin="9"
+								   Grid.Row="1"
+								   IsVisible="False" />
+					</Grid>
+				</Border>
+			</Grid>
+		</Grid>
+		</Grid>
+	</Grid>
+</UserControl>

@@ -7,6 +7,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Handlers.DataHandling;
+using Handlers.Theming;
 using Handlers.OnlineHandling;
 using System;
 using System.Collections.Generic;
@@ -101,10 +102,21 @@ namespace CRT
             this.TabSchematicsControl.Initialize(this);
             this.TabOverview.Initialize(this);
             this.TabContribute.Initialize(this);
+            this.TabWorkbooks.Initialize(this);
 
             this.ApplyOscilloscopeTabVisibility();
+
+            // Refreshes the worklog surfaces itself on the enable side, so no separate
+            // RefreshWorklogBar() call belongs here. There used to be one, and by the time
+            // TabWorkbooks.Initialize above had handed the tab its MainWindow it was no longer
+            // cheap - it reached ReadAllWorkbooks (a directory scan plus a JSON parse per workbook)
+            // and GetEntries synchronously, inside the constructor, before first paint.
+            //
+            // Nothing is lost by not refreshing here: the hardware/board combos are not populated
+            // until PopulateHardwareDropDown further down, so GetCurrentBoardKey returns empty at
+            // this point and there is no board whose workbooks could be shown. That population
+            // raises OnBoardSelectionChanged, which refreshes with a real board key.
             this.ApplyWorklogBarVisibility();
-            this.RefreshWorklogBar();
 
             // Restore left panel width from settings
             this.RootGrid.ColumnDefinitions[0].Width = new GridLength(UserSettings.LeftPanelWidth);
@@ -745,7 +757,7 @@ namespace CRT
 
             this.TabSchematicsControl.highlightIndexBySchematic = new(StringComparer.OrdinalIgnoreCase);
             this.TabSchematicsControl.schematicByName = new(StringComparer.OrdinalIgnoreCase);
-            this.TabSchematicsControl.highlightRectsBySchematicAndLabel = new(StringComparer.OrdinalIgnoreCase);
+            this.SetComponentHighlightRects(new(StringComparer.OrdinalIgnoreCase));
 
             this._currentBoardData = null;
             this.UpdateRegionButtonsState();
@@ -757,6 +769,11 @@ namespace CRT
 
             if (string.IsNullOrEmpty(selectedHardware) || string.IsNullOrEmpty(selectedBoard))
             {
+                // No board selected at all. _currentBoardData was cleared above, so refresh to the
+                // empty state rather than leaving the bar and the Workbooks tab showing the board
+                // that WAS selected a moment ago - stale worklog surfaces above a blank schematic
+                // view read as the previous board still being loaded.
+                this.RefreshWorklogBar();
                 return;
             }
 
@@ -764,7 +781,6 @@ namespace CRT
             UserSettings.SetLastBoardForHardware(selectedHardware, selectedBoard);
 
             string boardKey = this.GetCurrentBoardKey();
-            this.RefreshWorklogBar();
             var innerGrid = this.TabSchematicsControl.FindControl<Grid>("SchematicsInnerGrid");
 
             if (innerGrid != null)
@@ -788,18 +804,48 @@ namespace CRT
 
             if (entry == null || string.IsNullOrWhiteSpace(entry.ExcelDataFile))
             {
+                // Same reasoning as the no-selection case above: this board has no data file, so
+                // there is nothing to load and _currentBoardData stays null. Refresh so the worklog
+                // surfaces show THIS board (its workbook list does not need board data) with an
+                // empty board pane, rather than the previous board's previews.
+                this.RefreshWorklogBar();
                 return;
             }
 
             var boardData = await DataManager.LoadBoardDataAsync(entry);
-            if (boardData == null || loadVersion != this._boardSelectionLoadVersion)
+
+            // A SUPERSEDED load returns without touching anything: the user has selected another
+            // board since, and that newer load owns every surface now - refreshing here would put
+            // this board's worklog state under the newer board's header.
+            if (loadVersion != this._boardSelectionLoadVersion)
             {
+                return;
+            }
+
+            if (boardData == null)
+            {
+                // The board's Excel file is missing or unreadable. Still the currently selected
+                // board, so its worklog surfaces must show IT (empty board pane, real workbook
+                // list) rather than whatever the previously selected board left on screen.
+                this.RefreshWorklogBar();
                 return;
             }
 
             this._currentBoardData = boardData;
             this.UpdateRegionButtonsState();
             this.PopulateBoardInfoSection(boardData.RevisionDate, boardData.Credits);
+
+            // AFTER _currentBoardData is assigned, deliberately - this call used to sit above the
+            // await, before the board data existed. Everything board-data-dependent in
+            // RefreshWorklogBar was wrong in that first pass, not just the board pane:
+            // RefreshSelectedSchematicEntries reset the selected schematic and drew the placeholder,
+            // and SetShowWorklogEntriesList re-seeded the Schematics overlay against a
+            // just-blanked highlight cache. It was patched with a second, narrow board-pane refresh
+            // here; running the whole refresh once, in the right place, fixes the class of bug
+            // rather than the one instance, and removes a full board-pane rebuild per board switch.
+            //
+            // Nothing above the await needs it back: the splitter-ratio restore reads only boardKey.
+            this.RefreshWorklogBar();
 
             var categories = ComponentListBuilder.BuildDistinctCategories(boardData);
             this.CategoryFilterListBox.ItemsSource = categories;
@@ -950,7 +996,7 @@ namespace CRT
                         // loading behind it, so flag that wait as soon as the board has KiCad data.
                         this.TabSchematicsControl.SetKiCadInitializingIndicatorVisible(rawPaths.Count > 0);
 
-                        this.TabSchematicsControl.highlightRectsBySchematicAndLabel = highlightRects;
+                        this.SetComponentHighlightRects(highlightRects);
                         this.TabSchematicsControl.schematicByName = schematicByName;
                         this.TabSchematicsControl.highlightIndexBySchematic = new(StringComparer.OrdinalIgnoreCase);
 
@@ -1300,7 +1346,23 @@ namespace CRT
                 this.TabOscilloscopeControl.HasSeenEstablishedOscilloscopeSessionForTitleState(),
                 this.TabOscilloscopeControl.HasActiveEstablishedOscilloscopeSessionForTitleState());
 
-            if (isEnabled || !ReferenceEquals(this.MainTabControl.SelectedItem, this.OscilloscopeTabItem))
+            if (isEnabled)
+                return;
+
+            this.MoveSelectionOffHiddenTab(this.OscilloscopeTabItem);
+        }
+
+        // ###########################################################################################
+        // Moves tab selection to the first still-visible tab, but only if the tab just hidden is the
+        // one currently selected - otherwise the tab control is left showing an empty page.
+        //
+        // One helper rather than a copy in each Apply*Visibility: there are two conditional tabs now
+        // (Oscilloscope and Workbooks) and the block was verbatim in both. Each caller keeps only its
+        // own feature-specific teardown.
+        // ###########################################################################################
+        private void MoveSelectionOffHiddenTab(TabItem? hiddenTab)
+        {
+            if (this.MainTabControl == null || !ReferenceEquals(this.MainTabControl.SelectedItem, hiddenTab))
                 return;
 
             var firstVisibleTab = this.MainTabControl.Items
@@ -1312,13 +1374,18 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Shows or hides the permanent worklog bar above the tabs to match the "Enable Worklog"
-        // configuration setting - and, when switching the feature off, tears down everything the
-        // feature had put on the schematic.
+        // Shows or hides the permanent worklog bar above the tabs AND the "Workbooks" tab to match
+        // the "Enable Worklog" configuration setting - and, when switching the feature off, tears
+        // down everything the feature had put on the schematic.
         //
         // Hiding the bar alone was not enough: the entry overlays, "#N" badges and thumbnail pills
         // all stayed drawn and clickable, and any active entry-drawing mode stayed live with its
         // cross cursor - while the only controls that could dismiss them had just been hidden.
+        //
+        // The Workbooks tab is part of the same feature and follows the same switch, so it is
+        // driven from here rather than from a second method that could fall out of step. As with
+        // the oscilloscope tab, hiding it while it is the SELECTED tab moves selection to the first
+        // still-visible tab, otherwise the tab control would be left showing an empty page.
         // ###########################################################################################
         public void ApplyWorklogBarVisibility()
         {
@@ -1328,19 +1395,133 @@ namespace CRT
             bool isEnabled = UserSettings.EnableWorklog;
             this.WorklogBar.IsVisible = isEnabled;
 
+            if (this.WorkbooksTabItem != null)
+                this.WorkbooksTabItem.IsVisible = isEnabled;
+
             if (isEnabled)
+            {
+                // Rebuilt BEFORE the early return, matching ApplyOscilloscopeTabVisibility's own
+                // enable-side work: the tab was hidden while board changes and worklog edits went on
+                // behind it (RefreshWorklogBar rebuilds it, but this method is what makes it visible
+                // again), so re-ticking "Enable Worklog" would otherwise reveal whatever was last
+                // rendered - which board, and which workbook, is anyone's guess.
+                this.RefreshWorklogBar();
                 return;
+            }
 
             this.TabSchematicsControl.CancelWorklogEntryMode();
             this.TabSchematicsControl.SetShowWorklogEntriesList(false, 0);
             this._worklogShowEntriesWorkbookId = 0;
+
+            this.MoveSelectionOffHiddenTab(this.WorkbooksTabItem);
+        }
+
+        // ###########################################################################################
+        // Resolves the ONE workbook the worklog bar shows, "Show worklogs" draws, and "Add worklog"
+        // writes new entries into - the single notion of "the active workbook" every worklog-facing
+        // control in Main and TabSchematics shares.
+        //
+        // Defaults to the board's newest workbook (open or closed - see RefreshWorklogBar's header
+        // for why status is not a filter here). Selecting a workbook on the Workbooks tab
+        // (TabWorkbooks.SelectWorkbook, via ActivateWorkbook below) overrides that default by saving
+        // the choice in UserSettings.ActiveWorkbookIdByBoard, so "activating" an older or closed
+        // workbook makes IT the one every other worklog surface acts on until something reactivates
+        // the newest one again.
+        //
+        // The saved id is validated against this board's actual workbooks on every call rather than
+        // trusted blindly: a workbook can be deleted from disk by hand, or the saved id can be stale
+        // after switching boards, and an unvalidated id would otherwise make the bar quietly show
+        // nothing (or another board's workbook, if ids ever collided) instead of falling back.
+        //
+        // The rule itself lives in WorklogManager.ResolveActiveWorkbook, not here: the Workbooks tab
+        // needs the same answer for its highlighted card, and two copies of "saved id if valid, else
+        // newest" is exactly how the card and the bar came to disagree. This wrapper only fetches
+        // the two inputs.
+        // ###########################################################################################
+        private WorkbookRecord? ResolveActiveWorkbookForBoard(string boardKey) =>
+            WorklogManager.ResolveActiveWorkbook(
+                WorklogManager.GetWorkbooksForBoard(boardKey),
+                UserSettings.GetActiveWorkbookId(boardKey));
+
+        // ###########################################################################################
+        // Activates a workbook for its board: persists it as the board's active workbook (so it
+        // survives a tab switch, a board switch and back, and an app restart) and refreshes every
+        // worklog surface that depends on "the active workbook" - the bar, and (via
+        // TabSchematicsControl.SetShowWorklogEntriesList inside RefreshWorklogBar) the Schematics
+        // tab's "Show worklogs" overlay for whichever schematic is on screen there.
+        //
+        // Called from TabWorkbooks.SelectWorkbook when the user clicks a card in the Workbooks tab -
+        // see that method for why the caller ALSO switches to the Schematics tab, which this method
+        // deliberately does not do itself (a board/data refresh must be able to call this without
+        // stealing the user's current tab).
+        // ###########################################################################################
+        // ###########################################################################################
+        // Sets the component highlight-rect cache and tells everything that reads it.
+        //
+        // The cache physically lives on TabSchematics (it is built as a side effect of that tab's
+        // board load and most of its readers are there), but MAIN is what actually owns it: all four
+        // writes are here - a board switch blanking it, the board load populating it, and both
+        // region-filter paths rebuilding it - and TabSchematics never assigns it at all.
+        //
+        // Routing every write through this one method exists for the SECOND reader. The Workbooks
+        // tab needs the same cache for a pill's "Mark components in scope" checklist, and the pane's
+        // pills go on screen before the board load's fire-and-forget task has populated it: click one
+        // in that window and the lookup missed, the checklist was silently skipped, and the two
+        // modals were no longer identical - the exact bug this feature was written to fix, back as an
+        // intermittent one. A region switch had the same gap from the other end, leaving the pane
+        // stale against a cache that had just been rebuilt with a different region's rects.
+        //
+        // Refreshing the board pane from here rather than from each write site means a fifth write
+        // added later cannot forget to.
+        // ###########################################################################################
+        private void SetComponentHighlightRects(Dictionary<string, Dictionary<string, List<Rect>>> highlightRects)
+        {
+            this.TabSchematicsControl.highlightRectsBySchematicAndLabel = highlightRects;
+            this.TabWorkbooks?.RefreshBoardPreviewsForCurrentSelection();
+        }
+
+        public void ActivateWorkbook(string boardKey, int workbookId)
+        {
+            if (string.IsNullOrWhiteSpace(boardKey))
+                return;
+
+            // An entry-drawing mode started for the PREVIOUSLY active workbook captured that
+            // workbook's id (BeginWorklogEntryMode), and nothing about switching tabs cancels it. So
+            // without this, activating another workbook here left the cross cursor live on the
+            // Schematics tab and the next drawn entry was written into the workbook the user had just
+            // navigated away from, while every visible surface named the new one.
+            // ApplyWorklogBarVisibility already performs the same teardown when the feature is
+            // switched off; this is the other way "which workbook is being written to" can change.
+            this.TabSchematicsControl.CancelWorklogEntryMode();
+
+            UserSettings.SetActiveWorkbookId(boardKey, workbookId);
+            this.RefreshWorklogBar();
+        }
+
+        // ###########################################################################################
+        // Switches the main tab strip to Schematics, if it is not already there. A public wrapper
+        // rather than exposing MainTabControl/SchematicsTabItem themselves to other tabs: those
+        // fields are Avalonia's own x:Name-generated ones, and TabWorkbooks (the one other caller
+        // that needs this, from SelectWorkbook) has no business reaching into Main's tab control
+        // directly - the same reasoning OnWorklogAddEntryClick already followed for itself.
+        // ###########################################################################################
+        public void SwitchToSchematicsTab()
+        {
+            // Null-guarded like ApplyOscilloscopeTabVisibility and ApplyWorklogBarVisibility, its two
+            // siblings that reach for the same control. This is public and callable from another tab
+            // now, so it can no longer assume it only runs at a point where the tab control is up.
+            if (this.MainTabControl == null || this.SchematicsTabItem == null)
+                return;
+
+            if (!ReferenceEquals(this.MainTabControl.SelectedItem, this.SchematicsTabItem))
+                this.MainTabControl.SelectedItem = this.SchematicsTabItem;
         }
 
         // ###########################################################################################
         // Refreshes the worklog bar's content for the currently selected board: either the empty
-        // "no jobs recorded" state, or that board's latest workbook.
+        // "no jobs recorded" state, or that board's active workbook (see ResolveActiveWorkbookForBoard).
         //
-        // The bar deliberately shows the latest workbook whether it is Open or Closed. Resolving a
+        // The bar deliberately shows the active workbook whether it is Open or Closed. Resolving a
         // workbook's last outstanding entry closes it automatically, and showing only open workbooks
         // meant a finished workbook disappeared from the UI entirely - indistinguishable from having
         // been deleted. Status is presentation only: it picks the status dot's color and appears in
@@ -1354,9 +1535,33 @@ namespace CRT
                 return;
 
             string boardKey = this.GetCurrentBoardKey();
-            var latestWorkbook = WorklogManager.GetLatestWorkbookForBoard(boardKey);
-            bool hasWorkbook = latestWorkbook != null;
-            bool isOpen = hasWorkbook && string.Equals(latestWorkbook!.Status, "Open", StringComparison.Ordinal);
+
+            // Read ONCE and used for both the bar's active-workbook resolution and the Workbooks
+            // tab's own list below - see RefreshWorkbooks for why reading it twice was expensive.
+            var workbooks = WorklogManager.GetWorkbooksForBoard(boardKey);
+            var activeWorkbook = WorklogManager.ResolveActiveWorkbook(workbooks, UserSettings.GetActiveWorkbookId(boardKey));
+            bool hasWorkbook = activeWorkbook != null;
+            bool isOpen = hasWorkbook && WorklogManager.IsWorkbookStatusOpen(activeWorkbook!.Status);
+
+            // The Workbooks tab's list is rebuilt from here rather than from its own wiring: this
+            // method is already the single place worklog state is refreshed from - board changes,
+            // entry saves, workbook creation and closure all reach it - so the tab cannot go stale
+            // in a case the bar handles and the tab forgot about.
+            //
+            // Skipped entirely when the worklog feature is switched off. That rebuild decodes every
+            // schematic image with an entry in the active workbook (full-resolution PNGs, hundreds of
+            // MB of BGRA on a big board) and re-reads entries.json, and it ran on every board change
+            // for a user who has the whole feature disabled and the tab hidden. Safe to skip because
+            // ApplyWorklogBarVisibility rebuilds the tab on the enable side before revealing it, so
+            // it cannot come back showing what was last rendered.
+            //
+            // Deliberately NOT also gated on "is the Workbooks tab currently selected". Clicking a
+            // card in that tab goes ActivateWorkbook -> RefreshWorklogBar -> RefreshWorkbooks, so an
+            // early-out on tab selection would make card clicks silently do nothing.
+            if (UserSettings.EnableWorklog)
+            {
+                this.TabWorkbooks?.RefreshWorkbooks(workbooks);
+            }
 
             this.WorklogNoJobText.IsVisible = !hasWorkbook;
             this.WorklogJobBox.IsVisible = hasWorkbook;
@@ -1364,7 +1569,7 @@ namespace CRT
             this.WorklogShowEntriesPanel.IsVisible = hasWorkbook;
             this.WorklogAddEntryButton.IsVisible = hasWorkbook;
 
-            if (!hasWorkbook || latestWorkbook!.Id != this._worklogShowEntriesWorkbookId)
+            if (!hasWorkbook || activeWorkbook!.Id != this._worklogShowEntriesWorkbookId)
             {
                 // A different (or no) workbook is now shown - re-seed the checkbox from the user's
                 // saved preference and apply it to this workbook directly, rather than relying on
@@ -1387,15 +1592,15 @@ namespace CRT
                     this._suppressWorklogShowEntriesSave = false;
                 }
 
-                int workbookId = showByDefault ? latestWorkbook!.Id : 0;
+                int workbookId = showByDefault ? activeWorkbook!.Id : 0;
                 this._worklogShowEntriesWorkbookId = workbookId;
                 this.TabSchematicsControl.SetShowWorklogEntriesList(showByDefault, workbookId);
             }
 
-            if (latestWorkbook == null)
+            if (activeWorkbook == null)
                 return;
 
-            this.WorklogJobBoxText.Text = $"#{latestWorkbook.Id} | {latestWorkbook.Title}";
+            this.WorklogJobBoxText.Text = $"#{activeWorkbook.Id} | {activeWorkbook.Title}";
 
             // Dot, label AND border all take the state colour, which is what an entry's own state
             // pill does for the selected state (see ApplyStatePillVisualState). Colouring only the
@@ -1404,11 +1609,11 @@ namespace CRT
             // visibly differing, which is the whole thing this pill was added to avoid.
             var statusBrush = this.ResolveWorklogStatusDotBrush(isOpen);
 
-            // fa-solid lock-open / lock, the same padlocks the entry state pills use - a workbook
-            // and an entry showing the same status must look the same. Verified present in the
-            // shipped Solid OTF; the glyph is set here rather than in the markup because this one
-            // pill shows whichever status the workbook currently has.
-            this.WorklogJobStatusDot.Text = isOpen ? "" : "";
+            // fa-solid lock-open / lock, from WorklogGlyphs - the same padlocks the entry state pills
+            // use, since a workbook and an entry showing the same status must look the same. Set here
+            // rather than in the markup because this one pill shows whichever status the workbook
+            // currently has.
+            this.WorklogJobStatusDot.Text = Handlers.Geometry.WorklogGlyphs.GlyphFor(!isOpen);
             this.WorklogJobStatusDot.Foreground = statusBrush;
 
             // The padlocks overshoot the font's declared ascent, so reserve the row they need -
@@ -1423,19 +1628,19 @@ namespace CRT
 
             // The status word lives in the pill now, so the trailing text carries only the counts
             // and the start date - otherwise "Open" would read twice, once in each.
-            this.WorklogJobStatusPillText.Text = latestWorkbook.Status;
+            this.WorklogJobStatusPillText.Text = activeWorkbook.Status;
 
-            string startDate = latestWorkbook.StartDate.ToString("yyyy-MMMM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            string startDate = activeWorkbook.StartDate.ToString("yyyy-MMMM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
-            if (latestWorkbook.EntryCount == 0)
+            if (activeWorkbook.EntryCount == 0)
             {
                 this.WorklogJobStatusText.Text = $"No worklog entries yet · started {startDate}";
                 return;
             }
 
-            string entryWord = latestWorkbook.EntryCount == 1 ? "worklog entry" : "worklog entries";
+            string entryWord = activeWorkbook.EntryCount == 1 ? "worklog entry" : "worklog entries";
             this.WorklogJobStatusText.Text =
-                $"{latestWorkbook.EntryCount} {entryWord} · started {startDate}";
+                $"{activeWorkbook.EntryCount} {entryWord} · started {startDate}";
         }
 
         // ###########################################################################################
@@ -1455,26 +1660,23 @@ namespace CRT
         //
         // The fallbacks are last-resort only, and must track the theme values above.
         // ###########################################################################################
-        private IBrush ResolveWorklogStatusDotBrush(bool isOpen)
-        {
-            string resourceKey = isOpen ? "Worklog_Status_Open" : "Worklog_Status_Closed";
-
-            if (this.TryFindResource(resourceKey, out var localResource) && localResource is IBrush localBrush)
-                return localBrush;
-
-            if (Application.Current != null)
-            {
-                var theme = Application.Current.ActualThemeVariant;
-                if (Application.Current.TryGetResource(resourceKey, theme, out var appResource) && appResource is IBrush appBrush)
-                    return appBrush;
-            }
-
-            return isOpen ? Brushes.IndianRed : new SolidColorBrush(Color.Parse("#4C8C31"));
-        }
+        private IBrush ResolveWorklogStatusDotBrush(bool isOpen) =>
+            ThemeResources.ResolveForControl(
+                this,
+                isOpen ? "Worklog_Status_Open" : "Worklog_Status_Closed",
+                isOpen ? Brushes.IndianRed : (IBrush)new SolidColorBrush(Color.Parse("#4C8C31")));
 
         // ###########################################################################################
-        // Opens the "Create new workbook" dialog for the currently selected board and refreshes the
-        // worklog bar to show the workbook it creates.
+        // Opens the "Create new workbook" dialog for the currently selected board and ACTIVATES the
+        // workbook it creates.
+        //
+        // ActivateWorkbook, not a bare RefreshWorklogBar: "which workbook is active" used to be
+        // "the board's newest", which a just-created workbook always was, so a plain refresh was
+        // enough. It is now ResolveActiveWorkbookForBoard, which prefers a previously-saved
+        // ActiveWorkbookIdByBoard entry whenever that id still names a real workbook - so after the
+        // user has ever clicked a card in the Workbooks tab, a refresh alone would leave the bar,
+        // "Show worklogs" and "Add worklog" pointing at the OLD workbook and write the next drawn
+        // entry into it rather than into the one just created and named.
         // ###########################################################################################
         private async void OnWorklogCreateWorkbookClick(object? sender, RoutedEventArgs e)
         {
@@ -1489,23 +1691,22 @@ namespace CRT
             if (record == null)
                 return;
 
-            this.RefreshWorklogBar();
+            this.ActivateWorkbook(boardKey, record.Id);
         }
 
         // ###########################################################################################
-        // Switches to the Schematics tab and enters worklog entry-drawing mode for the workbook the
-        // bar is showing, so the user can drag out the area a new fault applies to. Uses the same
-        // latest-workbook lookup the bar does rather than the Open-only one, so this keeps working
-        // on a closed workbook - the entry it adds is Open, which reopens the workbook anyway.
+        // Switches to the Schematics tab and enters worklog entry-drawing mode for the ACTIVE
+        // workbook - the one ResolveActiveWorkbookForBoard resolves, which the bar is already
+        // showing. Not the Open-only lookup, so this keeps working on a closed workbook - the entry
+        // it adds is Open, which reopens the workbook anyway.
         // ###########################################################################################
         private void OnWorklogAddEntryClick(object? sender, RoutedEventArgs e)
         {
-            var activeWorkbook = WorklogManager.GetLatestWorkbookForBoard(this.GetCurrentBoardKey());
+            var activeWorkbook = this.ResolveActiveWorkbookForBoard(this.GetCurrentBoardKey());
             if (activeWorkbook == null)
                 return;
 
-            if (!ReferenceEquals(this.MainTabControl.SelectedItem, this.SchematicsTabItem))
-                this.MainTabControl.SelectedItem = this.SchematicsTabItem;
+            this.SwitchToSchematicsTab();
 
             if (!this.TabSchematicsControl.BeginWorklogEntryMode(activeWorkbook.Id))
                 return;
@@ -1544,7 +1745,7 @@ namespace CRT
             bool isChecked = this.WorklogShowEntriesCheckBox.IsChecked == true;
             UserSettings.WorklogShowEntriesChecked = isChecked;
 
-            var activeWorkbook = WorklogManager.GetLatestWorkbookForBoard(this.GetCurrentBoardKey());
+            var activeWorkbook = this.ResolveActiveWorkbookForBoard(this.GetCurrentBoardKey());
             int workbookId = isChecked && activeWorkbook != null ? activeWorkbook.Id : 0;
 
             this._worklogShowEntriesWorkbookId = workbookId;
@@ -2151,8 +2352,8 @@ namespace CRT
             if (this._currentBoardData == null)
                 return;
 
-            this.TabSchematicsControl.highlightRectsBySchematicAndLabel = await Task.Run(() =>
-                HighlightRectBuilder.BuildHighlightRects(this._currentBoardData, this._localRegion));
+            this.SetComponentHighlightRects(await Task.Run(() =>
+                HighlightRectBuilder.BuildHighlightRects(this._currentBoardData, this._localRegion)));
 
             var previouslySelectedKeys = new HashSet<string>(
                 this.ComponentFilterListBox.SelectedItems?.Cast<ComponentListItem>()
@@ -2485,8 +2686,8 @@ namespace CRT
 
             string searchTerm = this.ComponentSearchTextBox?.Text ?? string.Empty;
 
-            this.TabSchematicsControl.highlightRectsBySchematicAndLabel =
-                HighlightRectBuilder.BuildHighlightRects(this._currentBoardData, this._localRegion);
+            this.SetComponentHighlightRects(
+                HighlightRectBuilder.BuildHighlightRects(this._currentBoardData, this._localRegion));
 
             var componentItems = ComponentListBuilder.BuildComponentItems(this._currentBoardData, this._localRegion, activeCategories, searchTerm);
 

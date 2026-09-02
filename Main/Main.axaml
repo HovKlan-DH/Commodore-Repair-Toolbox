@@ -545,6 +545,14 @@
 						<local:TabResources x:Name="TabResources" />
 					</TabItem>
 
+					<!-- The Workbooks tab is hidden unless "Enable Worklog" is ticked in Configuration.
+					     IsVisible starts False so a launch with the worklog off never flashes the tab;
+					     ApplyWorklogBarVisibility sets the real value during startup and again whenever
+					     the setting is toggled, alongside the worklog bar's own visibility. -->
+					<TabItem x:Name="WorkbooksTabItem" Header="Workbooks" IsVisible="False">
+						<local:TabWorkbooks x:Name="TabWorkbooks" />
+					</TabItem>
+
 					<TabItem x:Name="OscilloscopeTabItem" Header="Oscilloscope">
 						<local:TabOscilloscope x:Name="TabOscilloscope" />
 					</TabItem>

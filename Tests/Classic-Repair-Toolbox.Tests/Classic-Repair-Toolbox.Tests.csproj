@@ -43,4 +43,8 @@ command-line (global) property - see the comment on SelfContained below.
     <ProjectReference Include="..\..\Classic-Repair-Toolbox.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

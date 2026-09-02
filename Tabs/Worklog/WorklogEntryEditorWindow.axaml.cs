@@ -14,6 +14,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Handlers.DataHandling;
+using Handlers.Theming;
 using Handlers.Geometry;
 
 namespace CRT
@@ -1170,20 +1171,8 @@ namespace CRT
         // always resolve a themed key by itself - without this second lookup every category chip and
         // state pill silently fell back to the caller's fallback color instead of its real one.
         // ###########################################################################################
-        private IBrush ResolveThemeBrush(string key, IBrush fallback)
-        {
-            if (this.TryFindResource(key, out var localResource) && localResource is IBrush localBrush)
-                return localBrush;
-
-            if (Application.Current != null)
-            {
-                var theme = Application.Current.ActualThemeVariant;
-                if (Application.Current.TryGetResource(key, theme, out var appResource) && appResource is IBrush appBrush)
-                    return appBrush;
-            }
-
-            return fallback;
-        }
+        private IBrush ResolveThemeBrush(string key, IBrush fallback) =>
+            ThemeResources.ResolveForControl(this, key, fallback);
 
         private Color ResolveCategoryColor(string category)
         {
@@ -1577,8 +1566,10 @@ namespace CRT
                 });
             }
 
-            double totalHours = this.thisEntry.WorkDoneItems.Sum(w => w.HoursSpent);
-            double totalCost = this.thisEntry.WorkDoneItems.Sum(w => w.Cost);
+            // The SAME sums the Workbooks tab's entry-detail card shows - see
+            // WorklogEntryScope.GetWorkDoneTotals. Both were written out separately, with a comment
+            // on the other one saying its formatting had to match this line by hand.
+            var (totalHours, totalCost) = WorklogEntryScope.GetWorkDoneTotals(this.thisEntry);
             this.EditorWorkDoneCountText.Text = this.thisWorkDoneRows.Count == 0
                 ? "none"
                 : $"{FormatItemCount(this.thisWorkDoneRows.Count, "entry", "entries")} · {totalHours:0.##} h · {totalCost:0.##}";

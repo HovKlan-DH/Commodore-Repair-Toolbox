@@ -98,6 +98,26 @@
 					<SolidColorBrush x:Key="Worklog_Status_Open">IndianRed</SolidColorBrush>
 					<SolidColorBrush x:Key="Worklog_Status_Closed">#4C8C31</SolidColorBrush>
 
+					<!-- Light, Workbooks tab: the surfaces the tab actually paints.
+
+					     There used to be sixteen more keys here - a Workbooks_Category_* /
+					     Workbooks_State_* set plus badge, chip, placeholder, scope-capture and pin
+					     colours - carried over from the mockup and referenced by nothing but the
+					     palette test asserting they resolved. They encoded the mockup's
+					     Note/Cosmetic/Suspected/Confirmed and Pending/Fixed/Ruled-out vocabulary,
+					     which is NOT the shipped WorklogManager model (Note/Cosmetic/Issue,
+					     Open/Closed); the real tab resolves its category and state colours through
+					     the Worklog_Category_* and Worklog_Status_* keys above, shared with the
+					     Schematics tab and the entry editor so an entry looks the same everywhere.
+					     Adding a category here would have produced a wrong-coloured chip that the
+					     palette test could not catch. Add new worklog colours to Worklog_*. -->
+					<SolidColorBrush x:Key="Workbooks_SelectedCard_Bg">#EAF3F8</SolidColorBrush>
+					<SolidColorBrush x:Key="Workbooks_Panel_Bg">#FAFAFA</SolidColorBrush>
+					<SolidColorBrush x:Key="Workbooks_Separator">#C8C8C8</SolidColorBrush>
+					<SolidColorBrush x:Key="Workbooks_RowSeparator">#E6E6E6</SolidColorBrush>
+					<SolidColorBrush x:Key="Workbooks_Muted_Fg">#5A5A5A</SolidColorBrush>
+					<SolidColorBrush x:Key="Workbooks_Faint_Fg">#7A7A7A</SolidColorBrush>
+
 					<!-- Light, Thumbnail -->
 					<SolidColorBrush x:Key="Thumbnail_Border">Black</SolidColorBrush>
 					<SolidColorBrush x:Key="Thumbnail_BorderSelected">IndianRed</SolidColorBrush>
@@ -214,6 +234,16 @@
 				<SolidColorBrush x:Key="Worklog_Category_Issue">IndianRed</SolidColorBrush>
 				<SolidColorBrush x:Key="Worklog_Status_Open">IndianRed</SolidColorBrush>
 				<SolidColorBrush x:Key="Worklog_Status_Closed">#4C8C31</SolidColorBrush>
+
+				<!-- Dark, Workbooks tab. Surfaces only - see the light block above for why the
+				     category and state colours are not here. -->
+
+				<SolidColorBrush x:Key="Workbooks_SelectedCard_Bg">#33403F</SolidColorBrush>
+				<SolidColorBrush x:Key="Workbooks_Panel_Bg">#241F1C</SolidColorBrush>
+				<SolidColorBrush x:Key="Workbooks_Separator">#524842</SolidColorBrush>
+				<SolidColorBrush x:Key="Workbooks_RowSeparator">#3E342F</SolidColorBrush>
+				<SolidColorBrush x:Key="Workbooks_Muted_Fg">#B5A896</SolidColorBrush>
+				<SolidColorBrush x:Key="Workbooks_Faint_Fg">#8F8578</SolidColorBrush>
 
 				<!-- Dark, Thumbnail -->
 				<SolidColorBrush x:Key="Thumbnail_Border">LightGray</SolidColorBrush>

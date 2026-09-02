@@ -294,10 +294,46 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
+        // Returns EVERY workbook recorded for the given board key, newest first, or an empty list
+        // when the board has none.
+        //
+        // The two lookups below each collapse a board's history to a single workbook - the active
+        // one, or the latest one - because the worklog bar has room for exactly one. The Workbooks
+        // tab lists the whole history instead, so it needs the unreduced set. Ordering matches
+        // theirs (descending id, so newest first) rather than by date: the id is what the user sees
+        // on each card as "#12", and a list numbered 12, 11, 9 that was not in that order would
+        // look sorted by nothing at all.
+        //
+        // An empty or unknown board key yields an empty list rather than every workbook on disk.
+        // Returning everything would show one board's repairs under another board's name, which is
+        // worse than showing nothing.
+        // ###########################################################################################
+        public static List<WorkbookRecord> GetWorkbooksForBoard(string boardKey)
+        {
+            if (string.IsNullOrWhiteSpace(boardKey))
+            {
+                return new List<WorkbookRecord>();
+            }
+
+            return ReadAllWorkbooks()
+                .Where(w => string.Equals(w.BoardKey, boardKey, StringComparison.Ordinal))
+                .OrderByDescending(w => w.Id)
+                .ToList();
+        }
+
+        // ###########################################################################################
         // Returns the most recently created still-open workbook for the given board key, or null
         // when that board has no open workbook (including when it has none at all, or its folder
         // was deleted). A board can accumulate several closed workbooks over time; only the
         // highest-id open one counts as "active".
+        //
+        // NOT the lookup any UI should use, despite the name. "Which workbook is active" is
+        // ResolveActiveWorkbook above: it honours the workbook the user activated on the Workbooks
+        // tab, and it is status-blind, so a finished workbook stays visible instead of vanishing
+        // from the UI the moment its last entry is resolved. Nothing in the app calls this any
+        // more - it is kept as a query the WorklogManager tests use to assert the OPEN/CLOSED
+        // bookkeeping RecomputeWorkbookStatus does. Calling it from a new worklog feature would
+        // silently reintroduce "newest open one, ignore what the user activated".
         // ###########################################################################################
         public static WorkbookRecord? GetActiveWorkbookForBoard(string boardKey)
         {
@@ -317,13 +353,17 @@ namespace Handlers.DataHandling
         // Returns the most recently created workbook for the given board key regardless of its
         // status, or null when that board has none at all.
         //
-        // This is the *display* lookup, deliberately separate from GetActiveWorkbookForBoard above,
-        // which stays Open-only for callers that specifically need an open workbook. Resolving a
-        // workbook's last outstanding entry closes it, and when the bar only ever asked for an open
-        // workbook that made the whole workbook vanish from the UI the moment it was finished - it
-        // looked like data loss even though everything was still on disk. The bar now shows a closed
-        // workbook too, with its Closed status dot; adding a still-Open entry to it reopens it
-        // through the normal RecomputeWorkbookStatus rule.
+        // Status-blind, deliberately unlike GetActiveWorkbookForBoard above: resolving a workbook's
+        // last outstanding entry closes it, and when the bar only ever asked for an OPEN workbook
+        // that made the whole workbook vanish from the UI the moment it was finished - it looked
+        // like data loss even though everything was still on disk.
+        //
+        // NOT the lookup any UI should use either, and for the opposite reason to the one above:
+        // "newest wins, always" is exactly what activating an older or closed workbook on the
+        // Workbooks tab is meant to override. Every former caller (the worklog bar, "Show worklogs",
+        // "Add worklog") now goes through ResolveActiveWorkbook. Kept only as the query the
+        // WorklogManager tests use to read a board's newest workbook back off disk; calling it from
+        // a new worklog feature would silently ignore what the user activated.
         // ###########################################################################################
         public static WorkbookRecord? GetLatestWorkbookForBoard(string boardKey)
         {
@@ -337,6 +377,70 @@ namespace Handlers.DataHandling
                 .OrderByDescending(w => w.Id)
                 .FirstOrDefault();
         }
+
+        // ###########################################################################################
+        // Picks the ONE workbook every worklog-facing surface acts on for a board: the worklog bar,
+        // "Show worklogs", "Add worklog", and the Workbooks tab's highlighted card and board pane.
+        //
+        // The saved id (UserSettings.ActiveWorkbookIdByBoard, set when the user clicks a card in the
+        // Workbooks tab) wins whenever it still names a workbook this board actually has; otherwise
+        // the board's newest, which is what everything defaulted to before workbooks could be
+        // activated at all. The saved id is validated on every call rather than trusted: a workbook
+        // folder can be deleted by hand, and an unvalidated id would leave the bar quietly showing
+        // nothing instead of falling back.
+        //
+        // Pure, and takes its two inputs rather than reading them: Main and TabWorkbooks each had
+        // their own copy of this rule with different shapes (one returning the record, one the id),
+        // which is precisely the disagreement between the highlighted card and the bar that the
+        // design was supposed to prevent. One implementation, unit-testable, called from both.
+        //
+        // "workbooks" is expected newest-first, which is GetWorkbooksForBoard's own order.
+        // ###########################################################################################
+        public static WorkbookRecord? ResolveActiveWorkbook(IReadOnlyList<WorkbookRecord> workbooks, int? savedActiveId)
+        {
+            if (workbooks == null || workbooks.Count == 0)
+            {
+                return null;
+            }
+
+            if (savedActiveId.HasValue)
+            {
+                var saved = workbooks.FirstOrDefault(w => w.Id == savedActiveId.Value);
+                if (saved != null)
+                {
+                    return saved;
+                }
+            }
+
+            return workbooks[0];
+        }
+
+        // ###########################################################################################
+        // Whether an entry state counts as finished. The ONE place that question is answered, so a
+        // second resolved state added to ResolvedEntryStates cannot auto-close a workbook while
+        // pills, padlocks and colours elsewhere still draw its entries as open.
+        //
+        // Case-insensitive, unlike the set it consults: the set decides the auto-close rule against
+        // states this app wrote itself, while this is asked about states read back off disk, which
+        // can carry "closed" from a hand edit or an older build. Falling through to "open" there
+        // renders a red padlock on a pill whose own label reads "closed", and is indistinguishable
+        // from the intended default - so it would never be noticed.
+        // ###########################################################################################
+        public static bool IsResolvedState(string? state) =>
+            !string.IsNullOrWhiteSpace(state) &&
+            ResolvedEntryStates.Any(resolved => string.Equals(resolved, state.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        // ###########################################################################################
+        // Whether a WORKBOOK's status counts as open - the other axis, the one RecomputeWorkbookStatus
+        // writes. Separate from IsResolvedState above because they answer different questions about
+        // different fields, even though both read "Open"/"Closed" to the user.
+        //
+        // Anything that is not recognisably "Closed" reads as open, matching how every status pill in
+        // the app already falls back, and case-insensitively for the same reason IsResolvedState is:
+        // a status read back off disk can carry other casing.
+        // ###########################################################################################
+        public static bool IsWorkbookStatusOpen(string? status) =>
+            !string.Equals(status?.Trim(), "Closed", StringComparison.OrdinalIgnoreCase);
 
         // ###########################################################################################
         // Creates a new open workbook for the given board: allocates the next id, creates its own
@@ -739,7 +843,7 @@ namespace Handlers.DataHandling
             }
 
             record.EntryCount = entries.Count;
-            record.Status = entries.Count > 0 && entries.All(e => ResolvedEntryStates.Contains(e.State))
+            record.Status = entries.Count > 0 && entries.All(e => IsResolvedState(e.State))
                 ? "Closed"
                 : "Open";
 

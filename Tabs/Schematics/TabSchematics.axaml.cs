@@ -52,6 +52,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Tabs.TabSchematics;
 using Handlers.Geometry;
+using Handlers.Theming;
 
 namespace CRT;
 
@@ -840,20 +841,8 @@ public partial class TabSchematics : UserControl
     // ###########################################################################################
     // Safely resolves visual brushes from global Theme dictionaries, regardless of UI attach state.
     // ###########################################################################################
-    private IBrush ResolveThemeBrush(string key, IBrush fallback)
-    {
-        if (this.TryFindResource(key, out var localRes) && localRes is IBrush localBrush)
-            return localBrush;
-
-        if (Application.Current != null)
-        {
-            var theme = Application.Current.ActualThemeVariant;
-            if (Application.Current.TryGetResource(key, theme, out var appRes) && appRes is IBrush appBrush)
-                return appBrush;
-        }
-
-        return fallback;
-    }
+    private IBrush ResolveThemeBrush(string key, IBrush fallback) =>
+        ThemeResources.ResolveForControl(this, key, fallback);
 
     // ###########################################################################################
     // Expands the control into image-only mode before it is rehosted in the fullscreen window.

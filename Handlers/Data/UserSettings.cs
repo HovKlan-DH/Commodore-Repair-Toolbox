@@ -71,8 +71,11 @@ namespace Handlers.DataHandling
         public bool? ContributorMode { get; set; }
 
         [JsonPropertyName("leftPanelWidth")] public double LeftPanelWidth { get; set; } = 200.0;
+        [JsonPropertyName("workbooksLeftPanelWidth")] public double WorkbooksLeftPanelWidth { get; set; } = 200.0;
+        [JsonPropertyName("workbooksEntryListWidth")] public double WorkbooksEntryListWidth { get; set; } = 347.0;
         [JsonPropertyName("schematicsSplitterRatios")] public Dictionary<string, double> SchematicsSplitterRatios { get; set; } = new();
         [JsonPropertyName("selectedCategoriesByBoard")] public Dictionary<string, List<string>> SelectedCategoriesByBoard { get; set; } = new();
+        [JsonPropertyName("activeWorkbookIdByBoard")] public Dictionary<string, int> ActiveWorkbookIdByBoard { get; set; } = new();
         [JsonPropertyName("lastHardware")] public string LastHardware { get; set; } = string.Empty;
         [JsonPropertyName("lastBoardByHardware")] public Dictionary<string, string> LastBoardByHardware { get; set; } = new();
         [JsonPropertyName("lastSchematicByBoard")] public Dictionary<string, string> LastSchematicByBoard { get; set; } = new();
@@ -671,6 +674,28 @@ namespace Handlers.DataHandling
             }
         }
 
+        public static double WorkbooksLeftPanelWidth
+        {
+            get => _data.WorkbooksLeftPanelWidth;
+            set
+            {
+                _data.WorkbooksLeftPanelWidth = value;
+                Logger.Info($"Setting changed: [WorkbooksLeftPanelWidth] [{value:F1}]");
+                Save();
+            }
+        }
+
+        public static double WorkbooksEntryListWidth
+        {
+            get => _data.WorkbooksEntryListWidth;
+            set
+            {
+                _data.WorkbooksEntryListWidth = value;
+                Logger.Info($"Setting changed: [WorkbooksEntryListWidth] [{value:F1}]");
+                Save();
+            }
+        }
+
         public static string ThemeVariant
         {
             get => string.Equals(_data.ThemeVariant, "Dark", StringComparison.OrdinalIgnoreCase) ? "Dark"
@@ -885,6 +910,29 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
+        // The workbook the user explicitly "activated" from the Workbooks tab for the given board -
+        // the one the worklog bar shows, "Show worklogs" draws, and "Add worklog" writes new entries
+        // into, in place of the board's newest workbook.
+        //
+        // Returns null when nothing has been activated (the common case: most boards are worked on
+        // one workbook at a time, and the newest-workbook fallback in Main.RefreshWorklogBar already
+        // covers that). The caller is responsible for checking the id still names a real workbook on
+        // this board - a workbook can be deleted from disk by hand, and this dictionary is not told.
+        // ###########################################################################################
+        public static int? GetActiveWorkbookId(string boardKey)
+            => _data.ActiveWorkbookIdByBoard.TryGetValue(boardKey, out var id) ? id : null;
+
+        // ###########################################################################################
+        // Persists the activated workbook id for the given board key.
+        // ###########################################################################################
+        public static void SetActiveWorkbookId(string boardKey, int workbookId)
+        {
+            _data.ActiveWorkbookIdByBoard[boardKey] = workbookId;
+            Logger.Info($"Setting changed: [ActiveWorkbookId] [{boardKey}] [#{workbookId}]");
+            Save();
+        }
+
+        // ###########################################################################################
         // Saves all window placement values atomically in a single disk write.
         // ###########################################################################################
         public static void SaveWindowPlacement(string state, double width, double height, int x, int y, int screenX, int screenY, int screenWidth, int screenHeight, double screenScaling)
@@ -1044,6 +1092,8 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [ContributorMode] [{ContributorMode}]");
                     Logger.Info($"        [InteractiveCadTraceHoverMode] [{InteractiveCadTraceHoverMode}]");
                     Logger.Info($"        [LeftPanelWidth] [{_data.LeftPanelWidth:F1}]");
+                    Logger.Info($"        [WorkbooksLeftPanelWidth] [{_data.WorkbooksLeftPanelWidth:F1}]");
+                    Logger.Info($"        [WorkbooksEntryListWidth] [{_data.WorkbooksEntryListWidth:F1}]");
                     Logger.Info($"        [Region] [{Region}]");
                     Logger.Info($"        [SchematicsLabelsPanelExpanded] [{SchematicsLabelsPanelExpanded}]");
                     Logger.Info($"        [SchematicsBoardSettingsPanelExpanded] [{SchematicsBoardSettingsPanelExpanded}]");
@@ -1066,6 +1116,7 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [SchematicsHoverHighlightsTracesByBoard] [{_data.SchematicsHoverHighlightsTracesByBoard.Count} entries]");
                     Logger.Info($"        [ContributorModeByBoard] [{_data.ContributorModeByBoard.Count} entries]");
                     Logger.Info($"        [SelectedCategoriesByBoard] [{_data.SelectedCategoriesByBoard.Count} entries]");
+                    Logger.Info($"        [ActiveWorkbookIdByBoard] [{_data.ActiveWorkbookIdByBoard.Count} entries]");
                     Logger.Info($"        [OscilloscopeSeriesByVendor] [{_data.LastOscilloscopeSeriesByVendor.Count} entries]");
                     Logger.Info($"        [OscilloscopeVendor] [{_data.LastOscilloscopeVendor}]");
                     Logger.Info($"        [OscilloscopeHost] [{_data.OscilloscopeHost}]");

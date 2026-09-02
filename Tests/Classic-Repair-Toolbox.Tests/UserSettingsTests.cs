@@ -451,6 +451,69 @@ public sealed class UserSettingsTests : IDisposable
         Assert.Null(UserSettings.GetSelectedCategories("Plus4/310163"));
     }
 
+    // The workbook the Workbooks tab "activated" (Main.ActivateWorkbook) for a board - what
+    // Main.ResolveActiveWorkbookForBoard reads back to decide which workbook the worklog bar,
+    // "Show worklogs" and "Add worklog" all act on, in place of the board's newest workbook.
+    [Fact]
+    public void Active_workbook_id_round_trips_per_board()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SetActiveWorkbookId("C64/250407", 31);
+        UserSettings.LoadFrom(path);
+
+        Assert.Equal(31, UserSettings.GetActiveWorkbookId("C64/250407"));
+
+        // A board with nothing activated has no saved id at all - that is what tells
+        // ResolveActiveWorkbookForBoard to fall back to the newest workbook, rather than to
+        // workbook id 0 or some other sentinel that could collide with a real id.
+        Assert.Null(UserSettings.GetActiveWorkbookId("Plus4/310163"));
+    }
+
+    [Fact]
+    public void Activating_a_different_workbook_for_the_same_board_overwrites_the_previous_one()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.SetActiveWorkbookId("C64/250407", 31);
+        UserSettings.SetActiveWorkbookId("C64/250407", 42);
+        UserSettings.LoadFrom(path);
+
+        // Only the most recently activated workbook is kept per board - activating a second one
+        // is a replacement, not an addition to some history of activations.
+        Assert.Equal(42, UserSettings.GetActiveWorkbookId("C64/250407"));
+    }
+
+    // The Workbooks tab's two splitters (left workbook list / rest, board pane / entry list) -
+    // plain app-wide pixel widths, not per-board like SchematicsSplitterRatios, since this tab's
+    // layout does not depend on which board is selected. Defaults match the AXAML's own design-time
+    // column widths (200 and 347) so a first run does not jump on its first save.
+    [Fact]
+    public void Workbooks_left_panel_width_round_trips()
+    {
+        string path = this.LoadSettings("{}");
+
+        Assert.Equal(200.0, UserSettings.WorkbooksLeftPanelWidth);
+
+        UserSettings.WorkbooksLeftPanelWidth = 260.0;
+        UserSettings.LoadFrom(path);
+
+        Assert.Equal(260.0, UserSettings.WorkbooksLeftPanelWidth);
+    }
+
+    [Fact]
+    public void Workbooks_entry_list_width_round_trips()
+    {
+        string path = this.LoadSettings("{}");
+
+        Assert.Equal(347.0, UserSettings.WorkbooksEntryListWidth);
+
+        UserSettings.WorkbooksEntryListWidth = 410.0;
+        UserSettings.LoadFrom(path);
+
+        Assert.Equal(410.0, UserSettings.WorkbooksEntryListWidth);
+    }
+
     [Fact]
     public void Schematic_order_round_trips_per_board()
     {

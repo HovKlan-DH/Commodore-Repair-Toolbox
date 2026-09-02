@@ -1,4 +1,4 @@
-using CRT;
+﻿using CRT;
 
 namespace ClassicRepairToolbox.Tests.Ui;
 
@@ -69,5 +69,16 @@ public class TabConstructionTests
         // The heaviest one: its constructor wires seventeen handlers to named controls, so it
         // is the tab most likely to break silently when the .axaml is edited.
         UiTest.Run(() => Assert.NotNull(new TabSchematics()));
+    }
+
+    [Fact]
+    public void The_workbooks_tab_can_be_constructed()
+    {
+        // Currently a static mockup with an empty constructor, so this proves the .axaml parses
+        // rather than that any wiring survives. That is worth having on its own here: the tab is
+        // several hundred lines of nested layout referencing a dozen Workbooks_* theme keys, and
+        // a malformed element or an unparseable value would otherwise only show up when someone
+        // ticked "Enable Worklog" and opened the tab by hand.
+        UiTest.Run(() => Assert.NotNull(new TabWorkbooks()));
     }
 }

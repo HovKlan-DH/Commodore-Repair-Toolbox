@@ -1,4 +1,4 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -115,9 +115,10 @@ number formats.
 | Security | `ExternalTargetLauncher`, `OnlineServices`' manifest-validation predicates |
 | KiCad | `KiCadRawProjectLoader`, `KiCadProjectLoader`, the `KiCadProjectData` model |
 | Board data | `BoardDataReader`, `BoardDataWriter`, `BoardComponentHighlightStorage`, `ComponentListBuilder`, `ComponentImageQueries`, `OverviewHtmlBuilder`, `ContactLinkFormatter` |
+| Worklog | `WorklogManager` (including `ResolveActiveWorkbook`, `IsResolvedState`, `IsWorkbookStatusOpen`), `WorklogEntryScope` |
 | Settings / startup | `UserSettings`, `DataManager` (data-root + master workbook), `DataValidator` (smoke only), `SimulationOptions` |
-| Headless UI (`Tests/.../Ui/`) | All eight tabs built headlessly, plus component highlight selection and schematics zoom - see [Headless UI tests](#headless-ui-tests) |
-| Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `KiCadPadGeometry`, `OverlayCullGeometry`, `KiCadOverlayCacheKeys`, `KiCadOverlayNetCache`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry` |
+| Headless UI (`Tests/.../Ui/`) | All nine tabs built headlessly, the worklog and Workbooks palettes, plus component highlight selection and schematics zoom - see [Headless UI tests](#headless-ui-tests) |
+| Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `KiCadPadGeometry`, `OverlayCullGeometry`, `KiCadOverlayCacheKeys`, `KiCadOverlayNetCache`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry`, `WorklogBadgeLayout` |
 
 `Handlers/` is where the real coverage is; most of the uncovered remainder is `Tabs/` and `Main/`,
 Avalonia code-behind that is verified by running the app.
@@ -169,6 +170,10 @@ has an `internal` seam; the test project sees them via `InternalsVisibleTo` in t
 - `Logger` writes nothing until `Logger.Initialize()` is called, and no test calls it — which is why
   the `Logger.*` calls inside classes under test are inert. **Never call `Logger.Initialize()` from a
   test**, or the suite starts writing to the user's real log file.
+- `WorklogManager.LoadFrom(root)` — the same idea for the local "Workbook" folder. **Never call
+  `WorklogManager.Load()` from a test.** `TabWorkbooks.BoardKeyOverrideForTests` is the matching
+  seam on the UI side: the Workbooks tab normally reads its board key off `Main`, which no test
+  constructs, so the override lets the list be tested without standing up the main window.
 
 Use `TempWorkspace` for anything that touches the filesystem; it creates and deletes a temp folder.
 Tests that mutate `UserSettings` or `DataManager` static state live in the `"UserSettings"` and
@@ -178,6 +183,13 @@ but still one cache that tests clear and repopulate) — so `BoardDataReaderTest
 and `BoardDataWriterTests` share the `"BoardData"` collection.
 **Any new test class that touches one of these statics must join its collection**, or it will
 pass alone and fail intermittently in the full run.
+
+**Collections do not run in parallel with each other.** `Tests/.../xunit.runner.json` sets
+`"parallelizeTestCollections": false`. A class can only join ONE collection, and the headless UI
+tests must be in `"HeadlessUi"` to share the dispatcher thread - which left `WorkbooksListTests`
+racing the `"UserSettings"` collection over `UserSettings`' shared `_data` object and save path, with
+unique dictionary keys giving no protection at all. Serialising every collection costs about five
+seconds on a ~40s suite and removes the whole class of race. Keep that file.
 
 ### Headless UI tests
 
@@ -192,6 +204,9 @@ and `UiTest.cs` (runs a body on the UI thread). The rest are the tests themselve
 | `TabConstructionTests.cs` | Every tab constructs without throwing |
 | `ComponentHighlightSelectionTests.cs` | Selecting/deselecting in the component filter box, and the highlights that appear and vanish across the main image and every thumbnail |
 | `SchematicsZoomTests.cs` | The schematic viewer's zoom limits, and zoom anchoring - that the point under the mouse pointer stays under the mouse pointer |
+| `WorkbooksPaletteTests.cs` | The Workbooks tab's `Workbooks_*` theme keys: that each resolves, that both themes define all of them, and that the pin colours stay identical across themes |
+| `WorkbooksListTests.cs` | The Workbooks tab's workbook list and selection: counts and their singular/plural forms, card contents, newest-first order, board scoping, default/click selection, that the status pill (list and top-line) uses the shared Open/Closed brushes, the activation fallback chain (`UserSettings.ActiveWorkbookIdByBoard` wins over newest; a stale saved id falls back to newest), and that both splitters' widths are restored from `UserSettings.WorkbooksLeftPanelWidth`/`WorkbooksEntryListWidth` via `ApplySplitterWidthsForTests` |
+| `WorkbooksBoardPreviewTests.cs` | The Workbooks tab's board pane: one preview per schematic with an entry in the selected workbook, shared previews for co-located entries, unknown-schematic and missing-image entries skipped without dropping other previews, the pane rebuilding when the selected workbook changes, (via `BuildShownTab`'s real layout pass) that a "show marked area" ON entry's badge anchors to its marker while an OFF entry's badge parks in the image's top-right corner instead, that a pill carries a Hand cursor on a hit-test-visible canvas, `RefreshBoardPreviewsForCurrentSelection` populating the pane from board data supplied after an earlier empty build without touching the workbook list, schematic selection (default-first, highlight moving on click, the entry list switching to the clicked schematic), an entry detail card's four rows read back by content (including the stats row's hours/cost/comment/link/photo/file counts, populated through `WorklogManager.UpdateEntry` rather than a bare in-memory record), that the card has exactly one outer border with no border wrapping any individual row, that the Legend panel is gone, and `BuildWorklogEntryComponentScopeForTests` (matched components whose highlight rect the entry's area touches, `null` with no cached highlight rects at all and `null` when the entry's own schematic has no cache entry) - the computation `OnPreviewBadgePointerPressed` hands to `WorklogEntryEditorWindow.InitializeComponentScope` so the modal opened from a pill is provably the same one the Schematics tab opens |
 
 **Do NOT add the `Avalonia.Headless.XUnit` package to get `[AvaloniaFact]`.** At 12.1.1 it depends
 on xunit **v3** while this suite is on xunit 2.9.3; adding it makes every `Fact` and `InlineData`
@@ -294,8 +309,163 @@ excludes `Tests/**` from its compile glob. Leave that exclusion in place.
 ### Tabs (`Tabs/`)
 
 One folder per UI tab — `About`, `Configuration`, `Contribute`, `Feedback`, `Oscilloscope`, `Overview`,
-`Resources`, `Schematics` — each an Avalonia `UserControl` (`.axaml`) with its logic in the paired
-`.axaml.cs`.
+`Resources`, `Schematics`, `Workbooks` — each an Avalonia `UserControl` (`.axaml`) with its logic in
+the paired `.axaml.cs`. `Worklog/` is the odd one out: it holds the worklog's dialog windows, not a
+tab.
+
+Two tabs are conditional, both hidden by a Configuration checkbox and both shown from `Main.axaml.cs`:
+`Oscilloscope` (`ApplyOscilloscopeTabVisibility`) and `Workbooks` (`ApplyWorklogBarVisibility`, which
+drives the tab and the worklog bar together since they are one feature). Each moves selection to the
+first still-visible tab when it is hidden while selected.
+
+**`Tabs/Workbooks/` is partway from mockup to functional** — concept "C; Worklog tab" from
+[Assets/UI mockups/worklog-mockup.html](../Assets/UI%20mockups/worklog-mockup.html), built as markup
+so the layout can be tweaked in the running app, with real data and behaviour landing incrementally
+on top of it. Split across `TabWorkbooks.axaml(.cs)` and `TabWorkbooks.BoardPreviews.cs` (the
+`.Board Previews` partial owns the board pane specifically — see its own header).
+
+- **Real:** the left-hand workbook list (`RefreshWorkbooks`, one card per
+  `WorklogManager.GetWorkbooksForBoard(boardKey)` result); clicking a card **activates** that
+  workbook app-wide (`SelectWorkbook`, see "Activation" below) WITHOUT leaving this tab - the
+  top-line and the board pane update in place for the newly active workbook; the board pane
+  (`RefreshBoardPreviews`, in `TabWorkbooks.BoardPreviews.cs`) — every schematic image with one or
+  more entries in the ACTIVE workbook, drawn with a 1px black outline so its boundary reads clearly
+  against the pane. Each entry is drawn one of two ways, mirroring `TabSchematics.Worklog.cs`'s own
+  `ShowMarkedArea` branch exactly: ticked gets a dashed bounds rectangle on the schematic tab's own
+  `WorklogEntriesOverlay` plus its "#N" badge anchored to that area; unticked gets NO rectangle, and
+  its badge is parked in the image's own top-right corner instead (`ParkedBadgeGeometry.ArrangeInTopRightBlock`,
+  the same geometry the real Schematics tab's parked pills use), stacking with any other parked
+  badges rather than overlapping them. Getting this backwards - anchoring every badge to its marker
+  regardless of `ShowMarkedArea` - was a reported bug; `WorkbooksBoardPreviewTests` pins both
+  branches down by actual on-screen position, not just presence, specifically to catch a
+  regression like it. **Every pill is clickable** (`OnPreviewBadgePointerPressed`), opening the
+  EXACT SAME `WorklogEntryEditorWindow` the Schematics tab's own "Show worklogs" badges open,
+  including the "Mark components in scope"/"Mark components completed" checklist
+  (both tabs now call the one shared `WorklogEntryScope.BuildComponentsInScope` in `Handlers/Data/`,
+  rather than the near-identical copy each used to carry) - an earlier version omitted that section because it needs a highlight-rect cache
+  only `TabSchematics` built; reported as the two modals not actually being identical, and fixed by
+  reading that SAME cache off `MainWindow.TabSchematicsControl.highlightRectsBySchematicAndLabel`
+  (via the `HighlightRectsBySchematicAndLabelForPreviews`/`...OverrideForTests` seam, the same
+  override-then-real-`MainWindow` pattern `CurrentBoardDataForPreviews` already used) rather than
+  building a second copy - `Main.ApplyRegionFilterAsync` already keeps that cache current on every
+  board load and region switch regardless of which tab is selected, so nothing new has to be kept
+  in sync. **Clicking anywhere else on a preview** (not a pill - `OnPreviewBadgePointerPressed` sets
+  `e.Handled` so the two clicks cannot both fire) **selects that schematic** (`SelectSchematic`): a
+  highlighted border (the same IndianRed `Main_TabUnderline_Selected` accent the selected workbook
+  card uses) and the entry list on the right (marker 4) switches to that schematic's entries, each
+  rendered by `BuildEntryDetailCard` as ONE 1px-bordered card - not one border per field, a reported
+  regression from an earlier three-separately-bordered-panel layout - holding four stacked rows:
+  `"#{N} {Title}"` (the "#N" a small filled badge in the category colour, exactly like
+  `WorklogEntryEditorWindow`'s `EditorIdBadge` - filled is still right here, since it names which
+  workbook entry this is, not a selection state), the description, a category chip and status pill,
+  then a stats row. The category chip and status pill (`BuildFilledCategoryChip`/`BuildFilledStatePill`,
+  renamed from `BuildFilled*`, which described the opposite of what they build) render in the
+  UNSELECTED/outlined visual `WorklogEntryEditorWindow` itself uses
+  for a NOT-currently-chosen category chip / state pill (`Form_Bg` background, a 1px `Form_Border`
+  outline) rather than that window's filled "selected" look - reported explicitly: this list has no
+  selection concept the way a click in the full editor does, so a filled pill here would falsely
+  read as "this is the chosen one." The stats row (`BuildEntryStatsRow`) sums total hours and cost
+  across the entry's `WorkDoneItems` (`"{hours} h"` / the bare cost number, matching
+  `WorklogEntryEditorWindow`'s own `SummaryText` formatting exactly - no currency symbol) plus how
+  many comments, links, photos and files the entry carries - one number each, added because a
+  workbook's worth of pills gave no sense of how much was behind each one without opening it.
+  Deliberately not the smaller dot-plus-label the board pane's own pills use for category, and not
+  the anchor-tag/timestamp/photo layout the mockup drew there, both gone. Defaults to the
+  alphabetically-first schematic with entries when nothing is yet selected, and stays on the current
+  selection across a rebuild if it is still shown (a save via a pill's editor re-enters
+  `RefreshBoardPreviews` and must not reset it) - same "keep if valid, else fall back" rule
+  `RefreshWorkbooks` applies to the selected workbook. All real pieces are refreshed from
+  `Main.RefreshWorklogBar`, the one funnel every worklog change already passes through, so none of
+  them can go stale in a case the bar handles. **The Legend panel the mockup drew under the board
+  pane is gone** - removed as unneeded once every pill already named its own category and state.
+- **Not wired up:** the "Find a previous repair" field. It is `IsEnabled="False"` with a
+  "(not yet available)" placeholder rather than left looking functional - a fully styled search box
+  that silently filters nothing is indistinguishable from a broken one. Re-enable it in the same
+  change that gives it a handler.
+
+**Board-data timing.** `Main.OnBoardSelectionChanged` used to call `RefreshWorklogBar` (which
+rebuilds this whole tab) BEFORE it awaited `DataManager.LoadBoardDataAsync`, so that pass ran against
+the PREVIOUS board's data, or none at all on the session's first board. Reported as "even if my
+workbook has data, it does not get reflected in the tab". **That call now sits AFTER
+`_currentBoardData` is assigned**, so it runs once, against the right board - the ordering fix rather
+than the patch-up second call it originally got. The three early-return paths in that method
+(no selection, no data file, unreadable board data) each refresh explicitly, so the tab shows the
+board that IS selected rather than the previous one's contents; a SUPERSEDED load deliberately
+refreshes nothing, since the newer load owns every surface.
+
+`TabWorkbooks.RefreshBoardPreviewsForCurrentSelection` survives for a different job: it is called
+from `Main.SetComponentHighlightRects` whenever the component highlight-rect cache is replaced (a
+board load finishing, or a region switch), because the pane's badges are clickable before that cache
+is populated and a click in that window silently dropped the editor's component checklist.
+
+**Activation.** Before this, every worklog-facing control (the bar, "Show worklogs", "Add worklog")
+always acted on `WorklogManager.GetLatestWorkbookForBoard` - there was no way to point any of them at
+an older or closed workbook. Clicking a card in the Workbooks tab now overrides that: `Main`'s
+`ActivateWorkbook(boardKey, workbookId)` saves the choice to `UserSettings.ActiveWorkbookIdByBoard`
+(per board, persisted) and calls `RefreshWorklogBar`. Creating a workbook activates it too
+(`OnWorklogCreateWorkbookClick`); a bare refresh would leave the bar on a previously-activated older
+one and write the next drawn entry into it. `ActivateWorkbook` also cancels any in-progress
+entry-drawing mode, which captured the OLD workbook's id when it started.
+
+**`WorklogManager.ResolveActiveWorkbook(workbooks, savedActiveId)` is the ONE place "which workbook"
+is decided** - saved id if it still names a workbook on this board, else the newest. Pure, unit
+tested, and called from both `Main.ResolveActiveWorkbookForBoard` and `TabWorkbooks.RefreshWorkbooks`,
+which used to implement the same rule separately in two different shapes.
+
+`TabWorkbooks.SelectWorkbook` has NO "already selected, nothing to do" guard, deliberately:
+`RefreshWorkbooks` highlights a default card without saving anything, so the card on screen can look
+active while `ActiveWorkbookIdByBoard` is empty, and an id-equality early return made clicking that
+exact card a no-op. It DELIBERATELY does not switch tabs - activating a workbook is meant to be seen
+on this tab. `Main.SwitchToSchematicsTab` still exists and is still used, just not from here:
+`OnWorklogAddEntryClick` calls it, since drawing a new entry needs the real schematic view.
+
+Activation goes through a settable `Action<string, int>` (`thisActivateWorkbook`, set by `Initialize`
+to `Main.ActivateWorkbook`) rather than an `if (MainWindow != null)` branch. That matters for tests:
+with the branch, EVERY headless test ran the no-`MainWindow` side and the shipped path - persist,
+then re-derive the selection from the saved id - was pinned by nothing at all. Tests now inject
+`ActivateWorkbookOverrideForTests` and drive the real path.
+
+**Splitters.** Both of this tab's `GridSplitter`s persist their width, the same pattern
+`UserSettings.LeftPanelWidth` (`Main`'s own left sidebar) and `TabSchematics.ApplySchematicsSplitterRatio`
+follow: `UserSettings.WorkbooksLeftPanelWidth` for the outer one (left workbook list vs. everything
+else) and `UserSettings.WorkbooksEntryListWidth` for the inner one (board pane vs. entry list).
+Unlike the Schematics tab's splitter these are plain app-wide pixel widths, not a per-board ratio -
+this tab's layout does not depend on which board is selected. `Initialize` applies both (via the
+private `ApplySplitterWidths`, exposed to tests as `ApplySplitterWidthsForTests`) right after
+`InitializeComponent`, clamped to a usable range so a width saved on a large monitor cannot restore
+off-screen on a small one. Each splitter's `PointerReleased` handler
+(`OnOuterSplitterPointerReleased`/`OnBoardEntrySplitterPointerReleased`) saves the new width back,
+deferred via `Dispatcher.UIThread.Post` so it reads the column's `Bounds` after the drag has actually
+been applied - the same reason `Main`'s own splitter handler defers.
+
+**Both are wired with `AddHandler(..., handledEventsToo: true)`, not a `PointerReleased="..."` markup
+attribute** - `GridSplitter` marks the event handled as it finishes its drag, so a plain subscription
+never runs and neither width was ever saved. Same as `Main.OnMainSplitterPointerReleased` and
+`TabSchematics`, which both carry the same comment.
+
+Cards, the top-line pill and preview badges are all built in code rather than by a `DataTemplate`,
+because their brushes need the two-step `Application.Current` + `ThemeVariant` lookup a template
+binding cannot express — the same reason `Main` builds the worklog bar's own pill in code.
+
+**Schematic bitmaps are shared, not decoded per rebuild.** `thisSchematicBitmapsByPath` holds one
+decoded `Bitmap` per image path for the life of the tab, disposed in `OnDetachedFromVisualTree`. A
+fresh `new Bitmap(path)` per preview per pass stranded a full-resolution decode every time (a
+4220x2941 schematic is ~47 MB of BGRA) on every board change, entry save and workbook create/close.
+Disposing on clear instead would be WORSE: `ShowDialog` does not block the dispatcher, so
+`RefreshWorklogBar` can re-enter while a badge's editor is up, and that editor documents that its
+schematic bitmap belongs to the caller - disposing under it is an `ObjectDisposedException` on the
+render thread, fatal in Avalonia.
+
+Its `Workbooks_*` theme keys in `App.axaml` are pinned by `WorkbooksPaletteTests` - which now covers
+only the six keys the tab actually paints; sixteen further mockup-era keys were referenced by nothing
+but that test and have been deleted along with it. The list, selection and activation chain are
+pinned by `WorkbooksListTests`; the board pane by `WorkbooksBoardPreviewTests` (uses
+`TabWorkbooks.CurrentBoardDataOverrideForTests`, alongside `BoardKeyOverrideForTests`, so a test
+never has to construct `Main`); `ActiveWorkbookIdByBoard`'s persistence itself by
+`UserSettingsTests`. Note the mockup's still-hardcoded entry list draws the
+README's four-category vocabulary (Note/Cosmetic/Suspected/Confirmed, Pending/Fixed/Ruled out),
+which is NOT the shipped `WorklogManager` model (Note/Cosmetic/Issue, Open/Closed) that every REAL
+piece of this tab already uses — reconciling the two is part of making the entry list functional.
 
 #### Schematics (`Tabs/Schematics/`)
 

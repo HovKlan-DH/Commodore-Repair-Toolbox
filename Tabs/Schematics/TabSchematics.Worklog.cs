@@ -11,6 +11,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using Handlers.DataHandling;
 using Handlers.Geometry;
+using Handlers.Theming;
 using Tabs.TabSchematics;
 
 namespace CRT;
@@ -672,33 +673,16 @@ public partial class TabSchematics
     // ###########################################################################################
     // Builds the component scope for a SAVED entry, for the full editor's copy of the checklist.
     //
-    // Returns null when the scope cannot be determined - no board data, or no highlight rectangles
-    // loaded for that entry's schematic. Null and empty mean different things to the caller: empty
-    // is "this area genuinely touches nothing", null is "unknown", and only the latter leaves the
-    // entry's saved ComponentLabels untouched. Returning an empty list for an unknown scope would
-    // wipe the user's selection the first time they saved.
+    // The computation itself is WorklogEntryScope.BuildComponentsInScope, shared with the Workbooks
+    // tab, which opens the same editor modal from its own pills - see that method for the null-vs-
+    // empty rule, which matters and must not be collapsed. This wrapper only supplies the board data
+    // and the highlight-rect cache; the two tabs read those from different places.
     // ###########################################################################################
-    private List<(string BoardLabel, string DisplayName)>? BuildWorklogEntryComponentScope(WorklogEntryRecord entry)
-    {
-        var boardData = this.MainWindow?.CurrentBoardData;
-        if (boardData == null)
-        {
-            return null;
-        }
-
-        if (string.IsNullOrWhiteSpace(entry.SchematicName) ||
-            !this.highlightRectsBySchematicAndLabel.TryGetValue(entry.SchematicName, out var rectsByLabel))
-        {
-            return null;
-        }
-
-        var area = new Rect(entry.AreaX, entry.AreaY, entry.AreaWidth, entry.AreaHeight);
-        var touchedLabels = RectGeometry.FindKeysWithRectsIntersecting(rectsByLabel, area);
-
-        return ComponentListBuilder.BuildComponentsInScope(boardData, touchedLabels)
-            .Select(c => (c.BoardLabel, c.DisplayName))
-            .ToList();
-    }
+    private List<(string BoardLabel, string DisplayName)>? BuildWorklogEntryComponentScope(WorklogEntryRecord entry) =>
+        WorklogEntryScope.BuildComponentsInScope(
+            this.MainWindow?.CurrentBoardData,
+            this.highlightRectsBySchematicAndLabel,
+            entry);
 
     // ###########################################################################################
     // "All" / "None" links above the checklist for quickly bulk-marking every touched component
@@ -890,8 +874,14 @@ public partial class TabSchematics
 
         string schematicName = this.GetCurrentSchematicName();
         var allEntries = WorklogManager.GetEntries(this.thisWorklogEntriesListWorkbookId);
+        // OrdinalIgnoreCase, matching how schematic names are keyed everywhere else in the app
+        // (schematicByName, highlightIndexBySchematic, highlightRectsBySchematicAndLabel and the
+        // Workbooks tab's own grouping are all OrdinalIgnoreCase). With Ordinal here, an entry saved
+        // against "sheet 1" on a board whose schematic is named "Sheet 1" - a hand edit of
+        // entries.json, or contributed board data - showed on the Workbooks tab and vanished on this
+        // one: the same "the two views are not identical" class of bug already reported once.
         var entries = allEntries
-            .Where(entry => string.Equals(entry.SchematicName, schematicName, StringComparison.Ordinal))
+            .Where(entry => string.Equals(entry.SchematicName, schematicName, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         var contentRect = this.GetImageContentRect();
@@ -1489,20 +1479,28 @@ public partial class TabSchematics
     // Anything unrecognised falls through to Open: state is a free-form string in entries.json, so
     // a hand-edited or future value must still render rather than throw.
     // ###########################################################################################
-    // fa-solid lock-open / lock. Read out of the shipped Solid OTF rather than from memory - the
-    // Free faces are subsets, so a codepoint that is wrong renders a blank box with nothing failing.
-    private const int WorklogOpenCodepoint = 0xF3C1;
+    // fa-solid lock-open / lock, from WorklogGlyphs - the ONE pair, sitting beside
+    // FontAwesomeGlyphMetrics, whose OvershootByCodepoint is keyed off these exact values. A site
+    // left on a different codepoint gets no overshoot padding and silently clips the top pixel row
+    // of its padlock, which is the defect that class exists to fix.
+    private const int WorklogOpenCodepoint = WorklogGlyphs.OpenCodepoint;
 
-    private const int WorklogClosedCodepoint = 0xF023;
+    private const int WorklogClosedCodepoint = WorklogGlyphs.ClosedCodepoint;
 
-    private const string WorklogOpenGlyph = "";
+    private static readonly string WorklogOpenGlyph = WorklogGlyphs.OpenGlyph;
 
-    private const string WorklogClosedGlyph = "";
+    private static readonly string WorklogClosedGlyph = WorklogGlyphs.ClosedGlyph;
 
-    // Anything that is not the closed state is treated as open, matching ResolveWorklogStateColor
+    // Anything that is not a resolved state is treated as open, matching ResolveWorklogStateColor
     // below - an unrecognised value from a future build shows as open rather than as nothing.
+    //
+    // Delegates to WorklogManager.IsResolvedState rather than comparing here: that is the one place
+    // "which states mean finished" is answered, so this cannot drift from the auto-close rule (a
+    // second resolved state would otherwise close the workbook while every badge still drew its
+    // entries as open), and it picks up that method's case-insensitive read of state values that
+    // came off disk.
     private bool IsWorklogStateResolved(string state) =>
-        string.Equals(state, WorklogStateClosed, StringComparison.Ordinal);
+        WorklogManager.IsResolvedState(state);
 
     // The FontAwesomeSolid family from the app resources, with the system default as a fallback so
     // a missing resource degrades to readable text rather than throwing.
@@ -1693,71 +1691,17 @@ public partial class TabSchematics
     // ###########################################################################################
     private Border CreateWorklogBadgeControl(WorklogEntryRecord entry, Color color, double inverseScale)
     {
-        var idText = new TextBlock
-        {
-            Text = $"#{entry.Id}",
-            FontSize = 11,
-            FontWeight = FontWeight.Bold,
-            Foreground = Brushes.White,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
-        };
+        // The visual comes from WorklogBadgeBuilder, shared with the Workbooks tab's board pane -
+        // the two used to be line-for-line copies of one another, each conceding the duplication and
+        // asserting the two "must look the same" with nothing enforcing it.
+        var badge = WorklogBadgeBuilder.Build(entry, color, this.ResolveWorklogStateColor(entry.State));
 
-        var stateBrush = new SolidColorBrush(this.ResolveWorklogStateColor(entry.State));
-
-        // A padlock in the state colour, on a white disc - the same open/closed padlocks the state
-        // pills in both modals use, so an entry reads the same wherever it appears.
-        //
-        // The disc stays WHITE rather than taking the state colour: the badge behind it is already
-        // filled with the entry's category colour, and a state-coloured disc on that would put two
-        // saturated colours against each other with the glyph lost between them. White separates
-        // the two and lets the padlock itself carry the state.
-        bool isResolved = this.IsWorklogStateResolved(entry.State);
-        int stateGlyphCodepoint = isResolved ? WorklogClosedCodepoint : WorklogOpenCodepoint;
-
-        const double stateIconFontSize = 10.0;
-
-        var stateIcon = new TextBlock
-        {
-            Text = isResolved ? WorklogClosedGlyph : WorklogOpenGlyph,
-            FontFamily = this.ResolveFontAwesomeSolid(),
-            FontSize = stateIconFontSize,
-            Foreground = stateBrush,
-
-            // The padlocks are drawn taller than the font's declared ascent, so without a reserved
-            // row their top pixel row falls outside the line box and is clipped - see
-            // FontAwesomeGlyphMetrics. Computed rather than hardcoded, so changing the font size
-            // above cannot quietly reintroduce the clipping.
-            Padding = FontAwesomeGlyphMetrics.GetTopOverflowThickness(stateGlyphCodepoint, stateIconFontSize),
-
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
-        };
-
-        var statePill = new Border
-        {
-            Width = 16,
-            Height = 16,
-            CornerRadius = new CornerRadius(8),
-            Background = Brushes.White,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-            Child = stateIcon
-        };
-
-        var content = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 4 };
-        content.Children.Add(idText);
-        content.Children.Add(statePill);
-
-        var badge = new Border
-        {
-            Background = new SolidColorBrush(color),
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(8, 3),
-            Cursor = new Cursor(StandardCursorType.Hand),
-            Child = content,
-            RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
-            RenderTransform = new ScaleTransform(inverseScale, inverseScale),
-            Tag = entry.Id
-        };
+        // What is genuinely this tab's own: these badges sit on a canvas carrying the view matrix, so
+        // a centred inverse scale cancels it out and keeps them a constant size on screen while the
+        // board zooms. The Workbooks pane never zooms and applies none of this.
+        badge.RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative);
+        badge.RenderTransform = new ScaleTransform(inverseScale, inverseScale);
+        badge.Tag = entry.Id;
         badge.PointerPressed += this.OnWorklogEntryPillPointerPressed;
 
         return badge;

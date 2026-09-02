@@ -634,6 +634,88 @@ public sealed class WorklogManagerTests : IDisposable
         Assert.Null(WorklogManager.GetLatestWorkbookForBoard("   "));
     }
 
+    // ---------------------------------------------------------------------------------------
+    // GetWorkbooksForBoard - the Workbooks tab's list. Unlike the two lookups above it does not
+    // reduce a board's history to one workbook, so these pin down that it returns the whole set,
+    // in the order the tab renders it.
+    // ---------------------------------------------------------------------------------------
+
+    [Fact]
+    public void A_board_with_no_workbooks_lists_an_empty_set_rather_than_null()
+    {
+        this.LoadWorklog();
+
+        // The tab does a .Count on this straight away to build its "N workbooks" heading, so a
+        // null here would be a crash on the most ordinary case there is - a board nobody has
+        // worked on yet.
+        var workbooks = WorklogManager.GetWorkbooksForBoard("Commodore 64|250469");
+
+        Assert.NotNull(workbooks);
+        Assert.Empty(workbooks);
+    }
+
+    [Fact]
+    public void Every_workbook_for_a_board_is_listed_newest_first()
+    {
+        this.LoadWorklog();
+
+        var first = CreateWorkbook("Commodore 64|250469", "Full recap", "");
+        var second = CreateWorkbook("Commodore 64|250469", "Dead PLA", "");
+        var third = CreateWorkbook("Commodore 64|250469", "No picture", "");
+
+        var workbooks = WorklogManager.GetWorkbooksForBoard("Commodore 64|250469");
+
+        // Descending id, matching the two single-workbook lookups. The id is what the user sees
+        // on each card as "#N", so a list that was not in id order would look sorted by nothing.
+        Assert.Equal(
+            new[] { third.Id, second.Id, first.Id },
+            workbooks.Select(w => w.Id).ToArray());
+    }
+
+    [Fact]
+    public void The_workbook_list_includes_closed_workbooks_not_just_open_ones()
+    {
+        this.LoadWorklog();
+
+        var open = CreateWorkbook("Commodore 64|250469", "Still going", "");
+        var closed = CreateWorkbook("Commodore 64|250469", "Finished", "");
+
+        // Status is derived, not assigned: a workbook closes when every one of its entries is
+        // resolved, so this closes it the way the app does rather than writing the field.
+        WorklogManager.AddEntry(open.Id, "Sch", new Rect(0, 0, 1, 1), "Still looking", "", "Issue", "Open", Array.Empty<string>());
+        WorklogManager.AddEntry(closed.Id, "Sch", new Rect(0, 0, 1, 1), "Sorted", "", "Issue", "Closed", Array.Empty<string>());
+
+        var workbooks = WorklogManager.GetWorkbooksForBoard("Commodore 64|250469");
+
+        // The tab is a history of everything done to a board, so a finished repair must stay in
+        // the list - that is the whole point of it. This is the same reasoning that made
+        // GetLatestWorkbookForBoard status-blind; an Open-only list would make a workbook vanish
+        // the moment it was completed, which reads as data loss.
+        Assert.Equal(2, workbooks.Count);
+        Assert.Contains(workbooks, w => w.Id == open.Id && w.Status == "Open");
+        Assert.Contains(workbooks, w => w.Id == closed.Id && w.Status == "Closed");
+
+        // The card's third line reads "{EntryCount} worklogs", so the count has to come back on
+        // the listed records rather than only on the single-workbook lookups.
+        Assert.All(workbooks, w => Assert.Equal(1, w.EntryCount));
+    }
+
+    [Fact]
+    public void The_workbook_list_is_scoped_to_its_board_and_rejects_a_blank_key()
+    {
+        this.LoadWorklog();
+        CreateWorkbook("Commodore 64|250469", "C64 job", "");
+        CreateWorkbook("Amiga 500|A500", "Amiga job", "");
+
+        Assert.Single(WorklogManager.GetWorkbooksForBoard("Commodore 64|250469"));
+        Assert.Single(WorklogManager.GetWorkbooksForBoard("Amiga 500|A500"));
+
+        // A blank key yields nothing rather than everything on disk. Returning everything would
+        // list one board's repairs under another board's name, which is worse than showing none.
+        Assert.Empty(WorklogManager.GetWorkbooksForBoard(""));
+        Assert.Empty(WorklogManager.GetWorkbooksForBoard("   "));
+    }
+
     [Fact]
     public void Adding_an_entry_to_a_workbook_with_no_folder_returns_null_instead_of_throwing()
     {
@@ -1132,5 +1214,134 @@ public sealed class WorklogManagerTests : IDisposable
         Assert.Equal("Original description", reloaded.Description);
         Assert.True(reloaded.ShowMarkedArea);
         Assert.Equal(entry.Id, reloaded.Id);
+    }
+
+    // ------------------------------------------------- "which workbook is active" (pure)
+
+    // The rule Main's worklog bar, "Show worklogs", "Add worklog" AND the Workbooks tab's
+    // highlighted card all resolve through. It used to be written out twice, in two different
+    // shapes, which is how the highlighted card and the bar came to be able to disagree.
+    //
+    // Pure, so these need no workbook folders on disk - which is the point of extracting it.
+    [Fact]
+    public void The_saved_active_workbook_wins_over_the_newest_one()
+    {
+        // Newest-first, matching GetWorkbooksForBoard's own order.
+        var workbooks = new List<WorkbookRecord>
+        {
+            new() { Id = 3, Title = "Newest" },
+            new() { Id = 2, Title = "Middle" },
+            new() { Id = 1, Title = "Oldest" },
+        };
+
+        Assert.Equal(1, WorklogManager.ResolveActiveWorkbook(workbooks, 1)!.Id);
+        Assert.Equal(2, WorklogManager.ResolveActiveWorkbook(workbooks, 2)!.Id);
+    }
+
+    // Nothing saved: the newest, which is what every worklog surface defaulted to before workbooks
+    // could be activated at all.
+    [Fact]
+    public void With_no_saved_activation_the_newest_workbook_is_active()
+    {
+        var workbooks = new List<WorkbookRecord>
+        {
+            new() { Id = 3, Title = "Newest" },
+            new() { Id = 1, Title = "Oldest" },
+        };
+
+        Assert.Equal(3, WorklogManager.ResolveActiveWorkbook(workbooks, null)!.Id);
+    }
+
+    // A saved id naming a workbook this board no longer has - the folder deleted by hand, or the id
+    // left over from another board - must fall back rather than resolve to nothing. Returning null
+    // here would make the worklog bar quietly show "no workbook" for a board that plainly has some.
+    [Fact]
+    public void A_saved_id_that_names_no_workbook_falls_back_to_the_newest()
+    {
+        var workbooks = new List<WorkbookRecord>
+        {
+            new() { Id = 3, Title = "Newest" },
+            new() { Id = 1, Title = "Oldest" },
+        };
+
+        Assert.Equal(3, WorklogManager.ResolveActiveWorkbook(workbooks, 9999)!.Id);
+    }
+
+    [Fact]
+    public void A_board_with_no_workbooks_has_no_active_workbook()
+    {
+        Assert.Null(WorklogManager.ResolveActiveWorkbook(new List<WorkbookRecord>(), null));
+        Assert.Null(WorklogManager.ResolveActiveWorkbook(new List<WorkbookRecord>(), 1));
+    }
+
+    // ------------------------------------------------------- "which states mean finished"
+
+    [Fact]
+    public void Closed_is_the_one_resolved_entry_state()
+    {
+        Assert.True(WorklogManager.IsResolvedState("Closed"));
+        Assert.False(WorklogManager.IsResolvedState("Open"));
+    }
+
+    // Case- and whitespace-insensitive, unlike the ResolvedEntryStates set it consults. States are
+    // read back off disk and can carry a hand edit or an older build's casing; falling through to
+    // "open" there draws a RED padlock on a pill whose own label reads "closed", which is
+    // indistinguishable from the intended default and so would never be noticed.
+    [Theory]
+    [InlineData("closed")]
+    [InlineData("CLOSED")]
+    [InlineData(" Closed ")]
+    public void A_differently_cased_closed_state_still_reads_as_resolved(string state)
+    {
+        Assert.True(WorklogManager.IsResolvedState(state));
+    }
+
+    // Anything unrecognised reads as unresolved - the safe direction, since it leaves a workbook
+    // open rather than silently closing it.
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    [InlineData("Pending")]
+    [InlineData("SomeFutureState")]
+    public void An_unrecognised_state_is_not_resolved(string? state)
+    {
+        Assert.False(WorklogManager.IsResolvedState(state));
+    }
+
+    // The workbook axis, not the entry one - RecomputeWorkbookStatus writes this field. Same
+    // case-insensitive read, same "anything unrecognised reads as open" fallback every status pill
+    // in the app already applies.
+    [Theory]
+    [InlineData("Open", true)]
+    [InlineData("open", true)]
+    [InlineData("", true)]
+    [InlineData(null, true)]
+    [InlineData("Closed", false)]
+    [InlineData("closed", false)]
+    [InlineData(" Closed ", false)]
+    public void A_workbook_status_reads_as_open_unless_it_is_recognisably_closed(string? status, bool expected)
+    {
+        Assert.Equal(expected, WorklogManager.IsWorkbookStatusOpen(status));
+    }
+
+    // The auto-close rule goes through the same IsResolvedState, so an entry stored as "closed"
+    // closes its workbook rather than holding it open forever while its own pill reads Closed.
+    [Fact]
+    public void A_differently_cased_closed_entry_still_closes_its_workbook()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        var entry = WorklogManager.AddEntry(
+            workbook.Id, "Sch", new Rect(0, 0, 1, 1), "Done", "", "Issue", "Open", Array.Empty<string>())!;
+
+        Assert.Equal("Open", WorklogManager.GetLatestWorkbookForBoard("Commodore 64|250469")!.Status);
+
+        // The casing a hand edit of entries.json, or an older build, could leave behind.
+        entry.State = "closed";
+        Assert.True(WorklogManager.UpdateEntry(workbook.Id, entry));
+
+        Assert.Equal("Closed", WorklogManager.GetLatestWorkbookForBoard("Commodore 64|250469")!.Status);
     }
 }
