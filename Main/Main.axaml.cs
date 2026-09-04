@@ -1930,33 +1930,19 @@ namespace CRT
             if (activeWorkbook == null)
                 return;
 
-            // Dot, label AND border all take the state colour, which is what an entry's own state
-            // pill does for the selected state (see ApplyStatePillVisualState). Colouring only the
-            // dot left a green dot with grey text in a grey outline sitting beside an entry pill
-            // with green text in a green outline - the two claiming to be "the same pill" while
-            // visibly differing, which is the whole thing this pill was added to avoid.
-            var statusBrush = this.ResolveWorklogStatusDotBrush(isOpen);
-
-            // fa-solid lock-open / lock, from WorklogGlyphs - the same padlocks the entry state pills
-            // use, since a workbook and an entry showing the same status must look the same. Set here
-            // rather than in the markup because this one pill shows whichever status the workbook
-            // currently has.
-            this.WorklogJobStatusDot.Text = Handlers.Geometry.WorklogGlyphs.GlyphFor(!isOpen);
-            this.WorklogJobStatusDot.Foreground = statusBrush;
-
-            // The padlocks overshoot the font's declared ascent, so reserve the row they need -
-            // computed from this control's own font size rather than hardcoded, see
-            // Handlers/Geometry/FontAwesomeGlyphMetrics.cs.
-            this.WorklogJobStatusDot.Padding = Handlers.Geometry.FontAwesomeGlyphMetrics
-                .GetTopOverflowThicknessForText(this.WorklogJobStatusDot.Text, this.WorklogJobStatusDot.FontSize);
-            this.WorklogJobStatusPillText.Foreground = statusBrush;
-            this.WorklogJobStatusPillText.FontWeight = Avalonia.Media.FontWeight.SemiBold;
-            this.WorklogJobStatusPill.BorderBrush = statusBrush;
-            this.WorklogJobStatusPill.BorderThickness = new Thickness(2);
-
-            // The status word lives in the pill now, so the trailing text carries only the counts
-            // and the start date - otherwise "Open" would read twice, once in each.
-            this.WorklogJobStatusPillText.Text = activeWorkbook.Status;
+            // Border, padlock, label and the padlock's overshoot padding all applied by the ONE
+            // shared informational styling - see Handlers/Theme/WorklogInfoPillBuilder.cs. This
+            // pill is declared in Main.axaml (long-lived, only its text changes), so it is
+            // restyled in place rather than rebuilt. It used to be styled here by hand at 2px,
+            // which is exactly the drift that class now prevents.
+            //
+            // The status WORD lives in the pill, so WorklogJobStatusText below carries only the
+            // counts and the start date - otherwise "Open" would read twice, once in each.
+            Handlers.Theming.WorklogInfoPillBuilder.ApplyStatePillVisual(
+                this.WorklogJobStatusPill,
+                this.WorklogJobStatusDot,
+                this.WorklogJobStatusPillText,
+                activeWorkbook.Status);
 
             string startDate = activeWorkbook.StartDate.ToString("yyyy-MMMM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
@@ -1970,29 +1956,6 @@ namespace CRT
             this.WorklogJobStatusText.Text =
                 $"{activeWorkbook.EntryCount} {entryWord} · started {startDate}";
         }
-
-        // ###########################################################################################
-        // Resolves the worklog bar's status dot color: red for an open workbook, green for a
-        // closed one - outstanding work reads as red, finished work as green. These same two
-        // brushes colour a worklog ENTRY's Open/Closed pill (see
-        // TabSchematics.Worklog.ResolveWorklogStateColor), so the two axes stay visually identical
-        // wherever either appears - deliberately, since both read "Open"/"Closed" to the user.
-        //
-        // The second lookup through Application.Current is what makes that true, and is NOT
-        // redundant: these keys live in App.axaml's ResourceDictionary.ThemeDictionaries, and a
-        // plain TryFindResource on this window does not resolve a theme-variant-keyed brush. With
-        // only the first lookup this method always returned the hardcoded fallback below, so the
-        // bar's dot stayed green no matter what the theme said - the entry pills picked up their
-        // real colour and the bar did not. WorklogEntryEditorWindow.ResolveThemeBrush and
-        // TabSchematics.ResolveThemeBrush carry the same two-step idiom for the same reason.
-        //
-        // The fallbacks are last-resort only, and must track the theme values above.
-        // ###########################################################################################
-        private IBrush ResolveWorklogStatusDotBrush(bool isOpen) =>
-            ThemeResources.ResolveForControl(
-                this,
-                isOpen ? "Worklog_Status_Open" : "Worklog_Status_Closed",
-                isOpen ? Brushes.IndianRed : (IBrush)new SolidColorBrush(Color.Parse("#4C8C31")));
 
         // ###########################################################################################
         // Opens the "Create new workbook" dialog for the currently selected board and ACTIVATES the

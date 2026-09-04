@@ -75,6 +75,12 @@ namespace Handlers.DataHandling
         [JsonPropertyName("leftPanelWidth")] public double LeftPanelWidth { get; set; } = 200.0;
         [JsonPropertyName("workbooksLeftPanelWidth")] public double WorkbooksLeftPanelWidth { get; set; } = 200.0;
         [JsonPropertyName("workbooksEntryListWidth")] public double WorkbooksEntryListWidth { get; set; } = 347.0;
+
+        // Whether the Workbooks tab's workbook-summary strip is expanded to its full breakdown.
+        // Collapsed by default: the one-line headline is always visible either way, and starting
+        // expanded would push the board pane down for every user to show detail most do not need
+        // on every visit.
+        [JsonPropertyName("workbooksSummaryExpanded")] public bool WorkbooksSummaryExpanded { get; set; }
         [JsonPropertyName("schematicsSplitterRatios")] public Dictionary<string, double> SchematicsSplitterRatios { get; set; } = new();
         [JsonPropertyName("selectedCategoriesByBoard")] public Dictionary<string, List<string>> SelectedCategoriesByBoard { get; set; } = new();
         [JsonPropertyName("activeWorkbookIdByBoard")] public Dictionary<string, int> ActiveWorkbookIdByBoard { get; set; } = new();
@@ -739,6 +745,17 @@ namespace Handlers.DataHandling
             }
         }
 
+        public static bool WorkbooksSummaryExpanded
+        {
+            get => _data.WorkbooksSummaryExpanded;
+            set
+            {
+                _data.WorkbooksSummaryExpanded = value;
+                Logger.Info($"Setting changed: [WorkbooksSummaryExpanded] [{value}]");
+                Save();
+            }
+        }
+
         public static string ThemeVariant
         {
             get => string.Equals(_data.ThemeVariant, "Dark", StringComparison.OrdinalIgnoreCase) ? "Dark"
@@ -1147,6 +1164,7 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [LeftPanelWidth] [{_data.LeftPanelWidth:F1}]");
                     Logger.Info($"        [WorkbooksLeftPanelWidth] [{_data.WorkbooksLeftPanelWidth:F1}]");
                     Logger.Info($"        [WorkbooksEntryListWidth] [{_data.WorkbooksEntryListWidth:F1}]");
+                    Logger.Info($"        [WorkbooksSummaryExpanded] [{_data.WorkbooksSummaryExpanded}]");
                     Logger.Info($"        [Region] [{Region}]");
                     Logger.Info($"        [SchematicsLabelsPanelExpanded] [{SchematicsLabelsPanelExpanded}]");
                     Logger.Info($"        [SchematicsBoardSettingsPanelExpanded] [{SchematicsBoardSettingsPanelExpanded}]");

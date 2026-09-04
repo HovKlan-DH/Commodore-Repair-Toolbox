@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -338,6 +338,17 @@ namespace CRT
         {
             Logger.Initialize();
             this.SetupGlobalExceptionLogging();
+
+            // QuestPDF (the workbook PDF export) REQUIRES a licence type to be declared before it
+            // generates anything, and throws on the first export if it is not - so it is set here,
+            // at startup, rather than at the export call site where a missing line would only be
+            // discovered by a user trying to export.
+            //
+            // Community is the correct type for this project: QuestPDF grants it free of charge to
+            // individuals and to organisations under $1M USD annual revenue, which Classic Repair
+            // Toolbox - a hobbyist tool given away - is. An organisation above that threshold
+            // shipping a fork of this app would need its own commercial licence from QuestPDF.
+            QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
             // The build configuration goes on this line because startup timings are meaningless
             // without it: DEBUG builds are JIT-only, and ReadyToRun applies only to a RID-targeted

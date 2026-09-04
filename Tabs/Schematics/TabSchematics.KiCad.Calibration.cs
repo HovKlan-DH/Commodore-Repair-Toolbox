@@ -54,22 +54,42 @@ public partial class TabSchematics
     private Point thisKiCadTraceCalibrationDragStartPixelPoint;
 
     // ###########################################################################################
+    // The four calibration edges as the one value KiCadCalibrationGeometry works on, and back.
+    //
+    // The fields stay the storage - this is only the adapter that lets the maths live outside
+    // the tab. Note the edges are passed through EXACTLY as stored, mirror-inverted ordering
+    // included: KiCadCalibrationBox is built for that and derives its mirror flags from it.
+    // ###########################################################################################
+    private KiCadCalibrationBox GetKiCadCalibrationBox() =>
+        new KiCadCalibrationBox(
+            this.thisKiCadCalibrationImageLeft,
+            this.thisKiCadCalibrationImageTop,
+            this.thisKiCadCalibrationImageRight,
+            this.thisKiCadCalibrationImageBottom);
+
+    private void SetKiCadCalibrationBox(KiCadCalibrationBox box)
+    {
+        this.thisKiCadCalibrationImageLeft = box.Left;
+        this.thisKiCadCalibrationImageTop = box.Top;
+        this.thisKiCadCalibrationImageRight = box.Right;
+        this.thisKiCadCalibrationImageBottom = box.Bottom;
+    }
+
+    private KiCadCalibrationBox GetKiCadCalibrationStartBox() =>
+        new KiCadCalibrationBox(
+            this.thisKiCadCalibrationStartImageLeft,
+            this.thisKiCadCalibrationStartImageTop,
+            this.thisKiCadCalibrationStartImageRight,
+            this.thisKiCadCalibrationStartImageBottom);
+
+    // ###########################################################################################
     // Applies saved KiCad mirror flags onto the calibration-box coordinates by swapping edges.
     // Calibration mode encodes mirroring by having Left>Right and/or Top>Bottom.
     // ###########################################################################################
     private void ApplyKiCadCalibrationMirrorFlagsToBox(bool mirrorX, bool mirrorY)
     {
-        if (mirrorX)
-        {
-            (this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight) =
-                (this.thisKiCadCalibrationImageRight, this.thisKiCadCalibrationImageLeft);
-        }
-
-        if (mirrorY)
-        {
-            (this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom) =
-                (this.thisKiCadCalibrationImageBottom, this.thisKiCadCalibrationImageTop);
-        }
+        this.SetKiCadCalibrationBox(
+            KiCadCalibrationGeometry.ApplyMirrorFlags(this.GetKiCadCalibrationBox(), mirrorX, mirrorY));
     }
 
     // ###########################################################################################
@@ -87,125 +107,18 @@ public partial class TabSchematics
             return false;
         }
 
-        if (modifiers.HasFlag(KeyModifiers.Shift) && modifiers.HasFlag(KeyModifiers.Alt))
+        // The maths - which modifier does what, and the refusal to shrink the box to nothing -
+        // is KiCadCalibrationGeometry's. This end only supplies the box and stores the result.
+        if (!KiCadCalibrationGeometry.TryApplyKeyboardStep(
+                this.GetKiCadCalibrationBox(),
+                key,
+                modifiers,
+                out var updatedBox))
         {
             return false;
         }
 
-        bool thisIsShift = modifiers.HasFlag(KeyModifiers.Shift);
-        bool thisIsAlt = modifiers.HasFlag(KeyModifiers.Alt);
-        const double thisStep = 1.0;
-        bool thisChanged = false;
-
-        bool thisMirrorX = this.thisKiCadCalibrationImageLeft > this.thisKiCadCalibrationImageRight;
-        bool thisMirrorY = this.thisKiCadCalibrationImageTop > this.thisKiCadCalibrationImageBottom;
-
-        double thisLeft = Math.Min(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
-        double thisRight = Math.Max(this.thisKiCadCalibrationImageLeft, this.thisKiCadCalibrationImageRight);
-        double thisTop = Math.Min(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
-        double thisBottom = Math.Max(this.thisKiCadCalibrationImageTop, this.thisKiCadCalibrationImageBottom);
-
-        if (!thisIsShift && !thisIsAlt)
-        {
-            switch (key)
-            {
-                case Key.Left:
-                    thisLeft -= thisStep;
-                    thisRight -= thisStep;
-                    thisChanged = true;
-                    break;
-
-                case Key.Right:
-                    thisLeft += thisStep;
-                    thisRight += thisStep;
-                    thisChanged = true;
-                    break;
-
-                case Key.Up:
-                    thisTop -= thisStep;
-                    thisBottom -= thisStep;
-                    thisChanged = true;
-                    break;
-
-                case Key.Down:
-                    thisTop += thisStep;
-                    thisBottom += thisStep;
-                    thisChanged = true;
-                    break;
-            }
-        }
-        else if (thisIsShift)
-        {
-            switch (key)
-            {
-                case Key.Left:
-                    thisLeft -= thisStep;
-                    thisChanged = true;
-                    break;
-
-                case Key.Right:
-                    thisRight += thisStep;
-                    thisChanged = true;
-                    break;
-
-                case Key.Up:
-                    thisTop -= thisStep;
-                    thisChanged = true;
-                    break;
-
-                case Key.Down:
-                    thisBottom += thisStep;
-                    thisChanged = true;
-                    break;
-            }
-        }
-        else if (thisIsAlt)
-        {
-            switch (key)
-            {
-                case Key.Left:
-                    if ((thisRight - thisLeft) > thisStep)
-                    {
-                        thisRight -= thisStep;
-                        thisChanged = true;
-                    }
-                    break;
-
-                case Key.Right:
-                    if ((thisRight - thisLeft) > thisStep)
-                    {
-                        thisLeft += thisStep;
-                        thisChanged = true;
-                    }
-                    break;
-
-                case Key.Up:
-                    if ((thisBottom - thisTop) > thisStep)
-                    {
-                        thisBottom -= thisStep;
-                        thisChanged = true;
-                    }
-                    break;
-
-                case Key.Down:
-                    if ((thisBottom - thisTop) > thisStep)
-                    {
-                        thisTop += thisStep;
-                        thisChanged = true;
-                    }
-                    break;
-            }
-        }
-
-        if (!thisChanged)
-        {
-            return false;
-        }
-
-        this.thisKiCadCalibrationImageLeft = thisMirrorX ? thisRight : thisLeft;
-        this.thisKiCadCalibrationImageRight = thisMirrorX ? thisLeft : thisRight;
-        this.thisKiCadCalibrationImageTop = thisMirrorY ? thisBottom : thisTop;
-        this.thisKiCadCalibrationImageBottom = thisMirrorY ? thisTop : thisBottom;
+        this.SetKiCadCalibrationBox(updatedBox);
 
         this.RefreshKiCadOverlay(forceImmediate: true);
         return true;
@@ -717,70 +630,12 @@ public partial class TabSchematics
     // Remaps a visually hit KiCad calibration handle to the underlying stored edge/corner definition.
     // This keeps resize behavior correct after horizontal and/or vertical flips, because the visible
     // top-left corner may no longer correspond to the stored left/top values.
+    //
+    // The mapping itself is KiCadCalibrationGeometry.RemapDragModeForFlip - eight handles across
+    // four flip states, which is exactly the kind of table that needs tests rather than eyes.
     // ###########################################################################################
-    private LabelEditorDragMode RemapKiCadTraceCalibrationDragModeForCurrentFlip(LabelEditorDragMode dragMode)
-    {
-        bool thisIsMirroredX = this.thisKiCadCalibrationImageLeft > this.thisKiCadCalibrationImageRight;
-        bool thisIsMirroredY = this.thisKiCadCalibrationImageTop > this.thisKiCadCalibrationImageBottom;
-
-        if (!thisIsMirroredX && !thisIsMirroredY)
-        {
-            return dragMode;
-        }
-
-        return dragMode switch
-        {
-            LabelEditorDragMode.ResizeTopLeft => thisIsMirroredX
-                ? thisIsMirroredY
-                    ? LabelEditorDragMode.ResizeBottomRight
-                    : LabelEditorDragMode.ResizeTopRight
-                : thisIsMirroredY
-                    ? LabelEditorDragMode.ResizeBottomLeft
-                    : LabelEditorDragMode.ResizeTopLeft,
-
-            LabelEditorDragMode.ResizeTop => thisIsMirroredY
-                ? LabelEditorDragMode.ResizeBottom
-                : LabelEditorDragMode.ResizeTop,
-
-            LabelEditorDragMode.ResizeTopRight => thisIsMirroredX
-                ? thisIsMirroredY
-                    ? LabelEditorDragMode.ResizeBottomLeft
-                    : LabelEditorDragMode.ResizeTopLeft
-                : thisIsMirroredY
-                    ? LabelEditorDragMode.ResizeBottomRight
-                    : LabelEditorDragMode.ResizeTopRight,
-
-            LabelEditorDragMode.ResizeRight => thisIsMirroredX
-                ? LabelEditorDragMode.ResizeLeft
-                : LabelEditorDragMode.ResizeRight,
-
-            LabelEditorDragMode.ResizeBottomRight => thisIsMirroredX
-                ? thisIsMirroredY
-                    ? LabelEditorDragMode.ResizeTopLeft
-                    : LabelEditorDragMode.ResizeBottomLeft
-                : thisIsMirroredY
-                    ? LabelEditorDragMode.ResizeTopRight
-                    : LabelEditorDragMode.ResizeBottomRight,
-
-            LabelEditorDragMode.ResizeBottom => thisIsMirroredY
-                ? LabelEditorDragMode.ResizeTop
-                : LabelEditorDragMode.ResizeBottom,
-
-            LabelEditorDragMode.ResizeBottomLeft => thisIsMirroredX
-                ? thisIsMirroredY
-                    ? LabelEditorDragMode.ResizeTopRight
-                    : LabelEditorDragMode.ResizeBottomRight
-                : thisIsMirroredY
-                    ? LabelEditorDragMode.ResizeTopLeft
-                    : LabelEditorDragMode.ResizeBottomLeft,
-
-            LabelEditorDragMode.ResizeLeft => thisIsMirroredX
-                ? LabelEditorDragMode.ResizeRight
-                : LabelEditorDragMode.ResizeLeft,
-
-            _ => dragMode
-        };
-    }
+    private LabelEditorDragMode RemapKiCadTraceCalibrationDragModeForCurrentFlip(LabelEditorDragMode dragMode) =>
+        KiCadCalibrationGeometry.RemapDragModeForFlip(this.GetKiCadCalibrationBox(), dragMode);
 
     // ###########################################################################################
     // Starts a KiCad calibration move or resize drag by capturing both the pointer start pixel and
@@ -813,64 +668,17 @@ public partial class TabSchematics
             return;
         }
 
+        // Offset from where the drag STARTED, applied to the box as it stood then - not an
+        // increment on the current box. See KiCadCalibrationGeometry.ApplyDrag for why.
         double dx = currentPixelPoint.X - this.thisKiCadTraceCalibrationDragStartPixelPoint.X;
         double dy = currentPixelPoint.Y - this.thisKiCadTraceCalibrationDragStartPixelPoint.Y;
 
-        double left = this.thisKiCadCalibrationStartImageLeft;
-        double top = this.thisKiCadCalibrationStartImageTop;
-        double right = this.thisKiCadCalibrationStartImageRight;
-        double bottom = this.thisKiCadCalibrationStartImageBottom;
-
-        switch (this.thisKiCadTraceCalibrationDragMode)
-        {
-            case LabelEditorDragMode.Move:
-                left += dx;
-                right += dx;
-                top += dy;
-                bottom += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeTopLeft:
-                left += dx;
-                top += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeTop:
-                top += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeTopRight:
-                right += dx;
-                top += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeRight:
-                right += dx;
-                break;
-
-            case LabelEditorDragMode.ResizeBottomRight:
-                right += dx;
-                bottom += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeBottom:
-                bottom += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeBottomLeft:
-                left += dx;
-                bottom += dy;
-                break;
-
-            case LabelEditorDragMode.ResizeLeft:
-                left += dx;
-                break;
-        }
-
-        this.thisKiCadCalibrationImageLeft = left;
-        this.thisKiCadCalibrationImageTop = top;
-        this.thisKiCadCalibrationImageRight = right;
-        this.thisKiCadCalibrationImageBottom = bottom;
+        this.SetKiCadCalibrationBox(
+            KiCadCalibrationGeometry.ApplyDrag(
+                this.GetKiCadCalibrationStartBox(),
+                this.thisKiCadTraceCalibrationDragMode,
+                dx,
+                dy));
 
         this.RefreshKiCadOverlay(forceImmediate: true);
     }

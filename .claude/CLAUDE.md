@@ -115,11 +115,11 @@ number formats.
 | Security | `ExternalTargetLauncher`, `OnlineServices`' manifest-validation predicates |
 | KiCad | `KiCadRawProjectLoader`, `KiCadProjectLoader`, the `KiCadProjectData` model |
 | Board data | `BoardDataReader`, `BoardDataWriter`, `BoardComponentHighlightStorage`, `ComponentListBuilder`, `ComponentImageQueries`, `OverviewHtmlBuilder`, `ContactLinkFormatter` |
-| Worklog | `WorklogManager` (including `ResolveActiveWorkbook`, `AddEntryRecord`, `IsResolvedState`, `IsWorkbookStatusOpen`, `GetAllWorkbooks`), `WorklogEntryScope`, `WorklogSearchQuery`, `WorklogSearchIndex` |
+| Worklog | `WorklogManager` (including `ResolveActiveWorkbook`, `AddEntryRecord`, `IsResolvedState`, `IsWorkbookStatusOpen`, `GetAllWorkbooks`), `WorklogEntryScope`, `WorklogSearchQuery`, `WorklogSearchIndex`, `WorkbookSummary`, `WorkbookExportModel`, `WorkbookPdfExporter.WriteZip` (the archive only) |
 | Text links | `TextLinkFinder` (which runs in a user-typed note are web links) |
 | Settings / startup | `UserSettings`, `DataManager` (data-root + master workbook), `DataValidator` (smoke only), `SimulationOptions` |
 | Headless UI (`Tests/.../Ui/`) | All nine tabs built headlessly, the worklog and Workbooks palettes, component highlight selection and schematics zoom, plus `Main` itself, the label editor's full edit cycle, the worklog area-marking flow, `ComponentInfoWindow`, the oscilloscope's SCPI sequencing, and the Configuration/Overview/About tabs - see [Headless UI tests](#headless-ui-tests) |
-| Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `KiCadPadGeometry`, `OverlayCullGeometry`, `KiCadOverlayCacheKeys`, `KiCadOverlayNetCache`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry`, `LabelEditorSnapGeometry`, `TraceGeometry`, `WorklogBadgeLayout` |
+| Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `KiCadPadGeometry`, `OverlayCullGeometry`, `KiCadOverlayCacheKeys`, `KiCadOverlayNetCache`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry`, `LabelEditorSnapGeometry`, `TraceGeometry`, `KiCadCalibrationGeometry`, `WorklogBadgeLayout`, `ExportOverlayGeometry` |
 
 `Handlers/` is where the real coverage is; most of the uncovered remainder is `Tabs/` and `Main/`,
 Avalonia code-behind that is verified by running the app.
@@ -157,7 +157,7 @@ spatial hover index, highlight rect building and label-editor handle geometry.
 
 **`public` and `internal` are both fine here, and the folder deliberately uses both.** A class
 extracted from a tab that nothing outside the assembly needs (`LabelEditorGeometry`,
-`LabelEditorSnapGeometry`, `TraceGeometry`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, and the
+`LabelEditorSnapGeometry`, `TraceGeometry`, `KiCadCalibrationGeometry`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, and the
 `KiCadRenderNodes.cs` DTOs) stays `internal`; the tests reach it through the
 `InternalsVisibleTo` entry in [Classic-Repair-Toolbox.csproj](../Classic-Repair-Toolbox.csproj), so
 `internal` costs no coverage. Do not widen one to `public` for consistency's sake — a type is
@@ -229,6 +229,7 @@ and `UiTest.cs` (runs a body on the UI thread). The rest are the tests themselve
 | `DeleteWorkbookWindowTests.cs` | That the delete-confirmation modal's Enter/Escape both CANCEL - including with the **Delete button focused**, the case a plain bubbling `KeyDown` handler misses entirely (the button's own Enter handling fires `Click` and confirms the delete). Asserts on the Delete button's `Click` rather than on the window closing, since it closes either way - the fix is `RoutingStrategies.Tunnel`, and this test fails against the bubbling version |
 | `WorklogEditorNewEntryTests.cs` | The editor opened on a NEW entry (`InitializeForNewEntry`, the "Add worklog" flow after the quick card was removed): that it opens blank with Save disabled, that typing a title ENABLES Save - the thing `Initialize`'s own end-of-method clean state would otherwise make impossible, so a new entry could never be saved at all - that a blank or whitespace title disables it again, the drawn area's schematic carried through, the Note/Open defaults and the "Worklog created" audit comment, "Show marked area" ticked, the window titled "New worklog entry", that cancelling reports `WasSaved == false` and a null `SavedNewEntry` (a draft writes nothing, so the caller must not be told to refresh), and `InitializeComponentScope`'s `tickAll` - fully ticked for a new entry, unticked without it |
 | `WorklogEditorNewEntryTests.cs` (cont.) | Also: the Save button reads "Add worklog" rather than "Update worklog" (set explicitly by `InitializeForNewEntry`, not left as the markup default), and that a blank title on a brand-new entry shows NO explanatory message - there is nothing on disk yet to disagree with, unlike a saved entry (see `WorklogEditorHeaderTests.cs`) |
+| `WorkbooksSummaryAndPillsTests.cs` | The things that made this tab read as one surface: that the entry card's status pill and the top-line's have the SAME border width AND colour (the reported "the pill is not identical" — matching on only one of the two is what let them drift while each claimed to match), that a status pill's border is the STATE colour so Open and Closed differ and a category chip's is its own CATEGORY colour, both at 1px; that an entry card carries a Hand cursor marking it clickable (the click itself opens a modal a headless test cannot dismiss — what makes it provably the pill's modal is the shared `OpenEntryEditor`); that a counted pill in the summary keeps the ordinary 1px informational outline in its own colour but drops its ICON (while an uncounted one keeps it), and that the category/state counts are drawn as pills with the count LEADING each; and the summary strip's real totals (counting "worklogs", not "entries"), that only its NUMBERS are bold (asserted run by run - the finished string cannot show the difference), its collapsed-by-default state, toggling both ways, that an expanded strip SURVIVES a refresh (it rebuilds on every board change and save), the components line hidden when nothing is scoped, and the strip hidden entirely with no workbook selected. Plus that BOTH export formats have their own visible button carrying no icon (the ZIP was reported as invisible when it lived only in the save dialog's type list), and the export document built through the tab's own path — that the tab's board data reaches the exported sections, and that the suggested file name names the workbook and board but NOT the title |
 | `WorkbooksSearchFocusTests.cs` | `TabWorkbooks.FocusSearchBox` - that calling it moves real keyboard focus onto `FindRepairTextBox`, that calling it twice is harmless, and that focus can still move away afterwards through ordinary interaction. Covers only what is testable without `Main` (never constructed by any test): `Main`'s own `OnMainTabControlSelectionChanged`, which calls this on tab entry and is guarded by `e.Source` against `SelectionChanged`'s bubble from a nested `ListBox`/`ComboBox` on another tab, is exercised only by running the app |
 | `ThumbnailWorklogPillsTests.cs` | The thumbnail gallery's "#N" pills, via `ThumbnailWorklogPillsOverlay.LayOutPills`: that a "show marked area" ON entry's pill sits on its marked area while an OFF one is PARKED in the image's top-right corner instead - the reported bug where the thumbnail kept drawing a hidden entry's pill at its marker while the main view parked it, asserted by actual position (the marker is deliberately bottom-left) rather than by mere difference - that the same marker lands in two different places depending on the flag, that a thumbnail carrying both kinds keeps each placement, that parked pills stack without overlapping and stay inside the image however many there are, that they hug the IMAGE's edge and not the letterboxed control's, that each keeps its own id and colour, and that a zero-sized bitmap lays out nothing |
 | `TextLinkRendererTests.cs` | Rendering a user-typed note with its web links clickable: that link-free text stays a plain single-`Text` block with no Hand cursor, that a linked one moves its content into `Inlines` with `Text == null` (a block carrying both renders the Text and silently ignores the Inlines), that only the link run is underlined, that re-rendering replaces the previous pass rather than layering on it, and the LINK + SEARCH-HIGHLIGHT merge - a search term landing inside a URL, one outside it, highlighting with no link present, and that the merged runs are never empty and always rebuild the original string. Plus the `LinkText` attached property the editor's DataTemplates use, including re-rendering when a recycled container is handed a different row |
@@ -281,8 +282,27 @@ context struct is the pattern to copy for anything similar: resolve the UI reads
 the call site and hand them over, rather than passing controls in. `EditableComponentHighlight` moved
 to `Handlers/Geometry/` with it — it was a private nested type in `TabSchematics.Types.cs`, which a
 `Handlers/` class cannot see. Extracting it also removed a wart: `ApplyNewLabelEditorRectangleSnap`
-used to set and restore `thisLabelEditorDragMode` around four calls, and now just passes each edge's
-mode as the `dragModeOverride` the resize snap already accepted.
+used to set and restore `thisLabelEditorDragMode` around four calls, and now drives each edge by
+copying the context with `LabelEditorSnapContext.WithDragMode`. `ApplyResizeSnap` deliberately takes
+the mode from that context and nowhere else — it used to accept a `dragModeOverride` argument
+*alongside* the context, which meant one value with two sources that a caller could set to disagree.
+
+**The KiCad trace calibration maths has since been extracted the same way**, into
+`Handlers/Geometry/KiCadCalibrationGeometry.cs`, leaving `TabSchematics.KiCad.Calibration.cs` as the
+rim that reads the tab's four edge fields, guards on mode, and refreshes the overlay. The value it
+works on is `KiCadCalibrationBox`, and the one thing to understand before touching it is that
+**mirroring is not a flag stored beside the edges — it IS the edge ordering**: a horizontally
+flipped board is held as `Left > Right`. That is why the box is four doubles rather than a `Rect`
+(a `Rect` normalises its edges and would silently discard the flip), why `IsMirroredX`/`IsMirroredY`
+are derived rather than stored, and why arithmetic that needs ascending edges must come back out
+through `WithNormalisedEdges` so the inversion is restored. It is also why `ApplyDrag` deliberately
+does **not** clamp an edge from crossing its opposite: that crossing is how a board gets flipped by
+dragging in the first place. The prize in this extraction was `RemapDragModeForFlip` — an
+eight-handle by four-flip-state table that decides which stored edge a visually grabbed handle
+actually controls. It was at 0% coverage, and a wrong arm in it is invisible: nothing throws,
+dragging a corner of a mirrored board just resizes the wrong edge. `KiCadCalibrationGeometryTests`
+asserts that table entry by entry and adds the involution property (remapping twice returns the
+original handle) that a single-arm typo cannot survive.
 
 The same sweep has now been done across the other tabs. What remains in `Tabs/` and `Main/` was
 checked and is genuinely UI-bound, so **do not go looking for more to extract there** — the
@@ -354,8 +374,9 @@ first still-visible tab when it is hidden while selected.
 **`Tabs/Workbooks/` is partway from mockup to functional** — concept "C; Worklog tab" from
 [Assets/UI mockups/worklog-mockup.html](../Assets/UI%20mockups/worklog-mockup.html), built as markup
 so the layout can be tweaked in the running app, with real data and behaviour landing incrementally
-on top of it. Split across `TabWorkbooks.axaml(.cs)` and `TabWorkbooks.BoardPreviews.cs` (the
-`.Board Previews` partial owns the board pane specifically — see its own header).
+on top of it. Split across `TabWorkbooks.axaml(.cs)`, `TabWorkbooks.BoardPreviews.cs` (the board
+pane specifically), `TabWorkbooks.Summary.cs` (the collapsible workbook-summary strip) and
+`TabWorkbooks.Export.cs` (PDF/ZIP export) — each has its own header explaining what it owns.
 
 - **Real:** the left-hand workbook list (`RefreshWorkbooks`, one card per
   `WorklogManager.GetWorkbooksForBoard(boardKey)` result); clicking a card **activates** that
@@ -444,6 +465,202 @@ on top of it. Split across `TabWorkbooks.axaml(.cs)` and `TabWorkbooks.BoardPrev
   disk, so `WorklogManager.ResolveActiveWorkbook`'s existing stale-id fallback lands the refresh on
   the board's newest remaining workbook automatically - the same fallback that already covers a
   workbook deleted by hand outside the app.
+- **A collapsible SUMMARY STRIP sits under the top-line's Note** (`TabWorkbooks.Summary.cs`).
+  One always-visible headline — `7 worklogs · 12.5 h · 430 · 4 open` — with a chevron that expands a
+  breakdown by category, by state, by attachment counts (comments/links/photos/files/work-done) and
+  by component scope. **It says "worklogs", not "entries"**: the app calls these worklogs everywhere
+  the user can see one, and "entry" is internal vocabulary that leaked out through this line once.
+  **The category and state counts are drawn as the same non-selectable PILLS the rest of the app
+  uses**, each carrying its count (`[ 3 Note ]`), rather than as plain text — every value
+  including the zeroes, so the row does not change width as a workbook is worked on. **Every number
+  in the strip is bold and the words are not**, which is why `WorkbookSummary` hands back `Stat`
+  parts (prefix/number/suffix) rather than finished strings: a `TextBlock` cannot mix weights within
+  one `Text`, and re-finding the digits in a formatted string would have to guess about `0.5 h`.
+  Those blocks therefore carry `Inlines` with `Text == null` — a test reading only `Text` sees them
+  as blank. **A COUNTED pill carries NO icon**, unlike every other informational pill: a padlock or
+  category glyph between a number and its label reads as a third piece of information rather than as
+  decoration. An UNCOUNTED pill keeps its glyph, because on an entry card that glyph is the only
+  thing separating Open from Closed at a glance — `WorklogInfoPillBuilder` branches on `count`, and
+  both halves are pinned. The numbers all come from
+  [Handlers/Data/WorkbookSummary.cs](../Handlers/Data/WorkbookSummary.cs) (pure, unit tested), which
+  the PDF export prints as its own opening section too — so an exported document cannot report
+  different totals from the screen it was produced from. Collapsed by default and persisted in
+  `UserSettings.WorkbooksSummaryExpanded` (per user, not per board), re-applied on every refresh
+  because this header is rebuilt on every board change and entry save. The components line is
+  hidden outright when the workbook scopes none, rather than showing a permanent zero. It is a
+  `Button` styled flat (`Button.WorkbooksSummaryToggle`) rather than an `Expander`, whose border,
+  background and padding would all have to be undone for a line inside an existing header row.
+
+- **Each entry's detail card in the right-hand list is CLICKABLE**, opening the same full editor
+  its pill on the board pane opens — asked for explicitly, since the card is simply the same entry
+  rendered larger. Both go through the one `OpenEntryEditor`; `OnPreviewBadgePointerPressed` is now
+  a wrapper around it, so the two cannot open different modals (the earlier version of exactly that
+  complaint is what the shared `WorklogEntryScope.BuildComponentsInScope` already exists for). The
+  card's schematic bitmap is resolved from the ENTRY's own schematic name rather than the selected
+  preview, so a future list showing more than one schematic's entries cannot hand the editor the
+  wrong board image. **Hovering a card outlines it in the same IndianRed accent a SELECTED schematic
+  preview uses** (`ApplyEntryCardHoverBorder`) — one colour language across the tab for "the thing
+  you are about to act on". Hover rather than selection, because this list has no selection: a card
+  is a button. It is 2px at rest as well as hovered, for the same reason the previews are — growing
+  1px to 2px would reflow the card as the pointer crossed it.
+
+- **Every workbook can be EXPORTED** (`TabWorkbooks.Export.cs`), from **two buttons** — "Export to
+  PDF" and "Export to ZIP" — on their own SECOND ROW inside `WorkbookHeaderActionsPanel`, under
+  Edit/Delete: four buttons across one line crowded the workbook title beside them and pushed the
+  header wider than a narrow window could hold. Both rows are right-aligned so they share a right
+  edge despite differing widths. **PDF** is the customer-facing document; **ZIP** is that same PDF plus
+  the workbook's original photos and attached files under one folder per entry (a PDF shows a photo
+  at page resolution and cannot carry an attached datasheet at all). Both go through one
+  `ExportWorkbook(bool asZip)`, so the picker, the guard, the off-thread write and the error
+  handling cannot drift apart. **The ZIP was originally offered only as a second file type inside
+  the save dialog and was reported as missing entirely** — a format reachable only by opening a
+  dropdown in a dialog the user opened for another reason is not discoverable, so the format now
+  comes from the button and the extension is enforced rather than read back off the returned name.
+
+  **Both exports are named `Workbook_{id}_{Hardware}_{Board}_{YYYYMMDD}`** — the BoardKey is
+  `Hardware|Board`, so its halves become their own underscore-separated segments. The workbook
+  TITLE is deliberately absent: it is a sentence, often carrying a customer's own details, on a file
+  about to be emailed. Inside the ZIP, each entry's attachments sit under **`worklog_{id}`** — the
+  same folder name `WorklogManager.BuildEntryAttachmentsFolderName` gives them in the local Workbook
+  folder, so what a recipient unpacks matches what the repairer sees on their own disk. That helper
+  is the single definition of the name; it was written out in four places before.
+  **The extension comes from the BUTTON, and `WorkbookExportModel.EnsureFileExtension` REPLACES the
+  other format's rather than appending to it** — typing `repair.pdf` into the ZIP dialog produced
+  `repair.pdf.zip`, and the picker's overwrite prompt had been shown for a different name, so an
+  existing file of that name was overwritten without asking. Only `.pdf`/`.zip` are replaced; an
+  unrelated suffix (`board rev 2.5`) is kept and the real extension appended.
+  **Neither button carries an icon**: the fa-regular file-pdf glyph rendered as a blank box in the
+  shipped font subset.
+
+  **`ZipArchive` in `Create` mode is write-forward only** — `GetEntry` and `Entries` both throw
+  `NotSupportedException("Cannot access entries in Create mode")`. `WriteZip` therefore tracks the
+  names it has written in a `HashSet` and never asks the archive. A collision check that called
+  `GetEntry` shipped once and **crashed the whole application** on the first export of any workbook
+  holding an attachment — a workbook with none never reached the call, which is exactly why
+  `WorkbookZipExportTests` is built entirely around workbooks that HAVE attachments. That file is
+  the one deliberate exception to "the PDF writer is not tested": the archive's contents and naming
+  are this app's decisions, not QuestPDF's. It also pins `EnsureIconFontLoaded` being safe to call
+  with no Avalonia available — the other half of the icon-font contract above.
+  [WorkbookExportModel](../Handlers/Data/WorkbookExportModel.cs) decides WHAT goes in and in what
+  order (grouped per schematic, entries by id, missing attachment files dropped, an entry with no
+  schematic filed under `(no schematic)` rather than silently lost) and is unit tested;
+  [WorkbookPdfExporter](../Handlers/Data/WorkbookPdfExporter.cs) only paints it, and its LAYOUT is
+  deliberately not tested — asserting on PDF bytes tests QuestPDF rather than this app.
+
+  **The PDF mirrors the app's own visuals**, asked for directly: outlined status pills and category
+  chips with real Font Awesome icons, the filled category-coloured "#N" badges, and each schematic
+  drawn with its worklog areas washed and outlined in the category colour. Every schematic starts on
+  a **new page**, its image spans the **full page width** and carries the same **1px outline** the
+  Workbooks board pane draws, so a marked area is large enough to locate on the board. An entry with
+  `ShowMarkedArea` off gets no rectangle and its pill parks top-right, mirroring what all three
+  on-screen surfaces do.
+
+  **The pill shapes are the app's own, and QuestPDF can express all of them** — `CornerRadius` is
+  available and was simply not used at first, which is why the exported pills shipped as square
+  boxes and were reported. A status pill is fully rounded, a category chip only softened and a "#N"
+  badge carries a real **white disc** with the state padlock inside it, matching
+  `WorklogInfoPillBuilder`'s 10px/3px split and `WorklogBadgeBuilder`'s disc exactly.
+
+  **Each photo sits in its own bordered panel** holding the picture, its FILE NAME and its comment.
+  The border is what makes the grouping structural — with two photos side by side, the gap between
+  a picture and its own caption is the same as the gap to the next one's, so a reader has to infer
+  which belongs to which. The file name is printed even when there is no comment, so a recipient can
+  find that exact photo in the ZIP's `worklog_{id}` folder.
+
+  **Web links are real, VISIBLE hyperlinks** — blue and underlined, via QuestPDF's
+  `TextDescriptor.Hyperlink`. They shipped as plain black text at first, which was reported: a PDF
+  viewer gives no hover cue of its own, so an unstyled hyperlink is indistinguishable from prose
+  until someone happens to click it, and on a printed page the styling is the only cue that survives
+  at all. Which runs of free text count as links is decided by `TextLinkFinder` — the SAME pure
+  helper the on-screen renderer uses, so the document cannot linkify things the app does not.
+
+  **A worklog's LINK ROWS are the exception, and get `BuildLinkTarget` instead.** `TextLinkFinder`
+  deliberately rejects a bare `example.com` (correct when scanning repair notes full of part numbers
+  and file names), but a link row is a DECLARED destination and the add-link dialog stores whatever
+  the user typed without normalising a scheme onto it. So those rows are linked whole, with `https`
+  filled in for the target when the stored text lacks a scheme — **a PDF hyperlink with no scheme
+  is silently ignored by every reader**, which would produce a link that looks right and does
+  nothing. Pinned by `WorkbookZipExportTests` via reflection.
+
+  **Nothing in this document may be a zero-sized container holding text** — QuestPDF answers that
+  by failing the whole render. Three guards exist for it and all three are load-bearing: the
+  no-icon-font fallback collapses with `Height(0)`, the badge's white disc is drawn only when
+  `IconFontAvailable`, and `PillLabel` substitutes a fallback for a blank State or Category (both
+  are plain strings in `entries.json`, so a hand-edited or older-build record can carry an empty
+  one). Parked pills wrap into a grid via `ParkedBadgeGeometry.GetGridShape` rather than stacking in
+  one unbounded column, which would grow past the bottom of the image.
+
+  **`CategoryHexColor` is case-INSENSITIVE**, like every other category comparison in the app. It
+  was a plain `switch` while the `CategoryGlyphs` dictionary beside it was `OrdinalIgnoreCase`, so
+  an entry stored as `"note"` drew the right icon in the unrecognised-category grey.
+
+  **A "#N" badge carries TWO colours, and they are different channels**: the fill is the CATEGORY
+  colour and the padlock inside the white disc is the STATE colour — so a Closed Issue is a green
+  padlock on a red badge. `WorklogBadgeBuilder` takes `categoryColor` and `stateColor` as separate
+  arguments for exactly this reason. Colouring the glyph to match its own badge was reported: it
+  made the badge report the category twice and the state not at all.
+
+  **Every number in the summary is bold and the words are not**, as on screen. That is why the PDF
+  walks `WorkbookSummary`'s `Stat` parts rather than its `Format*` helpers — the identical reason
+  `TabWorkbooks.Summary.cs` does. The **state pills sit on their own line** under the categories:
+  two different kinds of pill running together read as one undifferentiated list of five.
+
+  **How the overlay is positioned — and the trap to avoid.** An entry's area is stored in the
+  schematic's own PIXEL coordinates, while the page draws the image at whatever width the margins
+  leave, a size QuestPDF decides during layout and never reports. So the placement is entirely
+  PROPORTIONAL: [ExportOverlayGeometry](../Handlers/Geometry/ExportOverlayGeometry.cs) turns a pixel
+  rect into fractions of the image, and each band is then expressed as an **aspect ratio**, which
+  QuestPDF can satisfy against any width. No page dimension appears in the drawing code at all.
+
+  **There is no percentage unit anywhere in QuestPDF** — every `Padding*`, `Width` and `Height`
+  takes an absolute length (points by default). The first version computed the fractions correctly
+  and then passed them to `PaddingLeft`/`PaddingTop` multiplied by 100 believing those were
+  percentages, so "58% across" became "58 points across" and a marked area covering a tenth of the
+  board was drawn covering most of it. Nothing threw; it was caught by holding the PDF next to the
+  screen. `ExportOverlayGeometryTests` now pins the fractions against a REAL entry's stored
+  coordinates, and four of them fail against that ×100 version.
+
+  **Rows have relative sizing; Columns do not.** `Row.RelativeItem(weight)` splits the horizontal
+  axis directly, but a `Column` has no equivalent, so the vertical axis is expressed as "this band
+  is X wide and Y tall, i.e. this ratio" via `TryBuildBandAspectRatio`. Every empty band is OMITTED
+  rather than emitted at zero — a zero-weight `RelativeItem` and a zero-ratio `AspectRatio` are both
+  degenerate and QuestPDF rejects the whole layout.
+
+  **A zero-sized container holding text fails the ENTIRE document.** QuestPDF answers it with
+  `DocumentLayoutException` and abandons the render rather than clipping one element, so a single
+  bad band takes down the export. Two things follow, both of which shipped broken once: a vertical
+  `AlignMiddle` inside a row whose height is still being negotiated measures its child against zero
+  height, and `container.Text(string.Empty)` still demands a line box — which is why the no-icon
+  fallback collapses the element with `Height(0)` and the badge's white disc is only drawn when
+  `IconFontAvailable`. `WorkbookZipExportTests` covers an entry WITH a shown marked area precisely
+  because every other test there uses parked entries that never reach this code.
+
+  The pixel dimensions come from `TryReadImageSize`, which parses the PNG/JPEG **header** rather
+  than decoding the file — a 4220x2941 board scan would otherwise cost ~47 MB per schematic just to
+  read two numbers. **The JPEG side is a marker walk, and which markers are frame headers is the
+  whole subtlety**: of `0xC0`-`0xCF` only C0-C3, C5-C7 and C9-CB carry dimensions (C4/C8/CC are
+  DHT/JPG/DAC and CD/CE/CF are DNL/DHP/EXP), and the standalone markers (`0x01` TEM, `0xD0`-`0xD9`)
+  carry no length word, so reading two bytes after one seeks into image data. Getting either wrong
+  is silent — a bogus size, no exception — and every marked area on that schematic then lands
+  nowhere. Covered by `WorkbookZipExportTests`.
+
+  **An area is CLIPPED to the image, not clamped inward.** `TryBuildAreaFractions` converts both
+  edges and intersects; clamping only the origin kept the full width and slid the rectangle off the
+  thing it marks (an entry at `x=-50 w=100` on a 1000px image drew 100px starting at 0).
+
+  **The icon font is loaded on the UI thread, deliberately** (`EnsureIconFontLoaded`, called from
+  the export handler before its `Task.Run`). The .otf is an `AvaloniaResource` compiled into the
+  assembly — not a file on disk, and not a plain manifest resource — so only Avalonia's `AssetLoader`
+  can read it, and that resolves `IAssetLoader` out of a locator **not available on a background
+  thread**. Doing the load inside the writer threw `InvalidOperationException` inside a `try`, so
+  every exported document silently came out with no icons at all until the PDF was inspected. Bytes
+  are now read on the UI thread and cached; the QuestPDF registration, which needs no Avalonia
+  service, happens lazily wherever the export runs. A failure still degrades to omitting icons
+  rather than throwing — an unregistered font renders as blank boxes, which looks like a defect.
+  **The export is deliberately not opened afterwards**: `ExternalTargetLauncher` admits a local path
+  only inside the data root, and an export is saved wherever the user chose, so calling it would
+  refuse every export and log a warning about the file it had just written.
+
 - **The "Find a previous repair" field is now wired up** and filters the whole tab as you type.
   The query language lives in [Handlers/Data/WorklogSearchQuery.cs](../Handlers/Data/WorklogSearchQuery.cs)
   (pure, unit tested by `WorklogSearchQueryTests`): space-separated terms are ANDed, `"a phrase"`
@@ -562,6 +779,19 @@ Cards, the top-line pill and preview badges are all built in code rather than by
 because their brushes need the two-step `Application.Current` + `ThemeVariant` lookup a template
 binding cannot express — the same reason `Main` builds the worklog bar's own pill in code.
 
+**Status pills and category chips have exactly TWO looks, and mixing them up has been reported
+twice.** A pill is either SELECTABLE — only inside `WorklogEntryEditorWindow`, where clicking one
+chooses it, and the chosen one is FILLED with its colour — or INFORMATIONAL, which is everywhere
+else. Every informational one now comes from
+[Handlers/Theme/WorklogInfoPillBuilder.cs](../Handlers/Theme/WorklogInfoPillBuilder.cs): a `Form_Bg`
+fill, a **1px** border in the thing's OWN colour (the state colour for a status pill, the category
+colour for a category chip), glyph and label in that same colour. Five sites used to draw these by
+hand — the worklog bar and the workbook card and the top-line at 2px in the status colour, the entry
+detail card's two at 1px in GREY — each under a comment asserting they all matched, which was true
+of no two of them. **Do not draw one of these by hand**; the builder is the only place that visual
+is decided, and `WorkbooksSummaryAndPillsTests` pins the border width and colour precisely because
+those are the two axes that drifted.
+
 **Schematic bitmaps are shared, not decoded per rebuild.** `thisSchematicBitmapsByPath` holds one
 decoded `Bitmap` per image path for the life of one ATTACHMENT, disposed in
 `OnDetachedFromVisualTree`. A fresh `new Bitmap(path)` per preview per pass stranded a
@@ -656,7 +886,7 @@ before grepping** — the same header map is repeated in
 | `TabSchematics.KiCad.RenderCache.cs` | Builds/caches per-net PCB render nodes and connected-segment chains |
 | `TabSchematics.KiCad.Geometry.cs` | KiCad world ↔ screen mapping, world bounds, curve sampling, zone polygon geometry |
 | `TabSchematics.KiCad.HitTest.cs` | Hover hit-testing, hit-test caches, hover throttling, trace hover mode UI |
-| `TabSchematics.KiCad.Calibration.cs` | Interactive KiCad trace calibration mode |
+| `TabSchematics.KiCad.Calibration.cs` | Interactive KiCad trace calibration mode; the maths is `Handlers/Geometry/KiCadCalibrationGeometry` |
 | `TabSchematics.Settings.cs` | Board-level and global setting rows, and restoring them per board |
 
 Supporting classes in the same folder are ordinary (non-partial) types: `KiCadOverlayRenderControl`,
@@ -724,6 +954,17 @@ contribution, not a code change.
   data root *and* carry a document/image/data file extension from its allowlist (it hands files to the
   OS shell, which would run a `.exe`/`.bat`/`.lnk` instead of displaying it), rejecting anything else.
   Use this rather than shelling out directly when opening user/data-supplied links or files.
+
+**QuestPDF** (the workbook PDF export) is the app's one non-Avalonia UI dependency worth knowing
+about. Two things about it:
+
+- **Its licence is a condition on this project, not just a package reference.** The Community
+  licence QuestPDF is used under is free for individuals and for organisations under $1M USD annual
+  revenue — which this project is. An organisation above that threshold shipping a fork would need
+  its own commercial licence from QuestPDF.
+- **`QuestPDF.Settings.License` must be set before it generates anything**, or the first export
+  throws. It is set once in `App.OnFrameworkInitializationCompleted`, not at the export call site,
+  so a missing line fails at launch in development rather than in a user's hands.
 
 ### Contribution webserver (`Assets/Webserver/`)
 

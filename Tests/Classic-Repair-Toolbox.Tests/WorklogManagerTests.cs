@@ -1098,7 +1098,13 @@ public sealed class WorklogManagerTests : IDisposable
         string? attachmentsFolder = WorklogManager.GetEntryAttachmentsFolder(workbook.Id, 1);
 
         Assert.NotNull(attachmentsFolder);
-        Assert.Equal(Path.Combine(root, workbook.Id.ToString(), "entry-1-files"), attachmentsFolder);
+
+        // "worklog_{id}", not the older "entry-{id}-files". This folder is visible to the user -
+        // in the Workbook folder on disk AND inside an exported ZIP, which reuses this exact name -
+        // and the app says "worklog" everywhere a user can see one. Renamed deliberately, with no
+        // migration of existing data: an older folder keeps its name and its attachments simply
+        // stop being found.
+        Assert.Equal(Path.Combine(root, workbook.Id.ToString(), "worklog_1"), attachmentsFolder);
         Assert.True(Directory.Exists(attachmentsFolder));
     }
 

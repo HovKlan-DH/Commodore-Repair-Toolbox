@@ -42,18 +42,6 @@ namespace CRT
     // ###########################################################################################
     public partial class TabWorkbooks
     {
-        // fa-solid lock-open / lock, from WorklogGlyphs - see that class. These used to be a local
-        // copy, justified on the grounds that this file and TabSchematics.Worklog.cs are
-        // "independent partials of different classes"; the other copy in THIS class's own other
-        // partial made that plainly untrue.
-        private const int WorklogOpenCodepoint = WorklogGlyphs.OpenCodepoint;
-
-        private const int WorklogClosedCodepoint = WorklogGlyphs.ClosedCodepoint;
-
-        private static readonly string WorklogOpenGlyph = WorklogGlyphs.OpenGlyph;
-
-        private static readonly string WorklogClosedGlyph = WorklogGlyphs.ClosedGlyph;
-
         // The schematic currently selected in the board pane - drives the entry list on the right.
         // Null means none selected (before the first RefreshBoardPreviews call, or the workbook has
         // no entries at all). RefreshBoardPreviews defaults this to the first schematic it builds a
@@ -196,9 +184,48 @@ namespace CRT
         // ###########################################################################################
         public void RefreshBoardPreviewsForCurrentSelection()
         {
-            // Its own refresh pass, like SelectSchematic - see the clear there.
+            this.StartFreshBoardPass();
+        }
+
+        // ###########################################################################################
+        // One refresh pass over the board pane AND the summary strip above it, from freshly-read
+        // entries.
+        //
+        // WHY THE THREE THINGS GO TOGETHER: thisEntriesReadThisPass caches an entries.json read for
+        // the duration of one pass, so a pass that does not clear it redraws from whatever the
+        // previous pass read - after a save, that is the pre-save record. And the summary strip is
+        // computed from those same entries, so rebuilding the pane without recomputing it leaves
+        // the totals above the pane disagreeing with the pills inside it.
+        //
+        // Every path that rebuilds the pane WITHOUT coming through RefreshWorkbooks (which does all
+        // three itself) must call this rather than RefreshBoardPreviews directly. Three such paths
+        // existed and each had got a different subset right: the highlight-cache refresh and
+        // SelectSchematic cleared the cache but never touched the summary, and the no-MainWindow
+        // save path did neither.
+        // ###########################################################################################
+        private void StartFreshBoardPass()
+        {
             this.thisEntriesReadThisPass.Clear();
             this.RefreshBoardPreviews();
+            this.RefreshSummaryForShownWorkbook();
+        }
+
+        // The summary strip for whichever workbook the tab is currently showing, or nothing when
+        // none is selected - ApplySummaryForWorkbook needs the record, not just the id.
+        private void RefreshSummaryForShownWorkbook()
+        {
+            if (this.thisSelectedWorkbookId <= 0)
+                return;
+
+            string boardKey = this.BoardKeyOverrideForTests ?? this.MainWindow?.GetCurrentBoardKey() ?? string.Empty;
+
+            var workbook = WorklogManager.GetWorkbooksForBoard(boardKey)
+                .FirstOrDefault(w => w.Id == this.thisSelectedWorkbookId);
+
+            if (workbook != null)
+            {
+                this.ApplySummaryForWorkbook(workbook);
+            }
         }
 
         // ###########################################################################################
@@ -346,8 +373,10 @@ namespace CRT
 
             // This is its own refresh pass - it does not come through RefreshWorkbooks, which is
             // what normally clears the cache - so clear it here too. Without this a click could be
-            // served entries read before an intervening save.
+            // served entries read before an intervening save. The summary is recomputed with it,
+            // for the reason StartFreshBoardPass gives.
             this.thisEntriesReadThisPass.Clear();
+            this.RefreshSummaryForShownWorkbook();
 
             foreach (var child in this.BoardPreviewPanel.Children)
             {
@@ -425,24 +454,6 @@ namespace CRT
             }
         }
 
-        // fa-regular note-sticky / fa-solid paint-roller / fa-solid triangle-exclamation - the SAME
-        // codepoints WorklogEntryEditorWindow.axaml uses for its three category chips
-        // (EditorCategoryNoteIcon/CosmeticIcon/IssueIcon), spelled as hex codepoints rather than
-        // literal glyph characters so this source file stays plain ASCII. Note is the one category
-        // whose glyph is Regular rather than Solid.
-        private const int NoteCategoryCodepoint = 0xF15C;
-
-        private const int CosmeticCategoryCodepoint = 0xF5D0;
-
-        private const int IssueCategoryCodepoint = 0xF188;
-
-        private static readonly Dictionary<string, (int Codepoint, bool IsRegular)> CategoryIconsByName = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Note"] = (NoteCategoryCodepoint, true),
-            ["Cosmetic"] = (CosmeticCategoryCodepoint, false),
-            ["Issue"] = (IssueCategoryCodepoint, false)
-        };
-
         // ###########################################################################################
         // Builds one entry's detail card for the selected-schematic list: ONE 1px-bordered panel
         // holding four stacked rows - "#{N} {Title}", the description, a category chip + status
@@ -455,7 +466,8 @@ namespace CRT
         // The "#N" badge is drawn in the same filled/white-text visual WorklogEntryEditorWindow uses
         // for its own EditorIdBadge - filled is right there, since it names WHICH workbook entry this
         // is rather than a selection state. The category chip and status pill beside it are
-        // deliberately the OUTLINED variant instead - see BuildOutlinedCategoryChip.
+        // deliberately the INFORMATIONAL outlined variant instead, from the one shared
+        // WorklogInfoPillBuilder - see that class for why they are not drawn here.
         // ###########################################################################################
         // An instance method rather than static: the title and description are drawn through
         // BuildHighlightedTextBlock, which needs THIS tab's current search query to know what to
@@ -504,8 +516,11 @@ namespace CRT
                 // title above deliberately is not - see ApplyHighlightedText's linkify note.
                 linkify: hasDescription);
 
-            var categoryChip = BuildOutlinedCategoryChip(entry.Category, categoryColor);
-            var statusPill = BuildOutlinedStatePill(entry.State);
+            // Both from the ONE shared informational builder - see WorklogInfoPillBuilder for why
+            // these may not be drawn by hand here (they were, in a grey outline that did not match
+            // the coloured one every other non-selectable pill in the app uses).
+            var categoryChip = WorklogInfoPillBuilder.BuildCategoryChip(entry.Category);
+            var statusPill = WorklogInfoPillBuilder.BuildStatePill(entry.State);
 
             var categoryStatusRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             categoryStatusRow.Children.Add(categoryChip);
@@ -519,15 +534,90 @@ namespace CRT
             stack.Children.Add(categoryStatusRow);
             stack.Children.Add(statsRow);
 
-            return new Border
+            var card = new Border
             {
                 Background = ResolveThemeBrushStatic("Workbooks_Panel_Bg"),
                 BorderBrush = ResolveThemeBrushStatic("Workbooks_RowSeparator"),
-                BorderThickness = new Thickness(1),
+
+                // 2px at rest as well as on hover, matching the schematic previews for the same
+                // reason - see ApplySchematicPreviewSelectedBorder. Growing 1px to 2px on hover
+                // would reflow the card's contents by a pixel as the pointer crossed it.
+                BorderThickness = new Thickness(2),
                 CornerRadius = new CornerRadius(4),
                 Padding = new Thickness(10),
+
+                // The whole card opens this entry's editor, exactly as its pill on the board pane
+                // does - see OpenEntryEditor, which both go through. The Hand cursor is the only
+                // thing that says so, since the card carries no button of its own; it is the same
+                // shared instance the previews and pills use (see HandCursor).
+                Cursor = HandCursor,
                 Child = stack
             };
+
+            // ###########################################################################################
+            // HOVER shows the same IndianRed accent a SELECTED schematic preview uses, so the whole
+            // tab speaks one colour language: red outline = "this is the one you are acting on".
+            //
+            // Hover rather than selection because this list HAS no selection - a card is a button,
+            // not a choice that persists after the click. Without it the only affordance was the
+            // Hand cursor, which does not say WHICH card a click will land on when several are
+            // stacked; the schematic previews beside them already made that clear with an outline.
+            //
+            // PointerEntered/Exited rather than a Style with a :pointerover selector: these cards
+            // are built in code (their brushes need the two-step theme lookup - see the class
+            // header), so there is no template for a selector to attach to.
+            // ###########################################################################################
+            card.PointerEntered += (_, _) => ApplyEntryCardHoverBorder(card, isHovered: true);
+            card.PointerExited += (_, _) => ApplyEntryCardHoverBorder(card, isHovered: false);
+
+            card.PointerPressed += (_, e) => this.OnEntryDetailCardPointerPressed(entry, e);
+
+            return card;
+        }
+
+        // ###########################################################################################
+        // A click anywhere on an entry's detail card opens that entry in the full editor - the same
+        // modal, through the same OpenEntryEditor, that the entry's pill on the board pane opens.
+        //
+        // The schematic bitmap is looked up by the entry's OWN schematic name rather than taken
+        // from the selected preview: the two agree today (the list only ever shows the selected
+        // schematic's entries), but resolving it from the entry means a future list showing more
+        // than one schematic's entries cannot hand the editor the wrong board image. A missing or
+        // unreadable image yields null, which the editor renders as no location preview rather
+        // than refusing to open - an entry's text is still worth reading without its picture.
+        // ###########################################################################################
+        private void OnEntryDetailCardPointerPressed(WorklogEntryRecord entry, PointerPressedEventArgs e)
+        {
+            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+                return;
+
+            e.Handled = true;
+
+            this.OpenEntryEditor(this.thisSelectedWorkbookId, entry.Id, this.ResolveSchematicBitmapForEntry(entry));
+        }
+
+        // ###########################################################################################
+        // The shared decoded bitmap for the schematic an entry sits on, or null when the board data
+        // does not name that schematic or its image file is missing from the data root.
+        //
+        // Same lookup BuildSchematicPreview does for the pane itself, and it goes through the same
+        // GetOrDecodeSchematicBitmap cache - so opening an entry from its card hands the editor the
+        // very bitmap instance the pane is already drawing, not a second decode of the same file.
+        // ###########################################################################################
+        private Bitmap? ResolveSchematicBitmapForEntry(WorklogEntryRecord entry)
+        {
+            if (string.IsNullOrWhiteSpace(entry.SchematicName))
+                return null;
+
+            var schematic = this.CurrentBoardDataForPreviews?.Schematics
+                ?.FirstOrDefault(s => string.Equals(s.SchematicName, entry.SchematicName, StringComparison.OrdinalIgnoreCase));
+
+            if (string.IsNullOrWhiteSpace(schematic?.SchematicImageFile))
+                return null;
+
+            return this.GetOrDecodeSchematicBitmap(Path.Combine(
+                DataManager.DataRoot,
+                schematic.SchematicImageFile.Replace('/', Path.DirectorySeparatorChar)));
         }
 
         // ###########################################################################################
@@ -564,99 +654,6 @@ namespace CRT
             VerticalAlignment = VerticalAlignment.Center
         };
 
-
-        // The category chip in the UNSELECTED visual from WorklogEntryEditorWindow's own
-        // ApplyCategoryChipVisualState else-branch: outlined rather than filled - Form_Bg
-        // background, a 1px Form_Border outline, icon and label both in the ordinary foreground
-        // colour. This list has no selection concept (nothing here is "the chosen category" the
-        // way a click in the full editor would make one), so the filled "selected" look the id
-        // badge still uses does not apply here - reported explicitly: the filled look should only
-        // ever mean "this is the selected one".
-        //
-        // Named BuildOutlined*, not BuildFilled*: it was called the latter while building the
-        // former, which read as an instruction to restore precisely the bug that was reported.
-        private static Border BuildOutlinedCategoryChip(string category, Color categoryColor)
-        {
-            var (codepoint, isRegular) = CategoryIconsByName.TryGetValue(category, out var icon) ? icon : (NoteCategoryCodepoint, true);
-            string glyph = char.ConvertFromUtf32(codepoint);
-
-            var labelBrush = ResolveThemeBrushStatic("Schematics_Panels_Fg");
-
-            var iconText = new TextBlock
-            {
-                Text = glyph,
-                FontFamily = isRegular ? ResolveFontAwesomeRegular() : ResolveFontAwesomeSolid(),
-                FontSize = 11,
-                Padding = FontAwesomeGlyphMetrics.GetTopOverflowThickness(codepoint, 11.0),
-                Foreground = labelBrush,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            var labelText = new TextBlock
-            {
-                Text = category,
-                FontSize = 11,
-                Foreground = labelBrush,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-
-            var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
-            content.Children.Add(iconText);
-            content.Children.Add(labelText);
-
-            return new Border
-            {
-                Background = ResolveThemeBrushStatic("Form_Bg"),
-                BorderBrush = ResolveThemeBrushStatic("Form_Border"),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(3),
-                Padding = new Thickness(8, 4),
-                Child = content
-            };
-        }
-
-        // The status pill in the UNSELECTED visual from WorklogEntryEditorWindow's own
-        // ApplyStatePillVisualState else-branch: outlined rather than filled - Form_Bg background,
-        // a 1px Form_Border outline, the padlock in the state's own colour (that is its identity,
-        // not a selection cue) and the label in the ordinary foreground. Same reasoning as
-        // BuildOutlinedCategoryChip: no selection concept in this list, so no filled pill.
-        private static Border BuildOutlinedStatePill(string state)
-        {
-            bool isResolved = WorklogManager.IsResolvedState(state);
-            Color stateColor = ResolveWorklogStateColor(state);
-            int glyphCodepoint = isResolved ? WorklogClosedCodepoint : WorklogOpenCodepoint;
-            const double glyphFontSize = 11.0;
-
-            var iconText = new TextBlock
-            {
-                Text = isResolved ? WorklogClosedGlyph : WorklogOpenGlyph,
-                FontFamily = ResolveFontAwesomeSolid(),
-                FontSize = glyphFontSize,
-                Foreground = new SolidColorBrush(stateColor),
-                Padding = FontAwesomeGlyphMetrics.GetTopOverflowThickness(glyphCodepoint, glyphFontSize),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            var labelText = new TextBlock
-            {
-                Text = state,
-                FontSize = 11,
-                Foreground = ResolveThemeBrushStatic("Schematics_Panels_Fg"),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-
-            var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
-            content.Children.Add(iconText);
-            content.Children.Add(labelText);
-
-            return new Border
-            {
-                Background = ResolveThemeBrushStatic("Form_Bg"),
-                BorderBrush = ResolveThemeBrushStatic("Form_Border"),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(10, 2),
-                Child = content
-            };
-        }
 
         // ###########################################################################################
         // Builds one schematic's preview: its image (natural aspect ratio, capped in height so a
@@ -837,6 +834,19 @@ namespace CRT
         }
 
         // ###########################################################################################
+        // Colours an entry detail card's border for the hovered state - the SAME
+        // Main_TabUnderline_Selected accent a selected schematic preview takes, deliberately: both
+        // mean "the thing you are about to act on", and two different reds for that would read as
+        // two different meanings.
+        // ###########################################################################################
+        private static void ApplyEntryCardHoverBorder(Border card, bool isHovered)
+        {
+            card.BorderBrush = isHovered
+                ? ResolveThemeBrushStatic("Main_TabUnderline_Selected")
+                : ResolveThemeBrushStatic("Workbooks_RowSeparator");
+        }
+
+        // ###########################################################################################
         // Colours a schematic preview's own border to show whether it is the selected one - the
         // same IndianRed accent BuildWorkbookCard's selected-card left edge uses, so "selected"
         // reads as one consistent colour language across this tab. A plain 1px neutral outline
@@ -977,7 +987,7 @@ namespace CRT
         // OnPreviewBadgePointerPressed for what it guards against.
         private bool thisIsOpeningEntryEditor;
 
-        private async void OnPreviewBadgePointerPressed(int workbookId, int entryId, Bitmap schematicBitmap, PointerPressedEventArgs e)
+        private void OnPreviewBadgePointerPressed(int workbookId, int entryId, Bitmap schematicBitmap, PointerPressedEventArgs e)
         {
             if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
                 return;
@@ -987,6 +997,26 @@ namespace CRT
             // firing off one click is not what either affordance is meant to do.
             e.Handled = true;
 
+            this.OpenEntryEditor(workbookId, entryId, schematicBitmap);
+        }
+
+        // ###########################################################################################
+        // Opens the full worklog entry editor for one entry, and refreshes afterwards if it saved.
+        //
+        // TWO callers, and they must stay one implementation: a pill on the board pane
+        // (OnPreviewBadgePointerPressed) and an entry's detail card in the right-hand list
+        // (OnEntryDetailCardPointerPressed). Clicking either was asked for explicitly to do the
+        // same thing - the card is simply the same entry rendered larger, so a click on it landing
+        // anywhere other than this exact modal would be the "the two modals are not identical"
+        // complaint over again, one level out.
+        //
+        // schematicBitmap is the entry's own schematic image, which the editor draws its location
+        // preview from. It belongs to this tab's shared cache and must NOT be disposed here - see
+        // thisSchematicBitmapsByPath. Null is tolerated by the editor (no preview drawn), which is
+        // what a card whose schematic image is missing from the data root passes.
+        // ###########################################################################################
+        private async void OpenEntryEditor(int workbookId, int entryId, Bitmap? schematicBitmap)
+        {
             if (this.thisIsOpeningEntryEditor)
                 return;
 
@@ -1025,7 +1055,10 @@ namespace CRT
                 }
                 else
                 {
-                    this.RefreshBoardPreviews();
+                    // A full pass, not a bare RefreshBoardPreviews: the entry that was just saved
+                    // is still in this pass's read cache, so the pane would redraw the PRE-save
+                    // record - wrong category, wrong state, and stale totals in the strip above it.
+                    this.StartFreshBoardPass();
                 }
             }
             catch (Exception ex)
@@ -1051,19 +1084,22 @@ namespace CRT
             WorklogBadgeBuilder.Build(entry, categoryColor, ResolveWorklogStateColor(entry.State));
 
         // ###########################################################################################
-        // Resolves a saved entry's category colour - the same Worklog_Category_{category} theme
-        // resources TabSchematics.Worklog.cs's ResolveWorklogCategoryColor reads, so a "Cosmetic"
-        // entry is the same blue everywhere it is drawn.
+        // A saved entry's category and state colours.
+        //
+        // Both DELEGATE to WorklogInfoPillBuilder rather than resolving the theme keys again. Each
+        // used to be its own copy of the same two-line lookup, which is exactly the duplication
+        // that builder was introduced to end: the pills on this pane and the badges beside them
+        // read their colours from different code, so the two could drift while every comment
+        // claimed they matched.
+        //
+        // Kept as named methods rather than inlining the calls - they are used from several places
+        // here, and the names say which of the two colours a call site means.
         // ###########################################################################################
         private static Color ResolveWorklogCategoryColor(string category) =>
-            ThemeResources.ResolveColor($"Worklog_Category_{category}", Colors.IndianRed);
+            WorklogInfoPillBuilder.ResolveCategoryColor(category);
 
-        // Mirrors TabSchematics.Worklog.cs's ResolveWorklogStateColor: Closed is green, anything
-        // else (including an unrecognised future value) reads as open/red.
         private static Color ResolveWorklogStateColor(string state) =>
-            ThemeResources.ResolveColor(
-                WorklogManager.IsResolvedState(state) ? "Worklog_Status_Closed" : "Worklog_Status_Open",
-                Colors.IndianRed);
+            WorklogInfoPillBuilder.ResolveStateColor(state);
 
         // See ThemeResources for why a ThemeDictionaries-scoped key needs the two-step
         // Application.Current + ActualThemeVariant lookup. Falls back to IndianRed, matching every

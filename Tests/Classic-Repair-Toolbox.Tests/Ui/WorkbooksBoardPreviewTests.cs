@@ -933,7 +933,7 @@ public sealed class WorkbooksBoardPreviewTests : IDisposable
     // Pins the whole card down to exactly ONE outer Border, with none of its four direct rows
     // (title, description, category+status, stats) wrapped in a border of their own - the id
     // badge, category chip and status pill ARE still their own (outlined, not filled - see
-    // BuildFilledCategoryChip/BuildFilledStatePill's own comments) Border "pills" nested further
+    // WorklogInfoPillBuilder, which now builds both) Border "pills" nested further
     // inside the category/status row, by design, so this does not assert "no Border anywhere in
     // the card" - only that the ROW-level wrapping is gone.
     // ###########################################################################################

@@ -39,7 +39,7 @@ namespace Handlers.DataHandling
     // either as "redundant" would discard real user data.
     // Links/Comments/WorkDoneItems/Photos/Files are the full editor's own sub-lists - see
     // their own record types below. Photo/file bytes themselves are not stored here, only their
-    // metadata; the files live in the entry's own "entry-<id>-files" subfolder under the workbook.
+    // metadata; the files live in the entry's own "worklog_<id>" subfolder under the workbook.
     // ###########################################################################################
     public sealed class WorklogEntryRecord
     {
@@ -129,7 +129,7 @@ namespace Handlers.DataHandling
 
     // ###########################################################################################
     // One row in an entry's "Photos/images" or "Files" list: the attached file's own name (as
-    // stored in the entry's "entry-<id>-files" subfolder) plus a user comment. Photos and Files
+    // stored in the entry's "worklog_<id>" subfolder) plus a user comment. Photos and Files
     // use the same shape - only which list they sit in tells them apart. DisplayOrder lets photos
     // be dragged into a different order without renaming the files on disk.
     // ###########################################################################################
@@ -153,7 +153,7 @@ namespace Handlers.DataHandling
     // One consequence of having no persisted id counter: the next id is the highest numbered
     // subfolder currently on disk, plus one. So hand-deleting workbook #3 (the highest) lets the
     // next workbook created take #3 again - nothing remembers #3 was ever used. That is not
-    // harmless: entry attachments live in "entry-<id>-files" folders keyed on the same reused ids
+    // harmless: entry attachments live in "worklog_<id>" folders keyed on the same reused ids
     // (see GetEntryAttachmentsFolder), so a recreated workbook can inherit a deleted one's files.
     // Worth a persisted counter in index.json before attachments actually ship.
     //
@@ -893,8 +893,8 @@ namespace Handlers.DataHandling
         // ###########################################################################################
         private static void MoveEntryAttachmentsFolder(string workbookFolder, int fromEntryId, int toEntryId)
         {
-            string from = Path.Combine(workbookFolder, $"entry-{fromEntryId.ToString(CultureInfo.InvariantCulture)}-files");
-            string to = Path.Combine(workbookFolder, $"entry-{toEntryId.ToString(CultureInfo.InvariantCulture)}-files");
+            string from = Path.Combine(workbookFolder, BuildEntryAttachmentsFolderName(fromEntryId));
+            string to = Path.Combine(workbookFolder, BuildEntryAttachmentsFolderName(toEntryId));
 
             try
             {
@@ -906,7 +906,7 @@ namespace Handlers.DataHandling
                 if (!Directory.Exists(to))
                 {
                     Directory.Move(from, to);
-                    Logger.Info($"Moved worklog draft attachments from [entry-{fromEntryId}-files] to [entry-{toEntryId}-files]");
+                    Logger.Info($"Moved worklog draft attachments from [{BuildEntryAttachmentsFolderName(fromEntryId)}] to [{BuildEntryAttachmentsFolderName(toEntryId)}]");
                     return;
                 }
 
@@ -918,7 +918,7 @@ namespace Handlers.DataHandling
                     if (File.Exists(targetFile))
                     {
                         Logger.Warning(
-                            $"Not moving worklog draft attachment [{name}]: a file of that name already exists in [entry-{toEntryId}-files]");
+                            $"Not moving worklog draft attachment [{name}]: a file of that name already exists in [{BuildEntryAttachmentsFolderName(toEntryId)}]");
                         continue;
                     }
 
@@ -932,7 +932,7 @@ namespace Handlers.DataHandling
                     Directory.Delete(from);
                 }
 
-                Logger.Info($"Merged worklog draft attachments from [entry-{fromEntryId}-files] into [entry-{toEntryId}-files]");
+                Logger.Info($"Merged worklog draft attachments from [{BuildEntryAttachmentsFolderName(fromEntryId)}] into [{BuildEntryAttachmentsFolderName(toEntryId)}]");
             }
             catch (Exception ex)
             {
@@ -1049,11 +1049,27 @@ namespace Handlers.DataHandling
 
         // ###########################################################################################
         // Resolves (creating if missing) the subfolder that holds one entry's photo/file attachment
-        // bytes - "entry-<id>-files" inside the entry's own workbook folder. Photo/file metadata
+        // bytes - "worklog_<id>" inside the entry's own workbook folder. Photo/file metadata
         // (comment, display order) lives in entries.json via WorklogAttachmentRecord; only the
         // actual bytes live here, named by WorklogAttachmentRecord.FileName.
         // Returns null when the workbook folder cannot be found.
         // ###########################################################################################
+        // ###########################################################################################
+        // The NAME (not path) of one entry's attachment folder: "worklog_{id}".
+        //
+        // ONE definition, because this string was written out four times - the two resolvers below,
+        // the draft-move helper, and its log lines - and any rename had to be made correctly in all
+        // of them or attachments would be written to one folder and read from another.
+        //
+        // Named for the WORKLOG rather than the "entry" the code calls it internally: this folder is
+        // visible to the user, both in the Workbook folder on disk and inside an exported ZIP, and
+        // the app says "worklog" everywhere a user can see one. It was "entry-{id}-files".
+        // Deliberately NO migration of existing data - a folder from an older build keeps its name
+        // and its attachments simply stop being found, which was accepted when this was requested.
+        // ###########################################################################################
+        public static string BuildEntryAttachmentsFolderName(int entryId) =>
+            $"worklog_{entryId.ToString(CultureInfo.InvariantCulture)}";
+
         public static string? GetEntryAttachmentsFolder(int workbookId, int entryId)
         {
             string? folder = GetWorkbookFolder(workbookId);
@@ -1062,7 +1078,7 @@ namespace Handlers.DataHandling
                 return null;
             }
 
-            string attachmentsFolder = Path.Combine(folder, $"entry-{entryId.ToString(CultureInfo.InvariantCulture)}-files");
+            string attachmentsFolder = Path.Combine(folder, BuildEntryAttachmentsFolderName(entryId));
             Directory.CreateDirectory(attachmentsFolder);
             return attachmentsFolder;
         }
@@ -1084,7 +1100,7 @@ namespace Handlers.DataHandling
                 return null;
             }
 
-            return Path.Combine(folder, $"entry-{entryId.ToString(CultureInfo.InvariantCulture)}-files");
+            return Path.Combine(folder, BuildEntryAttachmentsFolderName(entryId));
         }
 
         // ###########################################################################################

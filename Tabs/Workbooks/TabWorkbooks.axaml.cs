@@ -189,15 +189,6 @@ namespace CRT
         // entry save must be visible on the very next refresh.
         private readonly Dictionary<int, List<WorklogEntryRecord>> thisEntriesReadThisPass = new();
 
-        // The SAME two glyphs the worklog bar's status pill and a worklog entry's own state pill use
-        // - a workbook reading "Open" here and "Open" there must look identical, which is the whole
-        // reason this pill was built to the existing recipe rather than invented again. They come
-        // from WorklogGlyphs rather than being spelled out here; the other partial of THIS class
-        // already had its own copy, which is what made "six declarations" six rather than three.
-        private static readonly string LockOpenGlyph = WorklogGlyphs.OpenGlyph;
-
-        private static readonly string LockClosedGlyph = WorklogGlyphs.ClosedGlyph;
-
         public TabWorkbooks()
         {
             this.InitializeComponent();
@@ -771,28 +762,23 @@ namespace CRT
                 this.WorkbookHeaderStatusPill.IsVisible = false;
                 this.WorkbookHeaderNoteText.IsVisible = false;
                 this.WorkbookHeaderActionsPanel.IsVisible = false;
+                this.WorkbookSummaryPanel.IsVisible = false;
                 return;
             }
 
             string title = string.IsNullOrWhiteSpace(workbook.Title) ? "(untitled)" : workbook.Title;
             this.ApplyHighlightedText(this.WorkbookHeaderTitleText, $"#{workbook.Id} · {title}");
 
-            bool isOpen = WorklogManager.IsWorkbookStatusOpen(workbook.Status);
-            var statusBrush = ResolveWorklogStatusBrush(isOpen);
-
+            // Border, glyph, label and the padlock's overshoot padding all applied by the ONE
+            // shared informational styling - see WorklogInfoPillBuilder. This pill is declared in
+            // the markup (it is long-lived and only its text changes), so it is restyled in place
+            // rather than rebuilt.
             this.WorkbookHeaderStatusPill.IsVisible = true;
-            this.WorkbookHeaderStatusPill.BorderBrush = statusBrush;
-            this.WorkbookHeaderStatusText.Text = workbook.Status;
-            this.WorkbookHeaderStatusText.Foreground = statusBrush;
-            this.WorkbookHeaderStatusGlyph.Text = isOpen ? LockOpenGlyph : LockClosedGlyph;
-            this.WorkbookHeaderStatusGlyph.Foreground = statusBrush;
-
-            // Recomputed rather than reused from the constructor: the glyph switches between the
-            // lock and lock-open codepoints, and the two overshoot their font's declared ascent by
-            // different amounts (see FontAwesomeGlyphMetrics), so a padding value fixed at
-            // construction would be right for only one of the two states.
-            this.WorkbookHeaderStatusGlyph.Padding = Handlers.Geometry.FontAwesomeGlyphMetrics
-                .GetTopOverflowThicknessForText(this.WorkbookHeaderStatusGlyph.Text, this.WorkbookHeaderStatusGlyph.FontSize);
+            WorklogInfoPillBuilder.ApplyStatePillVisual(
+                this.WorkbookHeaderStatusPill,
+                this.WorkbookHeaderStatusGlyph,
+                this.WorkbookHeaderStatusText,
+                workbook.Status);
 
             // Blank for most workbooks (Note is optional in the create/edit dialog), so the row is
             // collapsed rather than showing an empty muted TextBlock next to the pill.
@@ -801,6 +787,11 @@ namespace CRT
             this.ApplyHighlightedText(this.WorkbookHeaderNoteText, hasNote ? workbook.Note : string.Empty, linkify: true);
 
             this.WorkbookHeaderActionsPanel.IsVisible = true;
+
+            // The summary reads the workbook's entries through the within-pass cache, so a refresh
+            // that has already read them for the search filter and the board pane does not read
+            // the same files a third time - see GetEntriesForThisPass.
+            this.ApplySummaryForWorkbook(workbook);
         }
 
         // ###########################################################################################
@@ -937,7 +928,7 @@ namespace CRT
         //
         // Built in code rather than as an ItemsControl DataTemplate because the status pill's brush
         // has to be resolved through Application.Current with an explicit ThemeVariant (see
-        // ResolveWorklogStatusBrush), which a template binding cannot express - the same reason
+        // WorklogInfoPillBuilder), which a template binding cannot express - the same reason
         // Main builds the worklog bar's pill in code.
         //
         // An instance method, not static: it needs to reach SelectWorkbook on THIS tab from the
@@ -1037,9 +1028,6 @@ namespace CRT
 
         private Border BuildWorkbookCard(WorkbookRecord workbook, bool isSelected)
         {
-            bool isOpen = WorklogManager.IsWorkbookStatusOpen(workbook.Status);
-            var statusBrush = ResolveWorklogStatusBrush(isOpen);
-
             // --- Row 1: "#N" and the status pill -------------------------------------------------
             var idText = new TextBlock
             {
@@ -1049,52 +1037,12 @@ namespace CRT
                 VerticalAlignment = VerticalAlignment.Center
             };
 
-            // Dot, label AND border all take the status colour, exactly as the worklog bar's pill
-            // and an entry's state pill do. Colouring only the dot would leave this pill visibly
-            // different from the ones it is meant to match.
-            var statusGlyph = new TextBlock
-            {
-                Text = isOpen ? LockOpenGlyph : LockClosedGlyph,
-                FontFamily = ResolveFontAwesomeSolid(),
-                FontSize = 10,
-                Foreground = statusBrush,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-
-            // The padlocks are drawn taller than the font's declared ascent, so their top pixel row
-            // is clipped without a reserved one. Computed from this control's own font size rather
-            // than hardcoded - see Handlers/Geometry/FontAwesomeGlyphMetrics.cs.
-            statusGlyph.Padding = Handlers.Geometry.FontAwesomeGlyphMetrics
-                .GetTopOverflowThicknessForText(statusGlyph.Text, statusGlyph.FontSize);
-
-            var statusLabel = new TextBlock
-            {
-                Text = workbook.Status,
-                FontSize = 10,
-                FontWeight = FontWeight.SemiBold,
-                Foreground = statusBrush,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-
-            var statusContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
-            statusContent.Children.Add(statusGlyph);
-            statusContent.Children.Add(statusLabel);
-
-            var statusPill = new Border
-            {
-                CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(10, 1),
-                BorderBrush = statusBrush,
-                BorderThickness = new Thickness(2),
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center,
-                Child = statusContent
-            };
-
-            // Through ThemeResources like every other lookup here. This was an inline copy of the
-            // two-step idiom with NO fallback, so a miss left Background unset rather than rendering
-            // something - invisible until someone noticed the pill was the wrong colour.
-            statusPill.Background = ThemeResources.ResolveBrush("Form_Bg", Brushes.Transparent);
+            // The one shared informational pill - see WorklogInfoPillBuilder. This was ~35 lines
+            // building a 2px-outlined copy by hand, under a comment asserting it matched the
+            // worklog bar and the entry pills; it did not, which is what "the pills are not
+            // identical" was reported about.
+            var statusPill = WorklogInfoPillBuilder.BuildStatePill(workbook.Status, fontSize: 10.0);
+            statusPill.HorizontalAlignment = HorizontalAlignment.Right;
 
             var headerRow = new Grid();
             headerRow.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
@@ -1176,25 +1124,5 @@ namespace CRT
             return $"{WorklogEntryScope.FormatCount(workbook.EntryCount, "worklog", "worklogs")} · started {startDate}";
         }
 
-        // ###########################################################################################
-        // Resolves the Open/Closed status colour the same way every other worklog surface does.
-        //
-        // ThemeResources.Resolve does the two-step Application.Current + ActualThemeVariant lookup
-        // these ThemeDictionaries-scoped keys need - see that class for why a plain TryFindResource
-        // on a control silently returns the fallback instead.
-        //
-        // The fallbacks are last-resort only, and must track the theme values in App.axaml.
-        // ###########################################################################################
-        private static IBrush ResolveWorklogStatusBrush(bool isOpen) =>
-            ThemeResources.ResolveBrush(
-                isOpen ? "Worklog_Status_Open" : "Worklog_Status_Closed",
-                isOpen ? Brushes.IndianRed : new SolidColorBrush(Color.Parse("#4C8C31")));
-
-        // The Font Awesome families, so a padlock built here is the same font as the identical
-        // padlock declared in XAML. Note is the one category whose glyph is Regular rather than Solid
-        // (WorklogEntryEditorWindow.axaml's EditorCategoryNoteIcon).
-        private static FontFamily ResolveFontAwesomeSolid() => ThemeResources.ResolveFontAwesomeSolid();
-
-        private static FontFamily ResolveFontAwesomeRegular() => ThemeResources.ResolveFontAwesomeRegular();
     }
 }

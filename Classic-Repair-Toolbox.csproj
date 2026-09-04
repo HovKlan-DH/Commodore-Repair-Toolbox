@@ -55,6 +55,7 @@
 	<PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.1.1" />
     <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
     <PackageReference Include="EPPlus" Version="8.7.0" />
+    <PackageReference Include="QuestPDF" Version="2026.8.0" />
     <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
 

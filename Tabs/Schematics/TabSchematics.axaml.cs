@@ -25,7 +25,8 @@
 //   TabSchematics.KiCad.RenderCache.cs        Builds and caches the per-net PCB render nodes
 //   TabSchematics.KiCad.Geometry.cs           KiCad world/screen mapping and zone geometry
 //   TabSchematics.KiCad.HitTest.cs            Hover hit-testing over the KiCad overlay
-//   TabSchematics.KiCad.Calibration.cs        Interactive KiCad trace calibration mode
+//   TabSchematics.KiCad.Calibration.cs        Interactive KiCad trace calibration mode (maths in
+//                                             Handlers/Geometry/KiCadCalibrationGeometry)
 //   TabSchematics.Worklog.cs                  Worklog "Add worklog" area-drawing mode (which opens
 //                                             the full editor), the saved-entry overlay and its
 //                                             anchored and parked pills

@@ -502,7 +502,7 @@ namespace Handlers.DataHandling
 
         // ###########################################################################################
         // Deletes one attachment's bytes via DeleteAttachmentFile, then removes the entry's shared
-        // "entry-{id}-files" folder too if that was the last thing in it - so removing an entry's
+        // "worklog_{id}" folder too if that was the last thing in it - so removing an entry's
         // only photo or file leaves no empty folder behind on disk.
         //
         // Photos and Files share ONE folder per entry (see WorklogManager.GetEntryAttachmentsFolder),

@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:CRT"
              x:Class="CRT.TabConfiguration">
@@ -163,15 +163,15 @@
 			<CheckBox x:Name="EnableMiniproExperimentalDemoModeCheckBox"
                       Content="Enable MiniPro programmer simulated demo mode (only required for CRT development)" />
 
-			<TextBlock Text="Misc"
+			<TextBlock Text="Workbooks"
                        FontSize="12"
                        FontWeight="SemiBold"
                        Margin="0,16,0,4" />
 
 			<CheckBox x:Name="EnableWorklogCheckBox"
-                      Content="Enable Worklog" />
+                      Content="Enable Workbooks tab" />
 
-			<TextBlock Text="Which scope to show under &quot;Workbooks&quot; tab:"
+			<TextBlock Text="Scope in Workbooks tab:"
                        Margin="0,8,0,0" />
 
 			<StackPanel Orientation="Vertical"
@@ -186,7 +186,7 @@
 			</StackPanel>
 
 			<Button x:Name="OpenAppDataFolderButton"
-                    Content="Open data/log/settings folder"
+                    Content="Open data/workbooks/log/settings folder"
                     Margin="0,16,0,0"
                     HorizontalAlignment="Left"
                     Click="OnOpenAppDataFolderClick" />

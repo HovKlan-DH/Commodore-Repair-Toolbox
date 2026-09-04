@@ -49,6 +49,32 @@
 			<Setter Property="Foreground" Value="{DynamicResource Workbooks_Faint_Fg}" />
 			<Setter Property="VerticalAlignment" Value="Center" />
 		</Style>
+
+		<!-- The workbook summary strip's expand/collapse line: a Button stripped back to plain
+		     text, so it reads as a line in the header rather than as a control sitting in one.
+		     A Button and not an Expander because Expander brings a border, a background and its
+		     own padding, all of which would have to be undone here anyway - see the strip's own
+		     comment in the header row below. -->
+		<Style Selector="Button.WorkbooksSummaryToggle">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Foreground" Value="{DynamicResource Workbooks_Muted_Fg}" />
+		</Style>
+
+		<!-- Hover and pressed both stay transparent: the default Button chrome paints a filled
+		     rectangle behind the text, which on this line looks like a stray highlight rather
+		     than a hover state. The Hand cursor already says it is clickable. -->
+		<Style Selector="Button.WorkbooksSummaryToggle:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+		</Style>
+
+		<Style Selector="Button.WorkbooksSummaryToggle:pressed /template/ ContentPresenter">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+		</Style>
 	</UserControl.Styles>
 
 	<!-- The whole tab is one filter field above the two panels. The field is deliberately OUTSIDE
@@ -169,11 +195,12 @@
 									   FontWeight="Bold"
 									   VerticalAlignment="Center" />
 
-							<!-- Same pill as the workbook cards in the left panel and the worklog bar:
-							     padlock glyph, status word, both in the status colour with a 2px border of
-							     it. Colours and text are set from code (SelectWorkbook) alongside the
-							     title, so this always shows the selected workbook's real status rather
-							     than the hardcoded "Open" the mockup drew. -->
+							<!-- Same pill as the workbook cards in the left panel and the worklog bar,
+							     and NOT by having the same values typed here: border, glyph, label and
+							     the padlock's overshoot padding are all applied by
+							     WorklogInfoPillBuilder.ApplyStatePillVisual (from ApplyHeaderForWorkbook),
+							     which is the one place the informational pill visual is decided. The
+							     attributes below are only what the designer shows before that runs. -->
 							<Border x:Name="WorkbookHeaderStatusPill"
 									Background="{DynamicResource Form_Bg}"
 									BorderBrush="{DynamicResource Worklog_Status_Open}"
@@ -212,6 +239,86 @@
 								   Text=""
 								   TextWrapping="Wrap"
 								   IsVisible="False" />
+
+						<!-- The workbook summary strip: one always-visible headline line
+						     ("7 entries - 12.5 h - 430 - 4 open") with a chevron that expands the
+						     full breakdown below it. Everything in it is set from code
+						     (ApplySummaryForWorkbook) off WorkbookSummary.Summarize, so the app and
+						     an exported PDF report the same numbers from the one computation.
+
+						     A strip here rather than a panel docked under the entry list: this is a
+						     property of the WORKBOOK, and the workbook's identity, status, note and
+						     Edit/Delete/Export actions are all already on this row. The expanded
+						     state persists (UserSettings.WorkbooksSummaryExpanded) so a user who
+						     wants the detail does not re-open it on every board change.
+
+						     A Button rather than an Expander: Expander brings its own border,
+						     padding and background, none of which suit a line inside an existing
+						     header row, and its header would need restyling into a plain line of
+						     text anyway. Classes="WorkbooksSummaryToggle" strips the button chrome
+						     back to that plain line - the style is in this file's own
+						     UserControl.Styles, above. -->
+						<StackPanel x:Name="WorkbookSummaryPanel"
+									Spacing="3"
+									Margin="0,2,0,0"
+									IsVisible="False">
+							<Button x:Name="WorkbookSummaryToggleButton"
+									Classes="WorkbooksSummaryToggle"
+									HorizontalAlignment="Left"
+									Click="OnWorkbookSummaryToggleClick">
+								<StackPanel Orientation="Horizontal" Spacing="6">
+									<!-- fa-solid chevron-right / chevron-down, swapped in code with
+									     the expanded state. Its overshoot padding is applied from
+									     code too, computed from this control's own font size - see
+									     FontAwesomeGlyphMetrics. -->
+									<TextBlock x:Name="WorkbookSummaryChevron"
+											   Text="&#xf054;"
+											   FontFamily="{DynamicResource FontAwesomeSolid}"
+											   FontSize="9"
+											   VerticalAlignment="Center" />
+									<!-- Filled from code as Runs, not Text: the numbers are bold and
+									     the words around them are not, which one Text cannot express.
+									     A TextBlock carrying both renders the Text and silently
+									     ignores the Inlines, so nothing is set here. -->
+									<TextBlock x:Name="WorkbookSummaryHeadlineText"
+											   FontSize="11"
+											   VerticalAlignment="Center" />
+								</StackPanel>
+							</Button>
+
+							<!-- The breakdown rows, one line each, indented to sit under the
+							     headline's text rather than under its chevron. Each is filled and
+							     shown or collapsed individually by ApplySummaryForWorkbook - the
+							     components line is hidden entirely for a workbook that scopes
+							     none, which is most workbooks of plain notes. -->
+							<StackPanel x:Name="WorkbookSummaryDetailPanel"
+										Spacing="2"
+										Margin="15,0,0,0"
+										IsVisible="False">
+								<!-- The category and state counts are drawn as the same non-selectable
+								     pills the rest of the app uses, each carrying its count - built in
+								     code (ApplySummaryForWorkbook) by WorklogInfoPillBuilder, since
+								     their brushes need the two-step theme lookup markup cannot express.
+								     WrapPanels, so five pills wrap rather than clip in a narrow
+								     top-line. -->
+								<WrapPanel x:Name="WorkbookSummaryCategoryPanel"
+										   Orientation="Horizontal"
+										   ItemSpacing="5"
+										   LineSpacing="4" />
+								<WrapPanel x:Name="WorkbookSummaryStatePanel"
+										   Orientation="Horizontal"
+										   ItemSpacing="5"
+										   LineSpacing="4" />
+								<TextBlock x:Name="WorkbookSummaryAttachmentsText"
+										   Classes="WorkbooksMuted"
+										   FontSize="11"
+										   TextWrapping="Wrap" />
+								<TextBlock x:Name="WorkbookSummaryComponentsText"
+										   Classes="WorkbooksMuted"
+										   FontSize="11"
+										   TextWrapping="Wrap" />
+							</StackPanel>
+						</StackPanel>
 					</StackPanel>
 
 					<!-- Edit/Delete act on whichever workbook the top-line and board pane currently
@@ -226,24 +333,63 @@
 					     top keeps them level with line 1 always. -->
 					<StackPanel x:Name="WorkbookHeaderActionsPanel"
 								Grid.Column="1"
-								Orientation="Horizontal"
+								Orientation="Vertical"
 								Spacing="4"
 								VerticalAlignment="Top"
 								Margin="8,0,0,0"
 								IsVisible="False">
-						<Button x:Name="EditWorkbookButton"
-								Content="Edit workbook"
-								FontSize="11"
-								Padding="8,4"
-								Click="OnEditWorkbookClick" />
-						<Button x:Name="DeleteWorkbookButton"
-								Content="Delete workbook"
-								FontSize="11"
-								Padding="8,4"
-								Foreground="{DynamicResource Button_Cancel_Fg}"
-								Background="{DynamicResource Button_Cancel_Bg}"
-								BorderBrush="{DynamicResource Button_Cancel_Border}"
-								Click="OnDeleteWorkbookClick" />
+
+						<!-- TWO ROWS, not one: four buttons across a single line crowded the
+						     workbook title beside them and pushed the whole header wider than a
+						     narrow window could hold. The managing actions lead, the exports sit
+						     under them - the exports are the ones read as a pair, so they are the
+						     row that can be scanned as a group.
+
+						     Each row is right-aligned (HorizontalAlignment="Right" on the rows
+						     rather than on the panel), so the two rows line up on their right edge
+						     against the panel's own edge even though they hold different total
+						     widths. Aligning left instead would leave a ragged right edge against
+						     the window border they sit next to. -->
+						<StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
+							<Button x:Name="EditWorkbookButton"
+									Content="Edit workbook"
+									FontSize="11"
+									Padding="8,4"
+									Click="OnEditWorkbookClick" />
+							<Button x:Name="DeleteWorkbookButton"
+									Content="Delete workbook"
+									FontSize="11"
+									Padding="8,4"
+									Foreground="{DynamicResource Button_Cancel_Fg}"
+									Background="{DynamicResource Button_Cancel_Bg}"
+									BorderBrush="{DynamicResource Button_Cancel_Border}"
+									Click="OnDeleteWorkbookClick" />
+						</StackPanel>
+
+						<!-- Export acts on the same workbook Edit/Delete do, which is why it lives
+						     in this panel rather than in the left-hand list.
+
+						     TWO buttons, not one with a format dropdown: the ZIP was originally
+						     offered only as a second file type inside the save dialog, which made
+						     it invisible from the tab - reported as "I do not see the Export to ZIP
+						     anywhere". A format the user cannot see is a format that does not
+						     exist, so each now has its own button.
+
+						     Deliberately NO icon on either: the fa-regular file-pdf glyph rendered
+						     as a blank box in the shipped font subset. Plain text labels say what
+						     these do without depending on a glyph being present. -->
+						<StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
+							<Button x:Name="ExportWorkbookButton"
+									Content="Export to PDF"
+									FontSize="11"
+									Padding="8,4"
+									Click="OnExportWorkbookClick" />
+							<Button x:Name="ExportWorkbookZipButton"
+									Content="Export to ZIP"
+									FontSize="11"
+									Padding="8,4"
+									Click="OnExportWorkbookZipClick" />
+						</StackPanel>
 					</StackPanel>
 				</Grid>
 			</Border>

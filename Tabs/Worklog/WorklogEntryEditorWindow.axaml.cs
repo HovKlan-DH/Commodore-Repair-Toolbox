@@ -1915,7 +1915,7 @@ namespace CRT
 
         // ###########################################################################################
         // Photos/images. The metadata (file name, comment, order) lives in entries.json with the
-        // entry; the bytes live in the entry's own "entry-<id>-files" folder, resolved through
+        // entry; the bytes live in the entry's own "worklog_<id>" folder, resolved through
         // WorklogManager.GetEntryAttachmentsFolder. Adding copies the chosen file in there under a
         // name that cannot collide with an existing one - see WorklogAttachmentStorage.
         // ###########################################################################################
@@ -2611,7 +2611,7 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Files - the same storage shape as Photos (bytes in the entry's "entry-<id>-files" folder,
+        // Files - the same storage shape as Photos (bytes in the entry's "worklog_<id>" folder,
         // metadata in entries.json), differing in what is accepted and how a row is presented:
         //
         //  - accepted types come from ExternalTargetLauncher's openable set rather than the narrower
