@@ -591,7 +591,7 @@ namespace CRT
         // ###########################################################################################
         private async Task RunWithEstablishedOscilloscopeSessionAsync(
             OscilloscopeSelectionSnapshot selectionSnapshot,
-            Func<ScopeScpiClient, OscilloscopeEntry, CancellationToken, Task> runAsync,
+            Func<IScopeClient, OscilloscopeEntry, CancellationToken, Task> runAsync,
             CancellationToken externalCancellationToken,
             bool writeWarnings)
         {
@@ -660,7 +660,7 @@ namespace CRT
         // Used by direct UI actions that are initiated from the oscilloscope tab itself.
         // ###########################################################################################
         private async Task RunWithEstablishedOscilloscopeSessionAsync(
-            Func<ScopeScpiClient, OscilloscopeEntry, CancellationToken, Task> runAsync,
+            Func<IScopeClient, OscilloscopeEntry, CancellationToken, Task> runAsync,
             CancellationToken externalCancellationToken)
         {
             OscilloscopeSelectionSnapshot selectionSnapshot = this.CreateOscilloscopeSelectionSnapshot();
@@ -720,7 +720,7 @@ namespace CRT
         // Executes a named scope command palette and logs every sent and received SCPI command.
         // ###########################################################################################
         private async Task ExecutePaletteAsync(
-            ScopeScpiClient scopeClient,
+            IScopeClient scopeClient,
             OscilloscopeEntry selectedOscilloscope,
             ScopeCommandPalette palette,
             CancellationToken cancellationToken)
@@ -769,7 +769,7 @@ namespace CRT
         // Executes the image dump workflow with the same preparation and cleanup pattern as shown.
         // ###########################################################################################
         private async Task ExecuteDumpImageWorkflowAsync(
-            ScopeScpiClient scopeClient,
+            IScopeClient scopeClient,
             OscilloscopeEntry selectedOscilloscope,
             CancellationToken cancellationToken)
         {
@@ -1006,6 +1006,12 @@ namespace CRT
             lock (this.thisPendingOutputLinesLock)
             {
                 this.thisPendingOutputLines.Add(line);
+
+                // The buffer above is drained and CLEARED by the flush 40ms later, so it is not
+                // something a test can assert on without racing that timer. This second list is
+                // never cleared and exists only when a test has opted in - see
+                // TabOscilloscope.TestSeams.cs.
+                this.thisRecordedOutputLinesForTests?.Add(line);
 
                 if (!this.thisOutputFlushScheduled)
                 {
@@ -2339,7 +2345,7 @@ namespace CRT
         // it performs one QueryTriggerLevel palette execution and stores the returned value.
         // ###########################################################################################
         private async Task<bool> EnsureCachedTriggerLevelVoltsAsync(
-            ScopeScpiClient scopeClient,
+            IScopeClient scopeClient,
             OscilloscopeEntry oscilloscopeEntry,
             CancellationToken cancellationToken)
         {
@@ -2502,7 +2508,7 @@ namespace CRT
         // keyboard stepping avoids the heavier full palette logging pipeline.
         // ###########################################################################################
         private async Task SendTriggerLevelFastAsync(
-            ScopeScpiClient scopeClient,
+            IScopeClient scopeClient,
             OscilloscopeEntry oscilloscopeEntry,
             double targetTriggerLevelVolts,
             CancellationToken cancellationToken)
@@ -2544,7 +2550,7 @@ namespace CRT
         // it performs one QueryTimeDiv palette execution and stores the returned value.
         // ###########################################################################################
         private async Task<bool> EnsureCachedTimeDivSecondsAsync(
-            ScopeScpiClient scopeClient,
+            IScopeClient scopeClient,
             OscilloscopeEntry oscilloscopeEntry,
             CancellationToken cancellationToken)
         {
@@ -2727,7 +2733,7 @@ namespace CRT
         // stepping avoids the heavier full palette logging pipeline.
         // ###########################################################################################
         private async Task SendTimeDivFastAsync(
-            ScopeScpiClient scopeClient,
+            IScopeClient scopeClient,
             OscilloscopeEntry oscilloscopeEntry,
             double targetTimeDivSeconds,
             CancellationToken cancellationToken)
@@ -2893,7 +2899,7 @@ namespace CRT
         // selections avoid the heavier full palette logging pipeline.
         // ###########################################################################################
         private async Task SendVoltsDivFastAsync(
-            ScopeScpiClient scopeClient,
+            IScopeClient scopeClient,
             OscilloscopeEntry oscilloscopeEntry,
             double targetVoltsDivVolts,
             CancellationToken cancellationToken)
@@ -3158,7 +3164,7 @@ namespace CRT
         // binary block received from the oscilloscope.
         // ###########################################################################################
         private async Task<byte[]> QueryDumpImagePaletteAsync(
-            ScopeScpiClient scopeClient,
+            IScopeClient scopeClient,
             OscilloscopeEntry selectedOscilloscope,
             CancellationToken cancellationToken)
         {

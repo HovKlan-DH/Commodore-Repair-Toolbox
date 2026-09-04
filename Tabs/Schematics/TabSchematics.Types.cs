@@ -108,15 +108,4 @@ public partial class TabSchematics
         public bool MirrorX { get; init; }
         public bool MirrorY { get; init; }
     }
-
-    private sealed class EditableComponentHighlight
-    {
-        public string SchematicName { get; set; } = string.Empty;
-        public string BoardLabel { get; set; } = string.Empty;
-        public string Category { get; set; } = string.Empty;
-        public double X { get; set; }
-        public double Y { get; set; }
-        public double Width { get; set; }
-        public double Height { get; set; }
-    }
 }

@@ -110,7 +110,7 @@ number formats.
 
 | Area | Classes |
 | --- | --- |
-| Oscilloscope | `ScopeValueMapper`, `ScopeCommandResolver`, `ScopeCommandPaletteDefinitions`, `ScopeFormatting`, `ScopePayloadParser` |
+| Oscilloscope | `ScopeValueMapper`, `ScopeCommandResolver`, `ScopeCommandPaletteDefinitions`, `ScopeFormatting`, `ScopePayloadParser`, plus `TabOscilloscope`'s command sequencing via `IScopeClient` and a fake |
 | IC testing | `MiniproOutputParser`, `IcTestService` (via `MockMiniproRunner` and local test doubles) |
 | Security | `ExternalTargetLauncher`, `OnlineServices`' manifest-validation predicates |
 | KiCad | `KiCadRawProjectLoader`, `KiCadProjectLoader`, the `KiCadProjectData` model |
@@ -118,8 +118,8 @@ number formats.
 | Worklog | `WorklogManager` (including `ResolveActiveWorkbook`, `AddEntryRecord`, `IsResolvedState`, `IsWorkbookStatusOpen`, `GetAllWorkbooks`), `WorklogEntryScope`, `WorklogSearchQuery`, `WorklogSearchIndex` |
 | Text links | `TextLinkFinder` (which runs in a user-typed note are web links) |
 | Settings / startup | `UserSettings`, `DataManager` (data-root + master workbook), `DataValidator` (smoke only), `SimulationOptions` |
-| Headless UI (`Tests/.../Ui/`) | All nine tabs built headlessly, the worklog and Workbooks palettes, plus component highlight selection and schematics zoom - see [Headless UI tests](#headless-ui-tests) |
-| Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `KiCadPadGeometry`, `OverlayCullGeometry`, `KiCadOverlayCacheKeys`, `KiCadOverlayNetCache`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry`, `WorklogBadgeLayout` |
+| Headless UI (`Tests/.../Ui/`) | All nine tabs built headlessly, the worklog and Workbooks palettes, component highlight selection and schematics zoom, plus `Main` itself, the label editor's full edit cycle, the worklog area-marking flow, `ComponentInfoWindow`, the oscilloscope's SCPI sequencing, and the Configuration/Overview/About tabs - see [Headless UI tests](#headless-ui-tests) |
+| Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `KiCadPadGeometry`, `OverlayCullGeometry`, `KiCadOverlayCacheKeys`, `KiCadOverlayNetCache`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry`, `LabelEditorSnapGeometry`, `TraceGeometry`, `WorklogBadgeLayout` |
 
 `Handlers/` is where the real coverage is; most of the uncovered remainder is `Tabs/` and `Main/`,
 Avalonia code-behind that is verified by running the app.
@@ -136,6 +136,14 @@ and read `lines-covered` / `lines-valid` from the `coverage.cobertura.xml` it wr
 build configuration you used** - Debug and Release instrument different numbers of lines (~26.7k vs
 ~21.4k), so two bare percentages from different configurations are not comparable.
 
+**CI already computes it on every push**, which is the one place a figure cannot go stale:
+[build-and-unittest.yml](../.github/workflows/build-and-unittest.yml) collects coverage alongside
+the test run and renders the totals into the run's GitHub job summary via
+[coverage-summary.sh](../.github/workflows/coverage-summary.sh), with the raw Cobertura XML kept as
+a 7-day artifact for per-file numbers. It is **reported, never enforced** - there is deliberately no
+threshold that fails the build, since a floor set while the suite is growing either blocks unrelated
+work or is meaningless. Read the number from a recent run rather than writing it down anywhere.
+
 ### `Handlers/Geometry/` — pure logic pulled out of the UI
 
 This folder exists because ~2,000 lines of genuinely pure logic were trapped as `private`
@@ -146,6 +154,14 @@ spatial hover index, highlight rect building and label-editor handle geometry.
 **When you add pure logic to a tab, put it here instead.** These classes use Avalonia's
 `Point`/`Rect`/`Matrix` value types but never touch a control, so they test with no display.
 `KiCadRenderNodes.cs` holds the DTOs they share (formerly nested private types).
+
+**`public` and `internal` are both fine here, and the folder deliberately uses both.** A class
+extracted from a tab that nothing outside the assembly needs (`LabelEditorGeometry`,
+`LabelEditorSnapGeometry`, `TraceGeometry`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, and the
+`KiCadRenderNodes.cs` DTOs) stays `internal`; the tests reach it through the
+`InternalsVisibleTo` entry in [Classic-Repair-Toolbox.csproj](../Classic-Repair-Toolbox.csproj), so
+`internal` costs no coverage. Do not widen one to `public` for consistency's sake — a type is
+`public` here only if something genuinely consumes it from outside.
 
 The same extraction has since been done for the other tabs, into the area folder that fits rather
 than into `Geometry/`: `Handlers/Oscilloscope/ScopeFormatting.cs` and `ScopePayloadParser.cs` (from
@@ -257,14 +273,21 @@ is genuinely UI: event handlers, control updates and rendering. Two methods that
 (`GetOrCreateKiCadSchematicHoverHitTestCache` and `HitTestKiCadSchematicOverlayForHover` both read
 instance caches and the view matrix), so they stayed put.
 
+The label editor's snapping maths has since been extracted the same way: `LabelEditorSnapGeometry`
+in `Handlers/Geometry/` now owns all ~950 lines of it, and `TabSchematics.LabelEditor.Snap.cs` is
+the thin rim that reads the tab's controls and builds a `LabelEditorSnapContext` (working
+highlights, drag mode, schematic name, the visible-pixel rect, and a selection predicate). That
+context struct is the pattern to copy for anything similar: resolve the UI reads to plain values at
+the call site and hand them over, rather than passing controls in. `EditableComponentHighlight` moved
+to `Handlers/Geometry/` with it — it was a private nested type in `TabSchematics.Types.cs`, which a
+`Handlers/` class cannot see. Extracting it also removed a wart: `ApplyNewLabelEditorRectangleSnap`
+used to set and restore `thisLabelEditorDragMode` around four calls, and now just passes each edge's
+mode as the `dragModeOverride` the resize snap already accepted.
+
 The same sweep has now been done across the other tabs. What remains in `Tabs/` and `Main/` was
 checked and is genuinely UI-bound, so **do not go looking for more to extract there** — the
 candidates that look pure are not:
 
-- **`TabSchematics.LabelEditor.Snap.cs`** (~970 lines of snapping maths, the single largest block of
-  maths left). It reads `SchematicsContainer.Bounds`, `currentFullResBitmap` and `schematicsMatrix`
-  directly, so extracting it means changing its signature, not moving it. Worth doing one day;
-  it is real surgery, not a lift-and-shift, and it needs its own change.
 - **`TabSchematics.KiCad.Geometry.cs`** — the world↔local mapping reads `currentFullResBitmap` for
   the calibration offset scale.
 - **Thumbnail bitmap builders** (`CreateScaledThumbnail`, `CreateHighlightedThumbnail`) — these need
@@ -623,8 +646,10 @@ before grepping** — the same header map is repeated in
 | `TabSchematics.Thumbnails.cs` | Thumbnail list, selection, thumbnail bitmaps, drag-to-reorder |
 | `TabSchematics.Highlights.cs` | Component highlight overlays, blink visuals, hover UI, on-schematic labels |
 | `TabSchematics.LabelEditor.cs` | Label editor lifecycle, menu, apply/cancel, validation and save dialogs, search, undo/redo |
+| `TabSchematics.LabelEditor.TestSeams.cs` | `...ForTests` seams letting headless tests drive the editor (see its header) |
+| `TabSchematics.Worklog.TestSeams.cs` | `...ForTests` seams for the worklog area-drawing flow (see its header) |
 | `TabSchematics.LabelEditor.Interaction.cs` | Label editor selection, resize handles, drawing, dragging, coordinate conversions |
-| `TabSchematics.LabelEditor.Snap.cs` | Label editor snapping maths and guide lines |
+| `TabSchematics.LabelEditor.Snap.cs` | Builds the snap context from tab state; the maths is `Handlers/Geometry/LabelEditorSnapGeometry` |
 | `TabSchematics.KiCad.cs` | KiCad project load, board-label→net/reference mapping, selection sets, runtime cache scopes |
 | `TabSchematics.KiCad.Panels.cs` | The "Important signals" and "Net connections" side panels |
 | `TabSchematics.KiCad.Render.cs` | Draws the KiCad overlay, refresh scheduling, pin-1 marking |
@@ -682,7 +707,11 @@ contribution, not a code change.
 - `Online/OnlineServices` — fetches the checksum manifest and syncs changed data files.
 - `Online/UpdateService` — checks/applies application updates via Velopack against GitHub Releases
   (`GitHubOwner`/`GitHubRepo` in `AppConfig`).
-- `Oscilloscope/ScopeScpiClient` — raw SCPI-over-TCP client; `ScopeCommandPalette`/`ScopeCommandResolver`/
+- `Oscilloscope/IScopeClient` — the "talk to the scope" seam (`SendAsync`/`QueryLineAsync`/
+  `QueryBinaryBlockAsync`), the same idea as `IMiniproRunner`. The Oscilloscope tab's sequencing
+  takes this interface, so it can be tested against a fake with no scope on the network; the real
+  `ScopeScpiClient` below it stays an untested I/O boundary.
+- `Oscilloscope/ScopeScpiClient` — raw SCPI-over-TCP client implementing `IScopeClient`; `ScopeCommandPalette`/`ScopeCommandResolver`/
   `ScopeValueMapper` translate the data-driven `OscilloscopeEntry` command strings (per brand/model, from
   the master workbook) into actual scope interactions for baseline capture.
 - `MiniPro/` — integration with the MiniPro USB IC programmer for in-app IC testing. `IMiniproRunner` is

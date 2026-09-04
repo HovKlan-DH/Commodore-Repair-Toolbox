@@ -143,9 +143,10 @@ namespace CRT
             // and GetEntries synchronously, inside the constructor, before first paint.
             //
             // Nothing is lost by not refreshing here: the hardware/board combos are not populated
-            // until PopulateHardwareDropDown further down, so GetCurrentBoardKey returns empty at
-            // this point and there is no board whose workbooks could be shown. That population
-            // raises OnBoardSelectionChanged, which refreshes with a real board key.
+            // until PopulateHardwareDropDown, which now runs in StartAsync rather than later in this
+            // constructor, so GetCurrentBoardKey returns empty at this point and there is no board
+            // whose workbooks could be shown. That population raises OnBoardSelectionChanged, which
+            // refreshes with a real board key.
             this.ApplyWorklogBarVisibility();
 
             // Restore left panel width from settings
@@ -207,7 +208,6 @@ namespace CRT
             this.BoardComboBox.SelectionChanged += this.OnBoardSelectionChanged;
             this.CategoryFilterListBox.SelectionChanged += this.OnCategoryFilterSelectionChanged;
             this.ComponentFilterListBox.SelectionChanged += this.OnComponentFilterSelectionChanged;
-            this.PopulateHardwareDropDown();
 
             // Renders each workbook as "#{Id} | {Title} (hardware/board)", e.g. "#3 | Black screen
             // (C64/250469)" - the short folder-derived label from FormatBoardKeyForDisplay, not the
@@ -300,21 +300,65 @@ namespace CRT
             handledEventsToo: true
         );
 
-            if (DataManager.DataUpdateRequiresAppUpdate)
-            {
-                this.ShowMainExcelRequiresAppUpdateBanner();
-            }
-
-            if (UserSettings.CheckVersionOnLaunch)
-            {
-                _ = this.CheckForAppUpdateNowAsync();
-            }
-
             UserSettings.CheckDataOnLaunchChanged += this.OnCheckDataOnLaunchSettingChanged;
             UserSettings.WorkbooksScopeChanged += this.OnWorkbooksScopeSettingChanged;
             this.UpdateDataSyncStatusIcon();
+        }
 
-            this.StartBackgroundSyncAsync();
+        // ###########################################################################################
+        // Everything the window does that reaches OUTSIDE itself: the hardware/board data it reads
+        // from DataManager, the update check (real HTTP) and the background data sync (network).
+        //
+        // These deliberately do NOT run from the constructor. Constructing Main used to mean hitting
+        // the network and DataManager's static state, so no test could build the window at all - the
+        // largest file in the app sat at zero coverage purely because of where these three calls
+        // lived. Splitting construction from startup is the same shape as HeadlessTestApp, which
+        // inherits the real App and skips its OnFrameworkInitializationCompleted for the same reason.
+        //
+        // App.OnFrameworkInitializationCompleted calls this BEFORE Show(), which is what keeps the
+        // running app behaving as before: the constructor used to populate the combos, so the window
+        // was fully populated by the time it was first painted. Calling this after Show() instead
+        // would paint an empty hardware/board dropdown and an empty component list for the duration
+        // of the first board load, and would let OnWindowFirstOpened run before that load rather
+        // than after it. Tests construct Main and never call this.
+        //
+        // Fire-and-forget by design (the caller does not await it): StartBackgroundSyncAsync was
+        // already an async void started from the constructor, so awaiting it here would hold up the
+        // splash close and change startup timing, which App logs as a StartupTimeline milestone.
+        //
+        // Which is also why this catches: the caller discards the returned Task, so without a catch
+        // an exception thrown before the first await - PopulateHardwareDropDown cascades
+        // synchronously into the whole first board load - would fault a Task nobody observes.
+        // TaskScheduler.UnobservedTaskException only fires when that Task is finalised, so the
+        // report would be arbitrarily late or never arrive at all; the old async void path reached
+        // the logger immediately. Logging here restores that.
+        // ###########################################################################################
+        internal async Task StartAsync()
+        {
+            try
+            {
+                if (DataManager.DataUpdateRequiresAppUpdate)
+                {
+                    this.ShowMainExcelRequiresAppUpdateBanner();
+                }
+
+                // Populates the hardware combo box, whose SelectionChanged cascades synchronously into
+                // OnBoardSelectionChanged and so triggers the first board load. This ran in the
+                // constructor before the WorklogJobBox.ItemTemplate above was assigned; running it here
+                // means that template is always in place before RefreshWorklogBar can populate the box.
+                this.PopulateHardwareDropDown();
+
+                if (UserSettings.CheckVersionOnLaunch)
+                {
+                    _ = this.CheckForAppUpdateNowAsync();
+                }
+
+                await this.StartBackgroundSyncAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.Critical($"Main.StartAsync failed: {ex}");
+            }
         }
 
         // ###########################################################################################
@@ -556,8 +600,12 @@ namespace CRT
 
         // ###########################################################################################
         // Starts the remaining background sync without blocking the caller.
+        //
+        // Returns a Task rather than being async void so StartAsync can compose it. It still swallows
+        // its own exceptions in the catch below, so nothing faults out of here either way - the
+        // signature change is about being awaitable, not about changing failure behaviour.
         // ###########################################################################################
-        private async void StartBackgroundSyncAsync(bool keepBannerTextStatic = false)
+        private async Task StartBackgroundSyncAsync(bool keepBannerTextStatic = false)
         {
             try
             {

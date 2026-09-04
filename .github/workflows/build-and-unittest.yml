@@ -58,4 +58,45 @@ jobs:
         run: dotnet build ${{ env.SOLUTION }} -c Release --no-restore
 
       - name: Test
-        run: dotnet test ${{ env.SOLUTION }} -c Release --no-build --logger "console;verbosity=normal"
+        run: >
+          dotnet test ${{ env.SOLUTION }} -c Release --no-build
+          --logger "console;verbosity=normal"
+          --collect:"XPlat Code Coverage"
+          --results-directory ${{ github.workspace }}/TestResults
+
+      #
+      # Coverage is REPORTED, not enforced. There is deliberately no threshold that fails the
+      # build: a floor set while the suite is still growing either blocks unrelated work or is set
+      # so low it means nothing. Making it a gate is a separate, deliberate decision.
+      #
+      # It exists because a percentage written into a document goes stale silently and is then
+      # quoted as fact - which is exactly what happened here once already. A figure the pipeline
+      # recomputes on every push cannot. This is also why no number is committed to CLAUDE.md.
+      #
+      # "always()" so the figures still appear when the suite is red: a run that fails a test is
+      # precisely when knowing what was and was not exercised is useful.
+      #
+      - name: Coverage summary
+        if: always()
+        run: |
+          # "|| true" and the redirect matter: run: blocks run under "bash -e", so a missing
+          # TestResults folder (dotnet test crashed before writing anything) would make find exit
+          # non-zero and fail THIS step - masking the real failure with a second red one, which is
+          # the exact case the always() above exists to report on. The script already handles an
+          # empty or missing path by skipping.
+          REPORT=$(find "${{ github.workspace }}/TestResults" -name 'coverage.cobertura.xml' 2>/dev/null | head -1 || true)
+          bash .github/workflows/coverage-summary.sh "$REPORT"
+
+      #
+      # The raw Cobertura XML, kept so a specific run's per-file numbers can be inspected later
+      # (the job summary only carries the totals). Short retention: this is a health check that
+      # runs on every push, and the report is only interesting while the run is recent.
+      #
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ${{ github.workspace }}/TestResults/**/coverage.cobertura.xml
+          retention-days: 7
+          if-no-files-found: ignore

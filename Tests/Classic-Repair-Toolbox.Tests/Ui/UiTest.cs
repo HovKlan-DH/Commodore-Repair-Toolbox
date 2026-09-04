@@ -1,4 +1,6 @@
+using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.Headless;
 
 namespace ClassicRepairToolbox.Tests.Ui;
@@ -24,6 +26,28 @@ public static class UiTest
     public static void Run(Action body)
     {
         Session.Dispatch(body, CancellationToken.None).GetAwaiter().GetResult();
+    }
+
+    // ###########################################################################################
+    // The same thing for a body that awaits.
+    //
+    // Use this rather than calling GetAwaiter().GetResult() on the body inside Run. Run's body
+    // executes ON the dispatcher thread, so blocking it there blocks the dispatcher itself: any
+    // code under test that awaits a Dispatcher.UIThread.InvokeAsync round-trip - which several
+    // paths in TabOscilloscope do - would deadlock, because the continuation it waits for can only
+    // run on the thread the block is holding. Dispatch's async overload keeps pumping instead, so
+    // those round-trips complete.
+    // ###########################################################################################
+    public static async Task RunAsync(Func<Task> body)
+    {
+        await Session.Dispatch(
+            async () =>
+            {
+                await body();
+                return true;
+            },
+            CancellationToken.None
+        );
     }
 }
 

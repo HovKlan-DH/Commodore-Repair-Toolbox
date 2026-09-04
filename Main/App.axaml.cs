@@ -418,6 +418,27 @@ namespace CRT
 
                 var main = new Main();
                 desktop.MainWindow = main;
+
+                // The window's outward-facing startup - the hardware/board data it reads from
+                // DataManager, the update check and the background data sync. These used to run from
+                // Main's constructor; they live in StartAsync so the window can be constructed
+                // without touching the network or DataManager's statics (see StartAsync's comment).
+                //
+                // BEFORE Show(), because that is where the constructor did this work: the combos and
+                // the first board load have to be in place before the window is first painted, or
+                // the user sees an empty dropdown and an empty component list until the load
+                // finishes, and Main's own Opened handler runs ahead of the load instead of after
+                // it. StartAsync's synchronous head (PopulateHardwareDropDown, which cascades into
+                // the whole first board load) therefore still completes before Show(), exactly as it
+                // did from the constructor.
+                //
+                // Deliberately not awaited: everything after that head is long-running background
+                // work, and the constructor never blocked on it either. Awaiting here would hold the
+                // splash open for the whole data sync and change what "Main window shown" means in
+                // the timeline logged below. StartAsync catches and logs its own exceptions, since
+                // discarding the Task means nothing else observes them.
+                _ = main.StartAsync();
+
                 main.Show();
                 splash.Close();
 

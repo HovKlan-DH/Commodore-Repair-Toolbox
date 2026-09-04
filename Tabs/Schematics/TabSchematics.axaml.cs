@@ -14,8 +14,11 @@
 //   TabSchematics.Thumbnails.cs               The schematic thumbnail list and drag-to-reorder
 //   TabSchematics.Highlights.cs               Component highlight overlays and on-schematic labels
 //   TabSchematics.LabelEditor.cs              Label editor mode: lifecycle, save/validate, undo
+//   TabSchematics.LabelEditor.TestSeams.cs    ...ForTests seams letting headless tests drive the
+//                                             editor - see that file's own header
 //   TabSchematics.LabelEditor.Interaction.cs  Label editor pointer/keyboard interaction
-//   TabSchematics.LabelEditor.Snap.cs         Label editor snapping maths and guide lines
+//   TabSchematics.LabelEditor.Snap.cs         Builds the snap context from tab state; the maths
+//                                             itself is Handlers/Geometry/LabelEditorSnapGeometry
 //   TabSchematics.KiCad.cs                    KiCad project state, selection and cache scopes
 //   TabSchematics.KiCad.Panels.cs             The Important signals and Net connections panels
 //   TabSchematics.KiCad.Render.cs             Draws the KiCad overlay onto the schematic
@@ -26,6 +29,8 @@
 //   TabSchematics.Worklog.cs                  Worklog "Add worklog" area-drawing mode (which opens
 //                                             the full editor), the saved-entry overlay and its
 //                                             anchored and parked pills
+//   TabSchematics.Worklog.TestSeams.cs        ...ForTests seams for the area-drawing flow - see
+//                                             that file's own header
 //   TabSchematics.Settings.cs                 Board-level and global setting rows
 //
 // They are one partial class, so state is shared; each field is declared in the part

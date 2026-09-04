@@ -166,7 +166,10 @@ public partial class TabSchematics
         this.thisLabelEditorOriginalDragRectangles.Clear();
         this.thisLabelEditorSchematicName = this.GetCurrentSchematicName();
 
-        var boardData = this.MainWindow?.CurrentBoardData;
+        // Via the property rather than MainWindow directly, so a headless test can supply board
+        // data without constructing Main - see TabSchematics.LabelEditor.TestSeams.cs. In the
+        // running app the override is null and this is exactly MainWindow.CurrentBoardData.
+        var boardData = this.CurrentBoardDataForLabelEditor;
         if (boardData == null || string.IsNullOrWhiteSpace(this.thisLabelEditorSchematicName))
         {
             return;

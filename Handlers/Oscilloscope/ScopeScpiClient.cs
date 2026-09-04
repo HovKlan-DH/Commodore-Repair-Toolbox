@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Handlers.Oscilloscope
 {
-    public sealed class ScopeScpiClient : IAsyncDisposable
+    public sealed class ScopeScpiClient : IScopeClient, IAsyncDisposable
     {
         private readonly TcpClient thisClient = new();
         private NetworkStream? thisStream;

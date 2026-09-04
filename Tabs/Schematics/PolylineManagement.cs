@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using CRT;
 using Handlers.DataHandling;
+using Handlers.Geometry;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -430,13 +431,7 @@ namespace Tabs.TabSchematics
         // ###########################################################################################
         private Point CanvasToNormalized(Point p)
         {
-            var rect = this._parent.GetImageContentRect();
-            if (rect.Width <= 0 || rect.Height <= 0) return new Point(0, 0);
-
-            double nx = (p.X - rect.X) / rect.Width;
-            double ny = (p.Y - rect.Y) / rect.Height;
-
-            return new Point(Math.Max(0.0, Math.Min(1.0, nx)), Math.Max(0.0, Math.Min(1.0, ny)));
+            return TraceGeometry.CanvasToNormalized(p, this._parent.GetImageContentRect());
         }
 
         // ###########################################################################################
@@ -444,31 +439,17 @@ namespace Tabs.TabSchematics
         // ###########################################################################################
         internal Point NormalizedToCanvas(Point norm)
         {
-            var rect = this._parent.GetImageContentRect();
-            if (rect.Width <= 0 || rect.Height <= 0) return norm;
-
-            return new Point(rect.X + (norm.X * rect.Width), rect.Y + (norm.Y * rect.Height));
+            return TraceGeometry.NormalizedToCanvas(norm, this._parent.GetImageContentRect());
         }
 
         private Point ApplySnappingCanvas(Point currentCanvas, ManagedPolyline poly, int nodeIndex, double tolerance)
         {
-            double snapX = currentCanvas.X;
-            double snapY = currentCanvas.Y;
-
-            double closestXDist = tolerance;
-            double closestYDist = tolerance;
-
+            // Only the immediately adjacent nodes are snap candidates - see TraceGeometry.
             var neighbors = new List<Point>();
             if (nodeIndex > 0) neighbors.Add(this.NormalizedToCanvas(poly.GetNode(nodeIndex - 1)));
             if (nodeIndex < poly.NodeCount - 1) neighbors.Add(this.NormalizedToCanvas(poly.GetNode(nodeIndex + 1)));
 
-            foreach (var n in neighbors)
-            {
-                if (Math.Abs(currentCanvas.X - n.X) < closestXDist) { snapX = n.X; closestXDist = Math.Abs(currentCanvas.X - n.X); }
-                if (Math.Abs(currentCanvas.Y - n.Y) < closestYDist) { snapY = n.Y; closestYDist = Math.Abs(currentCanvas.Y - n.Y); }
-            }
-
-            return new Point(snapX, snapY);
+            return TraceGeometry.ApplyNodeSnapping(currentCanvas, neighbors, tolerance);
         }
 
         public bool OnPointerReleased(Point containerPoint, Point localPoint)
@@ -482,7 +463,7 @@ namespace Tabs.TabSchematics
                     Point pStart = this.NormalizedToCanvas(this._drawingStartPoint);
                     Point pEnd = this.NormalizedToCanvas(this._tempDrawingLine.GetNode(1));
 
-                    if (Distance(pStart, pEnd) > (3.0 / scale))
+                    if (TraceGeometry.Distance(pStart, pEnd) > (3.0 / scale))
                     {
                         this._polylines.Add(this._tempDrawingLine);
                         this._activePolyline = this._tempDrawingLine;
@@ -538,19 +519,15 @@ namespace Tabs.TabSchematics
                 // Restore exact checkbox toggle state from disk
                 this._colorVisibilityOptions[c] = tm.Visible;
 
-                bool isLegacy = tm.Nodes.Any(n => n.X > 2.0 || n.Y > 2.0);
+                bool isLegacy = tm.Nodes.Any(n => TraceGeometry.IsLegacyCanvasCoordinate(n.X, n.Y));
 
                 Point ToNormalized(PointModel nm)
                 {
                     if (!isLegacy) return new Point(nm.X, nm.Y);
 
-                    var rect = this._parent.GetImageContentRect();
-                    if (rect.Width <= 0 || rect.Height <= 0) return new Point(0, 0);
-
-                    return new Point(
-                        Math.Max(0.0, Math.Min(1.0, (nm.X - rect.X) / rect.Width)),
-                        Math.Max(0.0, Math.Min(1.0, (nm.Y - rect.Y) / rect.Height))
-                    );
+                    return TraceGeometry.CanvasToNormalized(
+                        new Point(nm.X, nm.Y),
+                        this._parent.GetImageContentRect());
                 }
 
                 var p1 = ToNormalized(tm.Nodes[0]);
@@ -656,7 +633,7 @@ namespace Tabs.TabSchematics
             {
                 for (int i = 0; i < poly.NodeCount; i++)
                 {
-                    double distSq = DistanceSquared(this.NormalizedToCanvas(poly.GetNode(i)), localPoint);
+                    double distSq = TraceGeometry.DistanceSquared(this.NormalizedToCanvas(poly.GetNode(i)), localPoint);
                     if (distSq <= closestLimit)
                     {
                         closestLimit = distSq;
@@ -681,7 +658,7 @@ namespace Tabs.TabSchematics
                 {
                     Point a = this.NormalizedToCanvas(poly.GetNode(i));
                     Point b = this.NormalizedToCanvas(poly.GetNode(i + 1));
-                    double distToLine = DistancePointToSegment(localPoint, a, b, out Point proj);
+                    double distToLine = TraceGeometry.DistancePointToSegment(localPoint, a, b, out Point proj);
 
                     if (distToLine <= closestLimit)
                     {
@@ -695,21 +672,6 @@ namespace Tabs.TabSchematics
             return hitPolyline != null;
         }
 
-        private static double Distance(Point a, Point b) => Math.Sqrt(DistanceSquared(a, b));
-        private static double DistanceSquared(Point a, Point b) => (a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y);
-        private static double DistancePointToSegment(Point p, Point v, Point w, out Point projection)
-        {
-            double l2 = DistanceSquared(v, w);
-            if (l2 == 0.0)
-            {
-                projection = v;
-                return Distance(p, v);
-            }
-
-            double t = Math.Max(0, Math.Min(1, ((p.X - v.X) * (w.X - v.X) + (p.Y - v.Y) * (w.Y - v.Y)) / l2));
-            projection = new Point(v.X + t * (w.X - v.X), v.Y + t * (w.Y - v.Y));
-            return Distance(p, projection);
-        }
     }
 
     // ###########################################################################################

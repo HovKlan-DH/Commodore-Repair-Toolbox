@@ -219,9 +219,33 @@ public partial class TabSchematics
     // ###########################################################################################
     private void CompleteDrawingWorklogEntryRectangle(Point releasePixelPoint)
     {
-        if (!this.thisIsDrawingWorklogEntryRectangle)
+        if (!this.TryFinishWorklogEntryDrawing(releasePixelPoint, out var finalRect))
         {
             return;
+        }
+
+        this.OpenNewWorklogEntryEditor(finalRect);
+    }
+
+    // ###########################################################################################
+    // Everything the drag's end does EXCEPT opening the editor: normalise the drawn rectangle,
+    // leave drawing state, apply the too-small rule, and record the accepted area so the overlay
+    // draws it.
+    //
+    // Split out from CompleteDrawingWorklogEntryRectangle so a headless test can exercise the
+    // accept/reject decision - OpenNewWorklogEntryEditor calls ShowDialog, which needs a real
+    // owner Window and cannot run in a test. The alternative was for the test seam to restate
+    // this decision, which would let the two drift; here there is one copy and the seam calls it.
+    //
+    // Returns true when the drag was a deliberate area, with it in acceptedRectangle.
+    // ###########################################################################################
+    private bool TryFinishWorklogEntryDrawing(Point releasePixelPoint, out Rect acceptedRectangle)
+    {
+        acceptedRectangle = default;
+
+        if (!this.thisIsDrawingWorklogEntryRectangle)
+        {
+            return false;
         }
 
         var finalRect = RectGeometry.CreateNormalizedRect(this.thisWorklogEntryDrawStartPixelPoint, releasePixelPoint);
@@ -232,7 +256,7 @@ public partial class TabSchematics
         if (LabelEditorGeometry.IsLabelEditorRectangleTooSmall(finalRect))
         {
             this.RefreshWorklogEntryOverlay();
-            return;
+            return false;
         }
 
         this.thisWorklogEntryFinalRectangle = finalRect;
@@ -241,7 +265,8 @@ public partial class TabSchematics
         // while they fill the editor in.
         this.RefreshWorklogEntryOverlay();
 
-        this.OpenNewWorklogEntryEditor(finalRect);
+        acceptedRectangle = finalRect;
+        return true;
     }
 
     // ###########################################################################################
