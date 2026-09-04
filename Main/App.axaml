@@ -118,6 +118,14 @@
 					<SolidColorBrush x:Key="Workbooks_Muted_Fg">#5A5A5A</SolidColorBrush>
 					<SolidColorBrush x:Key="Workbooks_Faint_Fg">#7A7A7A</SolidColorBrush>
 
+					<!-- The summary strip's ZERO-count category/state pills (WorklogInfoPillBuilder's
+					     MutedPillBrush) - deliberately its OWN, lighter token rather than reusing
+					     Muted_Fg or Faint_Fg above: both of those are body-text greys, tuned to stay
+					     readable as PROSE (a card's meta line, an empty-state message), and both were
+					     tried here and reported as "still looks black" on a small bold pill. A zero
+					     count needs to look closer to disabled/washed-out than to muted body text. -->
+					<SolidColorBrush x:Key="Workbooks_ZeroCount_Fg">#BBBBBB</SolidColorBrush>
+
 					<!-- The run of text matched by the "Find a previous repair" search box. A
 					     background wash rather than a foreground colour, so it reads as a marker pen
 					     over the text and stays legible on the muted/faint greys above as well as on
@@ -251,6 +259,14 @@
 				<SolidColorBrush x:Key="Workbooks_RowSeparator">#3E342F</SolidColorBrush>
 				<SolidColorBrush x:Key="Workbooks_Muted_Fg">#B5A896</SolidColorBrush>
 				<SolidColorBrush x:Key="Workbooks_Faint_Fg">#8F8578</SolidColorBrush>
+
+				<!-- See the light block's own comment on Workbooks_ZeroCount_Fg - a dedicated,
+				     dimmer tone for a zero-count pill rather than either body-text grey above.
+				     Darker than both of them here (the dark surfaces run the opposite direction
+				     from light: Faint_Fg is already darker than Muted_Fg on this side), so a
+				     zero-count pill still reads as washed-out against the panel background rather
+				     than as bright, attention-grabbing text. -->
+				<SolidColorBrush x:Key="Workbooks_ZeroCount_Fg">#5E5850</SolidColorBrush>
 
 				<!-- Search hit. A muted amber rather than the light theme's brighter one: on the
 				     dark ground a saturated wash glares, and the dark foreground below is what keeps

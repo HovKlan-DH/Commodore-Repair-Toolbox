@@ -23,7 +23,7 @@ namespace ClassicRepairToolbox.Tests.Ui;
 //
 // The FILE side of that - what AddEntryRecord writes, and the id it allocates - is
 // WorklogManagerTests' job; these stop at the window, because WorklogManager is a static pointed
-// at the user's real Workbook folder and re-pointing it from this collection would race the
+// at the user's real Workbooks folder and re-pointing it from this collection would race the
 // "Worklog" collection that owns it.
 [Collection("HeadlessUi")]
 public class WorklogEditorNewEntryTests

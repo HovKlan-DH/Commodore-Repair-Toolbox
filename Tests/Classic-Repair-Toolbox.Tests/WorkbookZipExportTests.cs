@@ -111,7 +111,7 @@ public class WorkbookZipExportTests : IDisposable
         Assert.Contains("Workbook_3_C64_250469_20260904.pdf", names);
 
         // Attachments sit under "worklog_{id}" - the SAME folder name the entry's attachments have
-        // in the local Workbook folder, so what the recipient unpacks matches what the repairer
+        // in the local Workbooks folder, so what the recipient unpacks matches what the repairer
         // sees on their own disk. The worklog title is deliberately not in the folder name.
         Assert.Contains("worklog_1/board.png", names);
         Assert.Contains("worklog_1/datasheet.txt", names);

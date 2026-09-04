@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
@@ -669,97 +669,42 @@ public partial class TabSchematics
     // Shows a modal error dialog when label-editor changes cannot be written to the Excel file
     // so save failures are visible immediately instead of only appearing in the logfile.
     // ###########################################################################################
-    private async Task ShowLabelEditorSaveFailedDialogAsync(string errorMessage)
+    private Task ShowLabelEditorSaveFailedDialogAsync(string errorMessage) =>
+        ShowDialogAsync(this.BuildLabelEditorSaveFailedDialog(errorMessage));
+
+    private Window BuildLabelEditorSaveFailedDialog(string errorMessage) =>
+        this.BuildLabelEditorErrorDialog(
+            windowTitle: "Label editor save failed",
+            headline: "Unable to save label editor changes",
+            errorMessage: errorMessage,
+            fallbackMessage: "The label editor changes could not be saved.",
+            hint: "If the Excel workbook is open in another program, close it and try again. Check the logfile for technical details.");
+
+    // ###########################################################################################
+    // Shows a modal error dialog when the label editor contains invalid data so validation
+    // problems are visible immediately instead of only appearing in the logfile.
+    // ###########################################################################################
+    private Task ShowLabelEditorValidationFailedDialogAsync(string errorMessage) =>
+        ShowDialogAsync(this.BuildLabelEditorValidationFailedDialog(errorMessage));
+
+    private Window BuildLabelEditorValidationFailedDialog(string errorMessage) =>
+        this.BuildLabelEditorErrorDialog(
+            windowTitle: "Label editor validation failed",
+            headline: "Unable to apply component label editor changes",
+            errorMessage: errorMessage,
+            fallbackMessage: "The label editor contains invalid data.",
+            hint: null);
+
+    // ###########################################################################################
+    // Shows an already-built dialog, modally when there is a window to own it.
+    //
+    // The fallback matters: TopLevel.GetTopLevel returns null when this control is not attached to
+    // a window, and ShowDialog with no owner throws. A non-modal Show is a degraded but working
+    // outcome - the user still sees the error - which beats an exception raised while reporting
+    // one.
+    // ###########################################################################################
+    private async Task ShowDialogAsync(Window dialog)
     {
-        string message = string.IsNullOrWhiteSpace(errorMessage)
-            ? "The label editor changes could not be saved."
-            : errorMessage;
-
-        var closeButton = new Button
-        {
-            Content = "Close",
-            MinWidth = 110,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Center
-        };
-
-        var dialog = new Window
-        {
-            Title = "Label editor save failed",
-            Width = 540,
-            MinWidth = 460,
-            CanResize = false,
-            ShowInTaskbar = false,
-            SizeToContent = SizeToContent.Height,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
-        };
-
-        closeButton.Click += (_, _) => dialog.Close();
-
-        var errorAccentBrush = new SolidColorBrush(Color.Parse("#C62828"));
-        var panelBackgroundBrush = this.ResolveThemeBrush("Schematics_Panels_Bg", new SolidColorBrush(Color.Parse("#FFF8F8")));
-        var panelBorderBrush = this.ResolveThemeBrush("Schematics_Panels_Border", new SolidColorBrush(Color.Parse("#E0B4B4")));
-        var foregroundBrush = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
-
-        dialog.Content = new Border
-        {
-            Background = panelBackgroundBrush,
-            BorderBrush = panelBorderBrush,
-            BorderThickness = new Thickness(1),
-            Padding = new Thickness(18),
-            Child = new StackPanel
-            {
-                Spacing = 14,
-                Children =
-                {
-                    new Border
-                    {
-                        Background = errorAccentBrush,
-                        CornerRadius = new CornerRadius(6),
-                        Padding = new Thickness(12, 10),
-                        Child = new StackPanel
-                        {
-                            Orientation = Avalonia.Layout.Orientation.Horizontal,
-                            Spacing = 10,
-                            Children =
-                            {
-                                new TextBlock
-                                {
-                                    Text = "⚠",
-                                    FontSize = 22,
-                                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                                    Foreground = Brushes.White
-                                },
-                                new TextBlock
-                                {
-                                    Text = "Unable to save label editor changes",
-                                    FontSize = 14,
-                                    FontWeight = FontWeight.Bold,
-                                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                                    Foreground = Brushes.White,
-                                    TextWrapping = TextWrapping.Wrap
-                                }
-                            }
-                        }
-                    },
-                    new TextBlock
-                    {
-                        Text = message,
-                        Foreground = foregroundBrush,
-                        TextWrapping = TextWrapping.Wrap
-                    },
-                    new TextBlock
-                    {
-                        Text = "If the Excel workbook is open in another program, close it and try again. Check the logfile for technical details.",
-                        Foreground = foregroundBrush,
-                        Opacity = 0.85,
-                        TextWrapping = TextWrapping.Wrap
-                    },
-                    closeButton
-                }
-            }
-        };
-
         if (TopLevel.GetTopLevel(this) is Window owner)
         {
             await dialog.ShowDialog(owner);
@@ -771,13 +716,33 @@ public partial class TabSchematics
     }
 
     // ###########################################################################################
-    // Shows a modal error dialog when the label editor contains invalid data so validation
-    // problems are visible immediately instead of only appearing in the logfile.
+    // Builds the label editor's error dialog, without showing it.
+    //
+    // The save and validation dialogs were written out separately and were identical for 48
+    // straight lines - same sizing, the same four theme brush lookups, the same red banner and the
+    // same nested layout - differing only in their title, headline, fallback text and whether a
+    // trailing hint paragraph is shown. Those four are now the parameters, so the two dialogs
+    // cannot drift apart visually.
+    //
+    // "errorMessage" is what actually went wrong; "fallbackMessage" stands in when it arrives
+    // blank, so the dialog never opens with an empty body. "hint" is null for a dialog that has
+    // nothing further to add, and that paragraph is then omitted entirely rather than emitted
+    // blank - an empty TextBlock still takes a line's worth of height.
+    //
+    // Kept separate from ShowDialogAsync above purely so it can be tested: ShowDialog blocks on a
+    // real window with nothing to dismiss it in a headless run, so a test that called the shipped
+    // entry points directly would hang rather than fail. The tests assert on the returned Window -
+    // the SAME one the app displays, since the caller does nothing to it but show it.
     // ###########################################################################################
-    private async Task ShowLabelEditorValidationFailedDialogAsync(string errorMessage)
+    private Window BuildLabelEditorErrorDialog(
+        string windowTitle,
+        string headline,
+        string errorMessage,
+        string fallbackMessage,
+        string? hint)
     {
         string message = string.IsNullOrWhiteSpace(errorMessage)
-            ? "The label editor contains invalid data."
+            ? fallbackMessage
             : errorMessage;
 
         var closeButton = new Button
@@ -790,7 +755,7 @@ public partial class TabSchematics
 
         var dialog = new Window
         {
-            Title = "Label editor validation failed",
+            Title = windowTitle,
             Width = 540,
             MinWidth = 460,
             CanResize = false,
@@ -806,66 +771,73 @@ public partial class TabSchematics
         var panelBorderBrush = this.ResolveThemeBrush("Schematics_Panels_Border", new SolidColorBrush(Color.Parse("#E0B4B4")));
         var foregroundBrush = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
 
+        var contentPanel = new StackPanel
+        {
+            Spacing = 14,
+            Children =
+            {
+                new Border
+                {
+                    Background = errorAccentBrush,
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(12, 10),
+                    Child = new StackPanel
+                    {
+                        Orientation = Avalonia.Layout.Orientation.Horizontal,
+                        Spacing = 10,
+                        Children =
+                        {
+                            new TextBlock
+                            {
+                                Text = "⚠",
+                                FontSize = 22,
+                                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                                Foreground = Brushes.White
+                            },
+                            new TextBlock
+                            {
+                                Text = headline,
+                                FontSize = 14,
+                                FontWeight = FontWeight.Bold,
+                                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                                Foreground = Brushes.White,
+                                TextWrapping = TextWrapping.Wrap
+                            }
+                        }
+                    }
+                },
+                new TextBlock
+                {
+                    Text = message,
+                    Foreground = foregroundBrush,
+                    TextWrapping = TextWrapping.Wrap
+                }
+            }
+        };
+
+        if (!string.IsNullOrWhiteSpace(hint))
+        {
+            contentPanel.Children.Add(new TextBlock
+            {
+                Text = hint,
+                Foreground = foregroundBrush,
+                Opacity = 0.85,
+                TextWrapping = TextWrapping.Wrap
+            });
+        }
+
+        contentPanel.Children.Add(closeButton);
+
         dialog.Content = new Border
         {
             Background = panelBackgroundBrush,
             BorderBrush = panelBorderBrush,
             BorderThickness = new Thickness(1),
             Padding = new Thickness(18),
-            Child = new StackPanel
-            {
-                Spacing = 14,
-                Children =
-                {
-                    new Border
-                    {
-                        Background = errorAccentBrush,
-                        CornerRadius = new CornerRadius(6),
-                        Padding = new Thickness(12, 10),
-                        Child = new StackPanel
-                        {
-                            Orientation = Avalonia.Layout.Orientation.Horizontal,
-                            Spacing = 10,
-                            Children =
-                            {
-                                new TextBlock
-                                {
-                                    Text = "⚠",
-                                    FontSize = 22,
-                                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                                    Foreground = Brushes.White
-                                },
-                                new TextBlock
-                                {
-                                    Text = "Unable to apply component label editor changes",
-                                    FontSize = 14,
-                                    FontWeight = FontWeight.Bold,
-                                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                                    Foreground = Brushes.White,
-                                    TextWrapping = TextWrapping.Wrap
-                                }
-                            }
-                        }
-                    },
-                    new TextBlock
-                    {
-                        Text = message,
-                        Foreground = foregroundBrush,
-                        TextWrapping = TextWrapping.Wrap
-                    },
-                    closeButton
-                }
-            }
+            Child = contentPanel
         };
 
-        if (TopLevel.GetTopLevel(this) is Window owner)
-        {
-            await dialog.ShowDialog(owner);
-        }
-        else
-        {
-            dialog.Show();
-        }
+        return dialog;
     }
 
     // ###########################################################################################

@@ -1,10 +1,11 @@
 ﻿using System.Text.Json;
 using Avalonia;
+using CRT;
 using Handlers.DataHandling;
 
 namespace ClassicRepairToolbox.Tests;
 
-// Characterisation tests for WorklogManager - the local, never-synced "Workbook" folder that backs
+// Characterisation tests for WorklogManager - the local, never-synced "Workbooks" folder that backs
 // the worklog bar. Same shape as UserSettingsTests: a static singleton whose LoadFrom() seam lets
 // a test point it at a temporary folder instead of the user's real AppData folder. NOTHING here
 // calls Load().
@@ -1100,7 +1101,7 @@ public sealed class WorklogManagerTests : IDisposable
         Assert.NotNull(attachmentsFolder);
 
         // "worklog_{id}", not the older "entry-{id}-files". This folder is visible to the user -
-        // in the Workbook folder on disk AND inside an exported ZIP, which reuses this exact name -
+        // in the Workbooks folder on disk AND inside an exported ZIP, which reuses this exact name -
         // and the app says "worklog" everywhere a user can see one. Renamed deliberately, with no
         // migration of existing data: an older folder keeps its name and its attachments simply
         // stop being found.
@@ -1886,5 +1887,83 @@ public sealed class WorklogManagerTests : IDisposable
         var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
 
         Assert.Null(WorklogManager.AddEntryRecord(workbook.Id, null!, reservedId: 1));
+    }
+
+    // ###########################################################################################
+    // THE PRE-RENAME FOLDER MIGRATION.
+    //
+    // The worklog folder was renamed from "Workbook" to "Workbooks" to match the tab. Without a
+    // migration that rename is silent data loss: Load resolves the new name, LoadFrom's
+    // Directory.CreateDirectory brings it into being empty, and every workbook, entry, photo and
+    // attachment an existing user recorded simply stops being found - reported as nothing, because
+    // "0 workbooks" is also what a fresh install shows.
+    //
+    // These drive MigrateLegacyWorklogFolder directly with explicit paths rather than going through
+    // Load(), which resolves the user's REAL AppData folder - see the test-seam rules in CLAUDE.md.
+    // ###########################################################################################
+    [Fact]
+    public void The_pre_rename_workbook_folder_is_moved_to_the_new_name()
+    {
+        string appFolder = this.thisWorkspace.Path_("App-" + Guid.NewGuid().ToString("N"));
+        string legacyFolder = Path.Combine(appFolder, AppConfig.LegacyWorklogFolderName);
+        string currentFolder = Path.Combine(appFolder, AppConfig.WorklogFolderName);
+
+        // A workbook as it would sit on disk from an older build: its own numbered subfolder
+        // holding index.json, which is what ReadAllWorkbooks walks.
+        Directory.CreateDirectory(Path.Combine(legacyFolder, "1"));
+        File.WriteAllText(Path.Combine(legacyFolder, "1", AppConfig.WorklogIndexFileName), "{\"Id\":1}");
+
+        WorklogManager.MigrateLegacyWorklogFolder(appFolder, currentFolder);
+
+        Assert.False(Directory.Exists(legacyFolder));
+        Assert.True(File.Exists(Path.Combine(currentFolder, "1", AppConfig.WorklogIndexFileName)));
+
+        // And the moved data is genuinely readable as workbooks afterwards, not just present as
+        // files - the point of the migration is that the tab finds them again.
+        WorklogManager.LoadFrom(currentFolder);
+        Assert.Equal(2, WorklogManager.PeekNextId());
+    }
+
+    // A fresh install has no legacy folder. The migration must be a no-op rather than creating
+    // anything or throwing - it runs on every single launch.
+    [Fact]
+    public void The_migration_does_nothing_when_there_is_no_legacy_folder()
+    {
+        string appFolder = this.thisWorkspace.Path_("App-" + Guid.NewGuid().ToString("N"));
+        string currentFolder = Path.Combine(appFolder, AppConfig.WorklogFolderName);
+        Directory.CreateDirectory(appFolder);
+
+        WorklogManager.MigrateLegacyWorklogFolder(appFolder, currentFolder);
+
+        Assert.False(Directory.Exists(currentFolder));
+    }
+
+    // ###########################################################################################
+    // BOTH folders present - the migration must REFUSE rather than merge.
+    //
+    // Reachable when the migration already ran (the normal second launch) or when a user has real
+    // data under both names. Moving one onto the other would merge two histories whose workbook ids
+    // collide, so the legacy folder is left exactly as it is for the user to sort out by hand.
+    // ###########################################################################################
+    [Fact]
+    public void The_migration_refuses_when_both_folders_exist_and_leaves_the_legacy_one_alone()
+    {
+        string appFolder = this.thisWorkspace.Path_("App-" + Guid.NewGuid().ToString("N"));
+        string legacyFolder = Path.Combine(appFolder, AppConfig.LegacyWorklogFolderName);
+        string currentFolder = Path.Combine(appFolder, AppConfig.WorklogFolderName);
+
+        Directory.CreateDirectory(Path.Combine(legacyFolder, "1"));
+        File.WriteAllText(Path.Combine(legacyFolder, "1", AppConfig.WorklogIndexFileName), "{\"Id\":1}");
+
+        Directory.CreateDirectory(Path.Combine(currentFolder, "7"));
+        File.WriteAllText(Path.Combine(currentFolder, "7", AppConfig.WorklogIndexFileName), "{\"Id\":7}");
+
+        WorklogManager.MigrateLegacyWorklogFolder(appFolder, currentFolder);
+
+        // Neither side touched: the legacy data is still recoverable, and the current data is not
+        // polluted with a colliding id.
+        Assert.True(File.Exists(Path.Combine(legacyFolder, "1", AppConfig.WorklogIndexFileName)));
+        Assert.True(File.Exists(Path.Combine(currentFolder, "7", AppConfig.WorklogIndexFileName)));
+        Assert.False(Directory.Exists(Path.Combine(currentFolder, "1")));
     }
 }

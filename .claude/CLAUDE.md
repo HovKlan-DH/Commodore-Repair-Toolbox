@@ -187,7 +187,7 @@ has an `internal` seam; the test project sees them via `InternalsVisibleTo` in t
 - `Logger` writes nothing until `Logger.Initialize()` is called, and no test calls it — which is why
   the `Logger.*` calls inside classes under test are inert. **Never call `Logger.Initialize()` from a
   test**, or the suite starts writing to the user's real log file.
-- `WorklogManager.LoadFrom(root)` — the same idea for the local "Workbook" folder. **Never call
+- `WorklogManager.LoadFrom(root)` — the same idea for the local "Workbooks" folder. **Never call
   `WorklogManager.Load()` from a test.** `TabWorkbooks.BoardKeyOverrideForTests` is the matching
   seam on the UI side: the Workbooks tab normally reads its board key off `Main`, which no test
   constructs, so the override lets the list be tested without standing up the main window.

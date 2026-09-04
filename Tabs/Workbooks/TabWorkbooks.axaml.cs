@@ -361,8 +361,18 @@ namespace CRT
         // not laid out yet at this point. The ceiling is generous - it only catches values that are
         // unusable on any ordinary screen - and the floor keeps a panel dragged shut from restoring
         // as an invisible sliver with no splitter to grab.
+        //
+        // Matches the ColumnDefinition MinWidth of the two columns this clamp actually applies to -
+        // OuterSplitGrid's left list column and BoardEntrySplitGrid's entry list column, both 200px
+        // - on purpose: that MinWidth is the LIVE floor GridSplitter enforces while dragging, and a
+        // lower value here would restore a width Avalonia immediately overrides back up to that
+        // floor anyway, making this constant lie about what actually gets applied. OuterSplitGrid's
+        // RIGHT column (the top-line/board/entry-list side) has its own higher 400px MinWidth
+        // instead - see that column's own comment - but nothing here ever writes its width, since
+        // it is the `*` column rather than a persisted one, so this constant does not need to know
+        // about it.
         // ###########################################################################################
-        private const double MinimumPanelWidth = 120.0;
+        private const double MinimumPanelWidth = 200.0;
 
         private const double MaximumPanelWidth = 900.0;
 
@@ -740,6 +750,15 @@ namespace CRT
                 return;
 
             this.thisActivateWorkbook?.Invoke(boardKey, workbookId);
+
+            // AFTER the activation, not before: that call is what rebuilds the board pane and so
+            // resolves which schematic this workbook actually shows (RefreshBoardPreviews sets
+            // thisSelectedSchematicName), and propagating first would send the PREVIOUS workbook's
+            // schematic over. Here rather than inside RefreshBoardPreviews because propagation must
+            // only ever follow a user's own click - see
+            // PropagateSelectedSchematicToSchematicsTab's header for what hooking the refresh path
+            // broke.
+            this.PropagateSelectedSchematicToSchematicsTab();
         }
 
         // ###########################################################################################

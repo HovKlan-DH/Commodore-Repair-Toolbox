@@ -532,6 +532,68 @@ public sealed class WorkbooksSummaryAndPillsTests : IDisposable
     }
 
     // ###########################################################################################
+    // A ZERO-count pill is muted to a neutral grey rather than its category/state colour - asked
+    // for directly, after the summary strip's five always-present pills (including the zeroes,
+    // see BuildCountPills' own header) blended together with nothing to draw the eye to which
+    // categories/states actually have entries.
+    //
+    // Pinned against Workbooks_ZeroCount_Fg - its OWN dedicated token, not one of the tab's two
+    // body-text greys: Muted_Fg, then Faint_Fg, were each tried here in turn and both reported as
+    // "still looks black"/"needs to be lighter" once bolded onto a small pill, since both are tuned
+    // to stay readable as PROSE rather than to read as washed-out/disabled - see MutedPillBrush's
+    // own comment. Muted pills also drop the count's bold weight (see BuildCountLabel).
+    //
+    // Only the COUNTED path is muted at zero - a workbook with one Note entry and zero Cosmetic/
+    // Issue ones still has a real "Open" or "Closed" state pill elsewhere on this very tab (the
+    // top-line, a workbook card, an entry card) that must never greyed out just because it shares
+    // a resolver with this one.
+    // ###########################################################################################
+    [Fact]
+    public void A_zero_count_pill_is_muted_to_a_neutral_grey_instead_of_its_own_colour()
+    {
+        this.LoadWorklog();
+        this.CreateWorkbookWithEntry("Sheet 1", "Note", "Open", out int workbookId);
+        var boardData = BuildBoardData("Sheet 1", this.WriteSchematicImage("sheet1.png"));
+
+        UiTest.Run(() =>
+        {
+            var tab = BuildTab(this.thisBoardKey, boardData, workbookId);
+            tab.ToggleSummaryForTests();
+
+            var mutedFg = ColorOf(ThemeResources.ResolveBrush("Workbooks_ZeroCount_Fg"));
+
+            // Cosmetic and Issue are both zero - the workbook has one Note entry only.
+            var cosmeticChip = tab.GetControl<WrapPanel>("WorkbookSummaryCategoryPanel").Children
+                .OfType<Border>().Single(b => AllText(b).Contains("Cosmetic", StringComparison.Ordinal));
+            var issueChip = tab.GetControl<WrapPanel>("WorkbookSummaryCategoryPanel").Children
+                .OfType<Border>().Single(b => AllText(b).Contains("Issue", StringComparison.Ordinal));
+
+            Assert.Equal(mutedFg, ColorOf(cosmeticChip.BorderBrush));
+            Assert.Equal(mutedFg, ColorOf(issueChip.BorderBrush));
+
+            // The muted "0" itself must not be bold - a bold zero in this lighter grey still read
+            // as solid/dark at pill size, which is what made Muted_Fg look black in the first place.
+            var cosmeticCount = TextBlocksIn(cosmeticChip).First(b => b.Text == "0");
+            Assert.Equal(FontWeight.Normal, cosmeticCount.FontWeight);
+
+            // Note itself has a real count (1) and must keep its own category colour.
+            var noteChip = tab.GetControl<WrapPanel>("WorkbookSummaryCategoryPanel").Children
+                .OfType<Border>().Single(b => AllText(b).Contains("Note", StringComparison.Ordinal));
+            Assert.Equal(WorklogInfoPillBuilder.ResolveCategoryColor("Note"), ColorOf(noteChip.BorderBrush));
+
+            // Closed is zero (the one entry is Open) and must be muted the same way.
+            var closedPill = tab.GetControl<WrapPanel>("WorkbookSummaryStatePanel").Children
+                .OfType<Border>().Single(b => AllText(b).Contains("Closed", StringComparison.Ordinal));
+            Assert.Equal(mutedFg, ColorOf(closedPill.BorderBrush));
+
+            // The workbook's own top-line status pill reports a REAL state (Open, uncounted) and
+            // must not be muted just because BuildStatePill also serves the summary's zero counts.
+            var topLineStatusPill = tab.GetControl<Border>("WorkbookHeaderStatusPill");
+            Assert.Equal(WorklogInfoPillBuilder.ResolveStateColor("Open"), ColorOf(topLineStatusPill.BorderBrush));
+        });
+    }
+
+    // ###########################################################################################
     // A COUNTED pill carries NO icon; an uncounted one still does.
     //
     // Asked for after the counted pills shipped with their icons: a padlock or a category glyph
@@ -575,6 +637,49 @@ public sealed class WorkbooksSummaryAndPillsTests : IDisposable
 
     private static IReadOnlyList<TextBlock> TextBlocksIn(Border pill) =>
         pill.Child is Panel panel ? panel.Children.OfType<TextBlock>().ToList() : new List<TextBlock>();
+
+    // ###########################################################################################
+    // WorklogInfoPillBuilder's own muting rule, exercised directly rather than through the summary
+    // strip: count: 0 replaces the state/category colour with Workbooks_ZeroCount_Fg on both the
+    // border and every text/label run, AND drops the count's bold weight, while a non-zero count
+    // (or no count at all, an ordinary uncounted pill) keeps the real colour and its usual weight.
+    //
+    // Its own dedicated token, and non-bold rather than bold: Muted_Fg and then Faint_Fg were each
+    // tried here in turn and both reported as still too dark at this pill's small bold size - see
+    // MutedPillBrush and BuildCountLabel's own comments.
+    // ###########################################################################################
+    [Fact]
+    public void BuildStatePill_and_BuildCategoryChip_mute_only_a_zero_count()
+    {
+        UiTest.Run(() =>
+        {
+            var mutedFg = ColorOf(ThemeResources.ResolveBrush("Workbooks_ZeroCount_Fg"));
+
+            var zeroStatePill = WorklogInfoPillBuilder.BuildStatePill("Open", count: 0);
+            Assert.Equal(mutedFg, ColorOf(zeroStatePill.BorderBrush));
+            Assert.All(TextBlocksIn(zeroStatePill), b => Assert.Equal(mutedFg, ColorOf(b.Foreground)));
+            Assert.Equal(FontWeight.Normal, TextBlocksIn(zeroStatePill).First(b => b.Text == "0").FontWeight);
+
+            var countedStatePill = WorklogInfoPillBuilder.BuildStatePill("Open", count: 3);
+            Assert.Equal(WorklogInfoPillBuilder.ResolveStateColor("Open"), ColorOf(countedStatePill.BorderBrush));
+            Assert.Equal(FontWeight.Bold, TextBlocksIn(countedStatePill).First(b => b.Text == "3").FontWeight);
+
+            var uncountedStatePill = WorklogInfoPillBuilder.BuildStatePill("Open");
+            Assert.Equal(WorklogInfoPillBuilder.ResolveStateColor("Open"), ColorOf(uncountedStatePill.BorderBrush));
+
+            var zeroChip = WorklogInfoPillBuilder.BuildCategoryChip("Issue", count: 0);
+            Assert.Equal(mutedFg, ColorOf(zeroChip.BorderBrush));
+            Assert.All(TextBlocksIn(zeroChip), b => Assert.Equal(mutedFg, ColorOf(b.Foreground)));
+            Assert.Equal(FontWeight.Normal, TextBlocksIn(zeroChip).First(b => b.Text == "0").FontWeight);
+
+            var countedChip = WorklogInfoPillBuilder.BuildCategoryChip("Issue", count: 3);
+            Assert.Equal(WorklogInfoPillBuilder.ResolveCategoryColor("Issue"), ColorOf(countedChip.BorderBrush));
+            Assert.Equal(FontWeight.Bold, TextBlocksIn(countedChip).First(b => b.Text == "3").FontWeight);
+
+            var uncountedChip = WorklogInfoPillBuilder.BuildCategoryChip("Issue");
+            Assert.Equal(WorklogInfoPillBuilder.ResolveCategoryColor("Issue"), ColorOf(uncountedChip.BorderBrush));
+        });
+    }
 
     // ###########################################################################################
     // 4. EXPORT

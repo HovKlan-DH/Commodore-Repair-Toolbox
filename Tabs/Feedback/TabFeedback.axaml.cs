@@ -223,6 +223,16 @@ namespace CRT
             if (attachLogs)
             {
                 targetFiles.Add((Path.Combine(localAppFolder, AppConfig.LogFileName), AppConfig.LogFileName));
+
+                // The crash file rides along with the log, because it is the ONLY record that
+                // survives a restart - the log is truncated on every launch, and a user reporting a
+                // crash has almost always relaunched before they get here, so the log they attach
+                // frequently no longer contains the crash they are writing about.
+                //
+                // Added unconditionally: it does not exist on an installation that has never
+                // crashed, and AddFileToZipSafe already skips a missing source rather than failing
+                // the whole submission.
+                targetFiles.Add((Path.Combine(localAppFolder, AppConfig.CrashFileName), AppConfig.CrashFileName));
             }
 
             if (attachConfig)

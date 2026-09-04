@@ -600,8 +600,8 @@ public sealed class WorkbooksListTests : IDisposable
     // splitter left to grab.
     [Theory]
     [InlineData(4000.0, 900.0)]   // absurdly wide - clamped down to the ceiling
-    [InlineData(0.0, 120.0)]      // dragged shut - raised to the floor
-    [InlineData(-50.0, 120.0)]    // nonsense - same
+    [InlineData(0.0, 200.0)]      // dragged shut - raised to the floor
+    [InlineData(-50.0, 200.0)]    // nonsense - same
     public void An_out_of_range_saved_width_is_clamped_to_something_usable(double saved, double expected)
     {
         this.LoadWorklog();
@@ -628,6 +628,42 @@ public sealed class WorkbooksListTests : IDisposable
             UserSettings.WorkbooksLeftPanelWidth = savedLeftPanelWidth;
             UserSettings.WorkbooksEntryListWidth = savedEntryListWidth;
         }
+    }
+
+    // ###########################################################################################
+    // Every panel column carries a LIVE MinWidth on its ColumnDefinition - distinct from
+    // ClampPanelWidth's matching floor above, which only guards a width read back from UserSettings
+    // on RESTORE. Without a MinWidth on the column itself, GridSplitter would happily drag any of
+    // these panels down to nothing WHILE DRAGGING, which the restore-time clamp cannot see or
+    // prevent - reported as panels becoming "fully hidden", then as "too narrow" once the floor
+    // was 100px.
+    //
+    // OuterSplitGrid's RIGHT column (the top-line/board/entry-list side) has a HIGHER floor than
+    // the other three - 400px, not 200px - because its top-line packs a title/pill/note beside FOUR
+    // buttons (Edit/Delete workbook, Export to PDF/ZIP across two rows); below 400px those buttons
+    // started overlapping the title rather than wrapping cleanly under it.
+    //
+    // The board pane's column (BoardEntrySplitGrid's own column 0) is the one of the four with no
+    // persisted width at all - it is whatever GridUnitType.Star leaves over - so this is the only
+    // place its floor is checked.
+    // ###########################################################################################
+    [Fact]
+    public void Every_panel_column_has_a_live_drag_floor()
+    {
+        this.LoadWorklog();
+
+        UiTest.Run(() =>
+        {
+            var tab = BuildTab(this.thisBoardKey);
+
+            var outerGrid = tab.GetControl<Grid>("OuterSplitGrid");
+            var boardEntryGrid = tab.GetControl<Grid>("BoardEntrySplitGrid");
+
+            Assert.Equal(200.0, outerGrid.ColumnDefinitions[0].MinWidth);
+            Assert.Equal(400.0, outerGrid.ColumnDefinitions[2].MinWidth);
+            Assert.Equal(200.0, boardEntryGrid.ColumnDefinitions[0].MinWidth);
+            Assert.Equal(200.0, boardEntryGrid.ColumnDefinitions[2].MinWidth);
+        });
     }
 
     // The SAVE half of the same pair, and the thing the restore test above cannot see: the tab

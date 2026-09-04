@@ -38,6 +38,10 @@ namespace CRT
     // and Save commits the direct fields via WorklogManager.UpdateEntry. For a NEW one nothing
     // reaches disk until Save, which writes the whole record through WorklogManager.AddEntryRecord -
     // see thisIsDraftEntry. Cancel/closing discards the working copy either way.
+    //
+    // The Photos and Files lists are ONE implementation parameterised by an AttachmentSection -
+    // see the ATTACHMENTS header further down for which axes they differ on and why the ordering
+    // rules inside those paths are not safe to hold two copies of.
     // ###########################################################################################
     public partial class WorklogEntryEditorWindow : Window
     {
@@ -1914,42 +1918,178 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Photos/images. The metadata (file name, comment, order) lives in entries.json with the
-        // entry; the bytes live in the entry's own "worklog_<id>" folder, resolved through
-        // WorklogManager.GetEntryAttachmentsFolder. Adding copies the chosen file in there under a
-        // name that cannot collide with an existing one - see WorklogAttachmentStorage.
+        // ATTACHMENTS - Photos and Files.
+        //
+        // Both lists have the same storage shape: metadata (file name, comment, order) lives in
+        // entries.json with the entry, while the bytes live in the entry's own "worklog_<id>"
+        // folder, resolved through WorklogManager.GetEntryAttachmentsFolder. Adding copies the
+        // chosen file in there under a name that cannot collide with an existing one - see
+        // WorklogAttachmentStorage.
+        //
+        // ONE implementation serves both, parameterised by the AttachmentSection below, for the
+        // same reason the drag-reorder further down is shared: the add/edit/delete paths each
+        // encode an ORDERING RULE learned from a real fault, and a second copy is a second place
+        // for one of them to be got wrong. The three rules, in the order they must happen:
+        //
+        //   Add    - copy the bytes, record the metadata, persist, and UNDO THE COPY if the
+        //            persist failed. Otherwise the folder holds bytes entries.json never mentions.
+        //   Edit   - persist the record BEFORE swapping the file, because the swap deletes what it
+        //            replaces. The other order left entries.json naming a file already deleted,
+        //            and Cancel then discarded the working copy - the row was permanently broken
+        //            with no way back to the original.
+        //   Delete - persist BEFORE removing the bytes. Deleting first leaves a still-listed row
+        //            pointing at nothing when the save fails.
+        //
+        // These were written out twice, and had already begun to drift: the file-side copies
+        // carried "see the photo path" comments rather than the reasoning itself, which is the
+        // admission that one was the original and the other a transcription.
+        //
+        // The two lists differ on exactly the axes this record names - which records, which rows,
+        // which stored-name prefix, which controls, and the noun used in messages. Everything else
+        // was identical. Photos additionally carry a decoded thumbnail; that is the ONE branch in
+        // the shared code (Thumbnail below), rather than a reason to keep two of everything.
+        //
+        // Records and Rows are lookups, not captured collections: anything replacing the thisEntry
+        // record (rather than mutating its lists in place) would otherwise leave a stale list
+        // behind - the same staleness the drag context's own comment describes.
         // ###########################################################################################
-        private void RefreshPhotoRows()
+        private sealed record AttachmentSection(
+            WorklogAttachmentStorage.AttachmentKind Kind,
+            string OwnerPrefix,
+            Func<List<WorklogAttachmentRecord>> Records,
+            Func<ObservableCollection<WorklogAttachmentRow>> Rows,
+            Func<ItemsControl> List,
+            Func<TextBlock> EmptyText,
+            Func<TextBlock> CountText,
+            string HeaderKey,
+            string Singular,
+            string Plural)
         {
-            // Each thumbnail is a decoded Bitmap holding an unmanaged surface. This method runs on
-            // every add/edit/delete/reorder and re-decodes the lot, so without disposing the old
-            // ones each refresh orphaned a full set until a finalizer eventually ran.
-            //
-            // Collected before Clear() but disposed after it: an Image is still bound to the bitmap
-            // until the row leaves the collection, and disposing one out from under a live binding
-            // risks a render against a freed surface.
-            var discardedThumbnails = this.thisPhotoRows.Select(row => row.Thumbnail).Where(bitmap => bitmap != null).ToList();
+            // The noun as it appears mid-sentence in a message ("The photo could not be copied").
+            public string Noun => this.Singular;
+        }
 
-            this.thisPhotoRows.Clear();
+        private AttachmentSection PhotoAttachments => new(
+            WorklogAttachmentStorage.AttachmentKind.Photo,
+            WorklogAttachmentStorage.PhotoFilePrefix,
+            () => this.thisEntry.Photos,
+            () => this.thisPhotoRows,
+            () => this.EditorPhotosList,
+            () => this.EditorNoPhotosText,
+            () => this.EditorPhotosCountText,
+            "EditorPhotosHeader",
+            "photo",
+            "photos");
+
+        private AttachmentSection FileAttachments => new(
+            WorklogAttachmentStorage.AttachmentKind.File,
+            WorklogAttachmentStorage.FileFilePrefix,
+            () => this.thisEntry.Files,
+            () => this.thisFileRows,
+            () => this.EditorFilesList,
+            () => this.EditorNoFilesText,
+            () => this.EditorFilesCountText,
+            "EditorFilesHeader",
+            "file",
+            "files");
+
+        // ###########################################################################################
+        // Test seam for the two attachment sections.
+        //
+        // What is worth pinning here is not that a record has the fields it was declared with, but
+        // that each section is wired to the RIGHT ONES - a copy/paste slip pointing the Files
+        // section at thisEntry.Photos, or at the photo prefix, compiles perfectly and silently
+        // makes the two lists share a set of records or a naming scheme. That is exactly the class
+        // of fault unifying the two implementations could introduce, so it is the thing to assert.
+        //
+        // Returns the section's wiring already resolved to values, so the test needs no access to
+        // the record type itself.
+        // ###########################################################################################
+        internal (string Prefix, string HeaderKey, string Singular, string Plural, bool IsPhotoKind,
+            int RecordCount, int RowCount, ItemsControl List, TextBlock EmptyText, TextBlock CountText)
+            DescribeAttachmentSectionForTests(bool photos)
+        {
+            var section = photos ? this.PhotoAttachments : this.FileAttachments;
+
+            return (
+                section.OwnerPrefix,
+                section.HeaderKey,
+                section.Singular,
+                section.Plural,
+                section.Kind == WorklogAttachmentStorage.AttachmentKind.Photo,
+                section.Records().Count,
+                section.Rows().Count,
+                section.List(),
+                section.EmptyText(),
+                section.CountText());
+        }
+
+        // Drives the shared row rebuild for one list, so a test can prove the SAME method serves
+        // both sections - including the thumbnail branch, which is the one place they differ.
+        internal void RefreshAttachmentRowsForTests(bool photos) =>
+            this.RefreshAttachmentRows(photos ? this.PhotoAttachments : this.FileAttachments);
+
+        // Appends a record directly to one section's list, bypassing the file copy an add would do.
+        // The rebuild is what is under test here, not the storage.
+        internal void AddAttachmentRecordForTests(bool photos, int id, string fileName, string comment)
+        {
+            var section = photos ? this.PhotoAttachments : this.FileAttachments;
+            section.Records().Add(new WorklogAttachmentRecord
+            {
+                Id = id,
+                FileName = fileName,
+                Comment = comment,
+                DisplayOrder = section.Records().Count
+            });
+        }
+
+        // ###########################################################################################
+        // Rebuilds one attachment list's rows from its records.
+        //
+        // The thumbnail disposal is the photo-only half, and it matters: each thumbnail is a decoded
+        // Bitmap holding an unmanaged surface, and this runs on every add/edit/delete/reorder.
+        // Without disposing the old ones each refresh orphaned a full set until a finalizer
+        // eventually ran. They are collected BEFORE Clear() but disposed AFTER it - an Image is
+        // still bound to the bitmap until the row leaves the collection, and disposing one out from
+        // under a live binding risks a render against a freed surface.
+        //
+        // Files never load a thumbnail, so for them the collected list is empty and this costs a
+        // no-op LINQ pass.
+        // ###########################################################################################
+        private void RefreshAttachmentRows(AttachmentSection section)
+        {
+            var rows = section.Rows();
+
+            var discardedThumbnails = rows.Select(row => row.Thumbnail).Where(bitmap => bitmap != null).ToList();
+
+            rows.Clear();
 
             foreach (var bitmap in discardedThumbnails)
             {
                 bitmap!.Dispose();
             }
-            foreach (var photo in this.thisEntry.Photos.OrderBy(p => p.DisplayOrder))
+
+            bool wantsThumbnail = section.Kind == WorklogAttachmentStorage.AttachmentKind.Photo;
+
+            foreach (var record in section.Records().OrderBy(r => r.DisplayOrder))
             {
-                this.thisPhotoRows.Add(new WorklogAttachmentRow
+                rows.Add(new WorklogAttachmentRow
                 {
-                    Id = photo.Id,
-                    FileName = photo.FileName,
-                    DisplayFileName = WorklogAttachmentStorage.GetDisplayFileName(photo.FileName, WorklogAttachmentStorage.PhotoFilePrefix, photo.Id),
-                    Comment = photo.Comment,
-                    Thumbnail = this.TryLoadPhotoThumbnail(photo.FileName)
+                    Id = record.Id,
+                    FileName = record.FileName,
+                    DisplayFileName = WorklogAttachmentStorage.GetDisplayFileName(record.FileName, section.OwnerPrefix, record.Id),
+                    Comment = record.Comment,
+                    Thumbnail = wantsThumbnail ? this.TryLoadPhotoThumbnail(record.FileName) : null
                 });
             }
-            this.EditorNoPhotosText.IsVisible = this.thisPhotoRows.Count == 0 && this.IsListSectionExpanded("EditorPhotosHeader");
-            this.EditorPhotosCountText.Text = FormatItemCount(this.thisPhotoRows.Count, "photo", "photos");
+
+            section.EmptyText().IsVisible = rows.Count == 0 && this.IsListSectionExpanded(section.HeaderKey);
+            section.CountText().Text = FormatItemCount(rows.Count, section.Singular, section.Plural);
         }
+
+        private void RefreshPhotoRows() => this.RefreshAttachmentRows(this.PhotoAttachments);
+
+        private void RefreshFileRows() => this.RefreshAttachmentRows(this.FileAttachments);
 
         // ###########################################################################################
         // Resolves the on-disk path of one of this entry's attachments, or null when the workbook
@@ -2000,9 +2140,11 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Adds one photo: collect the file and comment, copy the bytes into the entry's attachments
-        // folder, then record the metadata. The record is only added once the copy has succeeded -
-        // a row pointing at a file that never landed would show as permanently broken.
+        // Adds one attachment: collect the file and comment, copy the bytes into the entry's
+        // attachments folder, then record the metadata. The record is only added once the copy has
+        // succeeded - a row pointing at a file that never landed would show as permanently broken -
+        // and the copy is undone if the metadata then fails to persist. See the ATTACHMENTS header
+        // for why that ordering is not negotiable.
         // ###########################################################################################
         private async void OnAddPhotoClick(object? sender, RoutedEventArgs e)
         {
@@ -2010,20 +2152,35 @@ namespace CRT
             // global handler instead of this window. GetEntryAttachmentsFolder calls
             // Directory.CreateDirectory, which throws on a read-only or disconnected folder - a
             // reportable condition, not a crash.
+            await this.AddAttachmentGuardedAsync(this.PhotoAttachments);
+        }
+
+        private async void OnAddFileClick(object? sender, RoutedEventArgs e)
+        {
+            await this.AddAttachmentGuardedAsync(this.FileAttachments);
+        }
+
+        private async Task AddAttachmentGuardedAsync(AttachmentSection section)
+        {
             try
             {
-                await this.AddPhotoAsync();
+                await this.AddAttachmentAsync(section);
             }
             catch (Exception ex)
             {
-                Logger.Warning($"Failed to add worklog photo: {ex.Message}");
-                this.ShowSaveFailed("The photo could not be added - see the log for details.");
+                Logger.Warning($"Failed to add worklog {section.Noun}: {ex.Message}");
+                this.ShowSaveFailed($"The {section.Noun} could not be added - see the log for details.");
             }
         }
 
-        private async Task AddPhotoAsync()
+        private async Task AddAttachmentAsync(AttachmentSection section)
         {
             var dialog = new WorklogAddPhotoWindow();
+            if (section.Kind == WorklogAttachmentStorage.AttachmentKind.File)
+            {
+                dialog.InitializeForFileKind();
+            }
+
             var result = await dialog.ShowDialog<WorklogAddPhotoWindow.PhotoResult?>(this);
             if (result == null || string.IsNullOrWhiteSpace(result.SourcePath))
             {
@@ -2033,33 +2190,35 @@ namespace CRT
             string? attachmentsFolder = WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id);
             if (attachmentsFolder == null)
             {
-                this.ShowSaveFailed("Could not resolve where to store the photo.");
+                this.ShowSaveFailed($"Could not resolve where to store the {section.Noun}.");
                 return;
             }
+
+            var records = section.Records();
 
             // The id is settled before the name, because the stored name is built from it. It also
             // skips any id whose file is already in the folder - see AllocateAttachmentId for why
             // plain Max(Id) + 1 can silently overwrite an orphaned attachment.
             int nextId = WorklogAttachmentStorage.AllocateAttachmentId(
-                this.thisEntry.Photos,
-                WorklogAttachmentStorage.PhotoFilePrefix,
+                records,
+                section.OwnerPrefix,
                 WorklogAttachmentStorage.ListAttachmentFileNames(attachmentsFolder));
 
             // Ordering is 0-based to match ReorderAttachment, which renumbers densely from 0. When
-            // this started at 1, the first photo added after any drag-reorder took the same
+            // this started at 1, the first attachment added after any drag-reorder took the same
             // DisplayOrder as an existing row, and two rows sharing an order sort arbitrarily.
-            int nextOrder = this.thisEntry.Photos.Count == 0 ? 0 : this.thisEntry.Photos.Max(p => p.DisplayOrder) + 1;
+            int nextOrder = records.Count == 0 ? 0 : records.Max(r => r.DisplayOrder) + 1;
 
             string storedFileName = WorklogAttachmentStorage.BuildStoredFileName(
-                result.SourcePath, WorklogAttachmentStorage.PhotoFilePrefix, nextId);
+                result.SourcePath, section.OwnerPrefix, nextId);
 
             if (!WorklogAttachmentStorage.CopyAttachmentIntoFolder(result.SourcePath, attachmentsFolder, storedFileName))
             {
-                this.ShowSaveFailed("The photo could not be copied into the worklog.");
+                this.ShowSaveFailed($"The {section.Noun} could not be copied into the worklog.");
                 return;
             }
 
-            this.thisEntry.Photos.Add(new WorklogAttachmentRecord
+            records.Add(new WorklogAttachmentRecord
             {
                 Id = nextId,
                 FileName = storedFileName,
@@ -2067,17 +2226,17 @@ namespace CRT
                 DisplayOrder = nextOrder
             });
 
-            this.EnsureListSectionExpanded("EditorPhotosHeader");
-            this.RefreshPhotoRows();
+            this.EnsureListSectionExpanded(section.HeaderKey);
+            this.RefreshAttachmentRows(section);
 
-            // A failed save means entries.json will never mention this photo, so the bytes just
+            // A failed save means entries.json will never mention this attachment, so the bytes just
             // copied in would sit in the attachments folder forever with nothing referencing them.
             // Undoing the copy keeps the folder consistent with what was actually recorded.
             if (!this.PersistEntrySilently())
             {
-                this.thisEntry.Photos.RemoveAll(p => p.Id == nextId);
+                records.RemoveAll(r => r.Id == nextId);
                 WorklogAttachmentStorage.DeleteAttachmentFileAndFolderIfEmpty(attachmentsFolder, storedFileName);
-                this.RefreshPhotoRows();
+                this.RefreshAttachmentRows(section);
             }
         }
 
@@ -2118,44 +2277,58 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Editing a photo reopens the same modal pre-filled, matching the comment and work-done
-        // rows. A replacement image is copied in alongside the old one and the record repointed;
-        // the previous file is deliberately left on disk rather than deleted, because an entry that
-        // has not been saved yet can still be cancelled, and deleting here would take the original
-        // with it. See the note on Delete below - the same reasoning applies.
+        // Editing an attachment reopens the same modal pre-filled, matching the comment and
+        // work-done rows. A replacement file is copied in alongside the old one and the record
+        // repointed; the previous file is deliberately left on disk rather than deleted, because an
+        // entry that has not been saved yet can still be cancelled, and deleting here would take
+        // the original with it. See the note on Delete below - the same reasoning applies.
         // ###########################################################################################
         private async void OnEditPhotoClick(object? sender, RoutedEventArgs e)
         {
             // See OnAddPhotoClick for why the body is wrapped.
+            await this.EditAttachmentGuardedAsync(this.PhotoAttachments, sender);
+        }
+
+        private async void OnEditFileClick(object? sender, RoutedEventArgs e)
+        {
+            await this.EditAttachmentGuardedAsync(this.FileAttachments, sender);
+        }
+
+        private async Task EditAttachmentGuardedAsync(AttachmentSection section, object? sender)
+        {
             try
             {
-                await this.EditPhotoAsync(sender);
+                await this.EditAttachmentAsync(section, sender);
             }
             catch (Exception ex)
             {
-                Logger.Warning($"Failed to edit worklog photo: {ex.Message}");
-                this.ShowSaveFailed("The photo could not be updated - see the log for details.");
+                Logger.Warning($"Failed to edit worklog {section.Noun}: {ex.Message}");
+                this.ShowSaveFailed($"The {section.Noun} could not be updated - see the log for details.");
             }
         }
 
-        private async Task EditPhotoAsync(object? sender)
+        private async Task EditAttachmentAsync(AttachmentSection section, object? sender)
         {
             if (sender is not Button { Tag: int id })
             {
                 return;
             }
 
-            var photo = this.thisEntry.Photos.FirstOrDefault(p => p.Id == id);
-            if (photo == null)
+            var record = section.Records().FirstOrDefault(r => r.Id == id);
+            if (record == null)
             {
                 return;
             }
 
+            bool isPhoto = section.Kind == WorklogAttachmentStorage.AttachmentKind.Photo;
+
             var dialog = new WorklogAddPhotoWindow();
             dialog.InitializeForEdit(
-                WorklogAttachmentStorage.GetDisplayFileName(photo.FileName, WorklogAttachmentStorage.PhotoFilePrefix, photo.Id),
-                photo.Comment,
-                this.ResolveAttachmentPath(photo.FileName));
+                WorklogAttachmentStorage.GetDisplayFileName(record.FileName, section.OwnerPrefix, record.Id),
+                record.Comment,
+                // Only a photo has an image to preview; a document has none.
+                isPhoto ? this.ResolveAttachmentPath(record.FileName) : null,
+                section.Kind);
 
             var result = await dialog.ShowDialog<WorklogAddPhotoWindow.PhotoResult?>(this);
             if (result == null)
@@ -2163,8 +2336,8 @@ namespace CRT
                 return;
             }
 
-            string previousFileName = photo.FileName;
-            string previousComment = photo.Comment;
+            string previousFileName = record.FileName;
+            string previousComment = record.Comment;
 
             string? attachmentsFolder = null;
             string newStoredFileName = string.Empty;
@@ -2174,27 +2347,27 @@ namespace CRT
                 attachmentsFolder = WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id);
                 if (attachmentsFolder == null)
                 {
-                    this.ShowSaveFailed("Could not resolve where to store the photo.");
+                    this.ShowSaveFailed($"Could not resolve where to store the {section.Noun}.");
                     return;
                 }
 
                 newStoredFileName = WorklogAttachmentStorage.BuildStoredFileName(
-                    result.SourcePath, WorklogAttachmentStorage.PhotoFilePrefix, photo.Id);
+                    result.SourcePath, section.OwnerPrefix, record.Id);
 
-                photo.FileName = newStoredFileName;
+                record.FileName = newStoredFileName;
             }
 
-            photo.Comment = result.Comment;
+            record.Comment = result.Comment;
 
-            // The record is saved BEFORE the file is swapped, because the swap deletes the image it
+            // The record is saved BEFORE the file is swapped, because the swap deletes the file it
             // replaces. Doing it the other way round meant a failed save left entries.json naming a
             // file that had already been deleted - and Cancel then discarded the working copy, so
             // the row was permanently broken with no way back to the original.
             if (!this.PersistEntrySilently())
             {
-                photo.FileName = previousFileName;
-                photo.Comment = previousComment;
-                this.RefreshPhotoRows();
+                record.FileName = previousFileName;
+                record.Comment = previousComment;
+                this.RefreshAttachmentRows(section);
                 return;
             }
 
@@ -2203,21 +2376,21 @@ namespace CRT
                 // Copies the new file in and removes the one it replaces, leaving exactly one file
                 // behind whether or not the stored name changed - see TryReplaceAttachmentFile.
                 this.RollBackAttachmentFileNameIfSwapFailed(
-                    photo,
+                    record,
                     previousFileName,
                     newStoredFileName,
                     result.SourcePath!,
                     attachmentsFolder,
-                    "The photo could not be copied into the worklog.");
+                    $"The {section.Noun} could not be copied into the worklog.");
             }
 
-            this.RefreshPhotoRows();
+            this.RefreshAttachmentRows(section);
         }
 
         // ###########################################################################################
-        // Removes the photo, metadata and bytes both. Deleting the file is safe because the stored
-        // name carries the photo's own id (see BuildStoredFileName), so it can only ever belong to
-        // the record being removed - the app copied it in and nothing else points at it.
+        // Removes an attachment, metadata and bytes both. Deleting the file is safe because the
+        // stored name carries the record's own id (see BuildStoredFileName), so it can only ever
+        // belong to the record being removed - the app copied it in and nothing else points at it.
         //
         // The file goes only after the metadata change has been persisted: if the save fails the
         // row is still listed, and deleting first would leave it pointing at nothing.
@@ -2228,21 +2401,33 @@ namespace CRT
         // ###########################################################################################
         private void OnDeletePhotoClick(object? sender, RoutedEventArgs e)
         {
+            this.DeleteAttachment(this.PhotoAttachments, sender);
+        }
+
+        private void OnDeleteFileClick(object? sender, RoutedEventArgs e)
+        {
+            this.DeleteAttachment(this.FileAttachments, sender);
+        }
+
+        private void DeleteAttachment(AttachmentSection section, object? sender)
+        {
             if (sender is not Button { Tag: int id })
             {
                 return;
             }
 
-            var photo = this.thisEntry.Photos.FirstOrDefault(p => p.Id == id);
-            if (photo == null)
+            var records = section.Records();
+
+            var record = records.FirstOrDefault(r => r.Id == id);
+            if (record == null)
             {
                 return;
             }
 
-            string fileName = photo.FileName;
+            string fileName = record.FileName;
 
-            this.thisEntry.Photos.RemoveAll(p => p.Id == id);
-            this.RefreshPhotoRows();
+            records.RemoveAll(r => r.Id == id);
+            this.RefreshAttachmentRows(section);
 
             if (this.PersistEntrySilently())
             {
@@ -2269,28 +2454,28 @@ namespace CRT
         // placeholder-index-as-target rule), and a second copy would be a second place for those to
         // be got wrong.
         // ###########################################################################################
-        // Records is a lookup, not a captured list: see CreatePhotoDragContext for why holding the
-        // list itself across a gesture can go stale.
+        // Built from the AttachmentSection for the list being dragged, so the drag and the
+        // add/edit/delete paths cannot disagree about which records, rows or control a list has.
+        //
+        // Records stays a lookup rather than a captured list, and the reason is the whole point of
+        // this record: the context survives the entire gesture, so anything replacing the thisEntry
+        // record mid-drag (rather than mutating its lists in place) would leave the release handler
+        // reordering a detached list and persisting nothing the user could see. Reading the list
+        // through thisEntry at use time cannot go stale that way.
         private sealed record DragContext(
             ItemsControl List,
             ObservableCollection<WorklogAttachmentRow> Rows,
             Func<List<WorklogAttachmentRecord>> Records,
             Action Refresh);
 
-        // Built once per gesture rather than on every press.
-        //
-        // These were properties allocating a fresh record plus a bound delegate on every pointer
-        // press, including presses that immediately bailed. More importantly, Records held a direct
-        // reference to thisEntry's list captured at press time, and the context survives the whole
-        // gesture - so anything replacing the thisEntry record mid-drag (rather than mutating its
-        // lists in place) left the release handler reordering a detached list and persisting
-        // nothing the user could see. Reading the list through thisEntry at use time cannot go
-        // stale that way.
-        private DragContext CreatePhotoDragContext() => new(
-            this.EditorPhotosList, this.thisPhotoRows, () => this.thisEntry.Photos, this.RefreshPhotoRows);
-
-        private DragContext CreateFileDragContext() => new(
-            this.EditorFilesList, this.thisFileRows, () => this.thisEntry.Files, this.RefreshFileRows);
+        // Built once per gesture rather than on every press - these were properties allocating a
+        // fresh record plus a bound delegate on every pointer press, including presses that
+        // immediately bailed.
+        private DragContext CreateDragContext(AttachmentSection section) => new(
+            section.List(),
+            section.Rows(),
+            section.Records,
+            () => this.RefreshAttachmentRows(section));
 
         private DragContext? thisActiveDragContext;
 
@@ -2305,12 +2490,12 @@ namespace CRT
 
         private void OnPhotoRowDragHandlePointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            this.BeginRowDrag(sender, e, this.CreatePhotoDragContext());
+            this.BeginRowDrag(sender, e, this.CreateDragContext(this.PhotoAttachments));
         }
 
         private void OnFileRowDragHandlePointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            this.BeginRowDrag(sender, e, this.CreateFileDragContext());
+            this.BeginRowDrag(sender, e, this.CreateDragContext(this.FileAttachments));
         }
 
         private void BeginRowDrag(object? sender, PointerPressedEventArgs e, DragContext context)
@@ -2611,191 +2796,6 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Files - the same storage shape as Photos (bytes in the entry's "worklog_<id>" folder,
-        // metadata in entries.json), differing in what is accepted and how a row is presented:
-        //
-        //  - accepted types come from ExternalTargetLauncher's openable set rather than the narrower
-        //    drawable-image one, so a PDF or CSV is fine and an executable/script/shortcut is not;
-        //  - nothing is rendered for the file, just its name as a link, since there is no useful
-        //    preview for a document;
-        //  - clicking the link opens it through ExternalTargetLauncher, scoped to the attachments
-        //    folder, so the same containment and extension rules apply as anywhere else in the app.
-        // ###########################################################################################
-        private void RefreshFileRows()
-        {
-            this.thisFileRows.Clear();
-            foreach (var file in this.thisEntry.Files.OrderBy(f => f.DisplayOrder))
-            {
-                this.thisFileRows.Add(new WorklogAttachmentRow
-                {
-                    Id = file.Id,
-                    FileName = file.FileName,
-                    DisplayFileName = WorklogAttachmentStorage.GetDisplayFileName(file.FileName, WorklogAttachmentStorage.FileFilePrefix, file.Id),
-                    Comment = file.Comment
-                });
-            }
-            this.EditorNoFilesText.IsVisible = this.thisFileRows.Count == 0 && this.IsListSectionExpanded("EditorFilesHeader");
-            this.EditorFilesCountText.Text = FormatItemCount(this.thisFileRows.Count, "file", "files");
-        }
-
-        private async void OnAddFileClick(object? sender, RoutedEventArgs e)
-        {
-            // See OnAddPhotoClick for why the body is wrapped.
-            try
-            {
-                await this.AddFileAsync();
-            }
-            catch (Exception ex)
-            {
-                Logger.Warning($"Failed to add worklog file: {ex.Message}");
-                this.ShowSaveFailed("The file could not be added - see the log for details.");
-            }
-        }
-
-        private async Task AddFileAsync()
-        {
-            var dialog = new WorklogAddPhotoWindow();
-            dialog.InitializeForFileKind();
-
-            var result = await dialog.ShowDialog<WorklogAddPhotoWindow.PhotoResult?>(this);
-            if (result == null || string.IsNullOrWhiteSpace(result.SourcePath))
-            {
-                return;
-            }
-
-            string? attachmentsFolder = WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id);
-            if (attachmentsFolder == null)
-            {
-                this.ShowSaveFailed("Could not resolve where to store the file.");
-                return;
-            }
-
-            // See AddPhotoAsync - the same id/orphan reasoning applies to files.
-            int nextId = WorklogAttachmentStorage.AllocateAttachmentId(
-                this.thisEntry.Files,
-                WorklogAttachmentStorage.FileFilePrefix,
-                WorklogAttachmentStorage.ListAttachmentFileNames(attachmentsFolder));
-            int nextOrder = this.thisEntry.Files.Count == 0 ? 0 : this.thisEntry.Files.Max(f => f.DisplayOrder) + 1;
-
-            string storedFileName = WorklogAttachmentStorage.BuildStoredFileName(
-                result.SourcePath, WorklogAttachmentStorage.FileFilePrefix, nextId);
-
-            if (!WorklogAttachmentStorage.CopyAttachmentIntoFolder(result.SourcePath, attachmentsFolder, storedFileName))
-            {
-                this.ShowSaveFailed("The file could not be copied into the worklog.");
-                return;
-            }
-
-            this.thisEntry.Files.Add(new WorklogAttachmentRecord
-            {
-                Id = nextId,
-                FileName = storedFileName,
-                Comment = result.Comment,
-                DisplayOrder = nextOrder
-            });
-
-            this.EnsureListSectionExpanded("EditorFilesHeader");
-            this.RefreshFileRows();
-
-            // Undo the copy when the save fails, so the folder never holds bytes that entries.json
-            // does not mention - same reasoning as the photo add path.
-            if (!this.PersistEntrySilently())
-            {
-                this.thisEntry.Files.RemoveAll(f => f.Id == nextId);
-                WorklogAttachmentStorage.DeleteAttachmentFileAndFolderIfEmpty(attachmentsFolder, storedFileName);
-                this.RefreshFileRows();
-            }
-        }
-
-        private async void OnEditFileClick(object? sender, RoutedEventArgs e)
-        {
-            // See OnAddPhotoClick for why the body is wrapped.
-            try
-            {
-                await this.EditFileAsync(sender);
-            }
-            catch (Exception ex)
-            {
-                Logger.Warning($"Failed to edit worklog file: {ex.Message}");
-                this.ShowSaveFailed("The file could not be updated - see the log for details.");
-            }
-        }
-
-        private async Task EditFileAsync(object? sender)
-        {
-            if (sender is not Button { Tag: int id })
-            {
-                return;
-            }
-
-            var file = this.thisEntry.Files.FirstOrDefault(f => f.Id == id);
-            if (file == null)
-            {
-                return;
-            }
-
-            var dialog = new WorklogAddPhotoWindow();
-            dialog.InitializeForEdit(
-                WorklogAttachmentStorage.GetDisplayFileName(file.FileName, WorklogAttachmentStorage.FileFilePrefix, file.Id),
-                file.Comment,
-                existingImagePath: null,
-                WorklogAttachmentStorage.AttachmentKind.File);
-
-            var result = await dialog.ShowDialog<WorklogAddPhotoWindow.PhotoResult?>(this);
-            if (result == null)
-            {
-                return;
-            }
-
-            string previousFileName = file.FileName;
-            string previousComment = file.Comment;
-
-            string? attachmentsFolder = null;
-            string newStoredFileName = string.Empty;
-
-            if (!string.IsNullOrWhiteSpace(result.SourcePath))
-            {
-                attachmentsFolder = WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id);
-                if (attachmentsFolder == null)
-                {
-                    this.ShowSaveFailed("Could not resolve where to store the file.");
-                    return;
-                }
-
-                newStoredFileName = WorklogAttachmentStorage.BuildStoredFileName(
-                    result.SourcePath, WorklogAttachmentStorage.FileFilePrefix, file.Id);
-
-                file.FileName = newStoredFileName;
-            }
-
-            file.Comment = result.Comment;
-
-            // Saved before the swap, because the swap deletes what it replaces - see the photo edit
-            // path for why the other order strands a record pointing at a deleted file.
-            if (!this.PersistEntrySilently())
-            {
-                file.FileName = previousFileName;
-                file.Comment = previousComment;
-                this.RefreshFileRows();
-                return;
-            }
-
-            if (attachmentsFolder != null)
-            {
-                // Same swap-and-roll-back as the photo path - see RollBackAttachmentFileNameIfSwapFailed.
-                this.RollBackAttachmentFileNameIfSwapFailed(
-                    file,
-                    previousFileName,
-                    newStoredFileName,
-                    result.SourcePath!,
-                    attachmentsFolder,
-                    "The file could not be copied into the worklog.");
-            }
-
-            this.RefreshFileRows();
-        }
-
-        // ###########################################################################################
         // Swaps an attachment's bytes for a newly picked file and, if that fails, puts the record's
         // stored name back so entries.json never names bytes that were never written.
         //
@@ -2895,37 +2895,6 @@ namespace CRT
             }
         }
 
-        // ###########################################################################################
-        // Removes the file, metadata and bytes both - the stored name carries the record's own id,
-        // so it can only belong to the row being removed. The bytes go only after the metadata
-        // change reached disk, matching OnDeletePhotoClick - including the empty-folder cleanup, see
-        // DeleteAttachmentFileAndFolderIfEmpty.
-        // ###########################################################################################
-        private void OnDeleteFileClick(object? sender, RoutedEventArgs e)
-        {
-            if (sender is not Button { Tag: int id })
-            {
-                return;
-            }
-
-            var file = this.thisEntry.Files.FirstOrDefault(f => f.Id == id);
-            if (file == null)
-            {
-                return;
-            }
-
-            string fileName = file.FileName;
-
-            this.thisEntry.Files.RemoveAll(f => f.Id == id);
-            this.RefreshFileRows();
-
-            if (this.PersistEntrySilently())
-            {
-                WorklogAttachmentStorage.DeleteAttachmentFileAndFolderIfEmpty(
-                    WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id),
-                    fileName);
-            }
-        }
         // ###########################################################################################
         // Cancel/Escape discards pending edits to the direct fields (Title/Description/category/
         // state), but still reports WasSaved when a Links/Comments/Work-done/Photos/Files change

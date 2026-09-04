@@ -28,7 +28,7 @@ command-line (global) property - see the comment on SelfContained below.
     <!-- Avalonia.Headless only. The Avalonia.Headless.XUnit adapter is bound to xunit v3
          and would collide with the xunit 2.x this suite uses, so UiTest drives the
          headless session directly instead. -->
-    <PackageReference Include="Avalonia.Headless" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Headless" Version="12.1.2" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />

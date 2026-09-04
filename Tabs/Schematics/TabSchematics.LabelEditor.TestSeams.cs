@@ -1,4 +1,5 @@
-using Avalonia;
+﻿using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Input;
 using Handlers.DataHandling;
 using Handlers.Geometry;
@@ -98,4 +99,24 @@ public partial class TabSchematics
     // The keyboard nudge/resize path, which is a different entry point from a pointer drag.
     internal bool ApplySelectedLabelEditorKeyboardStepForTests(Key key, KeyModifiers modifiers) =>
         this.ApplySelectedLabelEditorKeyboardStep(key, modifiers);
+
+    // The save/validation error dialog, BUILT but not shown.
+    //
+    // The two shipped entry points end in ShowDialog, which blocks on a real window with nothing
+    // to dismiss it headlessly - so a test driving them would hang instead of failing. This seam
+    // returns the constructed Window instead, which is the same object the app shows: the shipped
+    // method does nothing to it between building and showing.
+    //
+    // Worth a seam because these two dialogs were 48 identical lines until they were merged behind
+    // one builder, and the four things that differ between them (title, headline, fallback text,
+    // and whether a hint paragraph exists at all) are now arguments that a caller can get wrong
+    // silently - a swapped pair still compiles and still shows a plausible-looking dialog.
+    // Each delegates to the SAME private builder call the shipped dialog uses - deliberately not a
+    // copy of its arguments here, which would be the very duplication this refactor removed and
+    // would let the test pass against strings the application does not use.
+    internal Window BuildLabelEditorSaveFailedDialogForTests(string errorMessage) =>
+        this.BuildLabelEditorSaveFailedDialog(errorMessage);
+
+    internal Window BuildLabelEditorValidationFailedDialogForTests(string errorMessage) =>
+        this.BuildLabelEditorValidationFailedDialog(errorMessage);
 }

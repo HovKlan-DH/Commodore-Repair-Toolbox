@@ -12,7 +12,7 @@ namespace Handlers.DataHandling
 {
     // ###########################################################################################
     // One repair job a user is tracking against a board. Persisted as its own subfolder's
-    // index.json inside the "Workbook" folder - never synced and never part of the online "Data"
+    // index.json inside the "Workbooks" folder - never synced and never part of the online "Data"
     // folder. Everything that ever belongs to this workbook (entries, photos, files) lives inside
     // that same subfolder, so deleting the folder deletes the workbook entirely.
     // ###########################################################################################
@@ -142,7 +142,7 @@ namespace Handlers.DataHandling
     }
 
     // ###########################################################################################
-    // Reads and writes workbooks under the local "Workbook" folder - one subfolder per workbook,
+    // Reads and writes workbooks under the local "Workbooks" folder - one subfolder per workbook,
     // named after its id, each holding its own index.json. There is deliberately no central index:
     // every query scans the subfolders on disk, so there is no bookkeeping file to keep in sync or
     // go stale.
@@ -165,7 +165,7 @@ namespace Handlers.DataHandling
         private static string _workbookRootPath = string.Empty;
 
         // ###########################################################################################
-        // Resolves the "Workbook" folder in the user's AppData folder and points the manager at it.
+        // Resolves the "Workbooks" folder in the user's AppData folder and points the manager at it.
         // Falls back to an unusable (empty) root silently on any failure.
         // ###########################################################################################
         public static void Load()
@@ -173,12 +173,84 @@ namespace Handlers.DataHandling
             try
             {
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                var directory = Path.Combine(appData, AppConfig.AppFolderName, AppConfig.WorklogFolderName);
+                var appFolder = Path.Combine(appData, AppConfig.AppFolderName);
+                var directory = Path.Combine(appFolder, AppConfig.WorklogFolderName);
+
+                // BEFORE LoadFrom, which creates the (new, empty) folder - once that exists the
+                // migration below can no longer tell an upgrading user from a fresh install.
+                MigrateLegacyWorklogFolder(appFolder, directory);
+
                 LoadFrom(directory);
             }
             catch (Exception ex)
             {
                 Logger.Warning($"Failed to load worklog: [{ex.Message}] - using defaults");
+            }
+        }
+
+        // ###########################################################################################
+        // Moves the pre-rename "Workbook" folder to "Workbooks", once, on the first launch after
+        // upgrading.
+        //
+        // WHY THIS EXISTS: the folder was renamed to match the Workbooks tab, and AppConfig holds
+        // only the new name. A rename with no migration is not a rename - it is silent data loss.
+        // Load resolves the new path, LoadFrom's Directory.CreateDirectory brings it into being
+        // empty, ReadAllWorkbooks finds nothing, and the tab, the worklog bar and every entry,
+        // photo and attachment simply report "0 workbooks" as if the user had never recorded a
+        // repair. The real data is still on disk the whole time, under a name nothing reads.
+        //
+        // A MOVE rather than a copy: two divergent copies of a repair history is a worse outcome
+        // than either one alone, since the user cannot tell which is current and the next save
+        // lands in only one of them.
+        //
+        // Every guard here is a REFUSAL to act, never a partial move:
+        //   - no legacy folder: a fresh install, nothing to do;
+        //   - destination already exists: either the migration already ran, or the user has real
+        //     data under the new name. Moving onto it would merge two histories with colliding
+        //     workbook ids, so the legacy folder is left untouched and named in the log instead.
+        //
+        // A failure is logged and swallowed rather than thrown: the worklog is one feature, and a
+        // folder that could not be moved (open in Explorer, held by a sync client, permissions)
+        // must not stop the whole application from starting. The legacy folder is left intact, so
+        // the next launch simply tries again.
+        // ###########################################################################################
+        internal static void MigrateLegacyWorklogFolder(string appFolder, string currentWorklogFolder)
+        {
+            try
+            {
+                var legacyFolder = Path.Combine(appFolder, AppConfig.LegacyWorklogFolderName);
+
+                // Guards the degenerate case of the two constants having been set to the same
+                // value: Directory.Move onto itself throws, and this runs during startup. Compared
+                // ignoring case because the filesystems this ships on (Windows, macOS by default)
+                // treat paths that way, so equal-but-for-case here means the same folder.
+                if (string.Equals(legacyFolder, currentWorklogFolder, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                if (!Directory.Exists(legacyFolder))
+                {
+                    return;
+                }
+
+                if (Directory.Exists(currentWorklogFolder))
+                {
+                    Logger.Warning(
+                        $"Worklog: found the pre-rename folder [{legacyFolder}] but [{currentWorklogFolder}] " +
+                        "already exists, so it was left alone. Merge it by hand if it holds workbooks you want.");
+                    return;
+                }
+
+                Directory.Move(legacyFolder, currentWorklogFolder);
+
+                Logger.Info($"Worklog: migrated [{legacyFolder}] to [{currentWorklogFolder}]");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(
+                    $"Worklog: could not migrate the pre-rename folder - [{ex.Message}]. " +
+                    "The old folder is untouched and the migration will be retried on the next launch.");
             }
         }
 
@@ -1062,7 +1134,7 @@ namespace Handlers.DataHandling
         // of them or attachments would be written to one folder and read from another.
         //
         // Named for the WORKLOG rather than the "entry" the code calls it internally: this folder is
-        // visible to the user, both in the Workbook folder on disk and inside an exported ZIP, and
+        // visible to the user, both in the Workbooks folder on disk and inside an exported ZIP, and
         // the app says "worklog" everywhere a user can see one. It was "entry-{id}-files".
         // Deliberately NO migration of existing data - a folder from an older build keeps its name
         // and its attachments simply stop being found, which was accepted when this was requested.

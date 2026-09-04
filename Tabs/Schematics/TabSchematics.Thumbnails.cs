@@ -61,6 +61,16 @@ public partial class TabSchematics
 
     private bool thisSuppressThumbnailSelectionChanged;
 
+    // Lets a headless test put the tab into the mid-drag state SelectSchematicByName has to refuse
+    // to act in, without driving a whole pointer drag-reorder through the list. Set by the drag
+    // handlers in the running app, never by anything else - the same test-seam pattern the
+    // LabelEditor and Worklog parts use.
+    internal bool SuppressThumbnailSelectionChangedForTests
+    {
+        get => this.thisSuppressThumbnailSelectionChanged;
+        set => this.thisSuppressThumbnailSelectionChanged = value;
+    }
+
     private PointerPressedEventArgs? thisThumbnailDragStartEventArgs;
 
     private string thisLastThumbnailHighlightSignature = string.Empty;
@@ -306,6 +316,46 @@ public partial class TabSchematics
         }
 
         this.SchematicsThumbnailList.ItemsSource = this.currentThumbnails;
+    }
+
+    // ###########################################################################################
+    // Selects a schematic by name in the thumbnail list, if one by that name is currently loaded -
+    // called from TabWorkbooks (SelectWorkbook/SelectSchematic) so that picking a workbook or a
+    // schematic on the Workbooks tab makes the matching schematic image the one waiting on the
+    // Schematics tab, without switching tabs to show it. Setting SelectedItem runs the exact same
+    // OnSchematicsThumbnailSelectionChanged path a click on the thumbnail would, so the full-res
+    // image, overlays and saved "last schematic for this board" all follow normally.
+    //
+    // A no-op when the name is not found (board not loaded yet, or the workbook references a
+    // schematic that was renamed/removed) or already selected - same "nothing to do" guard
+    // OnSchematicsThumbnailSelectionChanged's own callers rely on elsewhere.
+    // ###########################################################################################
+    public void SelectSchematicByName(string schematicName)
+    {
+        if (string.IsNullOrWhiteSpace(schematicName))
+            return;
+
+        // A thumbnail drag-reorder is in progress (the flag is set on drag start and cleared only
+        // on release), during which OnSchematicsThumbnailSelectionChanged early-returns. Assigning
+        // SelectedItem here would move the list's highlight while the image, overlays and
+        // currentFullResBitmap stayed on the OLD schematic - and the drag's own release handler
+        // reassigns SelectedItem to the dragged thumbnail anyway, so the assignment would be lost.
+        // Dropping the request is right: the user is reordering thumbnails, not asking for a
+        // different one, and the caller is a cross-tab convenience rather than a command.
+        if (this.thisSuppressThumbnailSelectionChanged)
+            return;
+
+        if (this.SchematicsThumbnailList.SelectedItem is SchematicThumbnail current &&
+            string.Equals(current.Name, schematicName, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var match = this.currentThumbnails.FirstOrDefault(t =>
+            string.Equals(t.Name, schematicName, StringComparison.OrdinalIgnoreCase));
+
+        if (match != null)
+        {
+            this.SchematicsThumbnailList.SelectedItem = match;
+        }
     }
 
     // ###########################################################################################

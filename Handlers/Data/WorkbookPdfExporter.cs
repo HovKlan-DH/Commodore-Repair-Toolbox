@@ -240,7 +240,7 @@ namespace Handlers.DataHandling
         // defeats the point of an export button.
         //
         // Entry folders are named "worklog_{id}" - the SAME name the entry's attachments have in
-        // the local Workbook folder (WorklogManager.BuildEntryAttachmentsFolderName), so what the
+        // the local Workbooks folder (WorklogManager.BuildEntryAttachmentsFolderName), so what the
         // recipient unpacks matches what the repairer sees on their own disk. The worklog title is
         // deliberately NOT in the folder name: it is free text the user typed, often carrying a
         // customer's own details, and the PDF beside it already says which worklog is which.
@@ -1107,7 +1107,7 @@ namespace Handlers.DataHandling
         //
         // The FILE NAME is printed as well as the comment, so a recipient reading the PDF can find
         // that exact photo in the ZIP export's "worklog_{id}" folder (or the repairer in their own
-        // Workbook folder). It is shown even when the photo has no comment, which is the common
+        // Workbooks folder). It is shown even when the photo has no comment, which is the common
         // case and the one where the name is the only handle on the file.
         //
         // Two to a row: one per row wastes half a page on a phone photo, and more than two makes

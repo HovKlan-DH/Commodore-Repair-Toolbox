@@ -378,6 +378,10 @@ namespace CRT
             this.thisEntriesReadThisPass.Clear();
             this.RefreshSummaryForShownWorkbook();
 
+            // Makes the newly clicked schematic the one waiting on the Schematics tab too - see
+            // PropagateSelectedSchematicToSchematicsTab's own header.
+            this.PropagateSelectedSchematicToSchematicsTab();
+
             foreach (var child in this.BoardPreviewPanel.Children)
             {
                 if (child is not Border preview || preview.Tag is not string previewSchematicName)
@@ -387,6 +391,41 @@ namespace CRT
             }
 
             this.RefreshSelectedSchematicEntries();
+        }
+
+        // ###########################################################################################
+        // Makes thisSelectedSchematicName the one showing on the Schematics tab too - asked for
+        // explicitly: selecting a workbook (or a schematic within it) on THIS tab should have the
+        // matching schematic image waiting on the Schematics tab, without actually switching there.
+        // The user stays on Workbooks; only what the Schematics tab would show if they clicked over
+        // to it changes.
+        //
+        // Goes through TabSchematics.SelectSchematicByName, which sets the thumbnail list's
+        // SelectedItem - the exact same path a click on that thumbnail takes, so the full-res image,
+        // overlays and "last schematic for this board" all follow exactly as they would from a real
+        // click. That method already no-ops when the name is not found or already selected, so no
+        // guard is needed here beyond the null checks for a headless test or a board with nothing
+        // selected yet.
+        //
+        // CALL THIS ONLY FROM A USER-INITIATED SELECTION - SelectSchematic (a click on a preview)
+        // and SelectWorkbook (a click on a workbook card). It must NOT be called from
+        // RefreshBoardPreviews, where it sat at first: that method runs on EVERY refresh pass -
+        // Main.RefreshWorklogBar drives it on every entry save, workbook create/delete, board load
+        // and search-debounce tick - and it re-derives thisSelectedSchematicName to
+        // entriesBySchematic[0] (alphabetically first) whenever the previous choice is not in the
+        // rebuilt set. Hooked there, saving a worklog entry FROM the Schematics tab yanked that tab
+        // off the schematic the user was working on and onto an unrelated one, discarding its
+        // full-resolution bitmap; a refresh arriving mid "Add worklog" also cancelled the
+        // area-marking mode outright, since OnSchematicsThumbnailSelectionChanged opens with
+        // CancelWorklogEntryMode. Propagation is a response to the user choosing something here,
+        // never a side effect of this tab refreshing itself.
+        // ###########################################################################################
+        private void PropagateSelectedSchematicToSchematicsTab()
+        {
+            if (this.thisSelectedSchematicName == null)
+                return;
+
+            this.MainWindow?.TabSchematicsControl?.SelectSchematicByName(this.thisSelectedSchematicName);
         }
 
         // ###########################################################################################

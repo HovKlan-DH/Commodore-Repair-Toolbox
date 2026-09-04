@@ -53,6 +53,7 @@ public class WorkbooksPaletteTests
     [InlineData("Workbooks_RowSeparator")]
     [InlineData("Workbooks_Muted_Fg")]
     [InlineData("Workbooks_Faint_Fg")]
+    [InlineData("Workbooks_ZeroCount_Fg")]
     [InlineData("Workbooks_SearchHit_Bg")]
     [InlineData("Workbooks_SearchHit_Fg")]
     public void Every_workbooks_palette_key_resolves_through_the_theme(string key)
@@ -70,6 +71,7 @@ public class WorkbooksPaletteTests
     [InlineData("Workbooks_RowSeparator")]
     [InlineData("Workbooks_Muted_Fg")]
     [InlineData("Workbooks_Faint_Fg")]
+    [InlineData("Workbooks_ZeroCount_Fg")]
     [InlineData("Workbooks_SearchHit_Bg")]
     [InlineData("Workbooks_SearchHit_Fg")]
     public void Every_workbooks_palette_key_is_defined_in_both_themes(string key)

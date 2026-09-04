@@ -19,7 +19,7 @@ namespace ClassicRepairToolbox.Tests.Ui;
 // completely uncovered.
 //
 // The comment ROWS are what is asserted, not the file on disk. WorklogManager is a static pointed
-// at the user's real Workbook folder, and re-pointing it from this collection would race the
+// at the user's real Workbooks folder, and re-pointing it from this collection would race the
 // "Worklog" collection that owns it - so these stop at the observable UI, and
 // WorklogAutomaticCommentTests covers the wording and WorklogManagerTests the persistence.
 [Collection("HeadlessUi")]

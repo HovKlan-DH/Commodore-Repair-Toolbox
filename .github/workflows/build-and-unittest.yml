@@ -100,3 +100,65 @@ jobs:
           path: ${{ github.workspace }}/TestResults/**/coverage.cobertura.xml
           retention-days: 7
           if-no-files-found: ignore
+
+      #
+      # Duplication is REPORTED, not enforced - the same deal as coverage above, and for a sharper
+      # reason: this codebase carries a long tail of structurally similar UI code (four worklog
+      # dialogs sharing an Escape/Ctrl+Enter handler, viewport helpers differing by exactly the
+      # bounds check their names describe) that a clone detector flags and that nobody intends to
+      # change. A threshold over that would fire on non-defects until people stopped reading it.
+      #
+      # It exists because before this, NOTHING measured duplication - not this workflow, not the
+      # csproj, not CodeQL (security queries, not clone detection). The duplicated helpers named in
+      # .claude/CLAUDE.md were all found by hand after they had shipped.
+      #
+      # Scoped to the app's own source folders: Tests/ is excluded on purpose, since test files
+      # legitimately repeat arrange/assert shapes and would dominate the figure with noise.
+      #
+      # "always()" so the figure still appears when the suite is red, matching the coverage step -
+      # a run that fails is when knowing what the code looks like is most useful. "continue-on-
+      # error" because a health-check run must not go red over a reporting tool: jscpd is fetched
+      # from npm at run time, so a registry blip is an infrastructure failure, not a code failure.
+      #
+      # Pinned rather than @latest: the summary script reads .statistics.total out of the JSON
+      # report, which is a shape this tool is free to change in a major version. An unpinned fetch
+      # would turn that into a silently empty summary on some future Tuesday.
+      - name: Duplication check
+        if: always()
+        continue-on-error: true
+        run: >
+          npx --yes jscpd@5.1.2 Handlers Main Tabs
+          --format csharp
+          --min-lines 10
+          --reporters json
+          --output ${{ github.workspace }}/DuplicationResults
+
+      - name: Duplication summary
+        if: always()
+        # Reporting only - it renders totals into the job summary and decides nothing. Same
+        # continue-on-error as the duplication step it reads from, and for the same reason: a
+        # failure here is infrastructure (a crash inside the script, an unreadable report), not a
+        # finding about the code, and it must not turn an otherwise green run red.
+        continue-on-error: true
+        run: |
+          # An empty path when the report is missing - the duplication step above runs under
+          # continue-on-error, so it can fail and leave no file behind. Passing "" rather than a
+          # non-existent path is what the script's own skip branch expects, and testing with
+          # "[ ! -f ]" keeps this from tripping "bash -e" and masking the real result.
+          REPORT="${{ github.workspace }}/DuplicationResults/jscpd-report.json"
+          if [ ! -f "$REPORT" ]; then REPORT=""; fi
+          bash .github/workflows/duplication-summary.sh "$REPORT"
+
+      #
+      # The full JSON, kept so a specific run's per-clone file and line numbers can be inspected
+      # later - the job summary only carries the totals. Same short retention as the coverage
+      # artifact, and for the same reason.
+      #
+      - name: Upload duplication report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: duplication-report
+          path: ${{ github.workspace }}/DuplicationResults/jscpd-report.json
+          retention-days: 7
+          if-no-files-found: ignore

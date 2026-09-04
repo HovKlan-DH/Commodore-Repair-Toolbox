@@ -75,6 +75,16 @@
 			<Setter Property="Background" Value="Transparent" />
 			<Setter Property="BorderThickness" Value="0" />
 		</Style>
+
+		<!-- The four workbook-header action buttons (Edit/Delete workbook, Export to PDF/ZIP) -
+		     one fixed Width so all four line up on the same two edges across both rows, rather
+		     than each sizing to its own label ("Delete workbook" is the widest). HorizontalContentAlignment
+		     centers the shorter labels within that width instead of leaving them flush left. -->
+		<Style Selector="Button.WorkbookHeaderAction">
+			<Setter Property="Width" Value="100" />
+			<Setter Property="Padding" Value="8,4" />
+			<Setter Property="HorizontalContentAlignment" Value="Center" />
+		</Style>
 	</UserControl.Styles>
 
 	<!-- The whole tab is one filter field above the two panels. The field is deliberately OUTSIDE
@@ -101,8 +111,21 @@
 		     main window and the Schematics tab: a fixed 4px column so the global GridSplitter style
 		     colours it. Column 0's width is restored from UserSettings.WorkbooksLeftPanelWidth in
 		     the code-behind (Initialize) and saved back on OnOuterSplitterPointerReleased - the
-		     same pattern Main.axaml.cs uses for its own LeftPanelWidth. -->
-		<Grid x:Name="OuterSplitGrid" Grid.Row="1" ColumnDefinitions="200,4,*">
+		     same pattern Main.axaml.cs uses for its own LeftPanelWidth.
+
+		     Both panel columns carry a live-drag MinWidth, the same protection Main.axaml's own
+		     splitter columns use - without it GridSplitter would let either panel be dragged down
+		     to nothing, which ClampPanelWidth's own floor only guards on RESTORE, not while
+		     actually dragging. The right-hand column's is 400px rather than the left's 200px: its
+		     top-line packs a title/pill/note beside FOUR buttons (Edit/Delete workbook, Export to
+		     PDF/ZIP across two rows - see WorkbookHeaderActionsPanel below), and below 400px those
+		     buttons start overlapping the title text rather than wrapping cleanly under it. -->
+		<Grid x:Name="OuterSplitGrid" Grid.Row="1">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="200" MinWidth="200" />
+				<ColumnDefinition Width="4" />
+				<ColumnDefinition Width="*" MinWidth="400" />
+			</Grid.ColumnDefinitions>
 
 		<!-- ===================================================================================
 		     LEFT: the workbooks recorded for the currently selected board.
@@ -299,16 +322,23 @@
 								     pills the rest of the app uses, each carrying its count - built in
 								     code (ApplySummaryForWorkbook) by WorklogInfoPillBuilder, since
 								     their brushes need the two-step theme lookup markup cannot express.
-								     WrapPanels, so five pills wrap rather than clip in a narrow
-								     top-line. -->
-								<WrapPanel x:Name="WorkbookSummaryCategoryPanel"
-										   Orientation="Horizontal"
-										   ItemSpacing="5"
-										   LineSpacing="4" />
-								<WrapPanel x:Name="WorkbookSummaryStatePanel"
-										   Orientation="Horizontal"
-										   ItemSpacing="5"
-										   LineSpacing="4" />
+
+								     Both groups share ONE ROW rather than two stacked ones - asked for
+								     directly, since five short pills on their own lines read as more
+								     vertical space than the information needed. Two separate WrapPanels
+								     (not one shared one) so the two groups can still be told apart and
+								     each keeps wrapping onto its own next line if the row runs out of
+								     room, rather than a state pill wrapping in among the categories. -->
+								<WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="4">
+									<WrapPanel x:Name="WorkbookSummaryCategoryPanel"
+											   Orientation="Horizontal"
+											   ItemSpacing="5"
+											   LineSpacing="4" />
+									<WrapPanel x:Name="WorkbookSummaryStatePanel"
+											   Orientation="Horizontal"
+											   ItemSpacing="5"
+											   LineSpacing="4" />
+								</WrapPanel>
 								<TextBlock x:Name="WorkbookSummaryAttachmentsText"
 										   Classes="WorkbooksMuted"
 										   FontSize="11"
@@ -349,17 +379,22 @@
 						     rather than on the panel), so the two rows line up on their right edge
 						     against the panel's own edge even though they hold different total
 						     widths. Aligning left instead would leave a ragged right edge against
-						     the window border they sit next to. -->
+						     the window border they sit next to.
+
+						     All four buttons share the same fixed Width (the four Button.WorkbookHeaderAction
+						     style below), sized to fit "Delete workbook", the widest label - without
+						     it each button sized to its own content and the four edges did not line
+						     up between the two rows, which read as untidy. -->
 						<StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
 							<Button x:Name="EditWorkbookButton"
+									Classes="WorkbookHeaderAction"
 									Content="Edit workbook"
 									FontSize="11"
-									Padding="8,4"
 									Click="OnEditWorkbookClick" />
 							<Button x:Name="DeleteWorkbookButton"
+									Classes="WorkbookHeaderAction"
 									Content="Delete workbook"
 									FontSize="11"
-									Padding="8,4"
 									Foreground="{DynamicResource Button_Cancel_Fg}"
 									Background="{DynamicResource Button_Cancel_Bg}"
 									BorderBrush="{DynamicResource Button_Cancel_Border}"
@@ -380,14 +415,14 @@
 						     these do without depending on a glyph being present. -->
 						<StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
 							<Button x:Name="ExportWorkbookButton"
+									Classes="WorkbookHeaderAction"
 									Content="Export to PDF"
 									FontSize="11"
-									Padding="8,4"
 									Click="OnExportWorkbookClick" />
 							<Button x:Name="ExportWorkbookZipButton"
+									Classes="WorkbookHeaderAction"
 									Content="Export to ZIP"
 									FontSize="11"
-									Padding="8,4"
 									Click="OnExportWorkbookZipClick" />
 						</StackPanel>
 					</StackPanel>
@@ -397,8 +432,17 @@
 			<!-- Board pane on the left of this row, entry list on the right. Another fixed-4px
 			     splitter, so the user can trade board size against list width. Column 2's width is
 			     restored from UserSettings.WorkbooksEntryListWidth in the code-behind (Initialize)
-			     and saved back on OnBoardEntrySplitterPointerReleased. -->
-			<Grid x:Name="BoardEntrySplitGrid" Grid.Row="1" ColumnDefinitions="*,4,347">
+			     and saved back on OnBoardEntrySplitterPointerReleased.
+
+			     Both panel columns carry a 200px MinWidth, matching OuterSplitGrid's own - see its
+			     comment for why a live drag floor is needed in addition to ClampPanelWidth's
+			     restore-time one. -->
+			<Grid x:Name="BoardEntrySplitGrid" Grid.Row="1">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*" MinWidth="200" />
+					<ColumnDefinition Width="4" />
+					<ColumnDefinition Width="347" MinWidth="200" />
+				</Grid.ColumnDefinitions>
 
 				<!-- ===========================================================================
 				     THE BOARD: every schematic image that has one or more worklog entries in

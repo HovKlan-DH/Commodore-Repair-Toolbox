@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Handlers.DataHandling;
 using Handlers.OnlineHandling;
 using System;
@@ -39,6 +40,16 @@ namespace CRT
         // Name of the log file written inside the AppFolderName directory.
         // Used by: Logger.Initialize
         public const string LogFileName = "Classic-Repair-Toolbox.log";
+
+        // Name of the crash file written inside the AppFolderName directory, alongside the log.
+        //
+        // Deliberately a SEPARATE file from LogFileName, because the two have opposite lifetimes:
+        // the log is truncated on every launch, and a user reporting a crash has almost always
+        // relaunched the application before they get around to sending anything - which erases the
+        // very thing they were asked for. The crash file is only ever appended to, so it survives
+        // any number of restarts and holds every crash the installation has ever had.
+        // Used by: CrashLogger.ResolveCrashFilePath
+        public const string CrashFileName = "Classic-Repair-Toolbox.crash.log";
         
         // Name of the JSON file storing user preferences. Stored alongside the log file.
         // Used by: UserSettings.Load
@@ -52,7 +63,19 @@ namespace CRT
         // alongside the log file, but deliberately its own subfolder: worklog data is purely local
         // and must never be synced like "Data" nor mixed in with settings/log files.
         // Used by: WorklogManager.Load
-        public const string WorklogFolderName = "Workbook";
+        public const string WorklogFolderName = "Workbooks";
+
+        // The name this folder had before it was renamed to match the "Workbooks" tab. Builds up to
+        // and including 2.5.0-alpha.4 wrote here, so an upgrading user's ENTIRE repair history -
+        // every workbook, entry, photo and attached file - lives under this name and nothing else
+        // knows about it.
+        //
+        // Kept solely so WorklogManager.Load can move that folder across on first run. Without it
+        // the rename is silent data loss rather than a rename: Load resolves the new name,
+        // Directory.CreateDirectory makes it, and the tab reports "0 workbooks" as an ordinary
+        // empty state, with the real data still on disk under a name nothing reads.
+        // Used by: WorklogManager.MigrateLegacyWorklogFolder
+        public const string LegacyWorklogFolderName = "Workbook";
 
         // Name of the JSON file holding one workbook's own record, stored inside that workbook's
         // own subfolder of WorklogFolderName (e.g. "Workbook/1/index.json"). There is deliberately
@@ -312,22 +335,92 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Registers global exception handlers to capture unexpected crashes into the log.
+        // Registers global exception handlers so that ANY unexpected crash reaches the log and the
+        // crash file, rather than the application simply vanishing from the user's screen.
+        //
+        // There are four distinct ways this application can die, and they need four handlers - a
+        // crash caught by one is invisible to the others. Two of them were previously unhandled,
+        // which is why crashes were being seen with nothing written anywhere:
+        //
+        //   Dispatcher          - an exception thrown inside a UI event handler, a binding, or a
+        //                         layout/render pass on the UI thread. This is BY FAR the most
+        //                         likely source in this application (every tab's logic runs here)
+        //                         and it was NOT handled before, so those crashes were silent.
+        //   Task scheduler      - a faulted Task that nobody awaited. Note this only fires when the
+        //                         Task is FINALISED, so it is inherently late and may never arrive
+        //                         at all; it is a backstop, not a primary net.
+        //   AppDomain           - anything else that reaches the top of a thread, including the
+        //                         render thread. The process is already dying by this point.
+        //   Startup             - see OnFrameworkInitializationCompleted, which is "async void" and
+        //                         so has no caller able to observe a throw.
+        //
+        // WHY THE DISPATCHER HANDLER DOES NOT SWALLOW THE EXCEPTION: setting "Handled = true" would
+        // keep the window alive after an arbitrary failure, leaving the user with a UI in an
+        // unknown, half-updated state that quietly corrupts their worklog data on the next save.
+        // The report is written and the crash is then allowed to proceed exactly as it did before,
+        // so this changes what is RECORDED, never what the application does.
         // ###########################################################################################
         private void SetupGlobalExceptionLogging()
         {
+            CrashLogger.Initialize(AppConfig.AppDisplayVersionString);
+
+            // The UI thread. This is the handler that was missing, and it is the one that matters
+            // most: an exception in any click handler, template, binding or layout pass lands here.
+            //
+            // Written as "Dispatcher.UIThread" EXPLICITLY. Both of these events are INSTANCE members
+            // of a Dispatcher, and "Application" happens to inherit a "Dispatcher" property - so a
+            // bare "Dispatcher.UnhandledException" inside this class silently binds to
+            // "this.Dispatcher" rather than to the type, which reads like a static subscription
+            // while being anything but. Naming the UI dispatcher outright says which one is meant.
+            //
+            // The FILTER runs first and while the stack is still intact - before the dispatcher has
+            // unwound it - so it is the place a full stack trace is most reliably available.
+            // "RequestCatch" is deliberately left untouched: changing it would alter whether the
+            // exception is caught, and this handler only observes.
+            Dispatcher.UIThread.UnhandledExceptionFilter += (s, e) =>
+            {
+                CrashLogger.Log("Dispatcher (UI thread)", e.Exception, isFatal: true);
+            };
+
+            // Also subscribed, because the filter does not run in every path that ends here - a
+            // miss is far more expensive than a duplicate. The duplicate itself is no longer
+            // written out in full: CrashLogger recognises the same exception instance arriving from
+            // a second handler and records it as one "[Also seen by: ...]" line under the report it
+            // already wrote, so one fault reads as one report while every handler keeps its cover.
+            Dispatcher.UIThread.UnhandledException += (s, e) =>
+            {
+                CrashLogger.Log("Dispatcher (UI thread, unhandled)", e.Exception, isFatal: true);
+
+                // Deliberately NOT setting "e.Handled = true" - see the note above.
+            };
+
             AppDomain.CurrentDomain.UnhandledException += (s, e) =>
             {
-                if (e.ExceptionObject is Exception ex)
+                var exception = e.ExceptionObject as Exception;
+
+                // "IsTerminating" is false only in rare hosted cases; it is reported rather than
+                // assumed, because whether the process survived is the first thing to know when
+                // reading a report against a user's description of what they saw.
+                CrashLogger.Log(
+                    $"AppDomain (terminating: {e.IsTerminating})",
+                    exception,
+                    isFatal: e.IsTerminating);
+
+                if (exception == null)
                 {
-                    Logger.Critical($"Unhandled AppDomain Exception: {ex}");
+                    // A non-Exception throw. Previously this branch logged nothing whatsoever.
+                    Logger.Critical($"Unhandled non-Exception object thrown: [{e.ExceptionObject}]");
                 }
             };
 
             TaskScheduler.UnobservedTaskException += (s, e) =>
             {
-                Logger.Critical($"Unobserved Task Exception: {e.Exception}");
-                e.SetObserved(); // Prevents the application from crashing
+                CrashLogger.Log("Unobserved Task", e.Exception, isFatal: false);
+
+                // Observing it keeps the previous behaviour: an unawaited background failure has
+                // never been allowed to take the application down, and that is still right - the
+                // difference is that it is now recorded in full rather than as one log line.
+                e.SetObserved();
             };
         }
 
@@ -336,8 +429,52 @@ namespace CRT
         // ###########################################################################################
         public override async void OnFrameworkInitializationCompleted()
         {
+            // Logging and the crash handlers come FIRST, before anything that could throw, so that
+            // a failure in startup itself is still recorded.
             Logger.Initialize();
             this.SetupGlobalExceptionLogging();
+
+            // This method is "async void", which Avalonia requires here but which has a sharp edge:
+            // there is no caller able to observe a throw, so an exception after the first "await"
+            // is lost entirely - the splash would simply sit on screen, or the window would never
+            // appear, with nothing written down. A crash during startup is also the WORST one to
+            // lose, since the user cannot reach the Configuration tab to send their log.
+            //
+            // TaskScheduler.UnobservedTaskException does not cover this: there is no Task for it to
+            // finalise. So the whole body is wrapped explicitly.
+            try
+            {
+                await this.StartApplicationAsync();
+            }
+            catch (Exception ex)
+            {
+                CrashLogger.Log("Application startup", ex, isFatal: true);
+
+                // Rethrowing here would only reach the same "async void" void, so instead the
+                // failure is surfaced the one way that still works this early: shut down with a
+                // non-zero exit code, having already written the report to disk.
+                try
+                {
+                    if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime failedLifetime)
+                    {
+                        failedLifetime.Shutdown(1);
+                    }
+                }
+                catch (Exception shutdownFailure)
+                {
+                    Logger.Critical($"Shutdown after startup failure also failed: {shutdownFailure}");
+                }
+            }
+        }
+
+        // ###########################################################################################
+        // The real startup sequence: splash, data initialisation, then the main window.
+        //
+        // Split out of OnFrameworkInitializationCompleted purely so that method can wrap it in a
+        // try/catch - see the note there about "async void" losing exceptions.
+        // ###########################################################################################
+        private async Task StartApplicationAsync()
+        {
 
             // QuestPDF (the workbook PDF export) REQUIRES a licence type to be declared before it
             // generates anything, and throws on the first export if it is not - so it is set here,

@@ -80,8 +80,15 @@ namespace Handlers.Theming
         // ###########################################################################################
         public static Border BuildStatePill(string state, double fontSize = 11.0, int? count = null)
         {
-            bool isResolved = WorklogManager.IsResolvedState(state);
-            var stateBrush = new SolidColorBrush(ResolveStateColor(state));
+            // A ZERO count is muted to a neutral grey rather than the state's own colour - asked
+            // for directly, after the summary strip's five always-present pills (including the
+            // zeroes, see BuildCountPills' own comment) blended together with no way to tell at a
+            // glance which categories/states actually have entries. Only a COUNTED zero is muted;
+            // an uncounted pill (a workbook card, an entry card) always names a real record's own
+            // status and must never be grey.
+            IBrush stateBrush = count == 0
+                ? MutedPillBrush
+                : new SolidColorBrush(ResolveStateColor(state));
 
             var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
 
@@ -91,7 +98,7 @@ namespace Handlers.Theming
             // summary the numbers are the content and the words merely label them.
             if (count.HasValue)
             {
-                content.Children.Add(BuildCountLabel(count.Value, fontSize, stateBrush));
+                content.Children.Add(BuildCountLabel(count.Value, fontSize, stateBrush, isMuted: count == 0));
             }
             else
             {
@@ -99,6 +106,13 @@ namespace Handlers.Theming
                 // third piece of information rather than as decoration - "2 [lock] Open" invites
                 // the question of what the lock is counting. On an uncounted pill the glyph is the
                 // only thing distinguishing Open from Closed at a glance, so it stays.
+                //
+                // Resolved HERE rather than at the top of the method: it picks the padlock, which
+                // only this branch draws, and a zero-count pill takes MutedPillBrush regardless of
+                // state - computing it up there was dead work that also read as though the state
+                // colour were still in play on a muted pill.
+                bool isResolved = WorklogManager.IsResolvedState(state);
+
                 content.Children.Add(BuildGlyph(
                     WorklogGlyphs.GlyphFor(isResolved),
                     ThemeResources.ResolveFontAwesomeSolid(),
@@ -134,7 +148,11 @@ namespace Handlers.Theming
                 ? icon
                 : (NoteCategoryCodepoint, true);
 
-            var categoryBrush = new SolidColorBrush(ResolveCategoryColor(category));
+            // See BuildStatePill's own note on why a COUNTED zero is muted and an uncounted chip
+            // never is.
+            IBrush categoryBrush = count == 0
+                ? MutedPillBrush
+                : new SolidColorBrush(ResolveCategoryColor(category));
 
             var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
 
@@ -142,7 +160,7 @@ namespace Handlers.Theming
             // is" into "how many of these the workbook holds", which is what the summary needs.
             if (count.HasValue)
             {
-                content.Children.Add(BuildCountLabel(count.Value, fontSize, categoryBrush));
+                content.Children.Add(BuildCountLabel(count.Value, fontSize, categoryBrush, isMuted: count == 0));
             }
             else
             {
@@ -212,6 +230,17 @@ namespace Handlers.Theming
         public static Color ResolveCategoryColor(string category) =>
             ThemeResources.ResolveColor($"Worklog_Category_{category}", Colors.IndianRed);
 
+        // The neutral grey a COUNTED pill/chip takes when its count is zero - see BuildStatePill's
+        // own note. Its OWN dedicated token, Workbooks_ZeroCount_Fg, rather than either of the
+        // tab's body-text greys (Muted_Fg, then Faint_Fg, were each tried here and both reported as
+        // "still looks black" on a small pill) - a zero count needs to read as washed-out/disabled,
+        // a different and lighter register than muted PROSE needs to stay readable at. Resolved
+        // fresh on every call rather than cached, matching every other brush here - ResolveBrush's
+        // own two-step Application.Current + ThemeVariant lookup is what lets this follow a live
+        // theme switch.
+        private static IBrush MutedPillBrush =>
+            ThemeResources.ResolveBrush("Workbooks_ZeroCount_Fg", Brushes.LightGray);
+
         private static TextBlock BuildGlyph(string text, FontFamily family, int codepoint, double fontSize, IBrush brush) => new()
         {
             Text = text,
@@ -229,11 +258,16 @@ namespace Handlers.Theming
 
         // Bold, unlike the label beside it: across the whole summary strip the numbers are what is
         // being reported and the words merely name them, so the numbers carry the weight.
-        private static TextBlock BuildCountLabel(int count, double fontSize, IBrush brush) => new()
+        //
+        // NOT bold when isMuted: a zero count is already de-emphasised by colour (MutedPillBrush),
+        // and a BOLD zero in that same light grey still reads as solid/dark at this pill's small
+        // size - reported as "the zero counts still look black". Regular weight lets the lighter
+        // colour actually read as light.
+        private static TextBlock BuildCountLabel(int count, double fontSize, IBrush brush, bool isMuted = false) => new()
         {
             Text = count.ToString(System.Globalization.CultureInfo.InvariantCulture),
             FontSize = fontSize,
-            FontWeight = FontWeight.Bold,
+            FontWeight = isMuted ? FontWeight.Normal : FontWeight.Bold,
             Foreground = brush,
             VerticalAlignment = VerticalAlignment.Center
         };
