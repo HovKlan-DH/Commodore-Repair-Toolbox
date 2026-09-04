@@ -22,6 +22,35 @@
         break the F5/watch loop. The build was at zero warnings when this went in.
         -->
         <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
+        <!--
+        SonarAnalyzer.CSharp's own rule IDs (the "S####" diagnostics) are listed in
+        WarningsNotAsErrors below, exempting them from TreatWarningsAsErrors. The analyzer was
+        added for refactoring visibility (cognitive complexity, code smells), and its first run
+        against this codebase surfaced ~180 pre-existing findings across ~38 distinct rules.
+        Promoting all of those straight to build-breaking errors on day one, in a project where
+        CI/the release gate/the Stop hook all build with warnings-as-errors, would have blocked
+        every build immediately. This keeps every finding visible (IDE squiggles, build output)
+        without gating anything; the CS/CA compiler and analyzer warnings this project already had
+        at zero are untouched and still fail Release/the Stop hook as before.
+
+        There is no wildcard for "every SonarAnalyzer diagnostic" - MSBuild's WarningsNotAsErrors
+        only takes literal IDs, and the legacy CodeAnalysisTreatWarningsAsErrors property does not
+        apply to Roslyn analyzers shipped as a NuGet package (both were tried and both still left
+        every S#### diagnostic as an error). So the list below is enumerated from the rules the
+        analyzer actually raised against this codebase; a rule not yet seen would still build as
+        an error the first time it fires - add its ID here (or fix the finding) when that happens.
+        Do NOT bulk-remove this list to "simplify" it; that reintroduces the original problem.
+
+        Confirmed to need re-checking on every SonarAnalyzer.CSharp version bump, not just the
+        first install: going from 9.32.0.97167 to 10.33.0.1635 immediately broke the build with 61
+        new S6444 errors (plus S1313/S4036/S8949/S8969, caught by forcing a full rebuild rather
+        than trusting the incremental one), because a major version can add rules the exemption
+        list has never seen. A few IDs from the 9.32 list (S1121, S2583, S2589, S6602, S6603) no
+        longer fire under 10.33 - left in place rather than pruned, since an unused ID here is
+        harmless and re-deriving the list from scratch on every bump is more error-prone than
+        appending to it.
+        -->
+        <WarningsNotAsErrors>$(WarningsNotAsErrors);S108;S125;S1066;S1075;S1118;S1121;S1125;S1144;S1172;S1244;S1313;S1450;S1481;S1854;S1871;S1905;S1940;S2292;S2325;S2365;S2486;S2583;S2589;S2737;S2953;S2971;S3168;S3267;S3358;S3604;S3963;S4036;S4136;S4158;S4487;S6444;S6602;S6603;S6605;S6608;S6966;S8949;S8969</WarningsNotAsErrors>
         <ApplicationManifest>Main\app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
@@ -57,7 +86,7 @@
     <PackageReference Include="EPPlus" Version="8.7.0" />
     <PackageReference Include="QuestPDF" Version="2026.8.0" />
     <PackageReference Include="Velopack" Version="1.2.0" />
-    <PackageReference Include="SonarAnalyzer.CSharp" Version="9.32.0.97167" PrivateAssets="all" />
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.33.0.1635" PrivateAssets="all" />
   </ItemGroup>
 
   <!--

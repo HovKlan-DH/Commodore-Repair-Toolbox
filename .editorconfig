@@ -1,0 +1,12 @@
+root = true
+
+[*.cs]
+
+# SonarAnalyzer.CSharp - added for cognitive-complexity and code-smell visibility during
+# refactoring (see the WarningsNotAsErrors comment in Classic-Repair-Toolbox.csproj for why its
+# rule IDs are exempted from this project's warnings-as-errors build).
+#
+# S2486 (exception caught but not handled or explained) and S1144 (unused private member) were
+# the two highest-value clusters found in the first scan - S2486 because a silently swallowed
+# exception can hide a real bug, S1144 because it is confirmed dead code. Worth reviewing first
+# when picking findings to act on.
