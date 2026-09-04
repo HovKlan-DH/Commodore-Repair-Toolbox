@@ -170,7 +170,21 @@
 
 			<CheckBox x:Name="EnableWorklogCheckBox"
                       Content="Enable Worklog" />
-			
+
+			<TextBlock Text="Which scope to show under &quot;Workbooks&quot; tab:"
+                       Margin="0,8,0,0" />
+
+			<StackPanel Orientation="Vertical"
+						Spacing="4"
+						Margin="16,4,0,0">
+				<RadioButton x:Name="WorkbooksScopeAllBoardsRadioButton"
+							 GroupName="WorkbooksScope"
+							 Content="Show all workbooks" />
+				<RadioButton x:Name="WorkbooksScopeCurrentBoardRadioButton"
+							 GroupName="WorkbooksScope"
+							 Content="Show only workbooks for selected board" />
+			</StackPanel>
+
 			<Button x:Name="OpenAppDataFolderButton"
                     Content="Open data/log/settings folder"
                     Margin="0,16,0,0"

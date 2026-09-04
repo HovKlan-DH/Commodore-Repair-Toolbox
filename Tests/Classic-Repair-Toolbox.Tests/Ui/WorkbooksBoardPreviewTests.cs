@@ -1124,4 +1124,119 @@ public sealed class WorkbooksBoardPreviewTests : IDisposable
             Assert.Null(legendHeading);
         });
     }
+
+    // ------------------------------------------------------- detach / re-attach (tab switching)
+
+    // THE CRASH THIS EXISTS TO PREVENT. A TabControl detaches the previous tab's content on every
+    // tab SWITCH, and OnDetachedFromVisualTree disposes this tab's decoded schematic bitmaps. The
+    // preview Image controls keep their Source across a detach, so disposing without clearing the
+    // pane first left every one of them holding a freed Skia surface - and the next render pass
+    // over them threw ObjectDisposedException on the RENDER thread, which is fatal in Avalonia.
+    // Reported as the app crashing on switching away from the Workbooks tab.
+    //
+    // Asserted as "no Image is left holding a Source", which is the property that actually makes it
+    // safe: a disposed bitmap that nothing references can never be drawn. Reaching into the Skia
+    // surface to prove it is disposed is neither possible from here nor the point.
+    [Fact]
+    public void Detaching_the_tab_leaves_no_preview_image_holding_a_disposed_bitmap()
+    {
+        this.LoadWorklog();
+        var workbook = WorklogManager.CreateWorkbook(this.thisBoardKey, "Recap", "");
+        Assert.NotNull(workbook);
+
+        string imagePath = this.WriteSchematicImage("sheet1.png");
+        WorklogManager.AddEntry(workbook!.Id, "Sheet 1", new Avalonia.Rect(0, 0, 10, 10), "Bad cap", "", "Issue", "Open", Array.Empty<string>());
+
+        var boardData = BuildBoardData(new BoardSchematicEntry { SchematicName = "Sheet 1", SchematicImageFile = imagePath });
+
+        UiTest.Run(() =>
+        {
+            var tab = BuildTab(this.thisBoardKey, boardData, workbook.Id);
+
+            var window = new Window { Width = 800, Height = 600, Content = tab };
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            // The pane really did build a preview, so the assertion below is not passing merely
+            // because there was never anything to strand.
+            Assert.NotEmpty(PreviewPanel(tab).Children);
+            Assert.Contains(tab.GetSelfAndVisualDescendants().OfType<Image>(), i => i.Source != null);
+
+            // Exactly what a tab switch does: the content is detached from the visual tree.
+            window.Content = null;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.DoesNotContain(
+                tab.GetSelfAndVisualDescendants().OfType<Image>(),
+                image => image.Source != null);
+
+            window.Close();
+        });
+    }
+
+    // ...and switching BACK rebuilds it, so the fix above does not simply leave the pane
+    // permanently empty after the first tab switch.
+    [Fact]
+    public void Re_attaching_the_tab_rebuilds_the_board_pane()
+    {
+        this.LoadWorklog();
+        var workbook = WorklogManager.CreateWorkbook(this.thisBoardKey, "Recap", "");
+        Assert.NotNull(workbook);
+
+        string imagePath = this.WriteSchematicImage("sheet1.png");
+        WorklogManager.AddEntry(workbook!.Id, "Sheet 1", new Avalonia.Rect(0, 0, 10, 10), "Bad cap", "", "Issue", "Open", Array.Empty<string>());
+
+        var boardData = BuildBoardData(new BoardSchematicEntry { SchematicName = "Sheet 1", SchematicImageFile = imagePath });
+
+        UiTest.Run(() =>
+        {
+            var tab = BuildTab(this.thisBoardKey, boardData, workbook.Id);
+
+            var window = new Window { Width = 800, Height = 600, Content = tab };
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            window.Content = null;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Empty(PreviewPanel(tab).Children);
+
+            // Back to the Workbooks tab.
+            window.Content = tab;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.NotEmpty(PreviewPanel(tab).Children);
+
+            // And the rebuilt preview draws a LIVE bitmap - a re-attach that handed the Image the
+            // old disposed instance back would satisfy the count assertion above and still crash.
+            Assert.Contains(tab.GetSelfAndVisualDescendants().OfType<Image>(), i => i.Source != null);
+
+            window.Close();
+        });
+    }
+
+    // A detach with nothing built (the tab was never shown, or its board has no entries) must not
+    // throw on the way out - the teardown runs unconditionally.
+    [Fact]
+    public void Detaching_a_tab_with_no_previews_is_harmless()
+    {
+        this.LoadWorklog();
+        var workbook = WorklogManager.CreateWorkbook(this.thisBoardKey, "No entries yet", "");
+        Assert.NotNull(workbook);
+
+        UiTest.Run(() =>
+        {
+            var tab = BuildTab(this.thisBoardKey, BuildBoardData(), workbook!.Id);
+
+            var window = new Window { Width = 800, Height = 600, Content = tab };
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            window.Content = null;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Empty(PreviewPanel(tab).Children);
+
+            window.Close();
+        });
+    }
 }

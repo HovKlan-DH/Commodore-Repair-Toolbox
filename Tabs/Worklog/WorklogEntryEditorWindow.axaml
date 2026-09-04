@@ -1,6 +1,7 @@
 ﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:CRT"
+        xmlns:theme="clr-namespace:Handlers.Theming;assembly=Classic-Repair-Toolbox"
         x:Class="CRT.WorklogEntryEditorWindow"
         Title="Worklog entry"
         Width="1200"
@@ -291,7 +292,7 @@
 											<Grid ColumnDefinitions="*,Auto">
 												<StackPanel Grid.Column="0" Spacing="1">
 													<TextBlock Text="{Binding DateText}" FontSize="10" Opacity="0.7" />
-													<TextBlock Text="{Binding Text}" FontSize="12" TextWrapping="Wrap" />
+													<TextBlock theme:TextLinkRenderer.LinkText="{Binding Text}" FontSize="12" TextWrapping="Wrap" />
 													<TextBlock Text="{Binding SummaryText}" FontSize="11" Opacity="0.8" />
 												</StackPanel>
 												<Button Grid.Column="1" Classes="WorklogRowIconButton" Margin="8,0,0,0" VerticalAlignment="Top" Click="OnDeleteWorkDoneClick" Tag="{Binding Id}" ToolTip.Tip="Delete work done">
@@ -331,7 +332,7 @@
 											<Grid ColumnDefinitions="*,Auto">
 												<StackPanel Grid.Column="0" Spacing="1">
 													<TextBlock Text="{Binding DateText}" FontSize="10" Opacity="0.7" />
-													<TextBlock Text="{Binding Text}" FontSize="12" TextWrapping="Wrap" />
+													<TextBlock theme:TextLinkRenderer.LinkText="{Binding Text}" FontSize="12" TextWrapping="Wrap" />
 												</StackPanel>
 												<Button Grid.Column="1" Classes="WorklogRowIconButton" Margin="8,0,0,0" VerticalAlignment="Top" Click="OnDeleteCommentClick" Tag="{Binding Id}" ToolTip.Tip="Delete comment">
 													<TextBlock Text="&#xf2ed;" FontFamily="{DynamicResource FontAwesomeSolid}" FontSize="13" Foreground="{DynamicResource Text_Fail_Fg}" />
@@ -366,12 +367,11 @@
 						<TextBlock x:Name="EditorLocationSchematicNameText" FontSize="11" Opacity="0.7" />
 					</StackPanel>
 
-					<!-- "Mark components in scope", the same checklist the quick "New fault" card
-					     shows (see TabSchematics.axaml). The rows are supplied by the caller, which
-					     owns the board data and the highlight rectangles; this window only renders
-					     them and reports back which are ticked. Hidden entirely when the caller
-					     could not work out the scope, rather than showing an empty box that looks
-					     like "no components here". -->
+					<!-- "Mark components in scope". The rows are supplied by the caller, which owns
+					     the board data and the highlight rectangles; this window only renders them
+					     and reports back which are ticked. Hidden entirely when the caller could not
+					     work out the scope, rather than showing an empty box that looks like "no
+					     components here". -->
 					<StackPanel x:Name="EditorComponentScopePanel" Spacing="4" IsVisible="False">
 						<Grid ColumnDefinitions="*,Auto">
 							<Border Grid.Column="0" Classes="WorklogListHeaderToggle" Tag="EditorComponentScopeHeader" PointerPressed="OnListHeaderTogglePointerPressed">
@@ -613,7 +613,7 @@
 												   Cursor="SizeNorthSouth"
 												   Tag="{Binding Id}"
 												   PointerPressed="OnPhotoRowDragHandlePointerPressed">
-												<TextBlock Text="{Binding Comment}"
+												<TextBlock theme:TextLinkRenderer.LinkText="{Binding Comment}"
 														   FontSize="11"
 														   Opacity="0.8"
 														   TextWrapping="Wrap"
@@ -721,7 +721,7 @@
 																   Foreground="{DynamicResource Link_Fg}"
 																   TextDecorations="Underline" />
 													</Border>
-													<TextBlock Text="{Binding Comment}" FontSize="11" Opacity="0.8" TextWrapping="Wrap" IsVisible="{Binding HasComment}" />
+													<TextBlock theme:TextLinkRenderer.LinkText="{Binding Comment}" FontSize="11" Opacity="0.8" TextWrapping="Wrap" IsVisible="{Binding HasComment}" />
 												</StackPanel>
 											</Panel>
 

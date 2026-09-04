@@ -28,15 +28,13 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Names the workbook being deleted in the confirmation text, so a user with several cards
-        // open at once cannot mistake which one they are about to lose.
+        // Names the workbook being deleted, on its own bold line, so a user with several cards open
+        // at once cannot mistake which one they are about to lose.
         // ###########################################################################################
         public void Initialize(WorkbookRecord workbook)
         {
             string title = string.IsNullOrWhiteSpace(workbook.Title) ? "(untitled)" : workbook.Title;
-            this.MessageText.Text =
-                $"This permanently deletes workbook #{workbook.Id} · {title} and everything recorded in it - " +
-                "worklog entries, photos and files. This cannot be undone.";
+            this.WorkbookNameText.Text = $"#{workbook.Id} · {title}";
         }
 
         // ###########################################################################################

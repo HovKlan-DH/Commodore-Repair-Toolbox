@@ -55,6 +55,7 @@ public sealed class UserSettingsTests : IDisposable
         Assert.True(UserSettings.EnableMiniproExperimentalMode);
         Assert.False(UserSettings.EnableMiniproExperimentalDemoMode);
         Assert.True(UserSettings.EnableWorklog);
+        Assert.Equal("CurrentBoard", UserSettings.WorkbooksScope);
     }
 
     [Fact]
@@ -743,6 +744,56 @@ public sealed class UserSettingsTests : IDisposable
         Assert.Equal(expected, UserSettings.InteractiveCadTraceHoverMode);
     }
 
+    [Theory]
+    [InlineData("AllBoards", "AllBoards")]
+    [InlineData("allboards", "AllBoards")]     // matched case-insensitively...
+    [InlineData("CurrentBoard", "CurrentBoard")]
+    [InlineData("All Boards", "CurrentBoard")] // ...but a space is NOT the same token
+    [InlineData("nonsense", "CurrentBoard")]   // anything unrecognised falls back to CurrentBoard
+    public void The_workbooks_scope_is_normalised_to_one_of_two_tokens(string input, string expected)
+    {
+        this.LoadSettings("{}");
+
+        UserSettings.WorkbooksScope = input;
+
+        Assert.Equal(expected, UserSettings.WorkbooksScope);
+    }
+
+    [Fact]
+    public void The_workbooks_scope_persists_across_a_reload()
+    {
+        string path = this.LoadSettings("{}");
+
+        UserSettings.WorkbooksScope = "AllBoards";
+
+        UserSettings.LoadFrom(path);
+
+        Assert.Equal("AllBoards", UserSettings.WorkbooksScope);
+    }
+
+    [Fact]
+    public void Changing_the_workbooks_scope_raises_its_change_event_only_when_it_actually_changes()
+    {
+        this.LoadSettings("""{"workbooksScope": "CurrentBoard"}""");
+
+        int raised = 0;
+        void Handler() => raised++;
+
+        UserSettings.WorkbooksScopeChanged += Handler;
+        try
+        {
+            UserSettings.WorkbooksScope = "AllBoards";
+            Assert.Equal(1, raised);
+
+            UserSettings.WorkbooksScope = "AllBoards";   // unchanged
+            Assert.Equal(1, raised);
+        }
+        finally
+        {
+            UserSettings.WorkbooksScopeChanged -= Handler;
+        }
+    }
+
     [Fact]
     public void Changing_check_data_on_launch_raises_its_change_event_with_the_new_value()
     {
@@ -803,7 +854,7 @@ public sealed class UserSettingsTests : IDisposable
     {
         string path = this.LoadSettings("{}");
 
-        UserSettings.SaveWorklogEntryWindowLayout("Maximized", 1000, 720, 240, 130, 0.42);
+        UserSettings.SaveWorklogEntryWindowLayout("Maximized", 1000, 720, 240, 130, 1920, 0, 0.42);
         UserSettings.LoadFrom(path);
 
         JsonNode json = ReadJson(path);
@@ -813,6 +864,8 @@ public sealed class UserSettingsTests : IDisposable
         Assert.Equal(720, json["worklogEntryWindowHeight"]!.GetValue<double>());
         Assert.Equal(240, json["worklogEntryWindowX"]!.GetValue<int>());
         Assert.Equal(130, json["worklogEntryWindowY"]!.GetValue<int>());
+        Assert.Equal(1920, json["worklogEntryWindowScreenX"]!.GetValue<int>());
+        Assert.Equal(0, json["worklogEntryWindowScreenY"]!.GetValue<int>());
         Assert.Equal(0.42, json["worklogEntryWindowLeftColumnRatio"]!.GetValue<double>());
         Assert.True(json["hasWorklogEntryWindowLayout"]!.GetValue<bool>());
 
@@ -823,7 +876,29 @@ public sealed class UserSettingsTests : IDisposable
         Assert.Equal(720, UserSettings.WorklogEntryWindowHeight);
         Assert.Equal(240, UserSettings.WorklogEntryWindowX);
         Assert.Equal(130, UserSettings.WorklogEntryWindowY);
+        Assert.Equal(1920, UserSettings.WorklogEntryWindowScreenX);
+        Assert.Equal(0, UserSettings.WorklogEntryWindowScreenY);
         Assert.Equal(0.42, UserSettings.WorklogEntryWindowLeftColumnRatio);
+    }
+
+    // THE BUG THIS EXISTS TO CLOSE: a window maximized on a second monitor, without ever being
+    // un-maximized there, must still be told to restore onto that monitor - not onto whichever one
+    // its last WINDOWED position named, which can be a different one entirely (see
+    // WorklogEntryWindowScreenX's own comment). Asserted separately from the round-trip test above
+    // so a future change to one cannot silently stop covering the other.
+    [Fact]
+    public void Worklog_entry_window_screen_position_is_independent_of_the_normal_state_position()
+    {
+        string path = this.LoadSettings("{}");
+
+        // Last windowed on the primary monitor (0,0), but maximized on a second one to the right.
+        UserSettings.SaveWorklogEntryWindowLayout("Maximized", 1000, 720, 50, 50, 1920, 0, 0.5);
+        UserSettings.LoadFrom(path);
+
+        Assert.Equal(50, UserSettings.WorklogEntryWindowX);
+        Assert.Equal(50, UserSettings.WorklogEntryWindowY);
+        Assert.Equal(1920, UserSettings.WorklogEntryWindowScreenX);
+        Assert.Equal(0, UserSettings.WorklogEntryWindowScreenY);
     }
 
     // The flag is what tells the window whether to apply a saved position at all. Without a saved

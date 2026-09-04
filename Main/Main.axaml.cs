@@ -132,6 +132,8 @@ namespace CRT
             this.TabContribute.Initialize(this);
             this.TabWorkbooks.Initialize(this);
 
+            this.MainTabControl.SelectionChanged += this.OnMainTabControlSelectionChanged;
+
             this.ApplyOscilloscopeTabVisibility();
 
             // Refreshes the worklog surfaces itself on the enable side, so no separate
@@ -272,7 +274,11 @@ namespace CRT
                     var selectedTab = this.MainTabControl?.SelectedItem as TabItem;
                     string? tabHeader = selectedTab?.Header?.ToString();
 
-                    if (tabHeader == "Feedback" || tabHeader == "Configuration")
+                    // The Workbooks tab has its own priority focus ("Find a previous repair"),
+                    // set on tab entry by OnMainTabControlSelectionChanged - see FocusSearchBox's
+                    // comment for why the global steal has to back off here, not just once but on
+                    // every pointer release while this tab is showing.
+                    if (tabHeader == "Feedback" || tabHeader == "Configuration" || tabHeader == "Workbooks")
                     {
                         return;
                     }
@@ -305,6 +311,7 @@ namespace CRT
             }
 
             UserSettings.CheckDataOnLaunchChanged += this.OnCheckDataOnLaunchSettingChanged;
+            UserSettings.WorkbooksScopeChanged += this.OnWorkbooksScopeSettingChanged;
             this.UpdateDataSyncStatusIcon();
 
             this.StartBackgroundSyncAsync();
@@ -1271,7 +1278,7 @@ namespace CRT
         // Falls back to the raw key if the board no longer exists in the synced data, e.g. content
         // that was later removed from classic-repair-toolbox.dk.
         // ###########################################################################################
-        private string FormatBoardKeyForDisplay(string boardKey) =>
+        internal string FormatBoardKeyForDisplay(string boardKey) =>
             FindEntryForBoardKey(boardKey)?.ShortHardwareBoardLabel is { Length: > 0 } shortLabel
                 ? shortLabel
                 : boardKey;
@@ -1607,9 +1614,26 @@ namespace CRT
         // for a board other than the one currently on screen, since the picker now lists every
         // workbook on every board (see RefreshWorklogBar). Guarded by _suppressWorklogJobBoxSave so
         // RefreshWorklogBar re-seeding the box's ItemsSource/SelectedItem does not loop back in here.
+        // ###########################################################################################
+        private void OnWorklogJobBoxSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (this._suppressWorklogJobBoxSave)
+                return;
+
+            if (this.WorklogJobBox.SelectedItem is not WorkbookRecord selected)
+                return;
+
+            this.ActivateWorkbookAcrossBoards(selected.BoardKey, selected.Id);
+        }
+
+        // ###########################################################################################
+        // Activates a workbook that may belong to a board other than the one currently on screen -
+        // shared by the worklog bar's own picker (OnWorklogJobBoxSelectionChanged) and the Workbooks
+        // tab's "Show all workbooks" scope (TabWorkbooks.SelectWorkbook), both of which can now list
+        // workbooks for every board rather than just the current one.
         //
-        // Same-board case: identical to clicking a card on the Workbooks tab
-        // (TabWorkbooks.SelectWorkbook -> ActivateWorkbook) - just calls ActivateWorkbook.
+        // Same-board case: identical to clicking a card when the tab is scoped to the current board -
+        // just calls ActivateWorkbook.
         //
         // Different-board case: the hardware/board selectors are switched FIRST. Persisting the
         // target workbook as its board's active one before that switch (rather than after, via
@@ -1622,33 +1646,28 @@ namespace CRT
         // switch, would be redundant at best and would run against the board being LEFT rather than
         // the one being entered.
         // ###########################################################################################
-        private void OnWorklogJobBoxSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        public void ActivateWorkbookAcrossBoards(string boardKey, int workbookId)
         {
-            if (this._suppressWorklogJobBoxSave)
+            if (string.IsNullOrWhiteSpace(boardKey))
                 return;
 
-            if (this.WorklogJobBox.SelectedItem is not WorkbookRecord selected)
-                return;
-
-            if (string.Equals(selected.BoardKey, this.GetCurrentBoardKey(), StringComparison.Ordinal))
+            if (string.Equals(boardKey, this.GetCurrentBoardKey(), StringComparison.Ordinal))
             {
-                this.ActivateWorkbook(selected.BoardKey, selected.Id);
+                this.ActivateWorkbook(boardKey, workbookId);
                 return;
             }
 
-            if (!TryResolveHardwareAndBoardForBoardKey(selected.BoardKey, out string hardwareName, out string boardName))
+            if (!TryResolveHardwareAndBoardForBoardKey(boardKey, out string hardwareName, out string boardName))
             {
                 // The board this workbook belongs to is no longer in the synced data (its Excel entry
-                // was removed by a later sync), so there is nothing to switch to. Put the box back on
-                // the workbook that IS active rather than leaving it displaying an unreachable one -
-                // the status pill, "Show worklogs" and "Add worklog" beside it all still act on the
-                // active workbook, and a picker naming a different one is the two disagreeing
-                // silently until the next refresh.
+                // was removed by a later sync), so there is nothing to switch to. Refresh instead of
+                // switching, so every surface goes back to naming the workbook that IS active rather
+                // than one that cannot be reached.
                 this.RefreshWorklogBar();
                 return;
             }
 
-            UserSettings.SetActiveWorkbookId(selected.BoardKey, selected.Id);
+            UserSettings.SetActiveWorkbookId(boardKey, workbookId);
 
             this.TabSchematicsControl.CancelWorklogEntryMode();
 
@@ -1692,6 +1711,34 @@ namespace CRT
 
             if (!ReferenceEquals(this.MainTabControl.SelectedItem, this.SchematicsTabItem))
                 this.MainTabControl.SelectedItem = this.SchematicsTabItem;
+        }
+
+        // ###########################################################################################
+        // Gives the Workbooks tab's own search box priority focus the moment it becomes the selected
+        // tab - see TabWorkbooks.FocusSearchBox for how that coexists with the global "steal focus
+        // into ComponentSearchTextBox" handler wired in the constructor (which now excludes this tab
+        // by header). Every OTHER tab is left alone: this handler only ever hands focus TO the
+        // Workbooks box, never takes it away when leaving - the global handler's own per-click logic
+        // already covers every tab that wants ComponentSearchTextBox back, including this one once
+        // the user clicks something on it.
+        //
+        // e.Source MUST be checked against MainTabControl itself. SelectionChanged is a bubbling
+        // routed event, and several tabs hold their own ListBox/ComboBox controls (the Schematics
+        // tab's thumbnail list among them) - without this guard, selecting a thumbnail or any other
+        // nested list would bubble up through MainTabControl and re-fire this, stealing focus back
+        // to the search box away from whatever the user had just clicked on the Workbooks tab.
+        // ###########################################################################################
+        private void OnMainTabControlSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (!ReferenceEquals(e.Source, this.MainTabControl))
+            {
+                return;
+            }
+
+            if (this.MainTabControl?.SelectedItem is TabItem { Header: "Workbooks" })
+            {
+                this.TabWorkbooks?.FocusSearchBox();
+            }
         }
 
         // ###########################################################################################
@@ -1746,7 +1793,14 @@ namespace CRT
             // early-out on tab selection would make card clicks silently do nothing.
             if (UserSettings.EnableWorklog)
             {
-                this.TabWorkbooks?.RefreshWorkbooks(workbooks);
+                // The tab's own list can show every board's workbooks ("Show all workbooks", the
+                // Configuration tab's radio group below "Enable Worklog") rather than just this
+                // board's - allWorkbooks is already the unfiltered read from above, so passing it
+                // through costs nothing extra; board is still used to resolve which workbook is
+                // active and to filter the fallback when no explicit choice was made (see
+                // TabWorkbooks.RefreshWorkbooks).
+                bool showAllBoards = string.Equals(UserSettings.WorkbooksScope, "AllBoards", StringComparison.Ordinal);
+                this.TabWorkbooks?.RefreshWorkbooks(showAllBoards ? allWorkbooks : workbooks);
             }
 
             this.WorklogNoJobText.IsVisible = !hasWorkbook;
@@ -1944,7 +1998,7 @@ namespace CRT
         // ###########################################################################################
         // Cancels the in-progress worklog entry-drawing mode. TabSchematics calls back into
         // ResetWorklogEntryModeButtons() once it has actually torn the mode down, so the buttons
-        // stay in sync whether cancellation came from here, Escape, or the "New fault" card itself.
+        // stay in sync whether cancellation came from here, Escape, or the entry editor closing.
         // ###########################################################################################
         private void OnWorklogCancelEntryClick(object? sender, RoutedEventArgs e)
         {
@@ -2106,6 +2160,7 @@ namespace CRT
         private void OnWindowClosed(object? sender, EventArgs e)
         {
             UserSettings.CheckDataOnLaunchChanged -= this.OnCheckDataOnLaunchSettingChanged;
+            UserSettings.WorkbooksScopeChanged -= this.OnWorkbooksScopeSettingChanged;
 
             if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
             {
@@ -2981,6 +3036,25 @@ namespace CRT
                     this.HideDataSyncDisabledBanner();
                 }
             });
+        }
+
+        // ###########################################################################################
+        // Reacts to the Configuration tab's "Show all workbooks" / "Show this board's workbooks"
+        // radio group being flipped, by rebuilding the Workbooks tab through the one funnel every
+        // other worklog change already uses.
+        //
+        // Needed because the scope decides WHICH workbooks RefreshWorklogBar passes the tab, so the
+        // tab cannot re-derive it on its own without a refresh. Before this the event was raised and
+        // subscribed by nothing: the setting only appeared to work because switching to the
+        // Workbooks tab happens to refresh it on attach - incidental, and no help at all to a
+        // Workbooks tab that is already on screen when the setting changes.
+        //
+        // Posted rather than run inline, matching OnCheckDataOnLaunchSettingChanged: the event is
+        // raised from a UserSettings setter, so this keeps the rebuild off the setter's own stack.
+        // ###########################################################################################
+        private void OnWorkbooksScopeSettingChanged()
+        {
+            Dispatcher.UIThread.Post(() => this.RefreshWorklogBar());
         }
 
         // ###########################################################################################

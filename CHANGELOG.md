@@ -8,3 +8,14 @@
   - Fixed timeout was too low when fetching manifest file
   - Fixed minor configuration for test cases, which should not be included when compiling using `dotnet publish`
   - Refactored "Contribute" tab and its backend server review process
+
+
+  Config tab
+    - rename worklog til Workbook
+    - rename Misc til Wirkbook
+
+  I workbooks tab:
+    - hver worklog (i højre side) skal være clickable
+    - hvir worklog (samme sted) skal være outlined i samme farve som deres kategori - ligeledes skal status være ens alle steder
+    - mangler en summary per board
+    - eksport til .. ?

@@ -1,120 +1,22 @@
-using System.Reflection;
-
 using Avalonia.Controls;
 using Avalonia.Media;
-using Avalonia.VisualTree;
 using Avalonia;
 using Avalonia.Threading;
 using CRT;
 
 namespace ClassicRepairToolbox.Tests.Ui;
 
-// The "Create worklog" quick card that opens after an area is drag-drawn on the board.
+// The two pieces of UI that surround "Add worklog" on the Schematics tab: the canvas that PARKS
+// the pills of entries with no marked area, and the khaki mode hint telling the user to drag one
+// out.
 //
-// A worklog with no title is unidentifiable: the worklog list and the on-board pill would show
-// nothing but its "#N". So the card's "Add worklog" button is gated on the title box having real
-// text in it, and these pin that gate down - including the whitespace case, which is the one that
-// silently slips through, because the title is Trim()ed before it is persisted and a title of
-// spaces would therefore be saved as an empty one.
+// What used to sit between them - a small "New fault" quick card asking for a title, description,
+// category, state and the component checklist - is gone: drawing an area now opens the full
+// WorklogEntryEditorWindow directly, so the fields those tests pinned down live in that window and
+// are covered by its own tests. The two areas kept here are NOT part of that card and outlived it.
 [Collection("HeadlessUi")]
-public class WorklogCreateCardTests
+public class WorklogEntryModeTests
 {
-    private static void SetTitle(TextBox titleBox, string? text)
-    {
-        titleBox.Text = text;
-
-        // Avalonia raises TextChanged from a posted dispatcher job rather than from the setter,
-        // so the gate has not run yet at the point the setter returns.
-        Dispatcher.UIThread.RunJobs();
-    }
-
-    private static void WithCard(Action<TextBox, Button> body)
-    {
-        UiTest.Run(() =>
-        {
-            var tab = new TabSchematics();
-
-            var titleBox = tab.FindControl<TextBox>("WorklogEntryTitleTextBox")!;
-            var saveButton = tab.FindControl<Button>("WorklogEntryCardSaveButton")!;
-
-            body(titleBox, saveButton);
-        });
-    }
-
-    // The card opens with an empty title, so the button must start disabled rather than being
-    // enabled until the first keystroke re-evaluates it.
-    [Fact]
-    public void The_add_worklog_button_starts_disabled()
-    {
-        WithCard((titleBox, saveButton) =>
-        {
-            Assert.True(string.IsNullOrEmpty(titleBox.Text));
-            Assert.False(saveButton.IsEnabled);
-        });
-    }
-
-    [Fact]
-    public void A_blank_title_disables_the_add_worklog_button()
-    {
-        WithCard((titleBox, saveButton) =>
-        {
-            SetTitle(titleBox, "Bad capacitor");
-            Assert.True(saveButton.IsEnabled);
-
-            SetTitle(titleBox, string.Empty);
-
-            Assert.False(saveButton.IsEnabled);
-        });
-    }
-
-    // Whitespace is not a title. The gate has to agree with what the save actually writes, and
-    // the save trims - so " " and "" must be treated the same.
-    [Theory]
-    [InlineData(" ")]
-    [InlineData("   ")]
-    [InlineData("\t")]
-    public void A_whitespace_only_title_disables_the_add_worklog_button(string title)
-    {
-        WithCard((titleBox, saveButton) =>
-        {
-            SetTitle(titleBox, "Bad capacitor");
-            Assert.True(saveButton.IsEnabled);
-
-            SetTitle(titleBox, title);
-
-            Assert.False(saveButton.IsEnabled);
-        });
-    }
-
-    [Fact]
-    public void Typing_a_title_re_enables_the_add_worklog_button()
-    {
-        WithCard((titleBox, saveButton) =>
-        {
-            SetTitle(titleBox, string.Empty);
-            Assert.False(saveButton.IsEnabled);
-
-            SetTitle(titleBox, "Bad capacitor");
-
-            Assert.True(saveButton.IsEnabled);
-        });
-    }
-
-    // The card's labels, asserted so a rename cannot silently drift from what the user was told
-    // the buttons and fields say.
-    [Fact]
-    public void The_card_uses_the_worklog_wording_for_its_fields_and_button()
-    {
-        UiTest.Run(() =>
-        {
-            var tab = new TabSchematics();
-
-            Assert.Equal("Worklog title", tab.FindControl<TextBox>("WorklogEntryTitleTextBox")!.PlaceholderText);
-            Assert.Equal("Description of worklog", tab.FindControl<TextBox>("WorklogEntryDescriptionTextBox")!.PlaceholderText);
-            Assert.Equal("Add worklog", tab.FindControl<Button>("WorklogEntryCardSaveButton")!.Content);
-        });
-    }
-
     // ------------------------------------------------------------- parked-pill canvas
 
     // The pills of entries whose "Show marked area" is unticked are parked in the schematic
@@ -167,69 +69,6 @@ public class WorklogCreateCardTests
             var panel = tab.FindControl<Border>("KiCadNetConnectionsPanel")!;
 
             Assert.True(parked.ZIndex < panel.ZIndex, $"parked pills at z{parked.ZIndex} are not below the panel at z{panel.ZIndex}");
-        });
-    }
-
-    // ------------------------------------------------------------- "Show marked area"
-
-    // The same setting the full editor offers, so a worklog can be created with its area already
-    // hidden rather than having to be created and then edited.
-    [Fact]
-    public void The_card_offers_the_show_marked_area_checkbox_ticked_by_default()
-    {
-        UiTest.Run(() =>
-        {
-            var tab = new TabSchematics();
-            var checkBox = tab.FindControl<CheckBox>("WorklogEntryShowMarkedAreaCheckBox")!;
-
-            Assert.Equal("Show marked area on schematics image", checkBox.Content);
-            Assert.True(checkBox.IsChecked);
-        });
-    }
-
-    // It sits ABOVE the components list, where the user reads it before deciding on scope.
-    [Fact]
-    public void The_checkbox_sits_above_the_components_in_scope_list()
-    {
-        UiTest.Run(() =>
-        {
-            var tab = new TabSchematics();
-            var window = new Window { Width = 800, Height = 900, Content = tab };
-
-            try
-            {
-                window.Show();
-                tab.FindControl<Border>("SchematicsNewWorklogEntryCardBorder")!.IsVisible = true;
-                window.Measure(new Size(800, 900));
-                window.Arrange(new Rect(0, 0, 800, 900));
-                Dispatcher.UIThread.RunJobs();
-
-                var checkBox = tab.FindControl<CheckBox>("WorklogEntryShowMarkedAreaCheckBox")!;
-                var list = tab.FindControl<ItemsControl>("WorklogEntryComponentList")!;
-
-                double checkBoxY = checkBox.TranslatePoint(new Point(0, 0), window)!.Value.Y;
-                double listY = list.TranslatePoint(new Point(0, 0), window)!.Value.Y;
-
-                Assert.True(checkBoxY < listY, $"the checkbox at {checkBoxY} is not above the list at {listY}");
-            }
-            finally
-            {
-                window.Close();
-            }
-        });
-    }
-
-    // Renamed from "Mark components in scope" to match the full editor.
-    [Fact]
-    public void The_components_list_uses_the_shorter_heading()
-    {
-        UiTest.Run(() =>
-        {
-            var tab = new TabSchematics();
-
-            Assert.Equal(
-                "Components in scope",
-                tab.FindControl<TextBlock>("WorklogEntryComponentScopeHeadingText")!.Text);
         });
     }
 
@@ -384,42 +223,4 @@ public class WorklogCreateCardTests
         throw new FileNotFoundException($"Could not find Main/Main.axaml above {AppContext.BaseDirectory}");
     }
 
-    // ------------------------------------------------------------- the components count
-
-    // The count reports the SELECTION against the total, matching the full editor, and it is LIVE -
-    // it used to read "{N} found", which said nothing about the choice the user had made and never
-    // changed when they made one.
-    //
-    // Driven through the tab's own checklist rows and its All/None handlers by reflection: the card
-    // is only populated by a real drag on a loaded board, which a headless test cannot stage, but
-    // the counting rule itself is what matters here.
-    [Fact]
-    public void The_count_reports_the_live_selection_against_the_total()
-    {
-        UiTest.Run(() =>
-        {
-            var tab = new TabSchematics();
-
-            var rowsField = typeof(TabSchematics).GetField("thisWorklogEntryComponentRows", BindingFlags.NonPublic | BindingFlags.Instance)!;
-            var rows = (System.Collections.ObjectModel.ObservableCollection<WorklogEntryComponentRow>)rowsField.GetValue(tab)!;
-
-            rows.Clear();
-            for (int i = 1; i <= 8; i++)
-            {
-                rows.Add(new WorklogEntryComponentRow { BoardLabel = $"C{i}", DisplayName = "Ceramic", IsChecked = true });
-            }
-
-            var update = typeof(TabSchematics).GetMethod("UpdateWorklogEntryComponentCount", BindingFlags.NonPublic | BindingFlags.Instance)!;
-            var selectNone = typeof(TabSchematics).GetMethod("OnWorklogEntrySelectNoneComponentsClick", BindingFlags.NonPublic | BindingFlags.Instance)!;
-
-            var countText = tab.FindControl<TextBlock>("WorklogEntryComponentCountText")!;
-
-            update.Invoke(tab, null);
-            Assert.Equal("8 of 8 selected", countText.Text);
-
-            // The failure the review found: unticking everything left the count frozen.
-            selectNone.Invoke(tab, new object?[] { null, null });
-            Assert.Equal("0 of 8 selected", countText.Text);
-        });
-    }
 }

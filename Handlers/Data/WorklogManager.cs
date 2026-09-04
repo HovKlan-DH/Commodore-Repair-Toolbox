@@ -28,14 +28,14 @@ namespace Handlers.DataHandling
     }
 
     // ###########################################################################################
-    // One "New fault" card save: the drawn area on a schematic, its headline/comment, category
+    // One worklog entry: the drawn area on a schematic, its headline/comment, category
     // (Note/Cosmetic/Issue), resolution state (Open/Closed) and the board labels of the
     // components marked in scope. Persisted as one entry inside its workbook's own entries.json -
     // see the WorklogManager class header for why entries live beside their workbook's index.json
     // rather than in any central file.
     //
     // Title is the entry's one-line headline and Description its longer comment. Both are written
-    // by the quick card and both stay editable in the full editor - neither is legacy, and dropping
+    // when the entry is created and both stay editable afterwards - neither is legacy, and dropping
     // either as "redundant" would discard real user data.
     // Links/Comments/WorkDoneItems/Photos/Files are the full editor's own sub-lists - see
     // their own record types below. Photo/file bytes themselves are not stored here, only their
@@ -277,9 +277,13 @@ namespace Handlers.DataHandling
 
         // ###########################################################################################
         // Returns the id AddEntry will hand out next for the given workbook, for display before the
-        // entry actually exists (the "New fault" card's on-board "#N" badge). Same
-        // highest-plus-one scheme as AddEntry itself - see its own comment - so this must stay in
-        // sync with it. A workbook with no folder or no entries yet previews "#1".
+        // entry actually exists: the on-board "#N" badge over a freshly drawn area, and the id a
+        // draft entry in the full editor RESERVES for its attachment folder. Same highest-plus-one
+        // scheme as AddEntry itself - see its own comment - so this must stay in sync with it. A
+        // workbook with no folder or no entries yet previews "#1".
+        //
+        // A PEEK, not a reservation: another entry can be added between this call and the save, so
+        // AddEntryRecord re-allocates the id at write time rather than trusting the peeked one.
         // ###########################################################################################
         public static int PeekNextEntryId(int workbookId)
         {
@@ -777,6 +781,166 @@ namespace Handlers.DataHandling
         }
 
         // ###########################################################################################
+        // Appends an ALREADY-BUILT entry to the given workbook - the shape AddEntry's own field list
+        // cannot express, because the record arrives carrying its sub-lists (links, comments, work
+        // done, photos, files) already populated.
+        //
+        // This is what the "Add worklog" flow writes. Drawing an area on the schematic now opens the
+        // FULL editor directly rather than a small quick card, and that editor holds the whole entry
+        // - sub-lists included - in memory until Save, so the record reaching disk for the first time
+        // is not the bare title/description/category/state one AddEntry takes. See
+        // WorklogEntryEditorWindow.InitializeForNewEntry.
+        //
+        // The id is ASSIGNED HERE rather than taken from the record. The editor needed an id up front
+        // (its attachment folder is named after one - see GetEntryAttachmentsFolder), and it got that
+        // from PeekNextEntryId; but a peek is not a reservation, so between the peek and this call
+        // another entry may have been added to the same workbook. Re-allocating from the entries as
+        // they are NOW is what stops two entries sharing an id, which entries.json has no way to
+        // represent and UpdateEntry would then resolve to whichever came first.
+        //
+        // reservedId reports the id the caller had been using, so it can move any attachment bytes it
+        // already wrote under that id into the folder for the id actually allocated. It is almost
+        // always the same number; when it is not, the bytes would otherwise be stranded in a folder
+        // no entry names.
+        //
+        // Returns the saved entry (carrying its final id), or null when the workbook folder cannot be
+        // found or the write itself failed - in both cases nothing was persisted.
+        // ###########################################################################################
+        public static WorklogEntryRecord? AddEntryRecord(int workbookId, WorklogEntryRecord entry, int reservedId)
+        {
+            if (entry == null)
+            {
+                return null;
+            }
+
+            string? folder = GetWorkbookFolder(workbookId);
+            if (folder == null)
+            {
+                Logger.Warning($"Failed to add worklog entry: workbook [#{workbookId}] folder not found");
+                return null;
+            }
+
+            var entries = ReadEntries(folder);
+            int nextEntryId = entries.Count == 0 ? 1 : entries.Max(e => e.Id) + 1;
+
+            entry.Id = nextEntryId;
+            NormalizeEntryCollections(entry);
+
+            // Trimmed exactly as AddEntry does. The editor's Save gate uses IsNullOrWhiteSpace, so a
+            // title of "  CPU socket  " passes it; writing that verbatim would sort and search
+            // differently from every entry AddEntry ever wrote, and render its padding on the card.
+            entry.Title = entry.Title?.Trim() ?? string.Empty;
+            entry.Description = entry.Description?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(entry.Category))
+            {
+                entry.Category = "Note";
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.State))
+            {
+                entry.State = "Open";
+            }
+
+            if (entry.CreatedDate == default)
+            {
+                entry.CreatedDate = DateTime.Now;
+            }
+
+            entries.Add(entry);
+
+            // The attachment bytes the editor wrote while the entry was still a draft live under the
+            // id it reserved. Moved BEFORE the entries.json write, not after: the record names those
+            // files, so committing it first and then failing to move them publishes an entry whose
+            // photo and file rows point at a folder that does not hold them. Doing it first means a
+            // failure leaves the entry unwritten instead - the user still has everything on screen
+            // and can retry Save.
+            //
+            // A failure is logged and not fatal: the entry itself still saves, since the alternative
+            // would lose the user's typed work over attachments they can re-add.
+            if (reservedId != nextEntryId)
+            {
+                MoveEntryAttachmentsFolder(folder, reservedId, nextEntryId);
+            }
+
+            if (!SaveEntries(folder, entries))
+            {
+                // Nothing reached disk - returning the entry would tell the caller it was saved.
+                return null;
+            }
+
+            RecomputeWorkbookStatus(folder, workbookId, entries);
+
+            Logger.Info($"Setting changed: [Worklog] added entry [#{nextEntryId}] to workbook [#{workbookId}] [{entry.Category}/{entry.State}]");
+
+            return entry;
+        }
+
+        // ###########################################################################################
+        // Moves a draft entry's attachment folder to the id the entry was actually saved under - see
+        // AddEntryRecord for when the two differ. Does nothing when the draft folder was never
+        // created (the overwhelmingly common case: no attachment was added).
+        //
+        // A destination that ALREADY EXISTS is merged into, file by file, rather than skipped. It
+        // can exist perfectly legitimately - a previous draft that reserved this same number and
+        // whose cleanup delete failed leaves one behind - and skipping stranded the draft's bytes in
+        // a folder no entry names, while the entry itself was saved naming filenames that were not
+        // in its own folder. The filenames cannot collide across the two: they are built from the
+        // owning record's own attachment ids (see WorklogAttachmentStorage.BuildStoredFileName), and
+        // AllocateAttachmentId already refuses an id whose file is sitting in the folder. A name
+        // that collides anyway is left alone rather than overwritten - the file already there is the
+        // one some record may still name.
+        // ###########################################################################################
+        private static void MoveEntryAttachmentsFolder(string workbookFolder, int fromEntryId, int toEntryId)
+        {
+            string from = Path.Combine(workbookFolder, $"entry-{fromEntryId.ToString(CultureInfo.InvariantCulture)}-files");
+            string to = Path.Combine(workbookFolder, $"entry-{toEntryId.ToString(CultureInfo.InvariantCulture)}-files");
+
+            try
+            {
+                if (!Directory.Exists(from))
+                {
+                    return;
+                }
+
+                if (!Directory.Exists(to))
+                {
+                    Directory.Move(from, to);
+                    Logger.Info($"Moved worklog draft attachments from [entry-{fromEntryId}-files] to [entry-{toEntryId}-files]");
+                    return;
+                }
+
+                foreach (string sourceFile in Directory.GetFiles(from))
+                {
+                    string name = Path.GetFileName(sourceFile);
+                    string targetFile = Path.Combine(to, name);
+
+                    if (File.Exists(targetFile))
+                    {
+                        Logger.Warning(
+                            $"Not moving worklog draft attachment [{name}]: a file of that name already exists in [entry-{toEntryId}-files]");
+                        continue;
+                    }
+
+                    File.Move(sourceFile, targetFile);
+                }
+
+                // Only when it is actually empty - anything left behind is a file that could not be
+                // moved, and deleting the folder would delete it.
+                if (Directory.GetFileSystemEntries(from).Length == 0)
+                {
+                    Directory.Delete(from);
+                }
+
+                Logger.Info($"Merged worklog draft attachments from [entry-{fromEntryId}-files] into [entry-{toEntryId}-files]");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to move worklog draft attachments from [{from}] to [{to}]: [{ex.Message}]");
+            }
+        }
+
+        // ###########################################################################################
         // Appends a new entry to the given workbook: allocates the next entry id (same
         // highest-plus-one scheme as workbook ids, scoped to this workbook's own entries),
         // saves entries.json, then recomputes and saves the workbook's own status/entryCount -
@@ -901,6 +1065,46 @@ namespace Handlers.DataHandling
             string attachmentsFolder = Path.Combine(folder, $"entry-{entryId.ToString(CultureInfo.InvariantCulture)}-files");
             Directory.CreateDirectory(attachmentsFolder);
             return attachmentsFolder;
+        }
+
+        // ###########################################################################################
+        // The same path as GetEntryAttachmentsFolder, but WITHOUT creating anything - for callers
+        // that are about to DELETE the folder or merely want to know whether it exists.
+        //
+        // Resolving through the creating form for those is self-defeating: it re-creates the very
+        // folder a caller is about to remove, so a delete leaves an empty folder behind where there
+        // had been none. Returns null when the workbook folder cannot be found; the attachments
+        // folder itself may or may not exist, which is the caller's business to check.
+        // ###########################################################################################
+        public static string? GetEntryAttachmentsFolderPath(int workbookId, int entryId)
+        {
+            string? folder = GetWorkbookFolder(workbookId);
+            if (folder == null)
+            {
+                return null;
+            }
+
+            return Path.Combine(folder, $"entry-{entryId.ToString(CultureInfo.InvariantCulture)}-files");
+        }
+
+        // ###########################################################################################
+        // Whether the given entry id is currently used by a SAVED entry of the workbook.
+        //
+        // The editor's draft asks this before deleting the attachment folder its reserved id names:
+        // a peeked id is not a reservation, so by the time a draft is cancelled that number can
+        // legitimately belong to an entry saved meanwhile, whose photos and files live in exactly
+        // that folder. Deleting it then destroys a saved entry's attachments while its entries.json
+        // rows survive, pointing at nothing.
+        // ###########################################################################################
+        public static bool EntryExists(int workbookId, int entryId)
+        {
+            string? folder = GetWorkbookFolder(workbookId);
+            if (folder == null)
+            {
+                return false;
+            }
+
+            return ReadEntries(folder).Any(e => e.Id == entryId);
         }
 
         // ###########################################################################################

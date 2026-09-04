@@ -20,15 +20,24 @@ using Handlers.Geometry;
 namespace CRT
 {
     // ###########################################################################################
-    // The full worklog entry editor: opened by clicking a saved entry's pill on the schematic (see
-    // TabSchematics.Worklog.cs's OnWorklogEntryPillPointerPressed). Edits everything the quick
-    // "New fault" card can (title/description/category/state) plus the entry's own Links/Comments/
-    // WorkDoneItems/Photos/Files sub-lists, and shows a read-only preview of where the entry's
-    // marked area sits on its schematic.
+    // The full worklog entry editor - the ONE place a worklog entry is written, whether it is being
+    // created or edited. It edits the entry's title/description/category/state, its Links/Comments/
+    // WorkDoneItems/Photos/Files sub-lists and its component checklists, and shows a read-only
+    // preview of where the entry's marked area sits on its schematic.
+    //
+    // Two ways in, both of which must be called before ShowDialog:
+    //   Initialize            - a SAVED entry, from clicking its pill on the Schematics tab (see
+    //                           TabSchematics.Worklog.cs's OnWorklogEntryPillPointerPressed) or on
+    //                           the Workbooks tab's board pane.
+    //   InitializeForNewEntry - a NEW entry, from "Add worklog" after an area is drawn. It used to
+    //                           open a small "New fault" quick card asking for a subset of these
+    //                           same fields; that card is gone and this window is the whole step.
     //
     // Works on a private working copy of the WorklogEntryRecord (thisEntry) built from the caller's
-    // record; nothing is written back to disk until Save calls WorklogManager.UpdateEntry.
-    // Cancel/closing the window discards the working copy entirely.
+    // record. For a saved entry, sub-list changes write through immediately (PersistEntrySilently)
+    // and Save commits the direct fields via WorklogManager.UpdateEntry. For a NEW one nothing
+    // reaches disk until Save, which writes the whole record through WorklogManager.AddEntryRecord -
+    // see thisIsDraftEntry. Cancel/closing discards the working copy either way.
     // ###########################################################################################
     public partial class WorklogEntryEditorWindow : Window
     {
@@ -62,6 +71,39 @@ namespace CRT
         // rather than overwriting them with an empty list.
         private bool thisHasComponentScope;
 
+        // ###########################################################################################
+        // True while this window is editing an entry that does NOT yet exist on disk - the "Add
+        // worklog" flow, which draws an area on the schematic and comes straight here (there is no
+        // longer a small quick card in between; see InitializeForNewEntry).
+        //
+        // A draft is held ENTIRELY in memory until Save. That is the one real behavioural difference
+        // from editing a saved entry, and it changes what the instant-save path does: for a saved
+        // entry every sub-list change (a comment, a photo, a reorder) writes through to disk at once
+        // via PersistEntrySilently, so Cancel cannot take it back; for a draft nothing is written at
+        // all, so Cancel discards the whole thing and leaves no half-made entry behind.
+        //
+        // Attachment BYTES are the exception and are written immediately either way - a photo has to
+        // be copied somewhere before it can be shown - into the folder for the id reserved below.
+        // WorklogManager.AddEntryRecord moves that folder if the entry ends up with a different id.
+        // Cancelling a draft therefore leaves those bytes in a folder no entry names; they are
+        // cleaned up on Cancel, see DiscardDraftAttachments.
+        // ###########################################################################################
+        private bool thisIsDraftEntry;
+
+        // The id a draft's attachment folder is named after, reserved from WorklogManager.
+        // PeekNextEntryId when the draft is created. Only meaningful while thisIsDraftEntry.
+        private int thisDraftReservedEntryId;
+
+        // Set once AddEntryRecord has actually written this draft, and never cleared. It exists
+        // solely so the Closing handler's recursive attachment delete has a second, independent
+        // reason not to run - see that handler for why one flag is not enough for an operation that
+        // destroys files.
+        private bool thisWasSuccessfullySaved;
+
+        // The draft entry actually saved, for the caller that has to know what was written (the
+        // Schematics tab refreshes its overlay against it). Null unless a draft reached disk.
+        public WorklogEntryRecord? SavedNewEntry { get; private set; }
+
         // Newest-first is the default sort for both lists - persisted globally via UserSettings so it
         // carries over between entries and app restarts, rather than resetting every time this window
         // is opened.
@@ -92,6 +134,23 @@ namespace CRT
         // each close rewrote the same zeros.
         private int? thisNormalX;
         private int? thisNormalY;
+
+        // ###########################################################################################
+        // Which screen the window is on RIGHT NOW - tracked whenever Position changes, in EVERY
+        // WindowState, unlike thisNormalX/Y above which only track Normal state.
+        //
+        // That difference is the point: dragging a maximized window to another monitor keeps it
+        // maximized there without ever passing through Normal state, so thisNormalX/Y never
+        // updates - it still names whichever monitor the window was last WINDOWED on, which can be
+        // a different one entirely. Reported: maximize on monitor 2, Cancel, "Add worklog" again -
+        // the new window opened maximized on monitor 1 instead. Restoring a maximized window has to
+        // move it onto this screen FIRST and maximize second, the same two-step Main.axaml.cs's own
+        // window placement uses for its own top-level window, for the same reason.
+        //
+        // Null until the first PositionChanged, which is enough: RestoreWindowPlacement only reads
+        // it on the Maximized branch, and a window that has never moved has nothing to disagree
+        // with the saved value about.
+        private PixelPoint? thisCurrentScreenTopLeft;
 
         // ###########################################################################################
         // Test seam: when false, the window keeps the size and split its XAML declares instead of
@@ -250,16 +309,45 @@ namespace CRT
             int savedX = UserSettings.WorklogEntryWindowX;
             int savedY = UserSettings.WorklogEntryWindowY;
 
+            bool restoreMaximized = string.Equals(
+                UserSettings.WorklogEntryWindowState, "Maximized", StringComparison.OrdinalIgnoreCase);
+
             if (this.IsSavedPositionOnAScreen(savedX, savedY))
             {
                 this.thisNormalX = savedX;
                 this.thisNormalY = savedY;
                 this.WindowStartupLocation = WindowStartupLocation.Manual;
+
+                // For the Maximized case this Normal-state position is about to be overwritten
+                // below by the saved SCREEN's position - see restoreMaximized. Set unconditionally
+                // anyway, or a window with no valid saved screen (see the fallback below) would
+                // start unpositioned instead of at least landing on the last windowed spot.
                 this.Position = new PixelPoint(savedX, savedY);
             }
 
-            if (string.Equals(UserSettings.WorklogEntryWindowState, "Maximized", StringComparison.OrdinalIgnoreCase))
+            if (restoreMaximized)
             {
+                // Move onto the saved SCREEN before maximizing, not the saved WINDOWED position -
+                // see thisCurrentScreenTopLeft's comment for why the two can name different
+                // monitors. +100,+100 only has to land inside the screen, matching the nudge
+                // Main.axaml.cs's own window placement uses for the same reason.
+                int screenX = UserSettings.WorklogEntryWindowScreenX;
+                int screenY = UserSettings.WorklogEntryWindowScreenY;
+
+                // Only moved when the saved screen was actually RECORDED. IsSavedPositionOnAScreen
+                // deliberately accepts anything when the screen list is unavailable (see its header),
+                // which is the right answer for a genuine saved position but the wrong one here: a
+                // settings file upgraded from a build that saved the window state but not the screen
+                // carries (0,0), and that is not a position the user chose. Nudging to (100,100)
+                // from it maximizes the window on whichever monitor happens to contain that point,
+                // rather than leaving the OS to maximize where the window already is.
+                bool hasSavedScreen = screenX != 0 || screenY != 0;
+
+                if (hasSavedScreen && this.IsSavedPositionOnAScreen(screenX, screenY))
+                {
+                    this.Position = new PixelPoint(screenX + 100, screenY + 100);
+                }
+
                 this.WindowState = WindowState.Maximized;
             }
 
@@ -323,10 +411,13 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Keeps the normal-state bounds current and writes them out when the window closes.
+        // Keeps the normal-state bounds, and the current screen, current - then writes them out
+        // when the window closes.
         //
-        // Both trackers ignore anything but WindowState.Normal, which is what keeps a maximized
-        // session from overwriting the restore size - see the fields above.
+        // The size/position trackers ignore anything but WindowState.Normal, which is what keeps a
+        // maximized session from overwriting the restore size - see the fields above. The screen
+        // tracker is the one exception and runs in EVERY state, including Maximized - see
+        // thisCurrentScreenTopLeft's own comment for why.
         // ###########################################################################################
         private void TrackWindowPlacement()
         {
@@ -346,6 +437,8 @@ namespace CRT
                     this.thisNormalX = this.Position.X;
                     this.thisNormalY = this.Position.Y;
                 }
+
+                this.UpdateCurrentScreenTopLeft();
             };
 
             // Closing, not Closed: the window's bounds are still meaningful here. It fires for every
@@ -353,7 +446,30 @@ namespace CRT
             // placement.
             this.Closing += (_, _) =>
             {
+                // The title-bar close does not go through OnCancelClick, so an abandoned draft's
+                // attachment bytes would survive that one exit route. DiscardDraftAttachments is
+                // idempotent and only fires while the entry is still a draft.
+                //
+                // thisWasSuccessfullySaved is checked ALONGSIDE the draft flag rather than relying
+                // on Save having cleared that flag first. Save does clear it - but this handler
+                // deletes an attachment folder recursively, so "correct because two lines in another
+                // method happen to be in this order" is not a safe basis for it: reordering them, or
+                // any future close path that does not clear the flag, would delete the photos and
+                // files of an entry that had just saved successfully. Two independent conditions
+                // mean either one being right is enough.
+                if (this.thisIsDraftEntry && !this.thisWasSuccessfullySaved)
+                {
+                    this.DiscardDraftAttachments();
+                }
+
                 string state = this.WindowState == WindowState.Maximized ? "Maximized" : "Normal";
+
+                // One last update in case the window closed WITHOUT PositionChanged ever firing
+                // after its final move - a maximize-then-close on a monitor the window had never
+                // visited before while windowed can do that.
+                this.UpdateCurrentScreenTopLeft();
+                var screenTopLeft = this.thisCurrentScreenTopLeft
+                    ?? new PixelPoint(UserSettings.WorklogEntryWindowScreenX, UserSettings.WorklogEntryWindowScreenY);
 
                 // Falls back to whatever is already stored when this window never reported a
                 // normal-state position, rather than inventing (0,0) - see the fields above.
@@ -363,12 +479,45 @@ namespace CRT
                     this.thisNormalHeight,
                     this.thisNormalX ?? UserSettings.WorklogEntryWindowX,
                     this.thisNormalY ?? UserSettings.WorklogEntryWindowY,
+                    screenTopLeft.X,
+                    screenTopLeft.Y,
                     this.CurrentLeftColumnRatio());
             };
         }
 
         // ###########################################################################################
-        // Escape acts like Cancel, same as the quick "New fault" card's Escape handling. Plain Enter
+        // Records the top-left of whichever screen the window's CURRENT position falls on - see
+        // thisCurrentScreenTopLeft's own comment for why this has to run in every WindowState, not
+        // only Normal.
+        //
+        // Matches by containment against this.Position, the same technique IsSavedPositionOnAScreen
+        // uses for the inverse check. Left unset (not overwritten with a guess) when no screen
+        // contains the point - headless/disconnected-monitor edge cases - so the fallback in the
+        // Closing handler above can fall back to the last known-good value instead of persisting a
+        // wrong one.
+        // ###########################################################################################
+        private void UpdateCurrentScreenTopLeft()
+        {
+            var screens = this.Screens;
+            if (screens == null)
+            {
+                return;
+            }
+
+            var position = this.Position;
+
+            foreach (var screen in screens.All)
+            {
+                if (screen.Bounds.Contains(position))
+                {
+                    this.thisCurrentScreenTopLeft = new PixelPoint(screen.Bounds.X, screen.Bounds.Y);
+                    return;
+                }
+            }
+        }
+
+        // ###########################################################################################
+        // Escape acts like Cancel. Plain Enter
         // in the single-line Title field saves and closes (Title has no use for a literal newline);
         // in the multi-line Description field (AcceptsReturn) plain Enter is left alone so it keeps
         // inserting a newline, and only Ctrl+Enter saves - same convention as WorklogAddCommentWindow.
@@ -417,6 +566,11 @@ namespace CRT
             this.thisWorkbookId = workbookId;
             this.thisEntry = CloneEntry(entry);
             this.thisSchematicBitmap = schematicBitmap;
+
+            // "Update worklog" for a saved entry; InitializeForNewEntry overrides this to "Add
+            // worklog" straight afterwards for a draft. Set here rather than left as the markup's
+            // default so the two callers cannot drift from each other.
+            this.EditorSaveButton.Content = "Update worklog";
 
             this.EditorIdText.Text = $"#{this.thisEntry.Id}";
             this.EditorTitleTextBox.Text = this.thisEntry.Title;
@@ -473,6 +627,74 @@ namespace CRT
         }
 
         // ###########################################################################################
+        // Must be called before showing the dialog when the entry does NOT yet exist - the "Add
+        // worklog" flow: the user picks "Add worklog" in the top bar, drags out an area on the
+        // schematic, and this window opens on it directly.
+        //
+        // It replaced a small "New fault" card that asked for a title, description, category, state
+        // and the component checklist, and then had to be reopened in THIS window to reach anything
+        // else. Two dialogs for one entry, with the first one's fields a strict subset of the
+        // second's - so the first was removed outright rather than kept as a shortcut.
+        //
+        // The entry is held in memory until Save (see thisIsDraftEntry): nothing is written on open,
+        // so a Cancel here leaves the workbook exactly as it was. The id is RESERVED rather than
+        // allocated - the attachment folder has to be named after something before Save - and
+        // WorklogManager.AddEntryRecord re-allocates and moves that folder if another entry claimed
+        // the number meanwhile.
+        //
+        // Category and state start at Note/Open, the same defaults the card it replaces used.
+        // ###########################################################################################
+        public void InitializeForNewEntry(
+            int workbookId,
+            string schematicName,
+            Rect area,
+            Bitmap? schematicBitmap)
+        {
+            this.thisIsDraftEntry = true;
+            this.thisDraftReservedEntryId = WorklogManager.PeekNextEntryId(workbookId);
+
+            var draft = new WorklogEntryRecord
+            {
+                Id = this.thisDraftReservedEntryId,
+                SchematicName = schematicName ?? string.Empty,
+                AreaX = area.X,
+                AreaY = area.Y,
+                AreaWidth = area.Width,
+                AreaHeight = area.Height,
+                Category = "Note",
+                State = "Open",
+                ShowMarkedArea = true,
+                CreatedDate = DateTime.Now
+            };
+
+            // Every worklog starts its own history with the fact that it was created - the same
+            // audit trail WorklogManager.AddEntry writes, added here because the draft bypasses it.
+            WorklogManager.AppendAutomaticComment(draft.Comments, WorklogManager.CreatedCommentText);
+
+            this.Initialize(workbookId, draft, schematicBitmap);
+
+            // Initialize is written for a saved entry and ends by clearing the dirty flag, which is
+            // right there and wrong here: an empty draft has nothing worth saving yet, but the
+            // moment the user types a title it must be saveable. UpdateSaveButtonEnabled already
+            // gates on a non-blank title, so the flag is simply forced on and the title box decides.
+            this.thisIsDirty = true;
+
+            this.Title = "New worklog entry";
+            this.EditorSaveButton.Content = "Add worklog";
+
+            // Same reasoning as Initialize's own deferred lift - its posted job runs after this
+            // method returns and would otherwise clear the flag straight back to false.
+            Dispatcher.UIThread.Post(
+                () =>
+                {
+                    this.thisIsDirty = true;
+                    this.UpdateSaveButtonEnabled();
+                    this.EditorTitleTextBox.Focus();
+                },
+                DispatcherPriority.Background);
+        }
+
+        // ###########################################################################################
         // The Save button starts disabled and is only ever enabled by an edit to one of the direct
         // fields (Title, Description, category, state) - see OnDirectFieldTextChanged and the
         // category/state pointer handlers below. Everything else (links/comments/work done, and
@@ -505,15 +727,20 @@ namespace CRT
 
             this.EditorSaveButton.IsEnabled = this.thisIsDirty && hasTitle;
 
-            // A disabled Save with no explanation reads as a broken button. Say why - and say it
-            // only when there is actually something waiting to be saved, so merely opening an entry
-            // and clearing its title does not scold the user before they have done anything.
+            // A disabled Save with no explanation reads as a broken button on a SAVED entry - say
+            // why, and say it only when there is actually something waiting to be saved, so merely
+            // opening an entry and clearing its title does not scold the user before they have done
+            // anything.
             //
-            // This matters more than it looks: SyncDirectFieldsToEntry keeps the STORED title when
-            // the box is blank (a blank title must never reach disk), so without a message the
+            // This matters more than it looks there: SyncDirectFieldsToEntry keeps the STORED title
+            // when the box is blank (a blank title must never reach disk), so without a message the
             // window and the file would silently disagree about the title while an instant-save -
             // adding a comment, say - wrote every other field.
-            if (this.thisIsDirty && !hasTitle)
+            //
+            // A brand-new entry (thisIsDraftEntry) skips the message entirely: there is nothing on
+            // disk yet to disagree with, and an empty title is simply the window's starting state,
+            // not something that needs explaining before the user has typed anything.
+            if (this.thisIsDirty && !hasTitle && !this.thisIsDraftEntry)
             {
                 this.ShowSaveFailed(BlankTitleMessage);
             }
@@ -615,10 +842,16 @@ namespace CRT
         //
         // Each row starts ticked if its label is already in the entry's saved ComponentLabels, so
         // reopening an entry shows the choice the user made last time rather than re-ticking
-        // everything. That is the one behavioural difference from the quick "New fault" card,
-        // where every row starts ticked because the entry has no saved selection yet.
+        // everything.
+        //
+        // tickAll overrides that for a NEW entry, where there is no saved selection to restore and
+        // every row would otherwise start unticked. The user drew the area around these components,
+        // so all of them in scope is the right starting point and unticking one is quicker than
+        // ticking eight - which is what the quick "New fault" card this flow replaced did too.
         // ###########################################################################################
-        public void InitializeComponentScope(IReadOnlyList<(string BoardLabel, string DisplayName)> componentsInScope)
+        public void InitializeComponentScope(
+            IReadOnlyList<(string BoardLabel, string DisplayName)> componentsInScope,
+            bool tickAll = false)
         {
             // Populating the checklist is not an edit, and building the rows drives the CheckBox
             // bindings - without a guard the window opened with Save already enabled, making every
@@ -639,12 +872,14 @@ namespace CRT
             // whether the caller could work one out.
             this.thisIsInitializing = true;
 
-            this.PopulateComponentScope(componentsInScope);
+            this.PopulateComponentScope(componentsInScope, tickAll);
 
             this.EditorSaveButton.IsEnabled = false;
         }
 
-        private void PopulateComponentScope(IReadOnlyList<(string BoardLabel, string DisplayName)> componentsInScope)
+        private void PopulateComponentScope(
+            IReadOnlyList<(string BoardLabel, string DisplayName)> componentsInScope,
+            bool tickAll = false)
         {
             this.thisHasComponentScope = true;
             this.thisComponentRows.Clear();
@@ -659,7 +894,7 @@ namespace CRT
                 {
                     BoardLabel = component.BoardLabel,
                     DisplayName = component.DisplayName,
-                    IsChecked = alreadySelected.Contains(component.BoardLabel)
+                    IsChecked = tickAll || alreadySelected.Contains(component.BoardLabel)
                 });
             }
 
@@ -1099,6 +1334,23 @@ namespace CRT
         private bool PersistEntrySilently()
         {
             this.SyncDirectFieldsToEntry();
+
+            // A DRAFT has nothing on disk to update, and deliberately writes nothing until Save -
+            // that is what lets Cancel discard a half-made new entry cleanly. The sub-list change
+            // the caller just made is already in the working copy, which is the whole record Save
+            // will write, so reporting success here is accurate: nothing was lost.
+            //
+            // What the true therefore MEANS is "the change is safely recorded", not "a file was
+            // written" - and that is exactly what every caller reads it for. The attachment delete
+            // paths gate their byte deletion on it, and for a draft that is still right: the row is
+            // gone from the working copy Save will write, so the bytes are genuinely unreferenced.
+            // Any caller added later that needs "reached disk" specifically has to ask
+            // thisIsDraftEntry itself; there is no disk write here to report on.
+            if (this.thisIsDraftEntry)
+            {
+                this.EditorSaveFailedText.IsVisible = false;
+                return true;
+            }
 
             if (WorklogManager.UpdateEntry(this.thisWorkbookId, this.thisEntry))
             {
@@ -1824,7 +2076,7 @@ namespace CRT
             if (!this.PersistEntrySilently())
             {
                 this.thisEntry.Photos.RemoveAll(p => p.Id == nextId);
-                WorklogAttachmentStorage.DeleteAttachmentFile(attachmentsFolder, storedFileName);
+                WorklogAttachmentStorage.DeleteAttachmentFileAndFolderIfEmpty(attachmentsFolder, storedFileName);
                 this.RefreshPhotoRows();
             }
         }
@@ -1969,6 +2221,10 @@ namespace CRT
         //
         // The file goes only after the metadata change has been persisted: if the save fails the
         // row is still listed, and deleting first would leave it pointing at nothing.
+        //
+        // DeleteAttachmentFileAndFolderIfEmpty also removes the entry's shared attachments folder
+        // once nothing - photo or file - is left in it, so deleting an entry's last attachment
+        // leaves no empty folder behind on disk.
         // ###########################################################################################
         private void OnDeletePhotoClick(object? sender, RoutedEventArgs e)
         {
@@ -1990,7 +2246,7 @@ namespace CRT
 
             if (this.PersistEntrySilently())
             {
-                WorklogAttachmentStorage.DeleteAttachmentFile(
+                WorklogAttachmentStorage.DeleteAttachmentFileAndFolderIfEmpty(
                     WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id),
                     fileName);
             }
@@ -2446,7 +2702,7 @@ namespace CRT
             if (!this.PersistEntrySilently())
             {
                 this.thisEntry.Files.RemoveAll(f => f.Id == nextId);
-                WorklogAttachmentStorage.DeleteAttachmentFile(attachmentsFolder, storedFileName);
+                WorklogAttachmentStorage.DeleteAttachmentFileAndFolderIfEmpty(attachmentsFolder, storedFileName);
                 this.RefreshFileRows();
             }
         }
@@ -2642,7 +2898,8 @@ namespace CRT
         // ###########################################################################################
         // Removes the file, metadata and bytes both - the stored name carries the record's own id,
         // so it can only belong to the row being removed. The bytes go only after the metadata
-        // change reached disk, matching OnDeletePhotoClick.
+        // change reached disk, matching OnDeletePhotoClick - including the empty-folder cleanup, see
+        // DeleteAttachmentFileAndFolderIfEmpty.
         // ###########################################################################################
         private void OnDeleteFileClick(object? sender, RoutedEventArgs e)
         {
@@ -2664,7 +2921,7 @@ namespace CRT
 
             if (this.PersistEntrySilently())
             {
-                WorklogAttachmentStorage.DeleteAttachmentFile(
+                WorklogAttachmentStorage.DeleteAttachmentFileAndFolderIfEmpty(
                     WorklogManager.GetEntryAttachmentsFolder(this.thisWorkbookId, this.thisEntry.Id),
                     fileName);
             }
@@ -2680,18 +2937,126 @@ namespace CRT
         // ###########################################################################################
         private void OnCancelClick(object? sender, RoutedEventArgs e)
         {
+            // A draft has written nothing to entries.json, so there is nothing for the caller to
+            // refresh and nothing for Cancel to have failed to undo - whatever
+            // thisHasPersistedChange picked up along the way describes a save that never happened.
+            if (this.thisIsDraftEntry)
+            {
+                this.DiscardDraftAttachments();
+                this.WasSaved = false;
+                this.Close(false);
+                return;
+            }
+
             this.WasSaved = this.thisHasPersistedChange;
             this.Close(this.WasSaved);
         }
 
         // ###########################################################################################
+        // Removes the attachment bytes a cancelled draft wrote.
+        //
+        // Photo and file bytes are copied to disk the moment they are added - they have to be, a
+        // photo cannot be shown from nowhere - so a draft that added one and was then cancelled
+        // would leave that folder behind naming an entry that does not exist. Worse than untidy:
+        // WorklogManager.AddEntryRecord moves the reserved folder into place for the NEXT draft that
+        // reserves the same id, so the abandoned photos would reappear on an unrelated entry.
+        //
+        // Only ever called for a draft, and only for the folder named after its own reserved id.
+        // Failure is logged rather than surfaced: the user asked to cancel, and there is nothing
+        // useful they could do about it.
+        //
+        // TWO things this must not do, both of which the obvious version did:
+        //
+        //  - It must not resolve the path through WorklogManager.GetEntryAttachmentsFolder, which
+        //    CREATES the folder. Resolving to delete would re-create the very folder this is about
+        //    to remove, leaving an empty one behind where there had been none. Hence the
+        //    ...FolderPath form, which only builds the path.
+        //  - It must not delete a folder that a SAVED entry now owns. The reserved id is a peek, not
+        //    a reservation: an entry saved elsewhere while this draft was open can legitimately hold
+        //    that number, and its photo and file bytes live in exactly this folder. Deleting it
+        //    would destroy a saved entry's attachments while its entries.json rows survived, each
+        //    pointing at nothing. So the id is checked against what is actually on disk first.
+        // ###########################################################################################
+        private void DiscardDraftAttachments()
+        {
+            if (this.thisEntry.Photos.Count == 0 && this.thisEntry.Files.Count == 0)
+            {
+                return;
+            }
+
+            if (WorklogManager.EntryExists(this.thisWorkbookId, this.thisDraftReservedEntryId))
+            {
+                // Another entry claimed the reserved number while this draft was open. Leaving the
+                // bytes behind is untidy; deleting them destroys that entry's attachments.
+                Logger.Warning(
+                    $"Not discarding cancelled draft attachments for workbook [#{this.thisWorkbookId}] entry [#{this.thisDraftReservedEntryId}]: " +
+                    "a saved entry now uses that id");
+                return;
+            }
+
+            string? attachmentsFolder = WorklogManager.GetEntryAttachmentsFolderPath(
+                this.thisWorkbookId,
+                this.thisDraftReservedEntryId);
+
+            if (attachmentsFolder == null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (System.IO.Directory.Exists(attachmentsFolder))
+                {
+                    System.IO.Directory.Delete(attachmentsFolder, recursive: true);
+                    Logger.Info($"Discarded attachments of cancelled draft worklog entry [#{this.thisDraftReservedEntryId}]");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Failed to discard cancelled draft attachments [{attachmentsFolder}]: [{ex.Message}]");
+            }
+        }
+
+        // ###########################################################################################
         // Commits the working copy back via WorklogManager.UpdateEntry, which also recomputes the
         // workbook's Open/Closed status - editing State to Closed here is exactly how the user
-        // resolves an entry from the full editor, same rule as the quick "New fault" card.
+        // resolves an entry from the full editor.
         // ###########################################################################################
         private void OnSaveClick(object? sender, RoutedEventArgs e)
         {
             this.SyncDirectFieldsToEntry();
+
+            if (this.thisIsDraftEntry)
+            {
+                // First time this entry has reached disk. AddEntryRecord allocates the real id (the
+                // draft's was only reserved) and moves the attachment folder if the two differ.
+                var saved = WorklogManager.AddEntryRecord(
+                    this.thisWorkbookId,
+                    this.thisEntry,
+                    this.thisDraftReservedEntryId);
+
+                if (saved == null)
+                {
+                    this.ShowSaveFailed(DefaultSaveFailedMessage);
+                    return;
+                }
+
+                // No longer a draft: the record exists, so a reopen or any later instant-save must
+                // go down the ordinary UpdateEntry path rather than adding a second copy.
+                //
+                // thisWasSuccessfullySaved is the belt to that braces - the Closing handler's
+                // attachment cleanup checks both, so this entry's freshly-moved attachment folder is
+                // safe even if the draft flag is ever left set. See that handler.
+                this.thisIsDraftEntry = false;
+                this.thisWasSuccessfullySaved = true;
+                this.thisEntry = saved;
+                this.SavedNewEntry = saved;
+                this.EditorIdText.Text = $"#{saved.Id}";
+
+                this.WasSaved = true;
+                this.Close(this.WasSaved);
+                return;
+            }
 
             if (!WorklogManager.UpdateEntry(this.thisWorkbookId, this.thisEntry))
             {

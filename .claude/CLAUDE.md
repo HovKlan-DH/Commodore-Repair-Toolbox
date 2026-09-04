@@ -115,7 +115,8 @@ number formats.
 | Security | `ExternalTargetLauncher`, `OnlineServices`' manifest-validation predicates |
 | KiCad | `KiCadRawProjectLoader`, `KiCadProjectLoader`, the `KiCadProjectData` model |
 | Board data | `BoardDataReader`, `BoardDataWriter`, `BoardComponentHighlightStorage`, `ComponentListBuilder`, `ComponentImageQueries`, `OverviewHtmlBuilder`, `ContactLinkFormatter` |
-| Worklog | `WorklogManager` (including `ResolveActiveWorkbook`, `IsResolvedState`, `IsWorkbookStatusOpen`, `GetAllWorkbooks`), `WorklogEntryScope`, `WorklogSearchQuery`, `WorklogSearchIndex` |
+| Worklog | `WorklogManager` (including `ResolveActiveWorkbook`, `AddEntryRecord`, `IsResolvedState`, `IsWorkbookStatusOpen`, `GetAllWorkbooks`), `WorklogEntryScope`, `WorklogSearchQuery`, `WorklogSearchIndex` |
+| Text links | `TextLinkFinder` (which runs in a user-typed note are web links) |
 | Settings / startup | `UserSettings`, `DataManager` (data-root + master workbook), `DataValidator` (smoke only), `SimulationOptions` |
 | Headless UI (`Tests/.../Ui/`) | All nine tabs built headlessly, the worklog and Workbooks palettes, plus component highlight selection and schematics zoom - see [Headless UI tests](#headless-ui-tests) |
 | Geometry (`Handlers/Geometry/`) | `PolygonGeometry`, `RectGeometry`, `KiCadLayerGeometry`, `KiCadPadGeometry`, `OverlayCullGeometry`, `KiCadOverlayCacheKeys`, `KiCadOverlayNetCache`, `ViewportMath`, `KiCadNetGraphBuilder`, `KiCadHoverIndex`, `HighlightRectBuilder`, `LabelEditorGeometry`, `WorklogBadgeLayout` |
@@ -208,7 +209,14 @@ and `UiTest.cs` (runs a body on the UI thread). The rest are the tests themselve
 | `WorkbooksListTests.cs` | The Workbooks tab's workbook list and selection: counts and their singular/plural forms, card contents, newest-first order, board scoping, default/click selection, that the status pill (list and top-line) uses the shared Open/Closed brushes, the activation fallback chain (`UserSettings.ActiveWorkbookIdByBoard` wins over newest; a stale saved id falls back to newest), that both splitters' widths are restored from `UserSettings.WorkbooksLeftPanelWidth`/`WorkbooksEntryListWidth` via `ApplySplitterWidthsForTests`, the top-line's Note text (shown/switched/collapsed-when-blank) and its Edit/Delete actions' visibility (hidden with no workbook selected, shown once one is), and that deleting a workbook via `WorklogManager.DeleteWorkbook` removes its card and a refresh lands the selection on the board's next remaining workbook (or clears the top-line entirely when it was the last one) |
 | `WorkbooksBoardPreviewTests.cs` | The Workbooks tab's board pane: one preview per schematic with an entry in the selected workbook, shared previews for co-located entries, unknown-schematic and missing-image entries skipped without dropping other previews, the pane rebuilding when the selected workbook changes, (via `BuildShownTab`'s real layout pass) that a "show marked area" ON entry's badge anchors to its marker while an OFF entry's badge parks in the image's top-right corner instead, that a pill carries a Hand cursor on a hit-test-visible canvas, `RefreshBoardPreviewsForCurrentSelection` populating the pane from board data supplied after an earlier empty build without touching the workbook list, schematic selection (default-first, highlight moving on click, the entry list switching to the clicked schematic), an entry detail card's four rows read back by content (including the stats row's hours/cost/comment/link/photo/file counts, populated through `WorklogManager.UpdateEntry` rather than a bare in-memory record), that the card has exactly one outer border with no border wrapping any individual row, that the Legend panel is gone, and `BuildWorklogEntryComponentScopeForTests` (matched components whose highlight rect the entry's area touches, `null` with no cached highlight rects at all and `null` when the entry's own schematic has no cache entry) - the computation `OnPreviewBadgePointerPressed` hands to `WorklogEntryEditorWindow.InitializeComponentScope` so the modal opened from a pill is provably the same one the Schematics tab opens |
 | `WorkbooksSearchTests.cs` | The "Find a previous repair" box actually applying `WorklogSearchQuery` to the tab: the workbook list narrowing (by title, by note, and through text in one of the workbook's entries), the result count and each empty state saying "no match" rather than "none recorded", AND/quoted-phrase/`-`exclusion/case-insensitivity end to end, the entry list narrowing to matched entries while a workbook matched by its OWN text keeps all of its entries, that filtering the ACTIVE workbook out moves the top-line to a shown one WITHOUT changing `ActiveWorkbookIdByBoard`, that `ClearSearchForBoardChange` empties both the box and the filter, and the highlighting - the matched runs marked and nothing else, original casing and the full text preserved through the `Inlines` split, no marks with no search active, and marks removed again when the box is cleared |
+| `WorkbooksBoardPreviewTests.cs` (cont.) | Plus the DETACH/RE-ATTACH cycle a tab switch performs: that detaching leaves no preview `Image` holding a `Source` (the disposed-bitmap crash - see the board pane's bitmap-cache note above; this test fails against the dispose-without-clearing version), that re-attaching rebuilds the pane with a LIVE bitmap rather than handing back the disposed one, and that detaching a tab which built no previews at all is harmless |
 | `DeleteWorkbookWindowTests.cs` | That the delete-confirmation modal's Enter/Escape both CANCEL - including with the **Delete button focused**, the case a plain bubbling `KeyDown` handler misses entirely (the button's own Enter handling fires `Click` and confirms the delete). Asserts on the Delete button's `Click` rather than on the window closing, since it closes either way - the fix is `RoutingStrategies.Tunnel`, and this test fails against the bubbling version |
+| `WorklogEditorNewEntryTests.cs` | The editor opened on a NEW entry (`InitializeForNewEntry`, the "Add worklog" flow after the quick card was removed): that it opens blank with Save disabled, that typing a title ENABLES Save - the thing `Initialize`'s own end-of-method clean state would otherwise make impossible, so a new entry could never be saved at all - that a blank or whitespace title disables it again, the drawn area's schematic carried through, the Note/Open defaults and the "Worklog created" audit comment, "Show marked area" ticked, the window titled "New worklog entry", that cancelling reports `WasSaved == false` and a null `SavedNewEntry` (a draft writes nothing, so the caller must not be told to refresh), and `InitializeComponentScope`'s `tickAll` - fully ticked for a new entry, unticked without it |
+| `WorklogEditorNewEntryTests.cs` (cont.) | Also: the Save button reads "Add worklog" rather than "Update worklog" (set explicitly by `InitializeForNewEntry`, not left as the markup default), and that a blank title on a brand-new entry shows NO explanatory message - there is nothing on disk yet to disagree with, unlike a saved entry (see `WorklogEditorHeaderTests.cs`) |
+| `WorkbooksSearchFocusTests.cs` | `TabWorkbooks.FocusSearchBox` - that calling it moves real keyboard focus onto `FindRepairTextBox`, that calling it twice is harmless, and that focus can still move away afterwards through ordinary interaction. Covers only what is testable without `Main` (never constructed by any test): `Main`'s own `OnMainTabControlSelectionChanged`, which calls this on tab entry and is guarded by `e.Source` against `SelectionChanged`'s bubble from a nested `ListBox`/`ComboBox` on another tab, is exercised only by running the app |
+| `ThumbnailWorklogPillsTests.cs` | The thumbnail gallery's "#N" pills, via `ThumbnailWorklogPillsOverlay.LayOutPills`: that a "show marked area" ON entry's pill sits on its marked area while an OFF one is PARKED in the image's top-right corner instead - the reported bug where the thumbnail kept drawing a hidden entry's pill at its marker while the main view parked it, asserted by actual position (the marker is deliberately bottom-left) rather than by mere difference - that the same marker lands in two different places depending on the flag, that a thumbnail carrying both kinds keeps each placement, that parked pills stack without overlapping and stay inside the image however many there are, that they hug the IMAGE's edge and not the letterboxed control's, that each keeps its own id and colour, and that a zero-sized bitmap lays out nothing |
+| `TextLinkRendererTests.cs` | Rendering a user-typed note with its web links clickable: that link-free text stays a plain single-`Text` block with no Hand cursor, that a linked one moves its content into `Inlines` with `Text == null` (a block carrying both renders the Text and silently ignores the Inlines), that only the link run is underlined, that re-rendering replaces the previous pass rather than layering on it, and the LINK + SEARCH-HIGHLIGHT merge - a search term landing inside a URL, one outside it, highlighting with no link present, and that the merged runs are never empty and always rebuild the original string. Plus the `LinkText` attached property the editor's DataTemplates use, including re-rendering when a recycled container is handed a different row |
+| `WorklogEntryModeTests.cs` | The parked-pill canvas (separate from the anchored badge canvas, so parked pills do not pan and zoom with the board; no `Background`, since one would swallow every press across the schematic panel; below the "Netlist names" panel in z-order) and the "Add worklog" mode hint (its wording, that it starts hidden and is not hit-testable, that it covers the data-sync icon, that its text wraps inside its box rather than overflowing - a horizontal `StackPanel` measures with infinite width and would never wrap - and that it is plain text with no icon). Formerly `WorklogCreateCardTests.cs`; the quick card's own tests went with the card |
 
 **Do NOT add the `Avalonia.Headless.XUnit` package to get `[AvaloniaFact]`.** At 12.1.1 it depends
 on xunit **v3** while this suite is on xunit 2.9.3; adding it makes every `Fact` and `InlineData`
@@ -340,7 +348,10 @@ on top of it. Split across `TabWorkbooks.axaml(.cs)` and `TabWorkbooks.BoardPrev
   badges rather than overlapping them. Getting this backwards - anchoring every badge to its marker
   regardless of `ShowMarkedArea` - was a reported bug; `WorkbooksBoardPreviewTests` pins both
   branches down by actual on-screen position, not just presence, specifically to catch a
-  regression like it. **Every pill is clickable** (`OnPreviewBadgePointerPressed`), opening the
+  regression like it. **It was then reported a second time against the SCHEMATICS TAB THUMBNAILS**,
+  which had the same defect and are now fixed the same way (`ThumbnailWorklogPillsOverlay`, pinned
+  by `ThumbnailWorklogPillsTests`) - so all THREE surfaces that draw these pills now share
+  `ParkedBadgeGeometry.ArrangeInTopRightBlock`. Any fourth must too. **Every pill is clickable** (`OnPreviewBadgePointerPressed`), opening the
   EXACT SAME `WorklogEntryEditorWindow` the Schematics tab's own "Show worklogs" badges open,
   including the "Mark components in scope"/"Mark components completed" checklist
   (both tabs now call the one shared `WorklogEntryScope.BuildComponentsInScope` in `Handlers/Data/`,
@@ -529,13 +540,25 @@ because their brushes need the two-step `Application.Current` + `ThemeVariant` l
 binding cannot express — the same reason `Main` builds the worklog bar's own pill in code.
 
 **Schematic bitmaps are shared, not decoded per rebuild.** `thisSchematicBitmapsByPath` holds one
-decoded `Bitmap` per image path for the life of the tab, disposed in `OnDetachedFromVisualTree`. A
-fresh `new Bitmap(path)` per preview per pass stranded a full-resolution decode every time (a
-4220x2941 schematic is ~47 MB of BGRA) on every board change, entry save and workbook create/close.
-Disposing on clear instead would be WORSE: `ShowDialog` does not block the dispatcher, so
-`RefreshWorklogBar` can re-enter while a badge's editor is up, and that editor documents that its
-schematic bitmap belongs to the caller - disposing under it is an `ObjectDisposedException` on the
-render thread, fatal in Avalonia.
+decoded `Bitmap` per image path for the life of one ATTACHMENT, disposed in
+`OnDetachedFromVisualTree`. A fresh `new Bitmap(path)` per preview per pass stranded a
+full-resolution decode every time (a 4220x2941 schematic is ~47 MB of BGRA) on every board change,
+entry save and workbook create/close. Disposing on clear instead would be WORSE: `ShowDialog` does
+not block the dispatcher, so `RefreshWorklogBar` can re-enter while a badge's editor is up, and that
+editor documents that its schematic bitmap belongs to the caller - disposing under it is an
+`ObjectDisposedException` on the render thread, fatal in Avalonia.
+
+**`OnDetachedFromVisualTree` is NOT "the tab is going away" - a `TabControl` detaches the previous
+tab's content on every tab SWITCH.** The preview `Image` controls keep their `Source` across a
+detach, so disposing the cache without tearing the pane down first left every one of them holding a
+freed Skia surface, and the next render pass over them threw `ObjectDisposedException` on the RENDER
+thread - fatal, and reported as the app crashing on switching away from Workbooks. So detach now
+calls `ClearBoardPreviewsBeforeDisposingBitmaps` FIRST and disposes second (nothing then references
+a disposed bitmap), and `OnAttachedToVisualTree` calls `RefreshWorkbooks` to rebuild when the tab
+comes back. Both halves are pinned by `WorkbooksBoardPreviewTests` - the detach test asserts no
+`Image` is left holding a `Source`, and fails against the dispose-without-clearing version. **Keep
+that ordering**; anything added later that renders one of these bitmaps must either live inside
+`BoardPreviewPanel` or be cleared alongside it.
 
 Its `Workbooks_*` theme keys in `App.axaml` are pinned by `WorkbooksPaletteTests` - which now covers
 only the six keys the tab actually paints; sixteen further mockup-era keys were referenced by nothing
@@ -553,6 +576,39 @@ piece of this tab already uses — reconciling the two is part of making the ent
 The most complex tab: it renders schematic/PCB images with three overlay layers (component highlights,
 an interactive KiCad trace/copper overlay, user-drawn polyline traces), hosts the component label
 editor, and hosts the MiniPro IC-test panel.
+
+**Adding a worklog entry goes straight to the full editor.** "Add worklog" in the top bar starts
+area-marking mode; the drag that follows opens `WorklogEntryEditorWindow` on the drawn area
+(`TabSchematics.Worklog.cs`'s `OpenNewWorklogEntryEditor` → `InitializeForNewEntry`). There used to
+be a small "New fault" quick card in between, asking for a title, description, category, state and
+the component checklist — every one of them a field the full editor also has, so reaching anything
+else (links, work done, comments, photos, files) meant saving and immediately reopening the same
+entry. The card was **removed outright** rather than kept as a shortcut, along with its markup, its
+`AnchoredCardPlacementGeometry` corner-placement helper and the tests that pinned its fields down.
+
+A NEW entry is held entirely in memory until Save (`thisIsDraftEntry` in the editor). That is the
+one behavioural difference from editing a saved entry, and it exists so Cancel leaves nothing
+behind: for a saved entry every sub-list change writes through to disk at once
+(`PersistEntrySilently`), which for a half-made new entry would strand it in the workbook. Save
+writes the whole record — sub-lists included — through `WorklogManager.AddEntryRecord`, which
+**re-allocates the entry id at write time**: the editor reserves one up front from `PeekNextEntryId`
+because its attachment folder has to be named after something, but a peek is not a reservation, so
+an entry written meanwhile would otherwise give two entries the same number. When the id does move,
+`AddEntryRecord` moves the draft's attachment folder with it; a cancelled draft's attachment bytes
+are deleted instead (`DiscardDraftAttachments`, wired to Cancel *and* to `Closing`, since the
+title-bar close does not go through Cancel).
+
+**Links in user-typed text are clickable.** The workbook Note, the worklog Description, and the Work
+done / Comment / Photo comment / File comment rows all render any web link in them as a clickable
+run — `Handlers/Data/TextLinkFinder.cs` decides which runs are links (pure, unit tested), and
+`Handlers/Theme/TextLinkRenderer.cs` turns those into styled `Run`s and opens the target through
+`ExternalTargetLauncher`. Code-built blocks call `Apply`/`ApplySegments`; the editor's templated
+rows use the `TextLinkRenderer.LinkText` attached property **instead of** `Text`, since a TextBlock
+carrying both renders the Text and silently ignores the Inlines. Link marking and the Workbooks
+tab's search highlighting are **merged in one pass** rather than applied in sequence: a search term
+routinely lands inside a URL, and the two splits cut the text at independent places. Titles are
+deliberately NOT linkified (`ApplyHighlightedText`'s `linkify` flag is opt-in) — a title is a
+headline, not something to navigate to.
 
 `TabSchematics` is one partial class split by area across the files below. **Find the right file here
 before grepping** — the same header map is repeated in
@@ -604,6 +660,11 @@ Supporting classes in the same folder are ordinary (non-partial) types: `KiCadOv
   binds these through an `xmlns:data="clr-namespace:Handlers.DataHandling"` mapping** — if you move
   or rename them, update `TabOverview.axaml` too.
 - `ContactLinkFormatter` — classifies a contributor's contact string and builds its href.
+- `TextLinkFinder` — which runs inside a user-typed free-text field are web links, so the UI can
+  render them as clickable. Deliberately conservative: only `http://`, `https://` and `www.` at a
+  word boundary count. A bare `example.com` does NOT, because that is the shape repair prose
+  collides with — `74LS08.pin3`, `5.0V`, `notes.txt` — and a false link is worse than none. Pure
+  string work, unit tested; the Avalonia half is `Handlers/Theme/TextLinkRenderer.cs`.
 
 ### Content (`Assets/Data/`)
 

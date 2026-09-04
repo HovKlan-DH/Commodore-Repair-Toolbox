@@ -112,8 +112,12 @@ namespace Handlers.DataHandling
         };
 
         // ###########################################################################################
-        // The name an attachment is stored under: its list's prefix, the owning record's id, an
-        // underscore, then the original file name - "photo3_IMG_1234.jpg" for photo #3.
+        // The name an attachment is stored under: its list's prefix, an underscore, the owning
+        // record's id, another underscore, then the original file name - "photo_3_IMG_1234.jpg"
+        // for photo #3. (Attachments stored by earlier builds used "photo3_..." with no separating
+        // underscore before the id; GetDisplayFileName still reads those back correctly, but no
+        // attachment is ever written in that older form again - existing files on disk are not
+        // renamed.)
         //
         // Attachments share one folder per entry, so two photos picked from different folders that
         // are both "IMG_1234.jpg" would otherwise collide and the second would overwrite the first
@@ -148,24 +152,23 @@ namespace Handlers.DataHandling
 
             candidate = SanitizeFileName(candidate);
 
-            return $"{ownerPrefix}{recordId.ToString(CultureInfo.InvariantCulture)}_{candidate}";
+            return $"{ownerPrefix}_{recordId.ToString(CultureInfo.InvariantCulture)}_{candidate}";
         }
 
         // ###########################################################################################
-        // The stored name with its owner prefix and id stripped back off - "photo3_board.png" reads
-        // as "board.png", "file2_manual.pdf" as "manual.pdf". The prefix exists to keep names unique
+        // The stored name with its owner prefix and id stripped back off - "photo_3_board.png" reads
+        // as "board.png", "file_2_manual.pdf" as "manual.pdf". The prefix exists to keep names unique
         // on disk and is noise to the user, so lists show this instead.
         //
         // Only the prefix built for THIS record is removed, which is why the record's id is a
         // parameter. A file the user named "2_schematic.png" that became photo #1 is stored as
-        // "photo1_2_schematic.png" and correctly reads back as "2_schematic.png" - one segment
+        // "photo_1_2_schematic.png" and correctly reads back as "2_schematic.png" - one segment
         // dropped, not two.
         //
         // A name that does not carry this record's exact prefix is returned unchanged. That covers
-        // attachments recorded before the scheme existed, photos stored by the brief build whose
-        // prefix was empty ("3_board.png"), and the genuinely ambiguous case: "file2_backup.pdf" is
-        // both a plausible user-chosen name and exactly what file #2 would be stored as, so only
-        // the record actually numbered 2 has it stripped.
+        // attachments recorded before the scheme existed, and the genuinely ambiguous case:
+        // "file_2_backup.pdf" is both a plausible user-chosen name and exactly what file #2 would be
+        // stored as, so only the record actually numbered 2 has it stripped.
         // ###########################################################################################
         public static string GetDisplayFileName(string? storedFileName, string ownerPrefix, int recordId)
         {
@@ -178,15 +181,25 @@ namespace Handlers.DataHandling
             // Strips only the exact prefix THIS record's name would have been built with, rather
             // than any prefix-plus-digits that happens to look right.
             //
-            // Guessing from the string alone cannot work: "file2_backup.pdf" is both a name a user
+            // Guessing from the string alone cannot work: "file_2_backup.pdf" is both a name a user
             // may legitimately have chosen and exactly what file #2 is stored as, and nothing in the
             // text distinguishes them. Matching the owning record's own id does: file #7 strips
-            // "file7_" and leaves "file2_backup.pdf" untouched, so the only name ever removed is one
-            // this class demonstrably created for that record.
+            // "file_7_" and leaves "file_2_backup.pdf" untouched, so the only name ever removed is
+            // one this class demonstrably created for that record.
             string id = recordId.ToString(CultureInfo.InvariantCulture);
-            string expected = $"{ownerPrefix}{id}_";
+            string expected = $"{ownerPrefix}_{id}_";
 
             if (TryStrip(trimmed, expected, out string displayName))
+            {
+                return displayName;
+            }
+
+            // The OLDER stored form, from before an underscore was added between the prefix and the
+            // id ("photo3_board.png" rather than "photo_3_board.png") - see BuildStoredFileName's own
+            // comment. Existing attachments are not renamed, so this class must keep reading that
+            // form back correctly or every attachment stored before the change would show its raw
+            // storage name forever the moment it upgrades.
+            if (TryStrip(trimmed, $"{ownerPrefix}{id}_", out displayName))
             {
                 return displayName;
             }
@@ -242,18 +255,52 @@ namespace Handlers.DataHandling
                 return candidate;
             }
 
-            // Compared on the "<prefix><id>_" stem rather than a whole filename, since the rest of
+            // Compared on the "<prefix>_<id>_" stem rather than a whole filename, since the rest of
             // the name comes from whatever file the user is attaching and is not known here.
+            //
+            // EVERY stem GetDisplayFileName reads back has to be tested, not only the current one.
+            // A file stored by an older build as "photo3_board.png" is just as much attachment #3's
+            // as "photo_3_board.png" is, so handing id 3 out again because only the new stem was
+            // checked reintroduces exactly the orphan-overwrite this scan exists to prevent - and
+            // leaves the orphan and the live row rendering the same display name, since
+            // GetDisplayFileName strips both forms.
             var taken = new HashSet<string>(existingFileNames, StringComparer.OrdinalIgnoreCase);
 
-            while (taken.Any(name => name.StartsWith(
-                       $"{ownerPrefix}{candidate.ToString(CultureInfo.InvariantCulture)}_",
-                       StringComparison.OrdinalIgnoreCase)))
+            while (taken.Any(name => IsStoredUnderId(name, ownerPrefix, candidate)))
             {
                 candidate++;
             }
 
             return candidate;
+        }
+
+        // ###########################################################################################
+        // Whether a stored file name belongs to the given record id - in ANY of the forms this class
+        // has written over time, matching GetDisplayFileName's read-back exactly:
+        //
+        //  - "photo_3_board.png"  the current form
+        //  - "photo3_board.png"   before the separating underscore was added
+        //  - "3_board.png"        the build where PhotoFilePrefix was empty
+        //
+        // Kept beside AllocateAttachmentId because the two must agree: a form that reads back as
+        // this record's must also block the id, or the same bytes are both displayed as one record's
+        // and overwritten as another's.
+        //
+        // The bare form was only ever written for photos, so testing it for a FILE allocation can
+        // only ever skip an id it did not have to - which costs nothing, and is the safe direction:
+        // the alternative is handing out an id whose bytes are already on disk.
+        // ###########################################################################################
+        private static bool IsStoredUnderId(string name, string ownerPrefix, int recordId)
+        {
+            string id = recordId.ToString(CultureInfo.InvariantCulture);
+
+            if (name.StartsWith($"{ownerPrefix}_{id}_", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith($"{ownerPrefix}{id}_", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return ownerPrefix.Length > 0 && name.StartsWith($"{id}_", StringComparison.OrdinalIgnoreCase);
         }
 
         // ###########################################################################################
@@ -307,7 +354,7 @@ namespace Handlers.DataHandling
         // Prefixes keeping the two attachment lists' ids from colliding in the folder they share.
         //
         // Both lists carry one, so a folder holding attachments of both kinds says which is which:
-        // "photo3_board.png" beside "file2_manual.pdf". The prefix is what makes the name unique -
+        // "photo_3_board.png" beside "file_2_manual.pdf". The prefix is what makes the name unique -
         // the two lists number their ids independently, so photo #3 and file #3 both exist and
         // would otherwise both want "3_board.png", one overwriting the other.
         //
@@ -451,6 +498,46 @@ namespace Handlers.DataHandling
                 Logger.Warning($"Failed to delete worklog attachment [{fileName}]: {ex.Message}");
                 return false;
             }
+        }
+
+        // ###########################################################################################
+        // Deletes one attachment's bytes via DeleteAttachmentFile, then removes the entry's shared
+        // "entry-{id}-files" folder too if that was the last thing in it - so removing an entry's
+        // only photo or file leaves no empty folder behind on disk.
+        //
+        // Photos and Files share ONE folder per entry (see WorklogManager.GetEntryAttachmentsFolder),
+        // so "empty" means empty of BOTH kinds, not just the one just deleted - checking Directory
+        // .EnumerateFileSystemEntries after the delete answers that directly, without either caller
+        // having to know about the other's rows.
+        //
+        // Only for the "this attachment is gone for good" callers (a user's Delete, or an add whose
+        // save failed and is being undone) - NOT for TryReplaceAttachmentFile's swap, which always
+        // leaves a fresh file behind and has no reason to call this.
+        // ###########################################################################################
+        public static bool DeleteAttachmentFileAndFolderIfEmpty(string? attachmentsFolder, string? fileName)
+        {
+            bool deleted = DeleteAttachmentFile(attachmentsFolder, fileName);
+
+            if (string.IsNullOrWhiteSpace(attachmentsFolder))
+            {
+                return deleted;
+            }
+
+            try
+            {
+                if (Directory.Exists(attachmentsFolder) && !Directory.EnumerateFileSystemEntries(attachmentsFolder).Any())
+                {
+                    Directory.Delete(attachmentsFolder);
+                }
+            }
+            catch (Exception ex)
+            {
+                // The attachment itself is already gone either way - an empty folder left behind on
+                // a failure here is untidy, not incorrect, so this does not change the return value.
+                Logger.Warning($"Failed to remove empty worklog attachments folder [{attachmentsFolder}]: {ex.Message}");
+            }
+
+            return deleted;
         }
 
         // ###########################################################################################

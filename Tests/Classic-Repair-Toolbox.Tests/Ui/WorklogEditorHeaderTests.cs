@@ -375,4 +375,50 @@ public class WorklogEditorHeaderTests
             }
         });
     }
+
+    // ------------------------------------------------------------- Save button label
+
+    // A SAVED entry's button says "Update worklog" - the counterpart to "Add worklog" on a new
+    // entry (see WorklogEditorNewEntryTests), and set explicitly in Initialize rather than left as
+    // the markup's default so the two paths cannot drift from each other.
+    [Fact]
+    public void A_saved_entrys_save_button_says_update_worklog()
+    {
+        WithEditor(window => Assert.Equal("Update worklog", SaveButton(window).Content));
+    }
+
+    // ------------------------------------------------------------- blank title message
+
+    // A SAVED entry's blank-title message explains a real inconsistency risk: the sub-lists write
+    // through to disk instantly (PersistEntrySilently), so without an explanation the window and
+    // the file could silently disagree about the title. This is the case
+    // WorklogEditorNewEntryTests' matching test shows does NOT apply to a brand-new entry.
+    [Fact]
+    public void Clearing_a_saved_entrys_title_shows_why_save_is_disabled()
+    {
+        WithEditor(window =>
+        {
+            SetTitle(window, "");
+
+            var message = window.FindControl<TextBlock>("EditorSaveFailedText")!;
+            Assert.True(message.IsVisible);
+            Assert.Equal("A worklog needs a title before it can be saved.", message.Text);
+        });
+    }
+
+    // Retyping a title clears OUR message specifically - not any real save failure that happened
+    // to be showing, which the message's own visibility toggle has to leave alone.
+    [Fact]
+    public void Retyping_a_title_clears_the_blank_title_message()
+    {
+        WithEditor(window =>
+        {
+            SetTitle(window, "");
+            Assert.True(window.FindControl<TextBlock>("EditorSaveFailedText")!.IsVisible);
+
+            SetTitle(window, "Restored");
+
+            Assert.False(window.FindControl<TextBlock>("EditorSaveFailedText")!.IsVisible);
+        });
+    }
 }

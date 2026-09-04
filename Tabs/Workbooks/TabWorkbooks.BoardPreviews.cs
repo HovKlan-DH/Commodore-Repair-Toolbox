@@ -137,8 +137,31 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Releases every decoded schematic bitmap. Called from DetachedFromVisualTree - the point at
-        // which no preview, and no editor opened from one, can still be showing any of them.
+        // Drops every control that holds one of the cached bitmaps, so DisposeSchematicBitmaps can
+        // run without leaving anything on screen pointing at a freed Skia surface.
+        //
+        // MUST be called before DisposeSchematicBitmaps, and is the whole reason that pairing
+        // exists: an Image keeps its Source across a detach, so disposing first and clearing second
+        // (or not clearing at all) leaves a window in which the renderer can touch a disposed
+        // bitmap - an ObjectDisposedException on the render thread, which is fatal. See
+        // OnDetachedFromVisualTree's own comment for the tab-switch case that hit this.
+        //
+        // Only the board pane holds them. The entry list beside it draws text and pills, and the
+        // workbook list is text-only, so neither can strand a bitmap reference.
+        // ###########################################################################################
+        private void ClearBoardPreviewsBeforeDisposingBitmaps()
+        {
+            this.BoardPreviewPanel?.Children.Clear();
+
+            // The selected schematic is a name, not a control, but it names a preview that no longer
+            // exists - clearing it keeps the "keep the selection if it is still shown, else fall
+            // back" rule in RefreshBoardPreviews reading against reality on the way back in.
+            this.thisSelectedSchematicName = null;
+        }
+
+        // ###########################################################################################
+        // Releases every decoded schematic bitmap. Called from DetachedFromVisualTree, immediately
+        // after ClearBoardPreviewsBeforeDisposingBitmaps has removed everything that references them.
         //
         // Not on a board change or a workbook switch: an editor opened from a pill outlives the
         // refresh that a save triggers, and it renders the bitmap this tab handed it. See the cache's
@@ -270,11 +293,28 @@ namespace CRT
 
             this.NoBoardPreviewsText.IsVisible = entriesBySchematic.Count == 0;
 
-            // As on the two lists: "none matched" is not the same as "none recorded", and saying
-            // "yet" for a search result reads as the entries having gone missing.
-            this.NoBoardPreviewsText.Text = matchedEntryIds != null && allWorkbookEntries.Count > 0
-                ? "No worklog entries in this workbook match your search."
-                : "No worklog entries recorded against a schematic image for this workbook yet.";
+            // Three different reasons this pane can be empty, and they must not be described with
+            // one another's wording.
+            //
+            // The first is specific to "Show all workbooks" scope: the list can be showing cards for
+            // OTHER boards while this pane can only ever render the CURRENTLY LOADED board's
+            // schematics, so a search matching only another board's workbooks leaves a populated
+            // list and a non-zero count above a pane with nothing in it and no top-line at all.
+            // Without this the user is looking at three result cards and a blank rectangle, with
+            // nothing saying the results are simply not on this board.
+            if (this.thisSelectedWorkbookId <= 0 && this.thisHasWorkbooksOnOtherBoardsOnly)
+            {
+                this.NoBoardPreviewsText.Text =
+                    "The matching workbooks are on other boards. Click one to switch to its board.";
+            }
+            else
+            {
+                // As on the two lists: "none matched" is not the same as "none recorded", and saying
+                // "yet" for a search result reads as the entries having gone missing.
+                this.NoBoardPreviewsText.Text = matchedEntryIds != null && allWorkbookEntries.Count > 0
+                    ? "No worklog entries in this workbook match your search."
+                    : "No worklog entries recorded against a schematic image for this workbook yet.";
+            }
 
             // The entries this pass already read are handed on rather than re-read: GetEntries has
             // no cache (File.ReadAllText + Deserialize + a per-entry normalise/migrate loop, every
@@ -459,7 +499,10 @@ namespace CRT
                 {
                     if (!hasDescription)
                         block.Foreground = ResolveThemeBrushStatic("Workbooks_Faint_Fg");
-                });
+                },
+                // The description is prose the user typed, so a URL in it is clickable here. The
+                // title above deliberately is not - see ApplyHighlightedText's linkify note.
+                linkify: hasDescription);
 
             var categoryChip = BuildOutlinedCategoryChip(entry.Category, categoryColor);
             var statusPill = BuildOutlinedStatePill(entry.State);

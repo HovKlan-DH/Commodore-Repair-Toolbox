@@ -54,6 +54,8 @@ namespace Handlers.DataHandling
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? EnableWorklog { get; set; }
 
+        [JsonPropertyName("workbooksScope")] public string WorkbooksScope { get; set; } = "CurrentBoard";
+
         [JsonPropertyName("worklogCommentsSortNewestFirst")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? WorklogCommentsSortNewestFirst { get; set; }
@@ -107,6 +109,18 @@ namespace Handlers.DataHandling
         [JsonPropertyName("worklogEntryWindowHeight")] public double WorklogEntryWindowHeight { get; set; } = 800.0;
         [JsonPropertyName("worklogEntryWindowX")] public int WorklogEntryWindowX { get; set; } = 0;
         [JsonPropertyName("worklogEntryWindowY")] public int WorklogEntryWindowY { get; set; } = 0;
+
+        // The top-left of the SCREEN the window was last on, independent of WorklogEntryWindowX/Y
+        // (the Normal-state restore position). Needed only for the Maximized case: restoring a
+        // maximized window by setting WindowState alone maximizes it on whatever monitor the OS
+        // last remembers, which is wrong once the window was dragged to - and maximized on -
+        // another monitor without ever being un-maximized there (WorklogEntryWindowX/Y then never
+        // updates, since position is only tracked in Normal state). Restoring instead moves the
+        // window onto this screen first, then maximizes - the same two-step Main.axaml.cs's own
+        // window placement uses for the same reason.
+        [JsonPropertyName("worklogEntryWindowScreenX")] public int WorklogEntryWindowScreenX { get; set; } = 0;
+        [JsonPropertyName("worklogEntryWindowScreenY")] public int WorklogEntryWindowScreenY { get; set; } = 0;
+
         [JsonPropertyName("worklogEntryWindowLeftColumnRatio")] public double WorklogEntryWindowLeftColumnRatio { get; set; } = 0.6;
         [JsonPropertyName("componentInfoScrollAction")] public string ComponentInfoScrollAction { get; set; } = "Image change";
         [JsonPropertyName("schematicsLabelBoard")] public bool SchematicsLabelBoard { get; set; } = false;
@@ -593,6 +607,35 @@ namespace Handlers.DataHandling
             }
         }
 
+        public static event Action? WorkbooksScopeChanged;
+
+        // ###########################################################################################
+        // Which workbooks the Workbooks tab's left-hand list shows: every workbook on every board
+        // ("AllBoards"), or only the ones for the currently selected board ("CurrentBoard", the
+        // original and default behaviour). Set from the Configuration tab's radio group below
+        // "Enable Worklog".
+        // ###########################################################################################
+        public static string WorkbooksScope
+        {
+            get => string.Equals(_data.WorkbooksScope, "AllBoards", StringComparison.OrdinalIgnoreCase)
+                ? "AllBoards"
+                : "CurrentBoard";
+            set
+            {
+                string normalized = string.Equals(value, "AllBoards", StringComparison.OrdinalIgnoreCase)
+                    ? "AllBoards"
+                    : "CurrentBoard";
+
+                if (string.Equals(_data.WorkbooksScope, normalized, StringComparison.Ordinal))
+                    return;
+
+                _data.WorkbooksScope = normalized;
+                Logger.Info($"Setting changed: [WorkbooksScope] [{normalized}]");
+                Save();
+                WorkbooksScopeChanged?.Invoke();
+            }
+        }
+
         // ###########################################################################################
         // Sort order for the worklog entry editor's Comments list. Defaults to newest-first, matching
         // the editor's in-memory default before this was persisted.
@@ -846,6 +889,8 @@ namespace Handlers.DataHandling
         public static double WorklogEntryWindowHeight => _data.WorklogEntryWindowHeight;
         public static int WorklogEntryWindowX => _data.WorklogEntryWindowX;
         public static int WorklogEntryWindowY => _data.WorklogEntryWindowY;
+        public static int WorklogEntryWindowScreenX => _data.WorklogEntryWindowScreenX;
+        public static int WorklogEntryWindowScreenY => _data.WorklogEntryWindowScreenY;
         public static double WorklogEntryWindowLeftColumnRatio => _data.WorklogEntryWindowLeftColumnRatio;
 
         // ###########################################################################################
@@ -854,8 +899,13 @@ namespace Handlers.DataHandling
         // Width/height/x/y are always the NORMAL (non-maximized) values - see the caller. Storing a
         // maximized window's bounds here would mean un-maximizing it later restored it to full
         // screen size, with no memory of the size the user actually chose.
+        //
+        // screenX/screenY are the top-left of whichever screen the window is CURRENTLY on, tracked
+        // independently of x/y - see WorklogEntryWindowScreenX's own comment for why a maximized
+        // window needs this separately from its Normal-state restore position.
         // ###########################################################################################
-        public static void SaveWorklogEntryWindowLayout(string state, double width, double height, int x, int y, double leftColumnRatio)
+        public static void SaveWorklogEntryWindowLayout(
+            string state, double width, double height, int x, int y, int screenX, int screenY, double leftColumnRatio)
         {
             _data.HasWorklogEntryWindowLayout = true;
             _data.WorklogEntryWindowState = state;
@@ -863,8 +913,10 @@ namespace Handlers.DataHandling
             _data.WorklogEntryWindowHeight = height;
             _data.WorklogEntryWindowX = x;
             _data.WorklogEntryWindowY = y;
+            _data.WorklogEntryWindowScreenX = screenX;
+            _data.WorklogEntryWindowScreenY = screenY;
             _data.WorklogEntryWindowLeftColumnRatio = leftColumnRatio;
-            Logger.Info($"Setting changed: [WorklogEntryWindowLayout] [{state}] [{width:F0}x{height:F0}] [Position: {x},{y}] [LeftRatio: {leftColumnRatio:F3}]");
+            Logger.Info($"Setting changed: [WorklogEntryWindowLayout] [{state}] [{width:F0}x{height:F0}] [Position: {x},{y}] [Screen: {screenX},{screenY}] [LeftRatio: {leftColumnRatio:F3}]");
             Save();
         }
 
@@ -1073,6 +1125,7 @@ namespace Handlers.DataHandling
                     Logger.Info($"        [EnableNetworkConnectedOscilloscopeTab] [{EnableNetworkConnectedOscilloscopeTab}]");
                     Logger.Info($"        [EnableMiniproExperimentalMode] [{EnableMiniproExperimentalMode}]");
                     Logger.Info($"        [EnableWorklog] [{EnableWorklog}]");
+                    Logger.Info($"        [WorkbooksScope] [{WorkbooksScope}]");
                     Logger.Info($"        [WorklogCommentsSortNewestFirst] [{WorklogCommentsSortNewestFirst}]");
                     Logger.Info($"        [WorklogWorkDoneSortNewestFirst] [{WorklogWorkDoneSortNewestFirst}]");
                     Logger.Info($"        [WorklogShowEntriesChecked] [{WorklogShowEntriesChecked}]");

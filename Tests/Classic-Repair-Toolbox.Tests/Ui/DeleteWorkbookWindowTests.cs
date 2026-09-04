@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using CRT;
 using Handlers.DataHandling;
@@ -115,22 +116,43 @@ public sealed class DeleteWorkbookWindowTests
         });
     }
 
-    // The confirmation names the workbook, since several cards can be on screen at once and "are you
-    // sure?" alone does not say which one is about to be lost.
+    // The confirmation names the workbook on its OWN bold line, since several cards can be on
+    // screen at once and "are you sure?" alone does not say which one is about to be lost.
     [Fact]
-    public void The_confirmation_names_the_workbook_being_deleted()
+    public void The_confirmation_names_the_workbook_being_deleted_on_its_own_bold_line()
     {
         UiTest.Run(() =>
         {
             var window = BuildWindow();
 
-            string message = window.GetVisualDescendants()
-                .OfType<TextBlock>()
-                .Select(t => t.Text ?? string.Empty)
-                .First(t => t.Contains("permanently", StringComparison.OrdinalIgnoreCase));
+            var nameBlock = window.GetControl<TextBlock>("WorkbookNameText");
 
-            Assert.Contains("#3", message);
-            Assert.Contains("Black screen", message);
+            Assert.Equal("#3 · Black screen", nameBlock.Text);
+            Assert.Equal(FontWeight.Bold, nameBlock.FontWeight);
+        });
+    }
+
+    // The surrounding copy: an intro sentence naming what is about to happen, then the body
+    // explaining what is lost, then a final warning that it cannot be undone - each its own
+    // TextBlock so the name can sit alone between them rather than buried in one run-on sentence.
+    [Fact]
+    public void The_surrounding_text_explains_and_warns_before_and_after_the_name()
+    {
+        UiTest.Run(() =>
+        {
+            var window = BuildWindow();
+
+            var textBlocks = window.GetVisualDescendants().OfType<TextBlock>().ToList();
+
+            Assert.Contains(textBlocks, t => t.Text == "This permanently deletes the workbook:");
+
+            var body = Assert.Single(textBlocks, t =>
+                t.Text != null && t.Text.Contains("work done, comments, photos and files", StringComparison.Ordinal));
+            Assert.Equal(
+                "Everything recorded to the workbook will be deleted; e.g. work done, comments, photos and files.",
+                body.Text);
+
+            Assert.Contains(textBlocks, t => t.Text == "This cannot be undone!");
         });
     }
 }

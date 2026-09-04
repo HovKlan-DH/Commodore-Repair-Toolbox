@@ -874,4 +874,237 @@ public sealed class WorkbooksListTests : IDisposable
             Assert.Empty(ListPanel(tab).Children);
         });
     }
+
+    // ---------------------------------------------------------------------------------------
+    // UserSettings.WorkbooksScope ("Show all workbooks" vs "Show only workbooks for selected
+    // board" on the Configuration tab, below "Enable Worklog"). RefreshWorkbooks reads this
+    // setting itself when no caller-supplied list overrides it (see its own header comment) -
+    // these tests call the no-arg overload, the same one OnAttachedToVisualTree and the search
+    // debounce timer use, rather than Main.RefreshWorklogBar's board-scoped/all-boards split,
+    // which is exercised by construction rather than by a headless test (see that method's own
+    // comment on why - it lives on Main, which no test constructs).
+    //
+    // Every test here restores WorkbooksScope in a finally block: it is a plain process-wide
+    // static with no per-board key, so a test that left it changed would leak into whatever ran
+    // after it in this "HeadlessUi" collection - the same reasoning the splitter-width tests
+    // above already follow for their own scalars.
+    // ---------------------------------------------------------------------------------------
+
+    [Fact]
+    public void CurrentBoard_scope_lists_only_this_boards_workbooks()
+    {
+        this.LoadWorklog();
+        string otherBoardKey = "Commodore 64|250407 (other board, current-board scope test)";
+
+        WorklogManager.CreateWorkbook(this.thisBoardKey, "This board's job", "");
+        WorklogManager.CreateWorkbook(otherBoardKey, "Other board's job", "");
+
+        string saved = UserSettings.WorkbooksScope;
+        try
+        {
+            UserSettings.WorkbooksScope = "CurrentBoard";
+
+            UiTest.Run(() =>
+            {
+                var tab = BuildTab(this.thisBoardKey);
+
+                Assert.Equal("1 workbook", CountText(tab));
+                Assert.Contains("This board's job", CardTexts(tab, 0));
+            });
+        }
+        finally
+        {
+            UserSettings.WorkbooksScope = saved;
+        }
+    }
+
+    [Fact]
+    public void AllBoards_scope_lists_workbooks_from_every_board()
+    {
+        this.LoadWorklog();
+        string otherBoardKey = "Commodore 64|250407 (other board, all-boards scope test)";
+
+        WorklogManager.CreateWorkbook(this.thisBoardKey, "This board's job", "");
+        WorklogManager.CreateWorkbook(otherBoardKey, "Other board's job", "");
+
+        string saved = UserSettings.WorkbooksScope;
+        try
+        {
+            UserSettings.WorkbooksScope = "AllBoards";
+
+            UiTest.Run(() =>
+            {
+                var tab = BuildTab(this.thisBoardKey);
+
+                Assert.Equal("2 workbooks", CountText(tab));
+                var allTexts = ListPanel(tab).Children.OfType<Control>().SelectMany(CardTexts).ToList();
+                Assert.Contains("This board's job", allTexts);
+                Assert.Contains("Other board's job", allTexts);
+            });
+        }
+        finally
+        {
+            UserSettings.WorkbooksScope = saved;
+        }
+    }
+
+    // A card for a board other than the one currently loaded names that board, so the list is
+    // not just a pile of identical-looking cards - see BuildWorkbookCard's board-label row.
+    [Fact]
+    public void AllBoards_scope_labels_a_cross_board_card_with_its_own_board()
+    {
+        this.LoadWorklog();
+        string otherBoardKey = "Commodore 64|250407 (other board, label test)";
+
+        WorklogManager.CreateWorkbook(otherBoardKey, "Other board's job", "");
+
+        string saved = UserSettings.WorkbooksScope;
+        try
+        {
+            UserSettings.WorkbooksScope = "AllBoards";
+
+            UiTest.Run(() =>
+            {
+                var tab = BuildTab(this.thisBoardKey);
+
+                var texts = CardTexts(tab, 0);
+                // No Main and so no synced hardware/board data for either key, so
+                // FormatBoardKeyForDisplay's fallback (the raw key) is what actually renders -
+                // this only proves the label is present and matches the CARD's own board, not
+                // the tab's, not that the short-name lookup itself succeeded (that needs a real
+                // Main and is out of scope for this file).
+                Assert.Contains(otherBoardKey, texts);
+            });
+        }
+        finally
+        {
+            UserSettings.WorkbooksScope = saved;
+        }
+    }
+
+    // The board pane and entry list can only ever render the CURRENTLY LOADED board's schematics
+    // (CurrentBoardDataForPreviews), so even in AllBoards scope the top-line/board-pane fallback
+    // (no explicit activation saved) must stay pinned to THIS board's own workbook rather than
+    // falling back to whatever is globally newest across every board - see RefreshWorkbooks'
+    // shownWorkbook comment. Otherwise opening the tab with a different board's newer workbook on
+    // disk would silently show that board's title with this board's (empty or mismatched) pane.
+    [Fact]
+    public void AllBoards_scope_still_shows_this_boards_own_workbook_with_no_explicit_activation()
+    {
+        this.LoadWorklog();
+        string otherBoardKey = "Commodore 64|250407 (other board, pin test)";
+
+        var thisBoardsWorkbook = WorklogManager.CreateWorkbook(this.thisBoardKey, "This board's job", "");
+        // Created AFTER, so it has the higher id and would win a bare "globally newest" fallback.
+        WorklogManager.CreateWorkbook(otherBoardKey, "Newer, but someone else's board", "");
+        Assert.NotNull(thisBoardsWorkbook);
+
+        string saved = UserSettings.WorkbooksScope;
+        try
+        {
+            UserSettings.WorkbooksScope = "AllBoards";
+
+            UiTest.Run(() =>
+            {
+                var tab = BuildTab(this.thisBoardKey);
+
+                Assert.Equal($"#{thisBoardsWorkbook!.Id} · This board's job", HeaderTitleText(tab));
+            });
+        }
+        finally
+        {
+            UserSettings.WorkbooksScope = saved;
+        }
+    }
+
+    // AllBoards scope is the one state where the LIST can be full while the right-hand side has
+    // nothing it can show: the board pane only ever renders the currently loaded board's schematics,
+    // so a search matching only OTHER boards' workbooks leaves cards and a non-zero count above a
+    // pane with nothing in it and no top-line at all. Saying nothing there reads as the workbooks
+    // having lost their contents, so the pane explains itself instead.
+    [Fact]
+    public void AllBoards_scope_says_why_the_board_pane_is_empty_when_only_other_boards_matched()
+    {
+        this.LoadWorklog();
+        string otherBoardKey = "Amstrad CPC|Z70290";
+
+        WorklogManager.CreateWorkbook(this.thisBoardKey, "This board's job", "");
+        WorklogManager.CreateWorkbook(otherBoardKey, "Amstrad PSU rebuild", "");
+
+        string saved = UserSettings.WorkbooksScope;
+        try
+        {
+            UserSettings.WorkbooksScope = "AllBoards";
+
+            UiTest.Run(() =>
+            {
+                var tab = BuildTab(this.thisBoardKey);
+
+                // A query only the OTHER board's workbook matches.
+                tab.GetControl<TextBox>("FindRepairTextBox").Text = "Amstrad PSU";
+                tab.RefreshWorkbooks();
+
+                // The list is genuinely showing a result - this is not the "nothing matched" case.
+                Assert.Single(ListPanel(tab).Children);
+                Assert.Equal("1 workbook", CountText(tab));
+                Assert.False(tab.GetControl<TextBlock>("NoWorkbooksText").IsVisible);
+
+                // But the pane cannot render it, and says so - rather than going silently blank.
+                var noPreviews = tab.GetControl<TextBlock>("NoBoardPreviewsText");
+                Assert.True(noPreviews.IsVisible);
+                Assert.Contains("other boards", noPreviews.Text ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+            });
+        }
+        finally
+        {
+            UserSettings.WorkbooksScope = saved;
+        }
+    }
+
+    // Selecting a card for a DIFFERENT board (AllBoards scope) must activate it under ITS OWN
+    // board key, not the tab's currently loaded one - otherwise the activation would be persisted
+    // to UserSettings.ActiveWorkbookIdByBoard under the wrong board entirely. SelectWorkbookForTests'
+    // boardKeyOverride stands in for BuildWorkbookCard's PointerPressed handler, which now passes
+    // the CLICKED card's own workbook.BoardKey rather than always the tab's current one - see
+    // SelectWorkbook's header comment. The running app's ActivateWorkbookAcrossBoards (Main)
+    // additionally switches the loaded hardware/board first; that half needs a real Main and is
+    // exercised by hand, not here - this only pins the id/key this tab hands to whatever
+    // thisActivateWorkbook is wired to.
+    [Fact]
+    public void Selecting_a_cross_board_card_activates_it_under_its_own_board_key()
+    {
+        this.LoadWorklog();
+        string otherBoardKey = "Commodore 64|250407 (other board, cross-activate test)";
+
+        var otherBoardsWorkbook = WorklogManager.CreateWorkbook(otherBoardKey, "Other board's job", "");
+        Assert.NotNull(otherBoardsWorkbook);
+
+        string saved = UserSettings.WorkbooksScope;
+        try
+        {
+            UserSettings.WorkbooksScope = "AllBoards";
+
+            (string BoardKey, int WorkbookId)? activated = null;
+
+            UiTest.Run(() =>
+            {
+                var tab = new TabWorkbooks { BoardKeyOverrideForTests = this.thisBoardKey };
+                tab.ActivateWorkbookOverrideForTests = (boardKey, workbookId) =>
+                {
+                    activated = (boardKey, workbookId);
+                    UserSettings.SetActiveWorkbookId(boardKey, workbookId);
+                    tab.RefreshWorkbooks();
+                };
+                tab.RefreshWorkbooks();
+
+                tab.SelectWorkbookForTests(otherBoardsWorkbook!.Id, otherBoardKey);
+            });
+
+            Assert.Equal((otherBoardKey, otherBoardsWorkbook!.Id), activated);
+        }
+        finally
+        {
+            UserSettings.WorkbooksScope = saved;
+        }
+    }
 }

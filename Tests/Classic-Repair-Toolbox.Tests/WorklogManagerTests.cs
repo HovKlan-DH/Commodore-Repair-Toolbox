@@ -1537,4 +1537,348 @@ public sealed class WorklogManagerTests : IDisposable
 
         Assert.Equal("Closed", WorklogManager.GetLatestWorkbookForBoard("Commodore 64|250469")!.Status);
     }
+
+    // ------------------------------------------------------------- AddEntryRecord
+
+    // AddEntryRecord is what the "Add worklog" flow writes with. Unlike AddEntry, which takes the
+    // direct fields and builds a bare record, this takes an ALREADY-BUILT one - because the full
+    // editor now opens directly on a new entry and holds the whole thing, sub-lists included, in
+    // memory until Save.
+    [Fact]
+    public void AddEntryRecord_saves_an_entry_with_its_sub_lists_already_populated()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        var draft = new WorklogEntryRecord
+        {
+            Id = 1,
+            SchematicName = "Sheet 1",
+            AreaX = 10,
+            AreaY = 20,
+            AreaWidth = 30,
+            AreaHeight = 40,
+            Title = "Dead VIC",
+            Description = "No video at all",
+            Category = "Issue",
+            State = "Open",
+        };
+        draft.Comments.Add(new WorklogCommentRecord { Id = 1, Text = "Checked the rail", Date = DateTime.Now });
+        draft.Links.Add(new WorklogLinkRecord { Id = 1, Headline = "Pinout", Url = "https://example.com" });
+
+        var saved = WorklogManager.AddEntryRecord(workbook.Id, draft, reservedId: 1);
+
+        Assert.NotNull(saved);
+        Assert.Equal(1, saved!.Id);
+
+        // Read back from disk, not from the returned object - the point is that the sub-lists
+        // survived the write, which the in-memory record would report either way.
+        var stored = Assert.Single(WorklogManager.GetEntries(workbook.Id));
+        Assert.Equal("Dead VIC", stored.Title);
+        Assert.Equal("No video at all", stored.Description);
+        Assert.Equal("Issue", stored.Category);
+        Assert.Equal("Sheet 1", stored.SchematicName);
+        Assert.Equal(10, stored.AreaX);
+        Assert.Equal(40, stored.AreaHeight);
+        Assert.Equal("Checked the rail", Assert.Single(stored.Comments).Text);
+        Assert.Equal("https://example.com", Assert.Single(stored.Links).Url);
+    }
+
+    // THE RACE THIS EXISTS TO CLOSE. The editor reserves an id up front (its attachment folder is
+    // named after one), but a peek is not a reservation - another entry can be written in between.
+    // AddEntryRecord must therefore re-allocate at write time; trusting the reserved id would
+    // produce two entries sharing a number, which entries.json cannot represent and UpdateEntry
+    // would resolve to whichever came first.
+    [Fact]
+    public void AddEntryRecord_reallocates_the_id_when_another_entry_claimed_the_reserved_one()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        // The editor peeks #1 and opens on a draft carrying it...
+        int reserved = WorklogManager.PeekNextEntryId(workbook.Id);
+        Assert.Equal(1, reserved);
+
+        // ...and while it is open, something else writes an entry, taking #1.
+        WorklogManager.AddEntry(
+            workbook.Id, "Sheet 1", new Rect(0, 0, 1, 1), "Written meanwhile", "", "Note", "Open", Array.Empty<string>());
+
+        var saved = WorklogManager.AddEntryRecord(
+            workbook.Id,
+            new WorklogEntryRecord { Id = reserved, SchematicName = "Sheet 1", Title = "The draft" },
+            reserved);
+
+        Assert.NotNull(saved);
+        Assert.Equal(2, saved!.Id);
+
+        var entries = WorklogManager.GetEntries(workbook.Id);
+        Assert.Equal(2, entries.Count);
+        Assert.Equal(new[] { 1, 2 }, entries.Select(e => e.Id).OrderBy(id => id));
+    }
+
+    // The draft's attachment BYTES are written the moment a photo is added, under the reserved id.
+    // When the id changes, that folder has to follow, or the entry's photos point at a folder no
+    // entry names - and worse, the next draft to reserve the same number would inherit them.
+    [Fact]
+    public void AddEntryRecord_moves_the_draft_attachment_folder_when_the_id_changes()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        int reserved = WorklogManager.PeekNextEntryId(workbook.Id);
+
+        // The editor writes a photo into the folder for the id it reserved.
+        string reservedFolder = WorklogManager.GetEntryAttachmentsFolder(workbook.Id, reserved)!;
+        File.WriteAllText(Path.Combine(reservedFolder, "1_photo.png"), "bytes");
+
+        // Something else takes that id first.
+        WorklogManager.AddEntry(
+            workbook.Id, "Sheet 1", new Rect(0, 0, 1, 1), "Written meanwhile", "", "Note", "Open", Array.Empty<string>());
+
+        var saved = WorklogManager.AddEntryRecord(
+            workbook.Id,
+            new WorklogEntryRecord { Id = reserved, SchematicName = "Sheet 1", Title = "The draft" },
+            reserved);
+
+        Assert.NotNull(saved);
+        Assert.NotEqual(reserved, saved!.Id);
+
+        string finalFolder = WorklogManager.GetEntryAttachmentsFolder(workbook.Id, saved.Id)!;
+        Assert.True(
+            File.Exists(Path.Combine(finalFolder, "1_photo.png")),
+            "the draft's photo did not follow the entry to its allocated id");
+
+        Assert.False(
+            Directory.Exists(reservedFolder),
+            "the draft's attachment folder was left behind under the reserved id");
+    }
+
+    // The common case, and the one where a move would be actively wrong: the reserved id was still
+    // free, so the folder is already in the right place and must be left exactly as it is.
+    [Fact]
+    public void AddEntryRecord_leaves_the_attachment_folder_alone_when_the_id_is_unchanged()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        int reserved = WorklogManager.PeekNextEntryId(workbook.Id);
+        string folder = WorklogManager.GetEntryAttachmentsFolder(workbook.Id, reserved)!;
+        File.WriteAllText(Path.Combine(folder, "1_photo.png"), "bytes");
+
+        var saved = WorklogManager.AddEntryRecord(
+            workbook.Id,
+            new WorklogEntryRecord { Id = reserved, SchematicName = "Sheet 1", Title = "The draft" },
+            reserved);
+
+        Assert.NotNull(saved);
+        Assert.Equal(reserved, saved!.Id);
+        Assert.True(File.Exists(Path.Combine(folder, "1_photo.png")));
+    }
+
+    // Blank category/state are filled in the same way AddEntry fills them, so a record built by a
+    // caller that did not set them cannot reach disk with an empty category the UI has no colour
+    // for. CreatedDate likewise.
+    [Fact]
+    public void AddEntryRecord_defaults_a_blank_category_state_and_date()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        var saved = WorklogManager.AddEntryRecord(
+            workbook.Id,
+            new WorklogEntryRecord { Id = 1, SchematicName = "Sheet 1", Title = "Bare", Category = "", State = "  " },
+            reservedId: 1);
+
+        Assert.NotNull(saved);
+        Assert.Equal("Note", saved!.Category);
+        Assert.Equal("Open", saved.State);
+        Assert.NotEqual(default, saved.CreatedDate);
+    }
+
+    // GetEntryAttachmentsFolder CREATES the folder, which is right for a caller about to write into
+    // it and self-defeating for one about to delete it - resolving to delete would re-create the
+    // very folder being removed. The ...Path form exists for those callers and must NOT create.
+    [Fact]
+    public void GetEntryAttachmentsFolderPath_does_not_create_the_folder()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        string path = WorklogManager.GetEntryAttachmentsFolderPath(workbook.Id, 7)!;
+
+        Assert.False(Directory.Exists(path), "resolving the path created the folder");
+
+        // Same path the creating form resolves - the two must not name different folders.
+        Assert.Equal(WorklogManager.GetEntryAttachmentsFolder(workbook.Id, 7), path);
+    }
+
+    // The editor's cancelled draft asks this before deleting the folder its RESERVED id names. A
+    // peek is not a reservation, so that number can belong to an entry saved meanwhile - whose
+    // photos and files live in exactly that folder. Answering wrongly destroys a saved entry's
+    // attachments while its entries.json rows survive, pointing at nothing.
+    [Fact]
+    public void EntryExists_reports_whether_a_saved_entry_uses_the_id()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        Assert.False(WorklogManager.EntryExists(workbook.Id, 1));
+
+        WorklogManager.AddEntry(
+            workbook.Id, "Sheet 1", new Rect(0, 0, 1, 1), "Real", "", "Note", "Open", Array.Empty<string>());
+
+        Assert.True(WorklogManager.EntryExists(workbook.Id, 1));
+        Assert.False(WorklogManager.EntryExists(workbook.Id, 2));
+
+        // A workbook that does not exist has no entries rather than throwing.
+        Assert.False(WorklogManager.EntryExists(9999, 1));
+    }
+
+    // A destination folder that ALREADY exists is a real case, not a corruption: a previous draft
+    // that reserved this same number and whose cleanup delete failed leaves one behind. Skipping
+    // the move there stranded the draft's bytes in a folder no entry names, while the entry itself
+    // was committed naming files that were not in its own folder - a photo row broken forever, with
+    // only a log line nobody reads. So the two folders are MERGED.
+    [Fact]
+    public void AddEntryRecord_merges_into_an_existing_destination_attachment_folder()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        int reserved = WorklogManager.PeekNextEntryId(workbook.Id);
+
+        // The draft's own photo, under the id it reserved.
+        string reservedFolder = WorklogManager.GetEntryAttachmentsFolder(workbook.Id, reserved)!;
+        File.WriteAllText(Path.Combine(reservedFolder, "photo_1_draft.png"), "draft bytes");
+
+        // Something else takes that id first, so the draft will be allocated the next one.
+        WorklogManager.AddEntry(
+            workbook.Id, "Sheet 1", new Rect(0, 0, 1, 1), "Written meanwhile", "", "Note", "Open", Array.Empty<string>());
+
+        // A stale folder is already sitting where the draft is about to be moved - an earlier
+        // cancelled draft whose delete failed.
+        string destinationFolder = WorklogManager.GetEntryAttachmentsFolder(workbook.Id, reserved + 1)!;
+        File.WriteAllText(Path.Combine(destinationFolder, "photo_9_orphan.png"), "orphan bytes");
+
+        var saved = WorklogManager.AddEntryRecord(
+            workbook.Id,
+            new WorklogEntryRecord { Id = reserved, SchematicName = "Sheet 1", Title = "The draft" },
+            reserved);
+
+        Assert.NotNull(saved);
+        Assert.Equal(reserved + 1, saved!.Id);
+
+        // The draft's own bytes made it across - the whole point.
+        Assert.True(
+            File.Exists(Path.Combine(destinationFolder, "photo_1_draft.png")),
+            "the draft's photo was stranded because the destination folder already existed");
+
+        // And the orphan already there was not destroyed on the way.
+        Assert.True(File.Exists(Path.Combine(destinationFolder, "photo_9_orphan.png")));
+
+        Assert.False(
+            Directory.Exists(reservedFolder),
+            "the emptied reserved folder was left behind");
+    }
+
+    // A name collision inside a merge leaves the file that is already there alone: it is the one
+    // some record may still name, and overwriting it would destroy bytes to save bytes.
+    [Fact]
+    public void AddEntryRecord_does_not_overwrite_a_colliding_name_when_merging_attachments()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        int reserved = WorklogManager.PeekNextEntryId(workbook.Id);
+
+        string reservedFolder = WorklogManager.GetEntryAttachmentsFolder(workbook.Id, reserved)!;
+        File.WriteAllText(Path.Combine(reservedFolder, "photo_1_shared.png"), "draft bytes");
+
+        WorklogManager.AddEntry(
+            workbook.Id, "Sheet 1", new Rect(0, 0, 1, 1), "Written meanwhile", "", "Note", "Open", Array.Empty<string>());
+
+        string destinationFolder = WorklogManager.GetEntryAttachmentsFolder(workbook.Id, reserved + 1)!;
+        File.WriteAllText(Path.Combine(destinationFolder, "photo_1_shared.png"), "existing bytes");
+
+        WorklogManager.AddEntryRecord(
+            workbook.Id,
+            new WorklogEntryRecord { Id = reserved, SchematicName = "Sheet 1", Title = "The draft" },
+            reserved);
+
+        Assert.Equal("existing bytes", File.ReadAllText(Path.Combine(destinationFolder, "photo_1_shared.png")));
+
+        // The one that could not be moved stays put rather than being silently dropped, and its
+        // folder survives with it.
+        Assert.True(File.Exists(Path.Combine(reservedFolder, "photo_1_shared.png")));
+    }
+
+    // AddEntry Trim()s Title and Description; AddEntryRecord must too, or an entry created through
+    // the "Add worklog" flow persists padding that the same entry edited later would have lost. The
+    // editor's Save gate is IsNullOrWhiteSpace, so "  CPU socket  " gets through it.
+    [Fact]
+    public void AddEntryRecord_trims_the_title_and_description()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        var saved = WorklogManager.AddEntryRecord(
+            workbook.Id,
+            new WorklogEntryRecord
+            {
+                Id = 1,
+                SchematicName = "Sheet 1",
+                Title = "  CPU socket cold joint  ",
+                Description = "\tReflowed pin 12\n"
+            },
+            reservedId: 1);
+
+        Assert.NotNull(saved);
+        Assert.Equal("CPU socket cold joint", saved!.Title);
+        Assert.Equal("Reflowed pin 12", saved.Description);
+
+        // And it is the TRIMMED form that reached disk, not just the returned copy.
+        var reloaded = WorklogManager.GetEntries(workbook.Id).Single();
+        Assert.Equal("CPU socket cold joint", reloaded.Title);
+        Assert.Equal("Reflowed pin 12", reloaded.Description);
+    }
+
+    // Writing an entry recomputes the workbook's Open/Closed status, exactly as AddEntry does -
+    // a Closed-only workbook must close, and the two write paths must not disagree about that.
+    [Fact]
+    public void AddEntryRecord_recomputes_the_workbooks_status()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        WorklogManager.AddEntryRecord(
+            workbook.Id,
+            new WorklogEntryRecord { Id = 1, SchematicName = "Sheet 1", Title = "Done", State = "Closed" },
+            reservedId: 1);
+
+        var reloaded = WorklogManager.GetLatestWorkbookForBoard("Commodore 64|250469")!;
+        Assert.Equal("Closed", reloaded.Status);
+        Assert.Equal(1, reloaded.EntryCount);
+    }
+
+    // No workbook folder means nothing was persisted, and the caller must be told so rather than
+    // being handed a record it would then treat as saved - the same contract AddEntry has.
+    [Fact]
+    public void AddEntryRecord_returns_null_when_the_workbook_does_not_exist()
+    {
+        this.LoadWorklog();
+
+        Assert.Null(WorklogManager.AddEntryRecord(
+            999,
+            new WorklogEntryRecord { Id = 1, SchematicName = "Sheet 1", Title = "Orphan" },
+            reservedId: 1));
+    }
+
+    [Fact]
+    public void AddEntryRecord_returns_null_for_a_null_entry()
+    {
+        this.LoadWorklog();
+        var workbook = CreateWorkbook("Commodore 64|250469", "C64 job", "");
+
+        Assert.Null(WorklogManager.AddEntryRecord(workbook.Id, null!, reservedId: 1));
+    }
 }

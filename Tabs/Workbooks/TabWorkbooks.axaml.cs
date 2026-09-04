@@ -138,6 +138,21 @@ namespace CRT
         // theme change must not silently drop the user's selection back to "nothing chosen".
         private int thisSelectedWorkbookId = -1;
 
+        // True when the list is showing workbook cards but none of them belongs to the currently
+        // loaded board, so nothing can be shown on the right-hand side. Only reachable in AllBoards
+        // scope; set by RefreshWorkbooks and read by RefreshBoardPreviews for its empty state.
+        private bool thisHasWorkbooksOnOtherBoardsOnly;
+
+        // ###########################################################################################
+        // Whether the left-hand list shows every board's workbooks or only the currently loaded
+        // board's - the Configuration tab's radio group below "Enable Worklog"
+        // (UserSettings.WorkbooksScope). Read fresh on every RefreshWorkbooks rather than cached, so
+        // flipping the setting takes effect on the very next refresh without this tab needing its own
+        // change notification.
+        // ###########################################################################################
+        private static bool IsAllBoardsScope =>
+            string.Equals(UserSettings.WorkbooksScope, "AllBoards", StringComparison.Ordinal);
+
         // The parsed "Find a previous repair" query. Parsed ONCE per keystroke here rather than per
         // record inside the filter loop - a board's worth of workbooks times their entries is a lot
         // of re-parsing of a string that has not changed.
@@ -204,16 +219,62 @@ namespace CRT
         }
 
         // ###########################################################################################
-        // Releases the full-resolution schematic bitmaps the board pane decoded, once this tab is off
-        // the visual tree - see thisSchematicBitmapsByPath in TabWorkbooks.BoardPreviews.cs for why
-        // they are held for the tab's whole life rather than freed on each rebuild. Without this the
-        // last set outlives the tab, exactly as WorklogEntryEditorWindow's own Closed handler
-        // documents for its thumbnails.
+        // Releases the full-resolution schematic bitmaps the board pane decoded - see
+        // thisSchematicBitmapsByPath in TabWorkbooks.BoardPreviews.cs for why they are held for a
+        // whole attachment rather than freed on each rebuild. Without this the last set outlives the
+        // tab, exactly as WorklogEntryEditorWindow's own Closed handler documents for its thumbnails.
+        //
+        // DETACH IS NOT "THE TAB IS GOING AWAY". A TabControl detaches the previous tab's content
+        // from the visual tree on every tab SWITCH, and this tab's Image controls keep their Source
+        // pointing at these bitmaps while detached. Disposing without clearing the pane therefore
+        // left every preview holding a dead Skia surface, and the next render pass over them threw
+        // ObjectDisposedException on the RENDER thread - fatal in Avalonia, and reported as a crash
+        // on switching away from Workbooks.
+        //
+        // So the pane is torn down FIRST and the bitmaps disposed second. Nothing then references a
+        // disposed bitmap, and OnAttachedToVisualTree rebuilds the pane when the tab comes back -
+        // the decode cost is the same one the first build already pays, and it only lands on a tab
+        // the user has actually returned to.
         // ###########################################################################################
         protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnDetachedFromVisualTree(e);
+
+            this.ClearBoardPreviewsBeforeDisposingBitmaps();
             this.DisposeSchematicBitmaps();
+        }
+
+        // ###########################################################################################
+        // Rebuilds what OnDetachedFromVisualTree tore down, when the tab is selected again.
+        //
+        // RefreshWorkbooks is the whole-tab funnel (list, top-line and board pane), which is what a
+        // returning tab needs: the board or the active workbook may have changed while it was away -
+        // Main.RefreshWorklogBar's own calls reach this tab only while it is attached.
+        //
+        // COST, and why it is not conditional. This re-reads every workbook from disk and re-decodes
+        // every schematic the active workbook has entries on, synchronously, on each return to the
+        // tab. That is not incidental waste that a "did anything change?" guard could skip: detach
+        // tore the pane down and disposed the bitmaps outright (it has to - see
+        // OnDetachedFromVisualTree), so there is nothing left to reuse and the pane genuinely has to
+        // be rebuilt from scratch whether or not anything changed.
+        //
+        // Making it cheaper means not disposing on detach, which is exactly the crash that pairing
+        // was written to fix, or holding the workbooks in a cache that an out-of-app edit could make
+        // stale. Neither is worth trading a correct tab for, so the cost is accepted deliberately
+        // rather than overlooked.
+        // ###########################################################################################
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+
+            // Guarded: this also fires during the very first attach, before Main has finished
+            // wiring the tab up (Initialize supplies the board-key source), and RefreshWorkbooks
+            // reads the board key. A null MainWindow with no test override means there is nothing
+            // to rebuild yet, and the first real refresh arrives from Main a moment later.
+            if (this.MainWindow != null || this.BoardKeyOverrideForTests != null)
+            {
+                this.RefreshWorkbooks();
+            }
         }
 
         // ###########################################################################################
@@ -224,7 +285,7 @@ namespace CRT
         public void Initialize(Main mainWindow)
         {
             this.MainWindow = mainWindow;
-            this.thisActivateWorkbook = mainWindow.ActivateWorkbook;
+            this.thisActivateWorkbook = mainWindow.ActivateWorkbookAcrossBoards;
             this.ApplySplitterWidths();
             this.WireSplitterPersistence();
         }
@@ -258,6 +319,29 @@ namespace CRT
         // constructing a real Main (Initialize's normal caller) - the same idea as
         // ApplySplitterWidthsForTests.
         internal void WireSplitterPersistenceForTests() => this.WireSplitterPersistence();
+
+        // ###########################################################################################
+        // Puts cursor focus in "Find a previous repair" - called by Main whenever this tab becomes
+        // the selected one, so a user landing here can start typing straight away rather than having
+        // to click the box first.
+        //
+        // This has to coexist with Main's own global "steal focus into ComponentSearchTextBox on any
+        // click" handler, which normally treats a click anywhere as a reason to refocus that box.
+        // Main excludes this tab from that handler by header the same way it already excludes
+        // "Feedback"/"Configuration", so the two do not fight over the caret - see
+        // OnMainPointerReleasedStealFocus's tab-header check. The user clicking anything ON this tab
+        // (a workbook card, a pill, an entry) still moves focus normally; only the GLOBAL steal is
+        // suppressed here, which is exactly what "clicking on something gives Filter components
+        // priority again" needs once the user has left this tab.
+        //
+        // Posted at Background priority: called from the tab's SelectionChanged, which fires before
+        // the tab's content has necessarily finished laying out on a first switch, and Focus() on a
+        // control not yet part of a realized visual tree is a silent no-op.
+        // ###########################################################################################
+        public void FocusSearchBox()
+        {
+            Dispatcher.UIThread.Post(() => this.FindRepairTextBox?.Focus(), DispatcherPriority.Background);
+        }
 
         // ###########################################################################################
         // Restores both of this tab's splitters from UserSettings, so they do not flash back to
@@ -381,7 +465,16 @@ namespace CRT
             this.thisEntriesReadThisPass.Clear();
 
             string boardKey = this.BoardKeyOverrideForTests ?? this.MainWindow?.GetCurrentBoardKey() ?? string.Empty;
-            var workbooks = boardWorkbooks ?? WorklogManager.GetWorkbooksForBoard(boardKey);
+
+            // "Show all workbooks" (UserSettings.WorkbooksScope == "AllBoards") lists every workbook
+            // on every board, not just this one - see the Configuration tab's radio group below
+            // "Enable Worklog". boardWorkbooks, when supplied (Main.RefreshWorklogBar's normal call),
+            // is already scope-aware - the full unfiltered set in AllBoards scope, this board's own
+            // otherwise - so it is used as-is; the fallback here only matters for callers that read
+            // straight off disk (e.g. the search debounce timer, OnAttachedToVisualTree).
+            var workbooks = boardWorkbooks ?? (IsAllBoardsScope
+                ? WorklogManager.GetAllWorkbooks()
+                : WorklogManager.GetWorkbooksForBoard(boardKey));
 
             this.WorkbookListPanel.Children.Clear();
 
@@ -397,11 +490,22 @@ namespace CRT
             // it. The highlight is therefore an assumption, not an activation - which is why
             // SelectWorkbook has no "already selected, nothing to do" guard; see its header.
             //
-            // Resolved from the UNFILTERED set, deliberately: the search box narrows what is SHOWN,
-            // it does not change which workbook the rest of the app is acting on. Typing in it must
-            // never silently re-activate a different workbook, or "Add worklog" would start writing
-            // into whichever workbook happened to survive the filter.
-            var active = WorklogManager.ResolveActiveWorkbook(workbooks, UserSettings.GetActiveWorkbookId(boardKey));
+            // Resolved from the UNFILTERED (by search) set, deliberately: the search box narrows
+            // what is SHOWN, it does not change which workbook the rest of the app is acting on.
+            // Typing in it must never silently re-activate a different workbook, or "Add worklog"
+            // would start writing into whichever workbook happened to survive the filter.
+            //
+            // Resolved from THIS BOARD's own workbooks specifically, even in AllBoards scope where
+            // "workbooks" holds every board's - UserSettings.GetActiveWorkbookId(boardKey) is itself
+            // board-scoped (nothing ever saves a cross-board id under it), and ResolveActiveWorkbook
+            // falls back to "workbooks[0]" when nothing is saved, which in the unfiltered list would
+            // be whichever board's workbook happens to be globally newest rather than this board's -
+            // exactly the mismatch the board pane cannot render (see CurrentBoardDataForPreviews).
+            // Same board-filtered input Main.RefreshWorklogBar's own activeWorkbook uses.
+            var workbooksForThisBoard = IsAllBoardsScope
+                ? workbooks.Where(w => string.Equals(w.BoardKey, boardKey, StringComparison.Ordinal)).ToList()
+                : workbooks;
+            var active = WorklogManager.ResolveActiveWorkbook(workbooksForThisBoard, UserSettings.GetActiveWorkbookId(boardKey));
 
             var shownWorkbooks = this.ApplySearchFilter(workbooks);
 
@@ -417,11 +521,24 @@ namespace CRT
             // "Show worklogs" and "Add worklog" keep acting on the real active workbook. It is a
             // display choice local to this tab, the same kind RefreshBoardPreviews already makes when
             // it picks which schematic to show.
+            //
+            // In "Show all workbooks" scope, shownWorkbooks can hold cards for OTHER boards too - but
+            // the board pane can only ever render the CURRENTLY LOADED board's schematics (see
+            // CurrentBoardDataForPreviews), so the fallback below is restricted to this board's own
+            // workbooks regardless of scope. Picking a different board's card still works - it just
+            // goes through SelectWorkbook -> ActivateWorkbookAcrossBoards, which switches the loaded
+            // board first - this is only about what shows with no explicit click.
             var shownWorkbook = active != null && shownWorkbooks.Any(w => w.Id == active.Id)
                 ? active
-                : shownWorkbooks.FirstOrDefault();
+                : shownWorkbooks.Where(w => string.Equals(w.BoardKey, boardKey, StringComparison.Ordinal))
+                    .FirstOrDefault();
 
             this.thisSelectedWorkbookId = shownWorkbook?.Id ?? -1;
+
+            // Recorded for the board pane's empty state: in AllBoards scope the list can be showing
+            // cards while nothing is selectable for THIS board, and a pane that just goes blank
+            // there reads as the workbooks having lost their contents. See RefreshBoardPreviews.
+            this.thisHasWorkbooksOnOtherBoardsOnly = shownWorkbook == null && shownWorkbooks.Count > 0;
 
             // "1 workbook" / "3 workbooks" - the count is the panel's heading, so it has to be
             // right for one as well as for none and many. Counts what is SHOWN, so it reads as the
@@ -615,11 +732,19 @@ namespace CRT
         // pointer-event routing against a UserControl that has no window - the same idea as
         // BoardKeyOverrideForTests. The running app always reaches this through a card's
         // PointerPressed handler in BuildWorkbookCard, never directly.
-        internal void SelectWorkbookForTests(int workbookId) => this.SelectWorkbook(workbookId);
+        internal void SelectWorkbookForTests(int workbookId, string? boardKeyOverride = null) =>
+            this.SelectWorkbook(workbookId, boardKeyOverride);
 
-        private void SelectWorkbook(int workbookId)
+        // ###########################################################################################
+        // boardKey is the CLICKED CARD's own board key, not necessarily the currently selected
+        // board's - in "Show all workbooks" scope a card can belong to a different board, and
+        // thisActivateWorkbook (Main.ActivateWorkbookAcrossBoards) switches the app to it before
+        // activating. In "current board" scope every shown card's board key already equals the
+        // selected board's, so this is unchanged for that case.
+        // ###########################################################################################
+        private void SelectWorkbook(int workbookId, string? boardKey = null)
         {
-            string boardKey = this.BoardKeyOverrideForTests ?? this.MainWindow?.GetCurrentBoardKey() ?? string.Empty;
+            boardKey ??= this.BoardKeyOverrideForTests ?? this.MainWindow?.GetCurrentBoardKey() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(boardKey))
                 return;
 
@@ -673,7 +798,7 @@ namespace CRT
             // collapsed rather than showing an empty muted TextBlock next to the pill.
             bool hasNote = !string.IsNullOrWhiteSpace(workbook.Note);
             this.WorkbookHeaderNoteText.IsVisible = hasNote;
-            this.ApplyHighlightedText(this.WorkbookHeaderNoteText, hasNote ? workbook.Note : string.Empty);
+            this.ApplyHighlightedText(this.WorkbookHeaderNoteText, hasNote ? workbook.Note : string.Empty, linkify: true);
 
             this.WorkbookHeaderActionsPanel.IsVisible = true;
         }
@@ -837,7 +962,8 @@ namespace CRT
             string text,
             double fontSize,
             TextWrapping wrapping = TextWrapping.NoWrap,
-            Action<TextBlock>? extraSetup = null)
+            Action<TextBlock>? extraSetup = null,
+            bool linkify = false)
         {
             var block = new TextBlock
             {
@@ -845,7 +971,7 @@ namespace CRT
                 TextWrapping = wrapping
             };
 
-            this.ApplyHighlightedText(block, text);
+            this.ApplyHighlightedText(block, text, linkify);
 
             extraSetup?.Invoke(block);
             return block;
@@ -859,14 +985,27 @@ namespace CRT
         // Clearing Inlines before every write matters: a block that was highlighted on the previous
         // pass keeps those runs otherwise, and setting Text alone would leave the old marked runs
         // rendering underneath the new value.
+        //
+        // linkify OPTS IN to rendering any web links in the text as clickable runs, and is off by
+        // default. It belongs on the fields the user writes prose into - a workbook's Note, an
+        // entry's Description - and NOT on titles or the "#N · Title" top line: a title is a
+        // headline, and a URL typed into one is a label rather than something to navigate to.
+        // Both markings compose in one pass (see TextLinkRenderer.ApplySegments), because a search
+        // term routinely lands inside a URL and applying one split after the other would lose runs.
         // ###########################################################################################
-        private void ApplyHighlightedText(TextBlock block, string text)
+        private void ApplyHighlightedText(TextBlock block, string text, bool linkify = false)
         {
-            block.Inlines?.Clear();
-
             var segments = this.thisSearchQuery.IsEmpty
                 ? null
                 : this.thisSearchQuery.SplitIntoSegments(text);
+
+            if (linkify)
+            {
+                TextLinkRenderer.ApplySegments(block, text, segments);
+                return;
+            }
+
+            block.Inlines?.Clear();
 
             if (segments == null || !segments.Any(s => s.IsMatch))
             {
@@ -988,6 +1127,23 @@ namespace CRT
             body.Children.Add(titleText);
             body.Children.Add(metaText);
 
+            // --- Row 4: which board this workbook belongs to, "Show all workbooks" scope only ----
+            // Only shown when the list can hold more than one board's cards - in the normal
+            // current-board scope every card already belongs to the board on screen, and naming it
+            // on each card would just be noise.
+            if (IsAllBoardsScope)
+            {
+                var boardLabelText = new TextBlock
+                {
+                    Text = this.MainWindow?.FormatBoardKeyForDisplay(workbook.BoardKey) ?? workbook.BoardKey,
+                    FontSize = 10,
+                    TextWrapping = TextWrapping.Wrap,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                boardLabelText.Classes.Add("WorkbooksMuted");
+                body.Children.Add(boardLabelText);
+            }
+
             var card = new Border
             {
                 // The record rides along on the card so SelectWorkbook can read it back off
@@ -1000,7 +1156,7 @@ namespace CRT
             if (isSelected)
                 card.Classes.Add("Selected");
 
-            card.PointerPressed += (_, _) => this.SelectWorkbook(workbook.Id);
+            card.PointerPressed += (_, _) => this.SelectWorkbook(workbook.Id, workbook.BoardKey);
 
             return card;
         }

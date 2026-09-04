@@ -38,6 +38,10 @@ namespace CRT
             this.UpdateEnableMiniproExperimentalDemoModeCheckBoxState();
             this.EnableWorklogCheckBox.IsChecked = UserSettings.EnableWorklog;
 
+            bool isAllBoardsScope = string.Equals(UserSettings.WorkbooksScope, "AllBoards", StringComparison.Ordinal);
+            this.WorkbooksScopeAllBoardsRadioButton.IsChecked = isAllBoardsScope;
+            this.WorkbooksScopeCurrentBoardRadioButton.IsChecked = !isAllBoardsScope;
+
             this.EnableMiniproExperimentalDemoModeCheckBox.IsCheckedChanged += this.OnEnableMiniproExperimentalDemoModeChanged;
 
             this.UpdateAllowDeletionOfOrphanAndNonUsedFilesCheckBoxState();
@@ -56,6 +60,8 @@ namespace CRT
             this.EnableNetworkConnectedOscilloscopeTabCheckBox.IsCheckedChanged += this.OnEnableNetworkConnectedOscilloscopeTabChanged;
             this.EnableMiniproExperimentalModeCheckBox.IsCheckedChanged += this.OnEnableMiniproExperimentalModeChanged;
             this.EnableWorklogCheckBox.IsCheckedChanged += this.OnEnableWorklogChanged;
+            this.WorkbooksScopeAllBoardsRadioButton.IsCheckedChanged += this.OnWorkbooksScopeChanged;
+            this.WorkbooksScopeCurrentBoardRadioButton.IsCheckedChanged += this.OnWorkbooksScopeChanged;
         }
 
         // ###########################################################################################
@@ -253,6 +259,36 @@ namespace CRT
             if (TopLevel.GetTopLevel(this) is Main mainWindow)
             {
                 mainWindow.ApplyWorklogBarVisibility();
+            }
+        }
+
+        // ###########################################################################################
+        // Persists which scope the Workbooks tab's workbook list uses - every board's workbooks, or
+        // only the currently selected board's - when either radio button is toggled.
+        //
+        // One click raises IsCheckedChanged TWICE, once for the button being unchecked and once for
+        // the one being checked, and BOTH see the same post-transition state. So the SENDER is what
+        // decides here: only the button that just became checked writes, and the uncheck is ignored
+        // outright. Reading the group's state instead (the previous form) happened to write the same
+        // value twice and relied entirely on UserSettings.WorkbooksScope's unchanged-value guard to
+        // absorb it - which now matters, because that setter raises WorkbooksScopeChanged and Main
+        // rebuilds the whole Workbooks tab off it: a doubled write is a doubled full disk rescan and
+        // schematic re-decode per click.
+        // ###########################################################################################
+        private void OnWorkbooksScopeChanged(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not RadioButton radioButton || radioButton.IsChecked != true)
+            {
+                return;
+            }
+
+            if (ReferenceEquals(radioButton, this.WorkbooksScopeAllBoardsRadioButton))
+            {
+                UserSettings.WorkbooksScope = "AllBoards";
+            }
+            else if (ReferenceEquals(radioButton, this.WorkbooksScopeCurrentBoardRadioButton))
+            {
+                UserSettings.WorkbooksScope = "CurrentBoard";
             }
         }
 

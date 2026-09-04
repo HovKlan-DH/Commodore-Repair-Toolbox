@@ -124,8 +124,7 @@ public partial class TabSchematics
             return;
         }
 
-        if (this.IsPointerInsideLabelEditorMenu(point) || this.IsPointerInsideNewLabelPrompt(point) ||
-            this.IsPointerInsideWorklogEntryCard(point))
+        if (this.IsPointerInsideLabelEditorMenu(point) || this.IsPointerInsideNewLabelPrompt(point))
         {
             e.Handled = true;
             return;
@@ -275,7 +274,7 @@ public partial class TabSchematics
                 return;
             }
 
-            if (pointer.Properties.IsLeftButtonPressed && !this.SchematicsNewWorklogEntryCardBorder.IsVisible)
+            if (pointer.Properties.IsLeftButtonPressed)
             {
                 if (this.TryGetSchematicsImagePixelPoint(point, out var worklogPixelPoint))
                 {
@@ -765,11 +764,10 @@ public partial class TabSchematics
 
         if (this.thisIsWorklogEntryMode)
         {
-            // The card's own text boxes live inside SchematicsContainer, so their key events bubble
-            // here. Escape while the card is open would otherwise throw away the drawn area and
-            // everything typed into it, with no confirmation - the same trap the label editor's
-            // new-label prompt guards against below. The card's Cancel button is the way out.
-            if (e.Key == Key.Escape && !this.SchematicsNewWorklogEntryCardBorder.IsVisible)
+            // Escape cancels the mode outright. Nothing is at risk: the mode is only ever waiting
+            // for an area to be drawn now, and the editor that opens once one IS drawn is a modal
+            // window with its own Escape handling, so this handler cannot fire underneath it.
+            if (e.Key == Key.Escape)
             {
                 this.CancelWorklogEntryMode();
                 e.Handled = true;

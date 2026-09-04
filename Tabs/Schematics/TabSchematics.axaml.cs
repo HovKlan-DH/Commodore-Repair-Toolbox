@@ -23,7 +23,9 @@
 //   TabSchematics.KiCad.Geometry.cs           KiCad world/screen mapping and zone geometry
 //   TabSchematics.KiCad.HitTest.cs            Hover hit-testing over the KiCad overlay
 //   TabSchematics.KiCad.Calibration.cs        Interactive KiCad trace calibration mode
-//   TabSchematics.Worklog.cs                  Worklog "Add worklog" area-drawing mode and its card
+//   TabSchematics.Worklog.cs                  Worklog "Add worklog" area-drawing mode (which opens
+//                                             the full editor), the saved-entry overlay and its
+//                                             anchored and parked pills
 //   TabSchematics.Settings.cs                 Board-level and global setting rows
 //
 // They are one partial class, so state is shared; each field is declared in the part
@@ -133,7 +135,6 @@ public partial class TabSchematics : UserControl
         // Only this overlay instance draws worklog entry areas, so its dashed-border mode is set
         // once here rather than threaded through every ApplyState call.
         this.SchematicsWorklogEntryOverlay.UseDashedBorder = true;
-        this.WorklogEntryComponentList.ItemsSource = this.thisWorklogEntryComponentRows;
 
         var thisPinchGestureRecognizer = new PinchGestureRecognizer();
         this.SchematicsContainer.GestureRecognizers.Add(thisPinchGestureRecognizer);
@@ -667,8 +668,7 @@ public partial class TabSchematics : UserControl
                IsInsideVisibleOverlay(this.KiCadNetConnectionsPanel) ||
                IsInsideVisibleOverlay(this.TraceFloatingPalette) ||
                IsInsideVisibleOverlay(this.SchematicsLabelEditorMenuBorder) ||
-               IsInsideVisibleOverlay(this.SchematicsNewLabelPromptBorder) ||
-               IsInsideVisibleOverlay(this.SchematicsNewWorklogEntryCardBorder);
+               IsInsideVisibleOverlay(this.SchematicsNewLabelPromptBorder);
     }
 
     // ###########################################################################################

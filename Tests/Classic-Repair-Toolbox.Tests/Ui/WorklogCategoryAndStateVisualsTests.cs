@@ -10,8 +10,9 @@ using Handlers.DataHandling;
 
 namespace ClassicRepairToolbox.Tests.Ui;
 
-// The category chips and state pills, in both places that offer them: the quick "Create worklog"
-// card on the Schematics tab and the full editor window.
+// The category chips and state pills in the full worklog editor window - the one place in the app
+// that offers them, since the quick "Create worklog" card that used to mirror them is gone and
+// drawing an area now opens this editor directly.
 //
 // The state pill used to be outline-only when selected, which on the pale panel background left
 // "selected" and "unselected" separated by little more than a 1px border-width difference - the
@@ -141,20 +142,6 @@ public class WorklogCategoryAndStateVisualsTests
         });
     }
 
-    // The quick "Add worklog" card shows the same two padlocks - the state has one appearance
-    // across the app, not one per screen.
-    [Fact]
-    public void The_create_card_state_pills_use_the_same_padlocks()
-    {
-        UiTest.Run(() =>
-        {
-            var tab = new TabSchematics();
-
-            Assert.Equal(OpenGlyph, tab.FindControl<TextBlock>("WorklogStateOpenDot")!.Text);
-            Assert.Equal(ClosedGlyph, tab.FindControl<TextBlock>("WorklogStateClosedDot")!.Text);
-        });
-    }
-
     // The selected pill must be visibly distinct from the unselected one. Asserting the
     // backgrounds differ is the property that actually failed before: outline-only left both
     // pills on near-identical backgrounds.
@@ -182,19 +169,6 @@ public class WorklogCategoryAndStateVisualsTests
             Assert.Equal(NoteGlyph, window.FindControl<TextBlock>("EditorCategoryNoteIcon")!.Text);
             Assert.Equal(CosmeticGlyph, window.FindControl<TextBlock>("EditorCategoryCosmeticIcon")!.Text);
             Assert.Equal(IssueGlyph, window.FindControl<TextBlock>("EditorCategoryIssueIcon")!.Text);
-        });
-    }
-
-    [Fact]
-    public void The_create_card_category_chips_carry_the_same_icons()
-    {
-        UiTest.Run(() =>
-        {
-            var tab = new TabSchematics();
-
-            Assert.Equal(NoteGlyph, tab.FindControl<TextBlock>("WorklogCategoryNoteIcon")!.Text);
-            Assert.Equal(CosmeticGlyph, tab.FindControl<TextBlock>("WorklogCategoryCosmeticIcon")!.Text);
-            Assert.Equal(IssueGlyph, tab.FindControl<TextBlock>("WorklogCategoryIssueIcon")!.Text);
         });
     }
 

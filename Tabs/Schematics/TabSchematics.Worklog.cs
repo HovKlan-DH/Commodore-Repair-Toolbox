@@ -18,10 +18,16 @@ namespace CRT;
 
 // ###########################################################################################
 // Worklog "Add worklog" area-marking mode: drag-draw a rectangle on the board to mark where a
-// fault is, then show the "New fault" quick card anchored near it, pre-populated with every
-// component whose highlight rectangle intersects the drawn area. Cancel just dismisses the
-// card and exits the mode; "Add worklog" persists the entry via WorklogManager.AddEntry and
-// then does the same.
+// fault is, then open the FULL worklog editor on it (WorklogEntryEditorWindow, via
+// InitializeForNewEntry), pre-populated with every component whose highlight rectangle
+// intersects the drawn area. Cancelling there writes nothing and the drawn area goes with the
+// mode; its Save is what creates the entry, through WorklogManager.AddEntryRecord.
+//
+// There used to be a small "New fault" quick card between the two, asking for a title,
+// description, category, state and the component checklist - all of them fields the full editor
+// also has, so reaching anything else (links, work done, comments, photos, files) meant saving
+// and immediately reopening the same entry. It was removed rather than kept as a shortcut:
+// OpenNewWorklogEntryEditor is now the whole of that step.
 //
 // Part of the TabSchematics partial class - see TabSchematics.axaml.cs for the tab overview.
 // ###########################################################################################
@@ -50,39 +56,24 @@ public partial class TabSchematics
     // ###########################################################################################
     private int thisWorklogEntryNextId = 1;
 
-    private readonly ObservableCollection<WorklogEntryComponentRow> thisWorklogEntryComponentRows = new();
-
     private Border? thisWorklogEntryBadgeBorder;
 
     private ScaleTransform? thisWorklogEntryBadgeScaleTransform;
 
     // ###########################################################################################
-    // Which corner of the drawn entry area the on-board "#N" badge sits at - always the corner
-    // diagonally opposite the one the "New fault" card is anchored to, so the two never overlap.
+    // The category a still-unsaved entry's marked area and "#N" badge are drawn in.
+    //
+    // Always the "Note" default now: the drawn area is only on screen between the mouse release and
+    // the full editor opening over it, and the editor - where the category is actually chosen -
+    // carries its own copy of that choice. It stays a field rather than becoming a literal because
+    // the two call sites read as "the category of the entry being drawn", which is the thing that
+    // may yet gain a way to be set before the editor opens.
     // ###########################################################################################
-    private RectCorner thisWorklogEntryBadgeCorner = RectCorner.TopLeft;
-
     private const string WorklogCategoryNote = "Note";
-    private const string WorklogCategoryCosmetic = "Cosmetic";
-    private const string WorklogCategoryIssue = "Issue";
 
-    // ###########################################################################################
-    // The category chosen for the entry currently being drawn/edited. Drives both the selected
-    // chip's visual state and the color of the marked-area boundary and its "#N" badge - resets
-    // to WorklogCategoryNote every time a new entry card is opened.
-    // ###########################################################################################
-    private string thisWorklogEntrySelectedCategory = WorklogCategoryNote;
-
-    private const string WorklogStateOpen = "Open";
     private const string WorklogStateClosed = "Closed";
 
-    // ###########################################################################################
-    // The state chosen for the entry currently being drawn/edited. Drives the selected state
-    // pill's outline/color - resets to WorklogStateOpen every time a new entry card is opened.
-    // Open reuses the "Issue" category color - category and state are unrelated axes (fault kind
-    // vs. resolution state) that happen to share a palette on purpose.
-    // ###########################################################################################
-    private string thisWorklogEntrySelectedState = WorklogStateOpen;
+    private readonly string thisWorklogEntrySelectedCategory = WorklogCategoryNote;
 
     // ###########################################################################################
     // Whether the top-bar "Show worklogs" checkbox is currently checked. Mirrors the checkbox
@@ -141,7 +132,6 @@ public partial class TabSchematics
         this.thisWorklogEntryDraftRectangle = null;
         this.thisWorklogEntryFinalRectangle = null;
 
-        this.HideNewWorklogEntryCard();
         this.RefreshWorklogEntryOverlay();
 
         this.SchematicsContainer.Cursor = new Cursor(StandardCursorType.Cross);
@@ -172,7 +162,6 @@ public partial class TabSchematics
         this.thisWorklogEntryDraftRectangle = null;
         this.thisWorklogEntryFinalRectangle = null;
 
-        this.HideNewWorklogEntryCard();
         this.RefreshWorklogEntryOverlay();
 
         this.SchematicsContainer.Cursor = Cursor.Default;
@@ -196,7 +185,6 @@ public partial class TabSchematics
         this.thisWorklogEntryDraftRectangle = new Rect(startPixelPoint.X, startPixelPoint.Y, 0, 0);
         this.thisWorklogEntryFinalRectangle = null;
 
-        this.HideNewWorklogEntryCard();
         this.RefreshWorklogEntryOverlay();
     }
 
@@ -218,10 +206,16 @@ public partial class TabSchematics
     }
 
     // ###########################################################################################
-    // Finishes drawing the entry area rectangle and opens the "New fault" card, anchored against
-    // the drawn area's own bounds rather than the release point. A rectangle too small to be a
-    // deliberate drag (an accidental click) is discarded instead, the same threshold the label
-    // editor uses for the same reason.
+    // Finishes drawing the entry area rectangle and opens the FULL worklog editor on it. A
+    // rectangle too small to be a deliberate drag (an accidental click) is discarded instead, the
+    // same threshold the label editor uses for the same reason.
+    //
+    // This used to open a small "New fault" quick card anchored beside the drawn area, which asked
+    // for a title, description, category, state and the component checklist - every one of them a
+    // field the full editor also has - and anything further (links, work done, comments, photos,
+    // files) then meant saving and reopening the same entry in the full editor. The card was
+    // removed outright rather than kept as a shortcut, so there is one place a worklog entry is
+    // written and one set of fields to keep in step.
     // ###########################################################################################
     private void CompleteDrawingWorklogEntryRectangle(Point releasePixelPoint)
     {
@@ -242,9 +236,114 @@ public partial class TabSchematics
         }
 
         this.thisWorklogEntryFinalRectangle = finalRect;
+
+        // Draws the marked area under the modal, so the user can see which area they are describing
+        // while they fill the editor in.
         this.RefreshWorklogEntryOverlay();
-        this.ShowNewWorklogEntryCard();
+
+        this.OpenNewWorklogEntryEditor(finalRect);
     }
+
+    // ###########################################################################################
+    // Opens the full worklog editor on the just-drawn area, leaving entry mode as it opens - see
+    // the CancelWorklogEntryMode call below for why that happens before the await rather than after.
+    //
+    // The editor holds the new entry entirely in memory until its Save (see
+    // WorklogEntryEditorWindow.InitializeForNewEntry), so cancelling here leaves the workbook
+    // untouched and the drawn area simply disappears with the mode.
+    //
+    // async void because it is reached from a pointer-release handler; everything after the await
+    // is therefore guarded, the same way OnWorklogEntryPillPointerPressed's continuation is - an
+    // exception in an async void continuation is unobservable and takes the process down.
+    // ###########################################################################################
+    private async void OpenNewWorklogEntryEditor(Rect areaPixelRectangle)
+    {
+        int workbookId = this.thisWorklogEntryWorkbookId;
+        string schematicName = this.GetCurrentSchematicName();
+
+        if (TopLevel.GetTopLevel(this) is not Window ownerWindow)
+        {
+            this.CancelWorklogEntryMode();
+            return;
+        }
+
+        var editor = new WorklogEntryEditorWindow();
+        editor.InitializeForNewEntry(workbookId, schematicName, areaPixelRectangle, this.currentFullResBitmap);
+
+        // The same component checklist the quick card built, computed the same way and handed to the
+        // editor the same way a saved entry's is - see BuildWorklogEntryComponentScope. Every row
+        // starts TICKED for a new entry, which is what the card did: the user drew the area around
+        // these components, so having them all in scope is the sensible starting point, and
+        // unticking is quicker than ticking a list of eight.
+        var componentsInScope = this.BuildNewWorklogEntryComponentScope(schematicName, areaPixelRectangle);
+        if (componentsInScope != null)
+        {
+            editor.InitializeComponentScope(componentsInScope, tickAll: true);
+        }
+
+        // Entry mode ends BEFORE the modal is awaited, not after it returns.
+        //
+        // ShowDialog does not block the dispatcher, so leaving the mode live for the whole life of
+        // the dialog left thisWorklogEntryWorkbookId and the drawn rectangle mutable underneath it:
+        // any refresh reaching Main.ActivateWorkbookAcrossBoards while the editor was open calls
+        // CancelWorklogEntryMode itself and clears them, and a second BeginWorklogEntryMode would
+        // reassign them. Everything the editor needs is already captured above - the workbook id,
+        // the schematic name, the area and the component scope - so there is nothing left for the
+        // mode to hold, and ending it here means the state the editor was built from cannot be
+        // changed out from under it.
+        //
+        // It also matches what the user sees: the drawn area's job is done once the editor is up.
+        this.CancelWorklogEntryMode();
+
+        try
+        {
+            await editor.ShowDialog(ownerWindow);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning($"Failed to show the worklog entry editor: [{ex.Message}]");
+            return;
+        }
+
+        try
+        {
+            if (!editor.WasSaved)
+            {
+                return;
+            }
+
+            this.MainWindow?.RefreshWorklogBar();
+            this.RefreshWorklogEntriesListOverlay();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning($"Failed to refresh worklog overlays after adding an entry: [{ex.Message}]");
+        }
+    }
+
+    // ###########################################################################################
+    // The component scope for an area that has no saved entry yet - the same intersection the
+    // quick card computed, expressed against the shared WorklogEntryScope helper the saved-entry
+    // path already uses so the two cannot drift.
+    //
+    // Returns null when there is no highlight-rect cache for this schematic at all, which is the
+    // "scope unknown" case the editor treats differently from "scope is empty" - see
+    // WorklogEntryScope.BuildComponentsInScope.
+    // ###########################################################################################
+    private List<(string BoardLabel, string DisplayName)>? BuildNewWorklogEntryComponentScope(
+        string schematicName,
+        Rect areaPixelRectangle) =>
+        WorklogEntryScope.BuildComponentsInScope(
+            this.MainWindow?.CurrentBoardData,
+            this.highlightRectsBySchematicAndLabel,
+            new WorklogEntryRecord
+            {
+                SchematicName = schematicName,
+                AreaX = areaPixelRectangle.X,
+                AreaY = areaPixelRectangle.Y,
+                AreaWidth = areaPixelRectangle.Width,
+                AreaHeight = areaPixelRectangle.Height
+            });
 
     // ###########################################################################################
     // Pushes the current draft/final rectangle into the shared overlay control. The final
@@ -302,9 +401,9 @@ public partial class TabSchematics
     private Color GetSelectedWorklogEntryCategoryColor() => this.ResolveWorklogCategoryColor(this.thisWorklogEntrySelectedCategory);
 
     // ###########################################################################################
-    // Shows a small "#N" badge at thisWorklogEntryBadgeCorner of the marked entry area - the
-    // corner diagonally opposite wherever the "New fault" card is anchored, so it stays visible
-    // which entry number a given marking on the board belongs to without the card covering it.
+    // Shows a small "#N" badge at the top-left of the freshly marked entry area, so the id the
+    // entry is about to get is visible on the board while the editor is being filled in - the same
+    // corner a SAVED entry's badge uses, so nothing moves when the entry is written.
     // Kept a constant screen size across zoom the same way the standard component labels do: a
     // ScaleTransform set to the inverse of the current view scale.
     // ###########################################################################################
@@ -360,13 +459,11 @@ public partial class TabSchematics
 
         Size unscaledSize = this.thisWorklogEntryBadgeBorder.DesiredSize;
 
-        Point anchorPoint = this.thisWorklogEntryBadgeCorner switch
-        {
-            RectCorner.TopRight => new Point(localRect.Right, localRect.Top),
-            RectCorner.BottomLeft => new Point(localRect.Left, localRect.Bottom),
-            RectCorner.BottomRight => new Point(localRect.Right, localRect.Bottom),
-            _ => new Point(localRect.Left, localRect.Top),
-        };
+        // Always the top-left corner, the same corner a SAVED entry's badge uses (see
+        // PositionWorklogEntriesListBadge), so the badge does not jump when the entry is written
+        // and the drawn area becomes a saved one. It used to be whichever corner the quick "New
+        // fault" card was NOT anchored to; with that card gone there is nothing left to dodge.
+        var anchorPoint = new Point(localRect.Left, localRect.Top);
 
         // Centred on its chosen corner, the same way the saved entries' badges are - see
         // PositionWorklogEntriesListBadge. Placing it at anchor - scaledSize/2 only lands correctly
@@ -375,299 +472,6 @@ public partial class TabSchematics
 
         Canvas.SetLeft(this.thisWorklogEntryBadgeBorder, anchorPoint.X + centreOffset.X);
         Canvas.SetTop(this.thisWorklogEntryBadgeBorder, anchorPoint.Y + centreOffset.Y);
-    }
-
-    // ###########################################################################################
-    // How far the "New fault" card sits from the drawn entry area's edge on the side it sits
-    // beside, so the two do not visually touch. See AnchoredCardPlacementGeometry's gap
-    // parameter - only the horizontal axis is offset, the vertical stays a true edge match.
-    // ###########################################################################################
-    private const double WorklogEntryCardGap = 8.0;
-
-    // ###########################################################################################
-    // Shows the "New fault" card anchored against the drawn entry area's own bounds rather than
-    // the mouse release point - the card always sits beside the area to its left or right, in one
-    // of four corner placements, whichever has the most room (see AnchoredCardPlacementGeometry).
-    // The on-board "#N" badge moves to the diagonally opposite corner so the two never overlap.
-    // The card must already be measurable (IsVisible=true) before its real DesiredSize is known,
-    // so content is filled in and it is made visible before placement is computed.
-    //
-    // The margin MUST be cleared before measuring: Avalonia's DesiredSize includes the control's
-    // margin, so measuring while the previous placement's margin is still set reports a card that
-    // is (previous X, previous Y) larger than it really is, and the next placement is computed
-    // from that inflated size - which is what made the card appear to drift with the mouse.
-    // ###########################################################################################
-    private void ShowNewWorklogEntryCard()
-    {
-        this.WorklogEntryIdText.Text = $"#{this.thisWorklogEntryNextId}";
-        this.WorklogEntryTitleTextBox.Text = string.Empty;
-        this.WorklogEntryDescriptionTextBox.Text = string.Empty;
-        this.thisWorklogEntrySelectedCategory = WorklogCategoryNote;
-        this.UpdateWorklogEntryCategoryChipVisuals();
-        this.thisWorklogEntrySelectedState = WorklogStateOpen;
-        this.UpdateWorklogEntryStatePillVisuals();
-        this.WorklogEntryShowMarkedAreaCheckBox.IsChecked = true;
-        this.RefreshWorklogEntryComponentList();
-        this.UpdateWorklogEntryCardSaveEnabled();
-
-        this.SchematicsNewWorklogEntryCardBorder.IsVisible = true;
-        this.SchematicsNewWorklogEntryCardBorder.Margin = new Thickness(0);
-        this.SchematicsNewWorklogEntryCardBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Size cardSize = this.SchematicsNewWorklogEntryCardBorder.DesiredSize;
-
-        double x = 6.0;
-        double y = 6.0;
-
-        Rect? anchorRectInContainer = this.GetWorklogEntryAreaBoundsInContainer();
-        if (anchorRectInContainer.HasValue)
-        {
-            var placement = AnchoredCardPlacementGeometry.ComputePlacement(
-                anchorRectInContainer.Value,
-                this.SchematicsContainer.Bounds.Size,
-                cardSize,
-                WorklogEntryCardGap);
-
-            this.thisWorklogEntryBadgeCorner = placement.BadgeCorner;
-
-            x = Math.Clamp(placement.CardTopLeft.X, 6.0, Math.Max(6.0, this.SchematicsContainer.Bounds.Width - cardSize.Width));
-            y = Math.Clamp(placement.CardTopLeft.Y, 6.0, Math.Max(6.0, this.SchematicsContainer.Bounds.Height - cardSize.Height));
-        }
-
-        this.SchematicsNewWorklogEntryCardBorder.Margin = new Thickness(x, y, 0, 0);
-
-        this.RefreshWorklogEntryOverlay();
-
-        Dispatcher.UIThread.Post(() => this.WorklogEntryTitleTextBox.Focus(), DispatcherPriority.Background);
-    }
-
-    // ###########################################################################################
-    // Keeps the card's "Add worklog" button in step with the title box - a worklog with no title
-    // is unidentifiable in the worklog list and on the board (the "#N" badge is all that would
-    // distinguish it), so an empty title is not a saveable state.
-    //
-    // Whitespace does not count: the title is Trim()ed before it is persisted, so a title of
-    // spaces would be saved as an empty one and the gate has to agree with what the save does.
-    // ###########################################################################################
-    private void OnWorklogEntryTitleTextChanged(object? sender, TextChangedEventArgs e)
-    {
-        this.UpdateWorklogEntryCardSaveEnabled();
-    }
-
-    private void UpdateWorklogEntryCardSaveEnabled()
-    {
-        this.WorklogEntryCardSaveButton.IsEnabled = !string.IsNullOrWhiteSpace(this.WorklogEntryTitleTextBox.Text);
-    }
-
-    // ###########################################################################################
-    // Returns the drawn entry area's bounds in SchematicsContainer's own coordinate space (the
-    // space the card's Margin-based positioning uses), by asking Avalonia to translate the
-    // area's local-space corners through the schematic view's actual render-transform chain -
-    // robust to however that chain is structured, rather than re-deriving it from schematicsMatrix
-    // by hand.
-    // ###########################################################################################
-    private Rect? GetWorklogEntryAreaBoundsInContainer()
-    {
-        if (this.currentFullResBitmap == null || !this.thisWorklogEntryFinalRectangle.HasValue)
-        {
-            return null;
-        }
-
-        var contentRect = this.GetImageContentRect();
-        var localRect = RectGeometry.PixelToLocalRect(this.thisWorklogEntryFinalRectangle.Value, contentRect, this.currentFullResBitmap.PixelSize);
-
-        Point? topLeft = this.SchematicsWorklogEntryOverlay.TranslatePoint(localRect.TopLeft, this.SchematicsContainer);
-        Point? bottomRight = this.SchematicsWorklogEntryOverlay.TranslatePoint(localRect.BottomRight, this.SchematicsContainer);
-
-        if (!topLeft.HasValue || !bottomRight.HasValue)
-        {
-            return null;
-        }
-
-        return new Rect(topLeft.Value, bottomRight.Value);
-    }
-
-    // ###########################################################################################
-    // Hides the "New fault" card and clears its description text.
-    // ###########################################################################################
-    private void HideNewWorklogEntryCard()
-    {
-        this.SchematicsNewWorklogEntryCardBorder.IsVisible = false;
-        this.WorklogEntryTitleTextBox.Text = string.Empty;
-        this.WorklogEntryDescriptionTextBox.Text = string.Empty;
-    }
-
-    // ###########################################################################################
-    // Selects a category chip - only one is selected at a time. Updates the chips' visuals and
-    // re-colors the marked-area boundary and badge to match, via RefreshWorklogEntryOverlay.
-    // ###########################################################################################
-    private void OnWorklogEntryCategoryChipPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is Border { Tag: string category })
-        {
-            this.thisWorklogEntrySelectedCategory = category;
-            this.UpdateWorklogEntryCategoryChipVisuals();
-            this.RefreshWorklogEntryOverlay();
-        }
-    }
-
-    // ###########################################################################################
-    // Restyles all three category chips to reflect thisWorklogEntrySelectedCategory: the selected
-    // chip gets a filled background/border in its category color with white text, the rest show
-    // their usual neutral outline. Also recolors the "#N" pill in the card header to match, the
-    // same way the on-board badge does.
-    //
-    // Text only - the chips carry no colour dot. The selected chip is filled with its category
-    // colour, which is what identifies the category; a dot would repeat that on the selected chip
-    // and be the only colour on the unselected ones.
-    // ###########################################################################################
-    private void UpdateWorklogEntryCategoryChipVisuals()
-    {
-        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryNoteChip, this.WorklogCategoryNoteText, this.WorklogCategoryNoteIcon, WorklogCategoryNote);
-        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryCosmeticChip, this.WorklogCategoryCosmeticText, this.WorklogCategoryCosmeticIcon, WorklogCategoryCosmetic);
-        this.ApplyWorklogCategoryChipVisualState(this.WorklogCategoryIssueChip, this.WorklogCategoryIssueText, this.WorklogCategoryIssueIcon, WorklogCategoryIssue);
-
-        this.WorklogEntryIdBadge.Background = new SolidColorBrush(this.GetSelectedWorklogEntryCategoryColor());
-    }
-
-    // The icon takes the label's color rather than a color of its own - white on the selected
-    // chip's filled background, the ordinary foreground otherwise. An icon left at one fixed color
-    // would either disappear into the fill or stay dark while its own label went white.
-    private void ApplyWorklogCategoryChipVisualState(Border chip, TextBlock label, TextBlock icon, string category)
-    {
-        var categoryBrush = this.ResolveThemeBrush($"Worklog_Category_{category}", new SolidColorBrush(Colors.IndianRed));
-
-        if (string.Equals(this.thisWorklogEntrySelectedCategory, category, StringComparison.Ordinal))
-        {
-            chip.Background = categoryBrush;
-            chip.BorderBrush = categoryBrush;
-            chip.BorderThickness = new Thickness(2);
-            chip.Opacity = 0.9;
-            label.Foreground = Brushes.White;
-            label.FontWeight = FontWeight.SemiBold;
-            icon.Foreground = label.Foreground;
-        }
-        else
-        {
-            chip.Background = this.ResolveThemeBrush("Form_Bg", new SolidColorBrush(Color.Parse("#F5F5F5")));
-            chip.BorderBrush = this.ResolveThemeBrush("Form_Border", new SolidColorBrush(Color.Parse("#CCCCCC")));
-            chip.BorderThickness = new Thickness(1);
-            chip.Opacity = 1.0;
-            label.Foreground = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
-            label.FontWeight = FontWeight.Normal;
-            icon.Foreground = label.Foreground;
-        }
-    }
-
-    // ###########################################################################################
-    // Selects a state pill - only one is selected at a time, same one-of-three pattern as the
-    // category chips above.
-    // ###########################################################################################
-    private void OnWorklogEntryStatePillPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is Border { Tag: string state })
-        {
-            this.thisWorklogEntrySelectedState = state;
-            this.UpdateWorklogEntryStatePillVisuals();
-        }
-    }
-
-
-    // ###########################################################################################
-    // Reserves the top pixel row an over-tall Font Awesome glyph needs, computed from the control's
-    // OWN text and font size.
-    //
-    // Applied from code rather than as a literal Padding in markup: the literal is correct only for
-    // the size it was written against (the padlocks need 2px at FontSize 17), and XAML cannot call
-    // the calculation - so every hardcoded site was a clipped icon waiting for a font-size change.
-    // Harmless on glyphs that do not overshoot; it resolves to an empty Thickness.
-    // ###########################################################################################
-    private static void ApplyFontAwesomeOverflowPadding(params TextBlock[] icons)
-    {
-        foreach (var icon in icons)
-        {
-            icon.Padding = FontAwesomeGlyphMetrics.GetTopOverflowThicknessForText(icon.Text, icon.FontSize);
-        }
-    }
-
-    // ###########################################################################################
-    // Restyles both state pills to reflect thisWorklogEntrySelectedState: the selected pill is
-    // FILLED with its state color and its label goes white and bold, the same treatment the
-    // category chips use. It was outline-only, which on the pale panel background left "selected"
-    // and "unselected" separated by little more than a 1px border-width difference - the selected
-    // pill was genuinely hard to pick out.
-    //
-    // The padlock keeps its state color in the UNSELECTED pill (it is the state's identity, not a
-    // selection cue) but turns white in the selected one, where the fill already carries the color
-    // and a colored glyph on a same-colored fill would simply vanish.
-    // ###########################################################################################
-    private void UpdateWorklogEntryStatePillVisuals()
-    {
-        ApplyFontAwesomeOverflowPadding(this.WorklogStateOpenDot, this.WorklogStateClosedDot);
-
-        this.ApplyWorklogEntryStatePillVisualState(this.WorklogStateOpenPill, this.WorklogStateOpenText, this.WorklogStateOpenDot, WorklogStateOpen, "Worklog_Status_Open");
-        this.ApplyWorklogEntryStatePillVisualState(this.WorklogStateClosedPill, this.WorklogStateClosedText, this.WorklogStateClosedDot, WorklogStateClosed, "Worklog_Status_Closed");
-    }
-
-    private void ApplyWorklogEntryStatePillVisualState(Border pill, TextBlock label, TextBlock icon, string state, string colorResourceKey)
-    {
-        var stateBrush = this.ResolveThemeBrush(colorResourceKey, new SolidColorBrush(Colors.IndianRed));
-
-        if (string.Equals(this.thisWorklogEntrySelectedState, state, StringComparison.Ordinal))
-        {
-            pill.Background = stateBrush;
-            pill.BorderBrush = stateBrush;
-            pill.BorderThickness = new Thickness(2);
-            pill.Opacity = 0.9;
-            icon.Foreground = Brushes.White;
-            label.Foreground = Brushes.White;
-            label.FontWeight = FontWeight.SemiBold;
-        }
-        else
-        {
-            pill.Background = this.ResolveThemeBrush("Form_Bg", new SolidColorBrush(Color.Parse("#F5F5F5")));
-            pill.BorderBrush = this.ResolveThemeBrush("Form_Border", new SolidColorBrush(Color.Parse("#CCCCCC")));
-            pill.BorderThickness = new Thickness(1);
-            pill.Opacity = 1.0;
-            icon.Foreground = stateBrush;
-            label.Foreground = this.ResolveThemeBrush("Schematics_Panels_Fg", Brushes.Black);
-            label.FontWeight = FontWeight.Normal;
-        }
-    }
-
-    // ###########################################################################################
-    // Rebuilds the "Mark components in scope" checklist from the components whose highlight
-    // rectangle intersects the drawn entry area, in the same order they appear in the board data
-    // (the order the Overview tab lists them in too - neither view re-sorts). The actual
-    // intersection test and row-building are pure Handlers/ helpers - see RectGeometry and
-    // ComponentListBuilder - so this method is just wiring them up to the current schematic/board.
-    // ###########################################################################################
-    private void RefreshWorklogEntryComponentList()
-    {
-        this.thisWorklogEntryComponentRows.Clear();
-
-        var boardData = this.MainWindow?.CurrentBoardData;
-        string schematicName = this.GetCurrentSchematicName();
-
-        if (boardData != null &&
-            this.thisWorklogEntryFinalRectangle.HasValue &&
-            !string.IsNullOrWhiteSpace(schematicName) &&
-            this.highlightRectsBySchematicAndLabel.TryGetValue(schematicName, out var rectsByLabel))
-        {
-            var touchedLabels = RectGeometry.FindKeysWithRectsIntersecting(rectsByLabel, this.thisWorklogEntryFinalRectangle.Value);
-            var componentsInScope = ComponentListBuilder.BuildComponentsInScope(boardData, touchedLabels);
-
-            foreach (var component in componentsInScope)
-            {
-                this.thisWorklogEntryComponentRows.Add(new WorklogEntryComponentRow
-                {
-                    BoardLabel = component.BoardLabel,
-                    DisplayName = component.DisplayName
-                });
-            }
-        }
-
-        this.UpdateWorklogEntryComponentCount();
-        this.WorklogEntryNoComponentsText.IsVisible = this.thisWorklogEntryComponentRows.Count == 0;
     }
 
     // ###########################################################################################
@@ -683,142 +487,6 @@ public partial class TabSchematics
             this.MainWindow?.CurrentBoardData,
             this.highlightRectsBySchematicAndLabel,
             entry);
-
-    // ###########################################################################################
-    // "All" / "None" links above the checklist for quickly bulk-marking every touched component
-    // as in or out of scope.
-    // ###########################################################################################
-    // ###########################################################################################
-    // The count beside the card's checklist heading. Reports the SELECTION against the total, the
-    // same wording the full editor uses - "8 found" said nothing about the choice the user had
-    // actually made, and never changed when they made one.
-    // ###########################################################################################
-    private void UpdateWorklogEntryComponentCount()
-    {
-        int total = this.thisWorklogEntryComponentRows.Count;
-        int selected = this.thisWorklogEntryComponentRows.Count(row => row.IsChecked);
-
-        this.WorklogEntryComponentCountText.Text = $"{selected} of {total} selected";
-    }
-
-    private void OnWorklogEntrySelectAllComponentsClick(object? sender, RoutedEventArgs e)
-    {
-        foreach (var row in this.thisWorklogEntryComponentRows)
-        {
-            row.IsChecked = true;
-        }
-
-        this.UpdateWorklogEntryComponentCount();
-    }
-
-    private void OnWorklogEntrySelectNoneComponentsClick(object? sender, RoutedEventArgs e)
-    {
-        foreach (var row in this.thisWorklogEntryComponentRows)
-        {
-            row.IsChecked = false;
-        }
-
-        this.UpdateWorklogEntryComponentCount();
-    }
-
-    // ###########################################################################################
-    // Toggles a checklist row's checkbox when anywhere in its row is clicked, not just the
-    // checkbox itself - the checkbox and its labels are IsHitTestVisible="False" so this Border
-    // handler is the only thing that reacts to the click.
-    // ###########################################################################################
-    private void OnWorklogEntryComponentRowPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is Control control && control.DataContext is WorklogEntryComponentRow row)
-        {
-            row.IsChecked = !row.IsChecked;
-            this.UpdateWorklogEntryComponentCount();
-        }
-    }
-
-    // ###########################################################################################
-    // Returns true when the pointer is currently inside the "New fault" card bounds, so schematic
-    // panning/selection does not fire underneath it.
-    // ###########################################################################################
-    private bool IsPointerInsideWorklogEntryCard(Point containerPoint)
-    {
-        if (!this.SchematicsNewWorklogEntryCardBorder.IsVisible)
-        {
-            return false;
-        }
-
-        Point? translatedTopLeft = this.SchematicsNewWorklogEntryCardBorder.TranslatePoint(new Point(0, 0), this.SchematicsContainer);
-        if (!translatedTopLeft.HasValue)
-        {
-            return false;
-        }
-
-        var cardRect = new Rect(translatedTopLeft.Value, this.SchematicsNewWorklogEntryCardBorder.Bounds.Size);
-        return cardRect.Contains(containerPoint);
-    }
-
-    // ###########################################################################################
-    // The card's Cancel button dismisses the card and exits entry mode without saving anything.
-    // ###########################################################################################
-    private void OnWorklogEntryCardDismissClick(object? sender, RoutedEventArgs e)
-    {
-        this.CancelWorklogEntryMode();
-    }
-
-    // ###########################################################################################
-    // Persists the entry currently in the "New fault" card via WorklogManager.AddEntry, then
-    // exits entry mode the same way Cancel does. A blank final rectangle (mode entered but no
-    // area ever drawn) is defensive only - the card cannot be open without one, see
-    // CompleteDrawingWorklogEntryRectangle. Refreshes the worklog bar afterwards so a workbook
-    // that just auto-closed (see WorklogManager.AddEntry) is reflected immediately.
-    // ###########################################################################################
-    private void OnWorklogEntryCardSaveClick(object? sender, RoutedEventArgs e)
-    {
-        if (!this.thisWorklogEntryFinalRectangle.HasValue)
-        {
-            this.CancelWorklogEntryMode();
-            return;
-        }
-
-        string title = this.WorklogEntryTitleTextBox.Text?.Trim() ?? string.Empty;
-        if (title.Length == 0)
-        {
-            // The button is disabled while the title is blank, so this is only reachable via a
-            // keyboard default-button path - but the rule belongs with the save, not only with
-            // the affordance, so a titleless entry can never be written.
-            this.UpdateWorklogEntryCardSaveEnabled();
-            this.WorklogEntryTitleTextBox.Focus();
-            return;
-        }
-
-        string description = this.WorklogEntryDescriptionTextBox.Text?.Trim() ?? string.Empty;
-        var componentLabels = this.thisWorklogEntryComponentRows
-            .Where(row => row.IsChecked)
-            .Select(row => row.BoardLabel);
-
-        var savedEntry = WorklogManager.AddEntry(
-            this.thisWorklogEntryWorkbookId,
-            this.GetCurrentSchematicName(),
-            this.thisWorklogEntryFinalRectangle.Value,
-            title,
-            description,
-            this.thisWorklogEntrySelectedCategory,
-            this.thisWorklogEntrySelectedState,
-            componentLabels,
-            this.WorklogEntryShowMarkedAreaCheckBox.IsChecked ?? true);
-
-        if (savedEntry == null)
-        {
-            // Nothing was persisted (already logged by AddEntry): either the workbook's own folder
-            // could not be found - most likely deleted from disk while the card was open - or the
-            // write itself failed. Leave the card open with its typed content intact rather than
-            // silently discarding what the user entered.
-            return;
-        }
-
-        this.CancelWorklogEntryMode();
-        this.MainWindow?.RefreshWorklogBar();
-        this.RefreshWorklogEntriesListOverlay();
-    }
 
     // ###########################################################################################
     // Turns the "Show worklogs" list view on or off for the given workbook - called by the
@@ -945,15 +613,15 @@ public partial class TabSchematics
     // cannot be shrunk to something impossible to grab again.
     private const double MinimumWorklogAreaSize = 8.0;
 
-    // thisIsWorklogEntryMode is checked as well as the card's visibility: entry mode is entered
-    // BEFORE the card appears (the card only shows once the rectangle is finished), so during the
-    // initial drag-out of a new area the card is invisible and resize hit-testing would otherwise
-    // run - painting markers and a directional cursor over the crosshair the drawing mode set.
+    // thisIsWorklogEntryMode keeps resize hit-testing out of the way while a NEW area is being
+    // drawn - otherwise the drag paints resize markers and a directional cursor over the crosshair
+    // the drawing mode set. (It used to also check the quick card's visibility; that card is gone,
+    // and the full editor that replaced it is a modal window, so nothing on this canvas can be
+    // hovered while it is up.)
     private bool IsWorklogEntryResizeAvailable =>
         this.thisIsShowingWorklogEntriesList &&
         this.currentFullResBitmap != null &&
         !this.thisIsWorklogEntryMode &&
-        !this.SchematicsNewWorklogEntryCardBorder.IsVisible &&
         !this.IsLabelEditorActive;
 
     // ###########################################################################################
@@ -1422,10 +1090,15 @@ public partial class TabSchematics
 
     // ###########################################################################################
     // Assigns each thumbnail its own "#N" pills - one per saved entry whose SchematicName matches
-    // that thumbnail, centered on the entry's marked area (not the drawn bounds), colored by
-    // category - see ThumbnailWorklogPillsOverlay for why status is deliberately left off. A
-    // board's entries can span several schematics, so this groups once across all of them rather
-    // than only the schematic currently on screen.
+    // that thumbnail, colored by category - see ThumbnailWorklogPillsOverlay for why status is
+    // deliberately left off. A board's entries can span several schematics, so this groups once
+    // across all of them rather than only the schematic currently on screen.
+    //
+    // The "Show marked area" branch is carried through as IsParked, so the thumbnail draws the
+    // entry the SAME way the main view does: ticked gets a pill centred on its marked area,
+    // unticked gets one parked in the image's own top-right corner. Passing the marker position
+    // regardless was a reported bug - an entry whose area is hidden showed no area on either view,
+    // but the thumbnail still pointed a pill at where that area would have been.
     // ###########################################################################################
     private void RefreshThumbnailWorklogPills(List<WorklogEntryRecord> allEntries)
     {
@@ -1451,7 +1124,11 @@ public partial class TabSchematics
                     entry.AreaX + (entry.AreaWidth / 2.0),
                     entry.AreaY + (entry.AreaHeight / 2.0));
 
-                pills.Add(new ThumbnailWorklogPillsOverlay.Pill(center, this.ResolveWorklogCategoryColor(entry.Category), entry.Id));
+                pills.Add(new ThumbnailWorklogPillsOverlay.Pill(
+                    center,
+                    this.ResolveWorklogCategoryColor(entry.Category),
+                    entry.Id,
+                    IsParked: !entry.ShowMarkedArea));
             }
 
             thumbnail.WorklogPills = pills;
@@ -1977,9 +1654,14 @@ public partial class TabSchematics
 }
 
 // ###########################################################################################
-// One row in the worklog entry card's "Mark components in scope" checklist: a component whose
-// highlight rectangle intersects the drawn entry area. Public and top-level (not nested inside
-// TabSchematics) so the compiled DataTemplate in TabSchematics.axaml can bind to it.
+// One row in the worklog editor's "Mark components in scope" / "Mark components completed"
+// checklists: a component whose highlight rectangle intersects the entry's area. Public and
+// top-level (not nested inside a control) so the compiled DataTemplates in
+// WorklogEntryEditorWindow.axaml can bind to it.
+//
+// It lives in this file rather than beside that window because the SCOPE is computed here - see
+// BuildWorklogEntryComponentScope and BuildNewWorklogEntryComponentScope - and the editor only
+// renders the rows it is handed.
 // ###########################################################################################
 public sealed class WorklogEntryComponentRow : System.ComponentModel.INotifyPropertyChanged
 {
