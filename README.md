@@ -44,7 +44,7 @@ Download the newest normal (non-BETA) _CRT_ version from [Releases](https://gith
 
 If you want the actual data stored elsewhere than default, then this can be changed via a command-line parameter, view [Commandline parameters](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/Commandline-parameters).
 
-Depending on your configuration settings, then _CRT_ will check for newer data at application launch. It is recommended to have this enabled, as there will come many updates over time.
+Depending on your configuration settings, then _CRT_ will check for newer data from its online source at application launch. It is recommended to have this enabled, as there will come many updates over time.
 
 When a new version is released it will (per default, but can be configured) be shown to you in the application, and you can update directly from within the application.
 
