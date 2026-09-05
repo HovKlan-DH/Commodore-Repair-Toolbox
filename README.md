@@ -2,14 +2,14 @@
 
 _Classic Repair Toolbox_ (or **CRT** hence forward) is a cross-platform desktop application to assist hardware enthusiasts in diagnosing, troubleshooting, and repairing vintage computers and peripherals.
 
-The project is a direct spin-off from an older project, **Commodore Repair Toolbox** which now resides in a faint and distant memory only. The new _Classic_ project (compared to _Commodore_) was realized as a complete rewrite, to be able to add natively support for **Linux** and **macOS**, but also to be able to support more hardware and not focus primarily on Commodore (Amstrad and ZX Spectrum etc.).
+The project is a direct spin-off from an older project, _Commodore Repair Toolbox_ which now resides in a faint and distant memory only. The new _Classic_ project was realized as a complete rewrite, to be able to add natively support for **Linux** and **macOS**, but also to be able to support more hardware and not focus primarily on Commodore (Amstrad, ZX Spectrum and even different hardware types etc.).
 
 
 ## What is it?
 
-With _CRT_ you can easily view technical schematics, zoom, identify components, view chip pinouts, use interactive (KiCad) traces or do manual circuit tracing, study datasheets, view oscilloscope images, ressources and various other information, helping you diagnosing and repairing old vintage hardware.
+With _CRT_ you can easily view technical schematics, zoom, identify components, view chip pinouts, use interactive (KiCad) traces or do manual circuit tracing, study datasheets, view oscilloscope images, resources and various other information, helping you diagnosing and repairing old vintage hardware.
 
-It is (for now) primarily dedicated to Commodore, and have several built-in systems for Commodore, it also has an Amstrad and a ZX Spectrum board, but it can support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simple" and have good documentation available, like schematics, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
+It is (for now) having Commodore computers with the most documented systems, but it also has an Amstrad and a ZX Spectrum board (more systems will come for sure), but it can support any kind of hardware, as you can add your own data - e.g. other computers, radios, DIY electronics or whatever else you can imagine. It probably works the best, if the hardware is "simple" and have good documentation available, like schematics, and if it is something you need to revisit multiple times - then you can add the needed information yourself, and use it for easy future reference.
 
 
 ## Table of Contents
@@ -35,23 +35,23 @@ It is (for now) primarily dedicated to Commodore, and have several built-in syst
   - **Linux** (64-bit)
 - Disk space needed: ~**2GB**
 
-Note that the newest .NET LTS (Long-Term Support) is embedded in application, which means you do not need to have this installed. It also does mean that even if you have .NET installed on your computer, then it will still use the one embedded in application. Do note that it is the newest LTS at build time - it will not get updated automatically and will stay as-is.
+Note that the newest .NET LTS (Long-Term Support) is embedded in application, which means you do not need to have this installed. It also does mean that even if you have .NET installed on your computer, then it will still use the one embedded in application. Do note that it is the newest LTS at build time - it will _not_ get updated automatically and will stay as-is, until a newer version of _CRT_ is released.
 
 
 ## Installation and usage
 
-Download the newest normal (non-BETA) _CRT_ version from [Releases](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/releases), and install it afterwards. The installation folder cannot be chosen by the user and is determined by the installation process. In the `Configuration` tab you can open the folder and see where the configuration and data files are stored.
+Download the newest normal (non-BETA) _CRT_ version from [Releases](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/releases), and install it. The installation folder cannot be chosen by the user and is determined by the installation process. In the `Configuration` tab you can open the folder and see where the configuration and data files are stored.
 
-If needed then the `data-root` folder can be changed via a commandline parameter, view [Commandline parameters](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/Commandline-parameters).
+If you want the actual data stored elsewhere than default, then this can be changed via a commandline parameter, view [Commandline parameters](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki/Commandline-parameters).
 
 Depending on your configuration settings, then _CRT_ will check for newer data at application launch. It is recommended to have this enabled, as there will come many updates over time.
 
-When a new version is released it will be shown to you in the application, and you can update directly from within the application.
+When a new version is released it will (per default, but can be configured) be shown to you in the application, and you can update directly from within the application.
 
 
 ## Technical and other documentation
 
-Please go to [Wiki](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki) to view more technical documentation or other information related to _CRT_.
+Please go to the [Wiki](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki) to view more technical documentation or other information, that is not suited for the project front page.
 
 
 ## Built-in hardware and boards
@@ -110,7 +110,11 @@ Please go to [Wiki](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki) t
 
 ### Data contributions being worked on currently
 
-- Please let me know if you want to contribute with something, so it can be visualized here to avoid duplicate work.
+Please let me know if you want to contribute with something, so it can be visualized here to avoid duplicate work.
+
+**Commodore 128 and 128D** 
+  - **250477** (C128DCR, metal cabinet)
+    - As soon as time allows, then I will do a full PAL oscilloscope baseline
 
 
 ## Supported oscilloscopes
