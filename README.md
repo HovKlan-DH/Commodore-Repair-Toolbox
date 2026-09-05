@@ -17,10 +17,10 @@ It is (for now) having Commodore computers with the most documented systems, but
 - [Requirements](#requirements)
 - [Installation and usage](#installation-and-usage)
 - [Technical and other documentation](#technical-and-other-documentation)
+- [YouTube Quick-Help videos available](#youtube-quick-help-videos-available)
 - [Built-in hardware and boards](#built-in-hardware-and-boards)
 - [Data contributions being worked on currently](#data-contributions-being-worked-on-currently)
 - [Supported oscilloscopes](#supported-oscilloscopes)
-- [YouTube Quick-Help videos available](#youtube-quick-help-videos-available)
 - [Help wanted](#help-wanted)
 - [Contact developer](#contact-developer)
 - [Screenshots](#screenshots)
@@ -54,6 +54,17 @@ When a new version is released it will (per default, but can be configured) be s
 Please go to the [Wiki](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki) to view more technical documentation or other information, that is not suited for the project front page.
 
 
+## YouTube Quick-Help videos available
+
+You can view the below _Quick Help_ videos for introduction to specific topics in _CRT_:
+
+- [Short introduction](https://youtu.be/fwR018x39qg)
+- [How to do manual traces](https://youtu.be/JUNXeCHsrME)
+- [How to sync oscilloscope](https://youtu.be/CbTh1FFp3tU)
+- [How to use component label editor](https://youtu.be/u-UkD-m4Z6o)
+- [How to use interactive traces](https://youtu.be/Y55nC_gJbH4)
+
+  
 ## Built-in hardware and boards
 
 - **Amstrad CPC 664**
@@ -156,17 +167,6 @@ Please let me know if you want to contribute with something, so it can be visual
   - SDS7000A
   - SHS800X
   - SHS1000X
-
-
-## YouTube Quick-Help videos available
-
-You can view the below _Quick Help_ videos for introduction to specific topics in _CRT_:
-
-- [Short introduction](https://youtu.be/fwR018x39qg)
-- [How to do manual traces](https://youtu.be/JUNXeCHsrME)
-- [How to sync oscilloscope](https://youtu.be/CbTh1FFp3tU)
-- [How to use component label editor](https://youtu.be/u-UkD-m4Z6o)
-- [How to use interactive traces](https://youtu.be/Y55nC_gJbH4)
 
 
 ## Help wanted
