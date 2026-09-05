@@ -16,10 +16,10 @@ It is (for now) primarily dedicated to Commodore, and have several built-in syst
 
 - [Installation and usage](#installation-and-usage)
 - [Technical and other documentation](#technical-and-other-documentation)
+- [Requirements](#requirements)
 - [Built-in hardware and boards](#built-in-hardware-and-boards)
 - [Data contributions being worked on currently](#data-contributions-being-worked-on-currently)
 - [Supported oscilloscopes](#supported-oscilloscopes)
-- [Requirements](#requirements)
 - [YouTube Quick-Help videos available](#youtube-quick-help-videos-available)
 - [Help wanted](#help-wanted)
 - [Contact developer](#contact-developer)
@@ -41,6 +41,17 @@ When a new version is released it will be shown to you in the application, and y
 ## Technical and other documentation
 
 Please go to [Wiki](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki) to view more technical documentation or other information related to _CRT_.
+
+
+## Requirements
+
+- Operating systems supported:
+  - **Windows 10** or newer (64-bit)
+  - **macOS** on both **Apple Silicon** (arm64) and **Intel** (x64)
+  - **Linux** (64-bit)
+- Disk space needed: ~**2GB**
+
+Note that the newest .NET LTS (Long-Term Support) is embedded in application, which means you do not need to have this installed. It also does mean that even if you have .NET installed on your computer, then it will still use the one embedded in application. Do note that it is the newest LTS at build time - it will not get updated automatically and will stay as-is.
 
 
 ## Built-in hardware and boards
@@ -141,17 +152,6 @@ Please go to [Wiki](https://github.com/HovKlan-DH/Classic-Repair-Toolbox/wiki) t
   - SDS7000A
   - SHS800X
   - SHS1000X
-
-
-## Requirements
-
-- Operating systems supported:
-  - **Windows 10** or newer (64-bit)
-  - **macOS** on both **Apple Silicon** (arm64) and **Intel** (x64)
-  - **Linux** (64-bit)
-- Disk space needed: ~**2GB**
-
-Note that the newest .NET LTS (Long-Term Support) is embedded in application, which means you do not need to have this installed. It also does mean that even if you have .NET installed on your computer, then it will still use the one embedded in application. Do note that it is the newest LTS at build time - it will not get updated automatically and will stay as-is.
 
 
 ## YouTube Quick-Help videos available
